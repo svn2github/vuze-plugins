@@ -28,6 +28,7 @@ package org.gudy.azureus2.ui.webplugin.remoteui.applet.view;
 
 import java.util.*;
 import java.awt.*;
+import java.awt.event.*;
 
 import javax.swing.*;
 import javax.swing.table.*;
@@ -325,6 +326,37 @@ VWDownloadView
 				}
 			});
 		
+	
+		table.addMouseListener(
+			new MouseAdapter()
+			{
+				public void 
+				mousePressed(
+					MouseEvent e )
+				{
+					if ( 	e.isPopupTrigger() ||
+							SwingUtilities.isRightMouseButton( e )){
+					
+						int row = table.rowAtPoint(e.getPoint());
+					
+						if (row != -1){
+													
+							table.getSelectionModel().setSelectionInterval(row, row);
+							
+							for (int i=0;i<listeners.size();i++){
+								
+								JPopupMenu menu = ((VWDownloadViewListener)listeners.get(i)).popupRequested(VWDownloadView.this, row);
+								
+								if ( menu != null ){
+									
+									menu.show( table, e.getX(), e.getY());
+								}
+							}
+						}
+					}
+				}
+			});
+			
 		sorter.addMouseListenerToHeaderInTable(table);
 
 		sorter.sortByColumn( 0, true );
@@ -355,7 +387,7 @@ VWDownloadView
 	{
 		for (int i=0;i<listeners.size();i++){
 			
-			((VWDownloadViewListener)listeners.get(i)).selectionChanged( getSelectedRows());
+			((VWDownloadViewListener)listeners.get(i)).selectionChanged( this, getSelectedRows());
 		}
 	}
 	

@@ -25,10 +25,20 @@ package org.gudy.azureus2.ui.webplugin.remoteui.applet.view;
  * @author parg
  *
  */
+
+import javax.swing.*;
+
 public interface 
 VWDownloadViewListener 
 {
 	public void
 	selectionChanged(
-		int[]	selected_rows );
+		VWDownloadView		view, 
+		int[]				selected_rows );
+	
+	public JPopupMenu
+	popupRequested(
+		VWDownloadView		view,
+		int					selected_row );
+		
 }

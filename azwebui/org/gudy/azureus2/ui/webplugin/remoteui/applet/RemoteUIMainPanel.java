@@ -232,7 +232,8 @@ RemoteUIMainPanel
 					{
 						public void
 						selectionChanged(
-							int[]		rows )
+							VWDownloadView	view,
+							int[]			rows )
 						{
 							if ( current_download_view == downloading_view && !view_mode ){
 								
@@ -252,6 +253,33 @@ RemoteUIMainPanel
 								}
 							}
 						}
+						
+						public JPopupMenu
+						popupRequested(
+							VWDownloadView		view,
+							final int			selected_row )
+						{
+							JPopupMenu	res = new JPopupMenu();
+	
+							JMenuItem	update = new JMenuItem("Update Tracker");
+							
+							update.addActionListener(
+								new ActionListener()
+								{
+									public void
+									actionPerformed(
+										ActionEvent	ev )
+									{
+										Download	dl = downloading_model.getDownload(selected_row);
+										
+										dl.requestTrackerAnnounce();
+									}
+								});
+							
+							res.add( update );
+						
+							return( res );
+						}										
 					});
 			
 			seeding_view 	= new VWDownloadView(seeding_model);
@@ -261,7 +289,8 @@ RemoteUIMainPanel
 					{
 						public void
 						selectionChanged(
-							int[]		rows )
+							VWDownloadView	view,
+							int[]			rows )
 						{
 							if ( current_download_view == seeding_view && !view_mode ){
 								
@@ -280,6 +309,14 @@ RemoteUIMainPanel
 									move_down.setEnabled(dl.getPosition() < seeding_model.getDownloads().length );
 								}
 							}
+						}
+						
+						public JPopupMenu
+						popupRequested(
+							VWDownloadView		view,
+							int					selected_row )
+						{
+							return( null );
 						}
 					});
 			
