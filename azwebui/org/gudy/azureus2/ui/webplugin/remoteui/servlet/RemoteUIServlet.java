@@ -249,6 +249,7 @@ RemoteUIServlet
 		"plugins/download/DownloadAnnounceResult.class",
 		"plugins/download/DownloadRemovalVetoException.class",
 		"plugins/download/DownloadListener.class",
+		"plugins/download/DownloadPropertyListener.class",
 		"plugins/download/DownloadTrackerListener.class",
 		"plugins/download/DownloadWillBeRemovedListener.class",
 		"plugins/download/DownloadPeerListener.class",
