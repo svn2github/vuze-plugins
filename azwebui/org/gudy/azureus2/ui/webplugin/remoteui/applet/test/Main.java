@@ -141,7 +141,7 @@ Main
 						getResource(
 							String		name )
 						{
-							return( getClass().getClassLoader().getResourceAsStream( name ));
+							return( getClass().getClassLoader().getResourceAsStream( "org/gudy/azureus2/ui/icons/" + name ));
 						}
 						
 						public void

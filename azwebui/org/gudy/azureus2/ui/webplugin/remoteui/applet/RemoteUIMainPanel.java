@@ -108,7 +108,7 @@ RemoteUIMainPanel
 				getButton(	"Refresh",
 							getImageIcon( 
 									UISwingImageRepository.getImage(
-									adapter.getResource("org/gudy/azureus2/ui/icons/recheck.gif"))));
+									adapter.getResource("recheck.gif"))));
 
 			refresh.setToolTipText("Refresh");
 			
@@ -117,7 +117,7 @@ RemoteUIMainPanel
 			JButton	start = 
 				getButton(	"Start",
 							getImageIcon(UISwingImageRepository.getImage(
-									adapter.getResource("org/gudy/azureus2/ui/icons/start.gif"))));
+									adapter.getResource("start.gif"))));
 			
 			start.setToolTipText("Start");
 
@@ -127,7 +127,7 @@ RemoteUIMainPanel
 			JButton	force_start = 
 				getButton(	"FStart",
 							getImageIcon(UISwingImageRepository.getImage(
-									adapter.getResource("org/gudy/azureus2/ui/icons/forcestart.gif"))));
+									adapter.getResource("forcestart.gif"))));
 			
 			force_start.setToolTipText("Toggle Force Start");
 
@@ -138,7 +138,7 @@ RemoteUIMainPanel
 			JButton	stop = 
 				getButton( 	"Stop",
 							getImageIcon(UISwingImageRepository.getImage(
-									adapter.getResource("org/gudy/azureus2/ui/icons/stop.gif"))));
+									adapter.getResource("stop.gif"))));
 
 			stop.setToolTipText("Stop");
 			
@@ -148,7 +148,7 @@ RemoteUIMainPanel
 			JButton	remove = 
 				getButton( 	"Remove",
 							getImageIcon(UISwingImageRepository.getImage(
-									adapter.getResource("org/gudy/azureus2/ui/icons/delete.gif"))));
+									adapter.getResource("delete.gif"))));
 			
 			remove.setToolTipText("Remove");
 
@@ -162,7 +162,7 @@ RemoteUIMainPanel
 			final JButton	host = 
 				getButton( 	"Host",
 							getImageIcon(UISwingImageRepository.getImage(
-										adapter.getResource("org/gudy/azureus2/ui/icons/host.gif"))));
+										adapter.getResource("host.gif"))));
 	
 			host.setToolTipText("Host");
 	
@@ -177,7 +177,7 @@ RemoteUIMainPanel
 			final JButton	move_up = 
 				getButton( 	"Up",
 							getImageIcon(UISwingImageRepository.getImage(
-										adapter.getResource("org/gudy/azureus2/ui/icons/up.gif"))));
+										adapter.getResource("up.gif"))));
 
 			move_up.setToolTipText("Move Up");
 
@@ -189,7 +189,7 @@ RemoteUIMainPanel
 			final JButton	move_down = 
 				getButton( 	"Down",
 							getImageIcon(UISwingImageRepository.getImage(
-										adapter.getResource("org/gudy/azureus2/ui/icons/down.gif"))));
+										adapter.getResource("down.gif"))));
 
 			move_down.setToolTipText("Move Down");
 
@@ -207,7 +207,7 @@ RemoteUIMainPanel
 			JButton	open = 
 				getButton( 	"Open",
 							getImageIcon(UISwingImageRepository.getImage(
-										adapter.getResource("org/gudy/azureus2/ui/icons/openFolder16x12.gif"))));
+										adapter.getResource("openFolder16x12.gif"))));
 
 			open.setToolTipText("Open Torrent URL");
 
@@ -550,8 +550,8 @@ RemoteUIMainPanel
 					{
 						String	cmd = ev.getActionCommand();
 											
-						try{
-							if ( cmd.equals( "" ) || cmd.equals( "enter")){
+						try{							
+							if ( cmd.equals( "" ) || cmd.equals( "enter") || cmd.equals( "Open" )){
 								
 								String	url_str = tf.getText().trim();
 								

@@ -34,10 +34,14 @@ import java.io.*;
 
 import java.applet.*;
 import java.awt.*;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 
 import javax.swing.*;
 import javax.net.ssl.*;
+import org.gudy.azureus2.ui.swing.*;
 
+import org.gudy.azureus2.core3.security.*;
 import org.gudy.azureus2.core3.config.*;
 import org.gudy.azureus2.core3.util.Semaphore;
 import org.gudy.azureus2.ui.webplugin.util.*;
@@ -63,9 +67,33 @@ RemoteUIApplet
 	protected Semaphore	dialog_sem			= new Semaphore(1);
 	protected ArrayList	outstanding_dialogs	= new ArrayList();
 	
+	protected boolean	application;
+	protected URL		dispatch_url;
+	protected JFrame	application_frame;
+	
 	public
 	RemoteUIApplet()
 	{	
+		this( null );
+	}
+	
+	protected
+	RemoteUIApplet(
+		URL		_dispatch_url )
+	{
+		if ( _dispatch_url == null ){
+			
+			// can't do this here, defer it... dispatch_url = getDocumentBase();
+			
+			application		= false;
+			
+		}else{
+		
+			dispatch_url	= _dispatch_url;
+			
+			application		= true;
+		}
+		
 		try{
 			
 			UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
@@ -88,7 +116,10 @@ RemoteUIApplet
 	public void
 	start()
 	{
-		jar_reader	= new WUJarReader( "remuiicons.jar");
+		if ( !application ){
+			
+			dispatch_url = getDocumentBase();
+		}
 		
 		try{
 			plugin_interface = RPFactory.getPlugin( this );
@@ -108,7 +139,7 @@ RemoteUIApplet
 							getResource(
 								String	name )
 							{
-								return( jar_reader.getResource( name ));
+								return( getIconResource( name ));
 							}
 							
 							public void
@@ -124,8 +155,6 @@ RemoteUIApplet
 							}
 						});
 			
-			setLayout(new BorderLayout());
-			
 			JPanel	outer_panel = new JPanel( new GridBagLayout());
 			
 			outer_panel.setBorder( BorderFactory.createLineBorder(Color.black));
@@ -138,13 +167,81 @@ RemoteUIApplet
 					GridBagConstraints.BOTH, 
 					new Insets(2, 2, 2, 2), 0, 0 ));
 			
-			add(outer_panel, BorderLayout.CENTER );
-			
-			validate();
+			construct( outer_panel );
 			
 		}catch( Throwable e ){
 			
 			showError( e );
+		}
+	}
+	
+	protected void
+	construct(
+		JPanel		outer_panel )
+	{
+		if ( application ){
+			
+			application_frame = new JFrame( "Azureus Swing UI" );
+
+			application_frame.addWindowListener(
+				new WindowAdapter()
+				{
+					public void
+					windowClosing(
+						WindowEvent	ev )
+					{
+						System.exit(0);
+					}
+				});
+			
+			application_frame.setSize(600,300);
+
+			Container cont = application_frame.getContentPane();
+			
+			cont.setLayout(new BorderLayout());
+			
+			cont.add(outer_panel, BorderLayout.CENTER );
+			
+			application_frame.setVisible(true);
+		}else{
+			
+			setLayout(new BorderLayout());
+		
+			add(outer_panel, BorderLayout.CENTER );
+		
+			validate();
+		}
+	}
+	
+	protected Component
+	getDialogOwner()
+	{
+		if ( application ){
+			
+			return( application_frame );
+			
+		}else{
+		
+			return( this );
+		}
+	}
+	
+	protected InputStream
+	getIconResource(
+		String	name )
+	{
+		if ( application ){
+	
+			return( UISwingImageRepository.getImageAsStream( name ));
+			
+		}else{
+
+			if ( jar_reader == null ){
+				
+				jar_reader	= new WUJarReader( "remuiicons.jar");
+			}
+			
+			return( jar_reader.getResource( "org/gudy/azureus2/ui/icons/" + name ));
 		}
 	}
 	
@@ -206,7 +303,7 @@ RemoteUIApplet
 					{
 						try{
 							JOptionPane.showMessageDialog( 
-									RemoteUIApplet.this, 
+									getDialogOwner(), 
 									message,
 									"Error Occurred",  
 									JOptionPane.ERROR_MESSAGE );
@@ -228,6 +325,12 @@ RemoteUIApplet
 	getPlugin()
 	{
 		return( plugin_interface );
+	}
+	
+	protected URL
+	getDispatchURL()
+	{
+		return( dispatch_url );
 	}
 	
 	public RPReply
@@ -283,9 +386,10 @@ RemoteUIApplet
 		throws RPException
 	{
 		try{
-			URL	url = this.getDocumentBase();
+			URL	url = getDispatchURL();
 		
-		    url = new URL( url.getProtocol() + "://" +url.getHost() + ":" + url.getPort() + "/process.cgi" );
+		    url = new URL( 	url.getProtocol() + "://" +
+		    				url.getHost() + ":" + url.getPort() + "/process.cgi" );
 			
 			// System.out.println( "doc base = " + url );
 			
@@ -426,5 +530,79 @@ RemoteUIApplet
 		panel.destroy();
 		
 		super.destroy();
+	}
+	
+	public static void
+	main(
+		String[]		args )
+	{
+		if ( args.length != 1 ){
+			
+			System.err.println( "Usage: RemoteUIApplet <url of webui server>");
+			System.err.println( "    For example RemoteUIAppler http://fred.com:6883/" );
+			System.err.println( "    If you need user/password encode in url. e.g. http://paul:secret@fred.com:6883/" );
+			System.err.println( "    For https you'll need to set up the ketstore yourself" );
+			
+			System.exit(1);
+		}
+		
+		try{
+			final URL	target = new URL( args[0] );
+			
+			String	user_info = target.getUserInfo();
+			
+			if ( user_info != null ){
+				
+				int	pos = user_info.indexOf( ":" );
+				
+				if ( pos == -1 ){
+					
+					System.err.println( "Invalid user info in URL" );
+					
+					System.exit(1);
+				}
+				
+				final String	user 		= user_info.substring(0,pos);
+				final String	password	= user_info.substring(pos+1);
+				
+				SESecurityManager.initialise();
+				
+				SESecurityManager.addPasswordListener(
+						new SEPasswordListener()
+						{
+							public PasswordAuthentication
+							getAuthentication(
+								String		realm,
+								URL			tracker )
+							{
+								if ( target.getHost().equals( tracker.getHost())){
+									
+									return( new PasswordAuthentication( user, password.toCharArray()));
+								}
+								
+								return( null );
+							}
+							
+							public void
+							setAuthenticationOutcome(
+								String		realm,
+								URL			tracker,
+								boolean		success )
+							{
+								
+							}
+						});
+			}
+			
+			RemoteUIApplet	applet = new RemoteUIApplet(target);
+			
+			applet.init();
+			
+			applet.start();
+			
+		}catch( Throwable e ){
+			
+			e.printStackTrace();
+		}
 	}
 }
