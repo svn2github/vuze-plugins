@@ -31,9 +31,9 @@ import org.gudy.azureus2.ui.webplugin.*;
 import java.io.*;
 import java.util.Properties;
 import java.util.zip.*;
-import java.util.jar.*;
 import java.net.URL;
 
+import org.gudy.azureus2.core3.util.jar.AEJarBuilder;
 import org.gudy.azureus2.plugins.tracker.web.*;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.torrent.*;
@@ -42,7 +42,6 @@ import org.gudy.azureus2.plugins.ui.model.*;
 import org.gudy.azureus2.plugins.ui.config.*;
 
 import org.gudy.azureus2.pluginsimpl.remote.*;
-import org.gudy.azureus2.ui.webplugin.util.*;
 
 public class 
 RemoteUIServlet
@@ -156,9 +155,7 @@ RemoteUIServlet
 		"ui/webplugin/remoteui/applet/view/VWEncodingView$5.class",
 		"ui/webplugin/remoteui/applet/view/VWEncodingView$6.class",
 		"ui/webplugin/remoteui/applet/view/VWEncodingView$7.class",
-		
-		"ui/webplugin/util/WUJarReader.class",
-		
+				
 		"core3/config/COConfigurationManager.class",
 		"core3/config/StringList.class",
 		"core3/config/impl/ConfigurationManager.class",
@@ -168,10 +165,9 @@ RemoteUIServlet
 		"core3/util/DisplayFormatters$1.class",
 		"core3/util/DisplayFormatters$2.class",
 		"core3/util/DisplayFormatters$3.class",
-		
 		"core3/util/Debug.class",
 		"core3/util/Debug$1.class",
-		"core3/util/Semaphore.class",
+		"core3/util/AESemaphore.class",
 		"core3/util/AEThread.class",
 		"core3/util/AERunnable.class",
 		"core3/util/AEMonSem.class",
@@ -179,10 +175,11 @@ RemoteUIServlet
 		"core3/util/AEMonSem$1.class",
 		"core3/util/AEMonSem$2.class",
 		"core3/util/AEMonSem$3.class",
-		"core3/util/AESemaphore.class",
 		"core3/util/AEMonitor.class",
 		"core3/util/AEDiagnostics.class",
 		"core3/util/AEDiagnosticsLogger.class",
+		//"core3/util/FileUtil.class",
+		//"core3/util/FileIsADirectoryException.class",
 		"core3/util/Timer.class",
 		"core3/util/TimerEvent.class",
 		"core3/util/TimerEventPeriodic.class",
@@ -195,6 +192,8 @@ RemoteUIServlet
 		"core3/util/ThreadPoolTask.class",
 		"core3/util/SystemTime.class",
 		"core3/util/SystemTime$1.class",
+		"core3/util/jar/AEJarReader.class",		
+		
 		"core3/torrentdownloader/TorrentDownloaderException.class",
 		"core3/torrent/TOTorrentException.class",
 		"core3/security/SEPasswordListener.class",
@@ -344,14 +343,14 @@ RemoteUIServlet
 		
 		if ( url.equals( "/remui.jar" ) || url.equals( "/remuiicons.jar" )){
 			
-			JarOutputStream	jos = null;
+			OutputStream	os = null;
 			
 			try{
-				jos = new JarOutputStream( response.getOutputStream());
+				os = response.getOutputStream();
 			
 				//long latest_time = 
-					WUJarBuilder.buildFromResources( 
-						jos, 
+					AEJarBuilder.buildFromResources( 
+						os, 
 						plugin_interface.getPluginClassLoader(), 
 						"org/gudy/azureus2", 
 						url.equals( "/remui.jar")?resource_names:resource_icon_names,
@@ -383,9 +382,9 @@ RemoteUIServlet
 				
 			}finally{
 				
-				if ( jos != null ){
+				if ( os != null ){
 
-					jos.close();
+					os.close();
 				}
 			}
 		}else if ( url.equals( "/process.cgi")){

@@ -31,6 +31,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 
+import org.gudy.azureus2.core3.security.SESecurityManager;
 import org.gudy.azureus2.plugins.*;
 // import org.gudy.azureus2.plugins.utils.*;
 
@@ -121,7 +122,7 @@ Main
 				windowClosing(
 					WindowEvent	ev )
 				{
-					System.exit(0);
+					SESecurityManager.exitVM(0);
 				}
 			});
 		

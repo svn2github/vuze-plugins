@@ -42,8 +42,8 @@ import javax.net.ssl.*;
 import org.gudy.azureus2.ui.swing.*;
 
 import org.gudy.azureus2.core3.config.*;
-import org.gudy.azureus2.core3.util.Semaphore;
-import org.gudy.azureus2.ui.webplugin.util.*;
+import org.gudy.azureus2.core3.util.AESemaphore;
+import org.gudy.azureus2.core3.util.jar.AEJarReader;
 
 import org.gudy.azureus2.pluginsimpl.remote.*;
 
@@ -61,9 +61,9 @@ RemoteUIApplet
 	
 	protected RemoteUIMainPanel		panel;
 	
-	protected WUJarReader			jar_reader;
+	protected AEJarReader			jar_reader;
 	
-	protected Semaphore	dialog_sem			= new Semaphore(1);
+	protected AESemaphore	dialog_sem		= new AESemaphore("RemoteUIApplet",1);
 	protected ArrayList	outstanding_dialogs	= new ArrayList();
 	
 	protected boolean	application;
@@ -237,7 +237,7 @@ RemoteUIApplet
 
 			if ( jar_reader == null ){
 				
-				jar_reader	= new WUJarReader( "remuiicons.jar");
+				jar_reader	= new AEJarReader( "remuiicons.jar");
 			}
 			
 			return( jar_reader.getResource( "org/gudy/azureus2/ui/icons/" + name ));
