@@ -41,7 +41,6 @@ import javax.swing.*;
 import javax.net.ssl.*;
 import org.gudy.azureus2.ui.swing.*;
 
-import org.gudy.azureus2.core3.security.*;
 import org.gudy.azureus2.core3.config.*;
 import org.gudy.azureus2.core3.util.Semaphore;
 import org.gudy.azureus2.ui.webplugin.util.*;
@@ -566,34 +565,17 @@ RemoteUIApplet
 				final String	user 		= user_info.substring(0,pos);
 				final String	password	= user_info.substring(pos+1);
 				
-				SESecurityManager.initialise();
-				
-				SESecurityManager.addPasswordListener(
-						new SEPasswordListener()
+				Authenticator.setDefault(
+						new Authenticator()
 						{
-							public PasswordAuthentication
-							getAuthentication(
-								String		realm,
-								URL			tracker )
-							{
-								if ( target.getHost().equals( tracker.getHost())){
-									
-									return( new PasswordAuthentication( user, password.toCharArray()));
-								}
-								
-								return( null );
+							protected PasswordAuthentication
+							getPasswordAuthentication()
+							{			
+								return( new PasswordAuthentication( user, password.toCharArray()));
 							}
-							
-							public void
-							setAuthenticationOutcome(
-								String		realm,
-								URL			tracker,
-								boolean		success )
-							{
-								
-							}
-						});
+						});	
 			}
+	
 			
 			RemoteUIApplet	applet = new RemoteUIApplet(target);
 			

@@ -167,12 +167,32 @@ RemoteUIServlet
 		"core3/util/DisplayFormatters$1.class",
 		"core3/util/DisplayFormatters$2.class",
 		"core3/util/DisplayFormatters$3.class",
+		
 		"core3/util/Semaphore.class",
+		"core3/util/AEThread.class",
+		"core3/util/AEMonSem.class",
+		"core3/util/AEMonSem$monSemData.class",
+		"core3/util/AEMonSem$1.class",
+		"core3/util/AEMonSem$2.class",
+		"core3/util/AEMonSem$3.class",
+		"core3/util/AESemaphore.class",
+		"core3/util/AEMonitor.class",
+		"core3/util/AEDiagnostics.class",
+		"core3/util/Timer.class",
+		"core3/util/TimerEvent.class",
+		"core3/util/TimerEventPeriodic.class",
+		"core3/util/TimerEventPerformer.class",
+		"core3/util/ThreadPool.class",
+		"core3/util/ThreadPool$1.class",
+		"core3/util/ThreadPool$2.class",
+		"core3/util/ThreadPool$threadPoolWorker.class",
+		"core3/util/ThreadPoolTask.class",
 		"core3/util/SystemTime.class",
 		"core3/util/SystemTime$1.class",
 		"core3/torrentdownloader/TorrentDownloaderException.class",
 		"core3/torrent/TOTorrentException.class",
 		"core3/security/SEPasswordListener.class",
+		
 		
 		"pluginsimpl/remote/RPRequestDispatcher.class",
 		"pluginsimpl/remote/RPException.class",
@@ -572,7 +592,11 @@ RemoteUIServlet
 					is.close();
 				}
 			}
-			
+		}else if ( url.endsWith(".class" )){ 
+	
+			response.setReplyStatus( 404 );
+		
+			return( true );		
 		}
 		
 		return( false );
