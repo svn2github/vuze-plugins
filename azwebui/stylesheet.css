@@ -11,15 +11,16 @@ h1 {
  margin: 0 auto;
  text-align: center;
  font-size: 1.2em;
- background: #526ed6 url('./lineV.gif') repeat-x;
+ background: #5978A1;
 }
 h2 {
- color: #000;
+ color: #5978A1;
  margin: 1em;
  text-align: center;
  font-size: 1.1em;
 }
-h2 a { color: #00f; }
+h2 a { color: #A42C2C; text-decoration: none}
+h2 a:hover { color: #A42C2C; text-decoration: underline}
 div, form {
  margin: 1ex auto;
  text-align: center;
@@ -28,7 +29,7 @@ p {
  color: #000;
  margin: 0.5ex;
  padding: 0;
- font-size: 0.8em;17:13 06/04/2004
+ font-size: 0.8em;
 }
 span {
  float: left;
