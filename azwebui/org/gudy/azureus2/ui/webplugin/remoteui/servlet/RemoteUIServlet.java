@@ -169,6 +169,7 @@ RemoteUIServlet
 		"pluginsimpl/remote/RPFactory.class",
 		"pluginsimpl/remote/RPRequest.class",
 		"pluginsimpl/remote/RPRequestHandler.class",		
+		"pluginsimpl/remote/RPRequestAccessController.class",		
 		"pluginsimpl/remote/RPObject.class",
 		"pluginsimpl/remote/RPReply.class",
 		"pluginsimpl/remote/RPPluginInterface.class",
@@ -247,8 +248,9 @@ RemoteUIServlet
 
 	};
 	
-	protected RPRequestHandler		request_handler;
-	
+	protected RPRequestHandler				request_handler;
+	protected WebPluginAccessController		access_controller;
+
 	protected BooleanParameter		sign_enable;
 	protected StringParameter		sign_alias;
 	protected DirectoryParameter	data_dir;
@@ -286,6 +288,9 @@ RemoteUIServlet
 		data_dir 	= config.addDirectoryParameter2("Data Directory", "webui.datadir", "" );
 		
 		sign_enable.addEnabledOnSelection( sign_alias );
+		
+		access_controller = new WebPluginAccessController( _plugin_interface );
+
 	}
 	
 	public boolean
@@ -358,7 +363,7 @@ RemoteUIServlet
 				
 				// System.out.println( "RemoteUIServlet:got request: " + rp_request.getString());
 				
-				RPReply	reply = request_handler.processRequest( rp_request );
+				RPReply	reply = request_handler.processRequest( rp_request, access_controller );
 				
 				if ( reply == null ){
 					
@@ -427,6 +432,8 @@ RemoteUIServlet
 				
 				try{
 
+					access_controller.checkUploadAllowed();
+					
 					int	sep1 = content.indexOf( "\r\n" );
 					
 					String	tag = content.substring(0,sep1);

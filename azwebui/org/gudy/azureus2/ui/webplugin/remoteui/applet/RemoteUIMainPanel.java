@@ -53,9 +53,9 @@ RemoteUIMainPanel
 	extends JPanel
 {
 	protected PluginInterface			plugin_interface;
-	protected Properties				properties;
 	protected DownloadManager			download_manager;
 	protected RemoteUIMainPanelAdaptor	adapter;
+	protected PluginConfig				plugin_config;
 		
 	protected MDDownloadModel	download_full_model;
 	protected MDDownloadModel	downloading_model;
@@ -92,11 +92,12 @@ RemoteUIMainPanel
 	{
 		try{
 			plugin_interface		= _plugin_interface;
-			properties				= plugin_interface.getPluginProperties();
 			download_manager		= _dm;
 			adapter					= _adapter;
 
-			String	mode_str = (String)properties.get("mode");
+			plugin_config = plugin_interface.getPluginconfig();
+
+			String	mode_str = plugin_config.getPluginStringParameter( "Mode", "" );
 						
 			final boolean view_mode = mode_str != null && mode_str.trim().equalsIgnoreCase("view");
 			
@@ -165,8 +166,7 @@ RemoteUIMainPanel
 										adapter.getResource("host.gif"))));
 	
 			host.setToolTipText("Host");
-	
-			host.setEnabled( true );
+			host.setEnabled( !view_mode );
 			
 			tb.add( host );
 				
@@ -686,7 +686,7 @@ RemoteUIMainPanel
 			
 			logMessage( "Downloaded torrent: " + torrent.getName());
 			
-			String data_dir = plugin_interface.getPluginconfig().getPluginStringParameter( "Data Directory", "" );
+			String data_dir = plugin_config.getPluginStringParameter( "Data Directory", "" );
 			
 			if ( data_dir.length() == 0 ){
 				
