@@ -238,6 +238,7 @@ RemoteUIServlet
 		"plugins/ui/tables/peers/PluginPeerItemFactory.class",
 		"plugins/ui/tables/mytorrents/PluginMyTorrentsItemFactory.class",
 		"plugins/ui/UIManager.class",
+		"plugins/ddb/DistributedDatabase.class",
 		"plugins/download/DownloadManager.class",
 		"plugins/download/DownloadException.class",
 		"plugins/download/Download.class",
