@@ -174,6 +174,19 @@ VWDownloadView
 								int 		row,
 								int 		column )
 						{
+							if ( o_value instanceof String){
+								
+									// truncate excessive strings to avoid the table being
+									// taken over by the column (e.g. status can be very long
+									// if the torrent has an error)
+								
+								String	s_value = (String)o_value;
+								
+								if ( s_value.length() > 30 ){
+									
+									o_value = s_value.substring(0,30)+"...";
+								}
+							}
 							JLabel	res = (JLabel)super.getTableCellRendererComponent( table, o_value, isSelected, hasFocus, row,column );
 							
 							res.setHorizontalAlignment( JLabel.RIGHT );
