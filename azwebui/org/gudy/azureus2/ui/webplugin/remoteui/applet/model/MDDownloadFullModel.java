@@ -30,6 +30,7 @@ package org.gudy.azureus2.ui.webplugin.remoteui.applet.model;
 import javax.swing.table.*;
 
 import org.gudy.azureus2.plugins.download.*;
+import org.gudy.azureus2.plugins.torrent.*;
 import org.gudy.azureus2.pluginsimpl.remote.RPException;
 
 public class 
@@ -113,17 +114,19 @@ MDDownloadFullModel
 		DownloadAnnounceResult	announce	= download.getLastAnnounceResult();
 		DownloadScrapeResult	scrape		= download.getLastScrapeResult();
 		
+		Torrent	torrent = download.getTorrent();
+		
 		if ( col == 0 ){
 			
 			return( new Long(download.getPosition()));
 			
 		}else if ( col == 1 ){
 				
-			return( download.getTorrent().getName());
+			return( torrent==null?"**** Broken torrent ****":torrent.getName());
 				
 		}else if ( col == 2 ){
 			
-			return( new Long( download.getTorrent().getSize()));
+			return( new Long( torrent==null?-1:torrent.getSize()));
 			
 		}else if ( col == 3 ){
 			
