@@ -40,6 +40,7 @@ import org.gudy.azureus2.ui.swing.*;
 
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.torrent.*;
+import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloaderException;
 import org.gudy.azureus2.plugins.download.*;
 
 
@@ -50,6 +51,7 @@ public class
 RemoteUIMainPanel
 	extends JPanel
 {
+	protected PluginInterface			plugin_interface;
 	protected Properties				properties;
 	protected DownloadManager			download_manager;
 	protected RemoteUIMainPanelAdaptor	adapter;
@@ -68,6 +70,7 @@ RemoteUIMainPanel
 	protected MDStatusAreaModel			status_area_model;
 		
 	protected JTextArea		log_area;
+	protected String		current_log_text	= "";
 	
 	protected int			next_refresh;
 	protected int			refresh_period;
@@ -80,12 +83,13 @@ RemoteUIMainPanel
 	
 	public
 	RemoteUIMainPanel(
-		final PluginInterface		_pi,
+		final PluginInterface		_plugin_interface,
 		DownloadManager				_dm,
 		RemoteUIMainPanelAdaptor	_adapter )
 	{
 		try{
-			properties				= _pi.getPluginProperties();
+			plugin_interface		= _plugin_interface;
+			properties				= plugin_interface.getPluginProperties();
 			download_manager		= _dm;
 			adapter					= _adapter;
 
@@ -264,7 +268,7 @@ RemoteUIMainPanel
 			current_download_model	=	downloading_model;
 			current_download_view	=	downloading_view;
 			
-			MDConfigModel			config_model	= new MDConfigModel( _pi );
+			MDConfigModel			config_model	= new MDConfigModel( plugin_interface );
 			
 			VWConfigView			config_view 	= new VWConfigView( this, config_model );
 			
@@ -335,7 +339,7 @@ RemoteUIMainPanel
 			bottom_panel.add( new JScrollPane(log_area), BorderLayout.CENTER );
 			
 			
-			status_area_model =  new MDStatusAreaModel( _pi, download_full_model );
+			status_area_model =  new MDStatusAreaModel( plugin_interface, download_full_model );
 			
 			status_area_view =  new VWStatusAreaView(status_area_model);
 			
@@ -494,9 +498,10 @@ RemoteUIMainPanel
 						ActionEvent	ev )
 					{
 						String	cmd = ev.getActionCommand();
-					
+											
 						try{
-							if ( cmd.equals( "enter")){
+							if ( cmd.equals( "" ) || cmd.equals( "enter")){
+								
 								String	url_str = tf.getText().trim();
 								
 								if ( url_str.length() == 0 ){
@@ -518,15 +523,8 @@ RemoteUIMainPanel
 									throw( new Exception( "Unsupported URL protocol" ));
 								}
 								
-								TorrentDownloader dl = _pi.getTorrentManager().getURLDownloader( url );
-								
-								Torrent torrent = dl.download();
-								
-								logMessage( "Downloaded torrent: " + torrent.getName());
-								
-								download_manager.addDownload( torrent );
-							
-								refresh();
+								openTorrent( url, null, null );
+		
 								
 							}else if ( cmd.equals("copy")){
 																
@@ -622,6 +620,40 @@ RemoteUIMainPanel
 		}
 	}
 	
+	public void
+	openTorrent(
+		URL		url,
+		String	user,
+		String	password)
+	{
+		try{
+			TorrentDownloader dl = plugin_interface.getTorrentManager().getURLDownloader( url, user, password );
+			
+			Torrent torrent = dl.download();
+			
+			logMessage( "Downloaded torrent: " + torrent.getName());
+			
+			download_manager.addDownload( torrent );
+		
+			refresh();
+			
+		}catch( Throwable e ){
+			
+			if ( 	e instanceof TorrentException &&
+					e.getCause() instanceof ResourceDownloaderException &&
+					e.getCause().getMessage() != null &&
+					e.getCause().getMessage().indexOf( "401" ) != -1 ){
+			
+				// auth error
+				
+				new VWAuthorisationView( this, url );
+				
+			}else{
+			
+				reportError( e );
+			}
+		}
+	}
 		// on Opera 7.5 images don't load properly so lash up 
 	
 	protected JButton
@@ -716,13 +748,13 @@ RemoteUIMainPanel
 		}
 	}
 	
-	public void
+	public synchronized void
 	logMessage(
 		String	str )
 	{
 		String ts = new SimpleDateFormat("hh:mm:ss - ").format( new Date());
 		
-		String	text = log_area.getText()+ "\r\n" + ts + str;
+		String	text = current_log_text + (current_log_text.length()==0?"":"\r\n") + ts + str;
 		
 		while( text.length() > 65536 ){
 			
@@ -736,10 +768,10 @@ RemoteUIMainPanel
 			text = text.substring( p+2 );
 		}
 		
+		current_log_text	= text;
+		
 		if ( init_complete ){
-			
-			final String f_text	= text;
-			
+						
 			SwingUtilities.invokeLater(
 				new Runnable()
 				{
@@ -747,12 +779,12 @@ RemoteUIMainPanel
 					run()
 					{
 	
-						log_area.setText( f_text );
+						log_area.setText( current_log_text );
 					}
 				});
 		}else{
 			
-			log_area.setText( text );
+			log_area.setText( current_log_text );
 		}
 	}
 	

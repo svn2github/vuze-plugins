@@ -36,6 +36,7 @@ import java.net.URL;
 import org.gudy.azureus2.plugins.tracker.web.*;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.torrent.*;
+import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloaderException;
 
 import org.gudy.azureus2.pluginsimpl.remote.*;
 import org.gudy.azureus2.ui.webplugin.util.*;
@@ -123,7 +124,11 @@ RemoteUIServlet
 		"ui/webplugin/remoteui/applet/view/VWConfigView$5.class",
 		"ui/webplugin/remoteui/applet/view/VWConfigView$6.class",
 		"ui/webplugin/remoteui/applet/view/VWConfigView$intValueAdapter.class",
-
+		"ui/webplugin/remoteui/applet/view/VWAuthorisationView.class",
+		"ui/webplugin/remoteui/applet/view/VWAuthorisationView$1.class",
+		"ui/webplugin/remoteui/applet/view/VWAuthorisationView$2.class",
+		"ui/webplugin/remoteui/applet/view/VWAuthorisationView$3.class",
+		
 		"ui/webplugin/util/WUJarReader.class",
 		
 		"core3/config/COConfigurationManager.class",
@@ -375,10 +380,26 @@ RemoteUIServlet
 								if ( file_name.toLowerCase().startsWith("http")){
 									
 									file_name = file_name.replaceAll( " ", "%20");
-									
-									TorrentDownloader dl = plugin_interface.getTorrentManager().getURLDownloader( new URL( file_name ));
-									
-									torrent = dl.download();									
+
+									URL	torrent_url = new URL( file_name );
+										
+									try{
+										TorrentDownloader dl = 
+											plugin_interface.getTorrentManager().getURLDownloader( torrent_url, null, null );
+										
+										torrent = dl.download();
+										
+									}catch( TorrentException e ){
+										
+										if ( 	e.getCause() instanceof ResourceDownloaderException &&
+												e.getCause().getMessage() != null &&
+												e.getCause().getMessage().indexOf( "401" ) != -1 ){
+											
+											throw( new Exception( 	"Authorisation failed, encode the user name and password in the URL using " +
+																	"http://&lt;user&gt;:&lt;password&gt;@" + torrent_url.getHost() + ":" + torrent_url.getPort()+
+																	torrent_url.getPath()));
+										}
+									}
 								}
 							}
 						}
