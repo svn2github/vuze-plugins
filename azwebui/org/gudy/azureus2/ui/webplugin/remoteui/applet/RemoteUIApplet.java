@@ -389,7 +389,8 @@ RemoteUIApplet
 			URL	url = getDispatchURL();
 		
 		    url = new URL( 	url.getProtocol() + "://" +
-		    				url.getHost() + ":" + url.getPort() + "/process.cgi" );
+		    				url.getHost() + 
+							(url.getPort()==-1?"":(":" + url.getPort())) + "/process.cgi" );
 			
 			// System.out.println( "doc base = " + url );
 			
