@@ -29,6 +29,7 @@ package org.gudy.azureus2.ui.webplugin.remoteui.servlet;
 import org.gudy.azureus2.ui.webplugin.*;
 
 import java.io.*;
+import java.util.Properties;
 import java.util.zip.*;
 import java.util.jar.*;
 import java.net.URL;
@@ -37,6 +38,8 @@ import org.gudy.azureus2.plugins.tracker.web.*;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.torrent.*;
 import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloaderException;
+import org.gudy.azureus2.plugins.ui.model.*;
+import org.gudy.azureus2.plugins.ui.config.*;
 
 import org.gudy.azureus2.pluginsimpl.remote.*;
 import org.gudy.azureus2.ui.webplugin.util.*;
@@ -45,6 +48,15 @@ public class
 RemoteUIServlet
 	extends WebPlugin
 {
+	public static final int	DEFAULT_PORT	= 6883;
+	
+	protected static Properties	defaults = new Properties();
+	
+	static{
+		
+		defaults.put( WebPlugin.CONFIG_PORT, new Integer( DEFAULT_PORT ));
+	}
+	
 	static String[] resource_icon_names = {
 			//"ui/icons/start2.png",
 			"ui/icons/openFolder16x12.gif",
@@ -68,6 +80,9 @@ RemoteUIServlet
 		"ui/swt/IconBarEnabler.class",
 		
 		"ui/webplugin/remoteui/applet/RemoteUIApplet.class",
+		"ui/webplugin/remoteui/applet/RemoteUIApplet$1.class",
+		"ui/webplugin/remoteui/applet/RemoteUIApplet$2.class",
+		"ui/webplugin/remoteui/applet/RemoteUIApplet$3.class",
 		"ui/webplugin/remoteui/applet/RemoteUIMainPanelAdaptor.class",
 		"ui/webplugin/remoteui/applet/RemoteUIMainPanel.class",
 		"ui/webplugin/remoteui/applet/model/MDDownloadModel.class",
@@ -87,7 +102,6 @@ RemoteUIServlet
 		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$3.class",
 		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$4.class",
 		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$5.class",
-		"ui/webplugin/remoteui/applet/RemoteUIApplet$1.class",
 		"ui/webplugin/remoteui/applet/model/MDConfigModelListener.class",
 		"ui/webplugin/remoteui/applet/model/MDConfigModel.class",
 		"ui/webplugin/remoteui/applet/view/VWConfigView.class",
@@ -97,8 +111,6 @@ RemoteUIServlet
 		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$9.class",
 		"ui/webplugin/remoteui/applet/view/VWConfigView$1.class",
 		"ui/webplugin/remoteui/applet/view/VWGridBagConstraints.class",
-		"ui/webplugin/remoteui/applet/RemoteUIApplet$3.class",
-		"ui/webplugin/remoteui/applet/RemoteUIApplet$2.class",
 		"ui/webplugin/remoteui/applet/view/VWStatusAreaView.class",
 		"ui/webplugin/remoteui/applet/view/VWLabel.class",
 		"ui/webplugin/remoteui/applet/model/MDStatusAreaModel.class",
@@ -216,10 +228,14 @@ RemoteUIServlet
 	
 	protected RPRequestHandler		request_handler;
 	
+	protected BooleanParameter		sign_enable;
+	
+	protected StringParameter		sign_alias;
+	
 	public
 	RemoteUIServlet()
 	{
-		super();
+		super( defaults );
 	}
 	
 	public void 
@@ -230,7 +246,21 @@ RemoteUIServlet
 	{	
 		super.initialize( _plugin_interface );
 		
+		plugin_interface.getUtilities().getLocaleUtilities().integrateLocalisedMessageBundle( 
+				"org.gudy.azureus2.ui.webplugin.remoteui.servlet.Messages" );
+		
 		request_handler = new RPRequestHandler( _plugin_interface );
+		
+		
+		BasicPluginConfigModel	config = getConfigModel();
+		
+		config.addLabelParameter2( "webui.signjars.info" );
+		
+		sign_enable = config.addBooleanParameter2("Sign Jars", "webui.signjars", false );
+		
+		sign_alias 	= config.addStringParameter2("Sign Alias", "webui.signalias", "Azureus" );
+		
+		sign_enable.addEnabledOnSelection( sign_alias );
 	}
 	
 	public boolean
@@ -240,6 +270,8 @@ RemoteUIServlet
 	
 		throws IOException
 	{
+		// System.out.println( "header:" + request.getHeader());
+		
 		String	url = request.getURL();
 		
 		if ( url.equals( "/remui.jar" ) || url.equals( "/remuiicons.jar" )){
@@ -249,13 +281,24 @@ RemoteUIServlet
 			try{
 				jos = new JarOutputStream( response.getOutputStream());
 			
-				WUJarBuilder.buildFromResources( 
+				//long latest_time = 
+					WUJarBuilder.buildFromResources( 
 						jos, 
 						plugin_interface.getPluginClassLoader(), 
 						"org/gudy/azureus2", 
-						url.equals( "/remui.jar")?resource_names:resource_icon_names );
+						url.equals( "/remui.jar")?resource_names:resource_icon_names,
+						sign_enable.getValue()?sign_alias.getValue():null );
+				
 				
 				response.setContentType("application/java-archive");
+				
+				/*
+				if ( latest_time > 0 ){
+					// GRRRRRR JRE 1.4.2_04 doesn't do this right anyway. leave it for now
+					//response.setLastModified( latest_time );
+					//response.setExpires( latest_time + 60*60*1000 );
+				}
+				*/
 				
 				return( true );
 				

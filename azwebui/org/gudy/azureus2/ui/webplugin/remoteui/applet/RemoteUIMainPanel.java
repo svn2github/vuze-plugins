@@ -597,6 +597,8 @@ RemoteUIMainPanel
 				logMessage( "        permission java.awt.AWTPermission \"accessClipboard\";" );
 				logMessage( "    };" );
 				logMessage( "where <webui_address:port> is the Web UI URL. e.g. \"http://wibble.org:6883/*\"" );			
+				logMessage( "Replace \"http\" with \"https\" if running over https (SSL)" );			
+				logMessage( "Alternatively, sign the applet - see the plugin configuration" );			
 			}
 			
 			new Thread("RemoteUIMainPanel::refresh")
