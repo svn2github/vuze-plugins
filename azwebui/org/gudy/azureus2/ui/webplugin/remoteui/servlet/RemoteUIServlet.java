@@ -168,6 +168,7 @@ RemoteUIServlet
 		"core3/util/DisplayFormatters$2.class",
 		"core3/util/DisplayFormatters$3.class",
 		
+		"core3/util/Debug.class",
 		"core3/util/Semaphore.class",
 		"core3/util/AEThread.class",
 		"core3/util/AEMonSem.class",
