@@ -296,7 +296,7 @@ VWDownloadView
 						
 						for (int j=0;j<mod.getRowCount();j++){
 						
-							Object data = model.getValueAt( j, i );
+							Object data = model.getValueAt( j, table.convertColumnIndexToModel(i));
 							
 							Component comp = rend.getTableCellRendererComponent( table, data, false, false, j, i );
 							
