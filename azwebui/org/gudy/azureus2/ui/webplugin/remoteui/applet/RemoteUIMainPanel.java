@@ -31,6 +31,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.io.File;
 
 import javax.swing.*;
 import javax.swing.event.*;
@@ -685,7 +686,16 @@ RemoteUIMainPanel
 			
 			logMessage( "Downloaded torrent: " + torrent.getName());
 			
-			download_manager.addDownload( torrent );
+			String data_dir = plugin_interface.getPluginconfig().getPluginStringParameter( "Data Directory", "" );
+			
+			if ( data_dir.length() == 0 ){
+				
+				download_manager.addDownload( torrent );
+				
+			}else{
+				
+				download_manager.addDownload( torrent, null, new File( data_dir ));
+			}
 		
 			refresh();
 			

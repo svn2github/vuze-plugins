@@ -215,6 +215,8 @@ RemoteUIServlet
 		"plugins/torrent/TorrentFile.class",
 		"plugins/torrent/TorrentException.class",
 		"plugins/torrent/TorrentManager.class",
+		"plugins/torrent/TorrentManagerListener.class",
+		"plugins/torrent/TorrentAttribute.class",
 		"plugins/torrent/TorrentDownloader.class",
 		"plugins/torrent/TorrentAnnounceURLList.class",
 		"plugins/tracker/Tracker.class",
@@ -243,8 +245,8 @@ RemoteUIServlet
 	protected RPRequestHandler		request_handler;
 	
 	protected BooleanParameter		sign_enable;
-	
 	protected StringParameter		sign_alias;
+	protected DirectoryParameter	data_dir;
 	
 	public
 	RemoteUIServlet()
@@ -273,6 +275,10 @@ RemoteUIServlet
 		sign_enable = config.addBooleanParameter2("Sign Jars", "webui.signjars", false );
 		
 		sign_alias 	= config.addStringParameter2("Sign Alias", "webui.signalias", "Azureus" );
+		
+			// this param also accessed in applet
+		
+		data_dir 	= config.addDirectoryParameter2("Data Directory", "webui.datadir", "" );
 		
 		sign_enable.addEnabledOnSelection( sign_alias );
 	}
@@ -480,7 +486,23 @@ RemoteUIServlet
 						torrent = plugin_interface.getTorrentManager().createFromBEncodedData( data );
 					}
 					
-					plugin_interface.getDownloadManager().addDownload( torrent );
+					String	data = data_dir.getValue();
+					
+					if ( data.length() > 0 ){
+						
+						File	data_dir_file = new File(data);
+						
+						if (!data_dir_file.exists()){
+							
+							throw( new Exception( "Data directory '" + data + "' doesn't exist" ));
+						}
+						
+						plugin_interface.getDownloadManager().addDownload( torrent, null, data_dir_file );
+						
+					}else{
+					
+						plugin_interface.getDownloadManager().addDownload( torrent );
+					}
 				
 					pw.println("<HTML><BODY><P><FONT COLOR=#00CC44>Upload OK</FONT></P></BODY></HTML>");
 				
