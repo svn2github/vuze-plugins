@@ -153,6 +153,8 @@ Main
 						error(
 							final Throwable 		e )
 						{
+							e.printStackTrace();
+							
 							SwingUtilities.invokeLater(
 									new Runnable()
 									{

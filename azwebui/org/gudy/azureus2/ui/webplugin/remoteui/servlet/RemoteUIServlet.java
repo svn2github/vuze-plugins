@@ -100,6 +100,7 @@ RemoteUIServlet
 		"ui/webplugin/remoteui/applet/view/VWDownloadView$5.class",
 		"ui/webplugin/remoteui/applet/view/VWDownloadView$6.class",
 		"ui/webplugin/remoteui/applet/view/VWDownloadView$7.class",
+		"ui/webplugin/remoteui/applet/view/VWDownloadView$8.class",
 		"ui/webplugin/remoteui/applet/view/TableSorter$1.class",
 		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$1.class",
 		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$2.class",
@@ -117,6 +118,7 @@ RemoteUIServlet
 		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$14.class",
 		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$15.class",
 		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$16.class",
+		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$17.class",
 		"ui/webplugin/remoteui/applet/view/VWConfigView$1.class",
 		"ui/webplugin/remoteui/applet/model/MDConfigModelListener.class",
 		"ui/webplugin/remoteui/applet/model/MDConfigModel.class",
@@ -146,6 +148,14 @@ RemoteUIServlet
 		"ui/webplugin/remoteui/applet/view/VWAuthorisationView$1.class",
 		"ui/webplugin/remoteui/applet/view/VWAuthorisationView$2.class",
 		"ui/webplugin/remoteui/applet/view/VWAuthorisationView$3.class",
+		"ui/webplugin/remoteui/applet/view/VWEncodingView.class",
+		"ui/webplugin/remoteui/applet/view/VWEncodingView$1.class",
+		"ui/webplugin/remoteui/applet/view/VWEncodingView$2.class",
+		"ui/webplugin/remoteui/applet/view/VWEncodingView$3.class",
+		"ui/webplugin/remoteui/applet/view/VWEncodingView$4.class",
+		"ui/webplugin/remoteui/applet/view/VWEncodingView$5.class",
+		"ui/webplugin/remoteui/applet/view/VWEncodingView$6.class",
+		"ui/webplugin/remoteui/applet/view/VWEncodingView$7.class",
 		
 		"ui/webplugin/util/WUJarReader.class",
 		
@@ -220,6 +230,7 @@ RemoteUIServlet
 		"plugins/torrent/Torrent.class",
 		"plugins/torrent/TorrentFile.class",
 		"plugins/torrent/TorrentException.class",
+		"plugins/torrent/TorrentEncodingException.class",
 		"plugins/torrent/TorrentManager.class",
 		"plugins/torrent/TorrentManagerListener.class",
 		"plugins/torrent/TorrentAttribute.class",
@@ -469,11 +480,12 @@ RemoteUIServlet
 
 									URL	torrent_url = new URL( file_name );
 										
+									// System.out.println( "downloading '" + torrent_url.toString() + "'" );
 									try{
 										TorrentDownloader dl = 
 											plugin_interface.getTorrentManager().getURLDownloader( torrent_url, null, null );
 										
-										torrent = dl.download();
+										torrent = dl.download("system");
 										
 									}catch( TorrentException e ){
 										
@@ -484,6 +496,11 @@ RemoteUIServlet
 											throw( new Exception( 	"Authorisation failed, encode the user name and password in the URL using " +
 																	"http://&lt;user&gt;:&lt;password&gt;@" + torrent_url.getHost() + ":" + torrent_url.getPort()+
 																	torrent_url.getPath()));
+										}
+										
+										if ( e instanceof TorrentEncodingException ){
+											
+											throw( new Exception( "Torrent encoding can't be resolved - use the applet interface to upload the torrent" ));
 										}
 									}
 								}

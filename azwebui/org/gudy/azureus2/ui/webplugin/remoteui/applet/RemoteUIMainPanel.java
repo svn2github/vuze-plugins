@@ -611,7 +611,7 @@ RemoteUIMainPanel
 									throw( new Exception( "Unsupported URL protocol" ));
 								}
 								
-								openTorrent( url, null, null );
+								openTorrent( url, null, null, "system" );
 		
 								
 							}else if ( cmd.equals("copy")){
@@ -714,12 +714,13 @@ RemoteUIMainPanel
 	openTorrent(
 		URL		url,
 		String	user,
-		String	password)
+		String	password,
+		String	encoding )
 	{
 		try{
 			TorrentDownloader dl = plugin_interface.getTorrentManager().getURLDownloader( url, user, password );
 			
-			Torrent torrent = dl.download();
+			Torrent torrent = dl.download( encoding );
 			
 			logMessage( "Downloaded torrent: " + torrent.getName());
 			
@@ -745,8 +746,20 @@ RemoteUIMainPanel
 			
 				// auth error
 				
-				new VWAuthorisationView( this, url );
+				new VWAuthorisationView( this, url, encoding );
+			
+			}else if ( e instanceof TorrentEncodingException ){
 				
+				TorrentEncodingException	tee = (TorrentEncodingException)e;
+				
+				if ( tee.getValidCharsets() != null ){
+					
+					new VWEncodingView( this, tee.getValidCharsets(), tee.getValidTorrentNames(), url, user, password );
+					
+				}else{
+					
+					reportError( e );
+				}
 			}else{
 			
 				reportError( e );

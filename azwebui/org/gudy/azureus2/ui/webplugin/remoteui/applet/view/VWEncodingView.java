@@ -1,5 +1,5 @@
 /*
- * Created on 04-Jun-2004
+ * Created on 27-Jul-2004
  * Created by Paul Gardner
  * Copyright (C) 2004 Aelitis, All Rights Reserved.
  *
@@ -23,29 +23,36 @@
 package org.gudy.azureus2.ui.webplugin.remoteui.applet.view;
 
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.KeyEvent;
-import java.net.*;
+import java.awt.event.*;
+
+import java.net.URL;
 
 import javax.swing.*;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
+import javax.swing.table.*;
+
+
+import org.gudy.azureus2.core3.util.DisplayFormatters;
+import org.gudy.azureus2.ui.webplugin.remoteui.applet.RemoteUIMainPanel;
 
 /**
  * @author parg
  *
  */
-
-import org.gudy.azureus2.ui.webplugin.remoteui.applet.*;
-
 public class 
-VWAuthorisationView 
+VWEncodingView 
 {
 	public
-	VWAuthorisationView(
-		final RemoteUIMainPanel	main_panel,
-		final URL				url,
-		final String			encoding )
+	VWEncodingView(
+		final RemoteUIMainPanel		main_panel,
+		final String[]				encodings,
+		final String[]				names,
+		final URL					url,
+		final String				user,
+		final String				password )
 	{
-		final JFrame	frame = new JFrame( "Authorisation Required" );
+		final JFrame	frame = new JFrame( "Select Encoding" );
 			
 		Container	cont = frame.getContentPane();
 			
@@ -53,52 +60,71 @@ VWAuthorisationView
 			
 		int	row = 0;
 		
-		cont.add( 	new JLabel( url.toString()),
-					new VWGridBagConstraints(
-						0, row, 2, 1, 0.0, 0.0,
-						GridBagConstraints.WEST,
-						GridBagConstraints.NONE, 
-						new Insets(8, 8, 8, 8), 0, 0 ));
+		String[][] table_data = new String[encodings.length][2];
 		
-		row++;
+		for (int i=0;i<encodings.length;i++){
+			
+			table_data[i][0] = encodings[i];
+			
+			table_data[i][1] = names[i];
+		}
 		
-		cont.add( 	new JLabel( "User name:" ),
-					new VWGridBagConstraints(
-						0, row, 1, 1, 0.0, 0.0,
-						GridBagConstraints.EAST,
-						GridBagConstraints.NONE, 
-						new Insets(8, 8, 8, 8), 0, 0 ));
+		TableModel	model = 
+			new DefaultTableModel( table_data, new String[]{"Encoding", "Decoded Torrent Name"} )
+			{
+			   	public boolean 
+			   	isCellEditable(int row, int column) 
+			   	{
+			   		return( false );
+			   	}		
+			};
+			
+		final JTable	table = new JTable( model );
+		
+		table.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
+		
+		table.setAutoscrolls( true );
+		
+		table.setShowHorizontalLines( true );
+		
+		table.setShowVerticalLines( true );
+				
+		TableColumnModel	tcm = table.getColumnModel();
+		
+		TableCellRenderer	cell_renderer = 
+			new DefaultTableCellRenderer()
+			{
+				public Component 
+				getTableCellRendererComponent(
+					JTable		table,
+					Object 		o_value,
+					boolean 	isSelected,
+					boolean 	hasFocus,
+					int 		row,
+					int 		column )
+				{
+					JLabel	res = (JLabel)super.getTableCellRendererComponent( table, o_value, isSelected, hasFocus, row, column );
+					
+					res.setBorder( noFocusBorder );
+					
+					return( res );
+				}
+			};
+			
+		tcm.getColumn(0).setCellRenderer(cell_renderer);
+		tcm.getColumn(1).setCellRenderer(cell_renderer);
+			
+		table.getSelectionModel().setSelectionMode( ListSelectionModel.SINGLE_SELECTION );
+		
+		table.getSelectionModel().setSelectionInterval(0,0);
+
 	
-		final JTextField	user_name = new JTextField();
-		
-		user_name.setColumns( 16 );
-		
-		cont.add( 	user_name,
+		cont.add( 	new JScrollPane(table),
 					new VWGridBagConstraints(
-						1, row, 1, 1, 1.0, 0.0,
+						0, row, 1, 1, 1.0, 1.0,
 						GridBagConstraints.WEST,
-						GridBagConstraints.HORIZONTAL, 
-						new Insets(8, 16, 8, 8), 0, 0 ));
-		
-		row++;
-		
-		cont.add( 	new JLabel( "Password:" ),
-					new VWGridBagConstraints(
-						0, row, 1, 1, 0.0, 0.0,
-						GridBagConstraints.EAST,
-						GridBagConstraints.NONE, 
-						new Insets(0, 8, 8, 8), 0, 0 ));
-	
-		final JPasswordField	password = new JPasswordField();
-		
-		password.setColumns(16);
-		
-		cont.add( 	password,
-					new VWGridBagConstraints(
-						1, row, 1, 1, 1.0, 0.0,
-						GridBagConstraints.WEST,
-						GridBagConstraints.HORIZONTAL, 
-						new Insets(0, 16, 8, 8), 0, 0 ));
+						GridBagConstraints.BOTH, 
+						new Insets(8, 8, 8, 8), 0, 0 ));
 		
 		row++;
 		
@@ -114,7 +140,7 @@ VWAuthorisationView
 		
 		JPanel	but_subpan = new JPanel(new GridLayout(1,2));
 		
-		JButton ok_but	= new JButton( "OK" );
+		final JButton ok_but	= new JButton( "OK" );
 
 		AbstractAction ok_action = 
 			new AbstractAction()
@@ -124,13 +150,15 @@ VWAuthorisationView
 					ActionEvent	ev )
 				{
 					frame.dispose();
-					
+											
 					new Thread()
 					{
 						public void
 						run()
 						{
-							main_panel.openTorrent( url, user_name.getText(), new String(password.getPassword()), encoding);
+							String	encoding = encodings[table.getSelectedRow()];
+														
+							main_panel.openTorrent( url, user, password, encoding );
 						}
 					}.start();
 				}
@@ -145,6 +173,32 @@ VWAuthorisationView
 		
 		frame.getRootPane().setDefaultButton( ok_but );
 		
+		table.getSelectionModel().addListSelectionListener(
+				new ListSelectionListener()
+				{
+					public void
+					valueChanged(
+						ListSelectionEvent	ev )
+					{
+						ok_but.setEnabled( table.getSelectedRow() != -1 );
+					}
+				});
+		
+		table.addMouseListener(
+				new MouseAdapter()
+				{
+					public void
+					mouseClicked(
+						MouseEvent	ev )
+					{
+						if ( ev.getClickCount() == 2 && table.getSelectedRow() != -1 ){
+			
+							ok_but.doClick();
+							
+						}
+					}
+				});
+			
 		JPanel	ok_but_pan = new JPanel(new GridLayout(1,1));
 		
 		ok_but_pan.setBorder(BorderFactory.createEmptyBorder(2,2,2,2));
@@ -190,12 +244,15 @@ VWAuthorisationView
 		
 		cont.add( 	but_pan,
 					new VWGridBagConstraints(
-						0, row, 2, 1, 1.0, 0.0,
+						0, row, 1, 1, 1.0, 0.0,
 						GridBagConstraints.WEST,
 						GridBagConstraints.HORIZONTAL, 
 						new Insets(8, 8, 8, 8), 0, 0 ));		
 		
-		frame.pack();
+		
+		frame.setSize(400,300);
+			
+		frame.validate();
 		
 		Dimension dim = Toolkit.getDefaultToolkit().getScreenSize();
 			
@@ -210,12 +267,16 @@ VWAuthorisationView
 		String[]	args )
 	{
 		try{
-			new VWAuthorisationView(null,new URL( "http://a.vb.c:6969/"), "system");
+			new VWEncodingView(
+					null,
+					new String[]{ "a", "b"}, 
+					new String[]{"sdsdsdsdsd!","grtrotprtoprto"},
+					null, null, null );
 			
 		}catch( Throwable e ){
 			
 			e.printStackTrace();
 		}
 	}
-			
+	
 }
