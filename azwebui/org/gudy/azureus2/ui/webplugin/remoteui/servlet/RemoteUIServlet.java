@@ -309,7 +309,7 @@ RemoteUIServlet
 		super.initialize( _plugin_interface );
 		
 		plugin_interface.getUtilities().getLocaleUtilities().integrateLocalisedMessageBundle( 
-				"org.gudy.azureus2.ui.webplugin.remoteui.servlet.Messages" );
+				"org.gudy.azureus2.ui.webplugin.remoteui.servlet.internat.Messages" );
 		
 		request_handler = new RPRequestHandler( _plugin_interface );
 		
