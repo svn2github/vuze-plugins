@@ -85,6 +85,8 @@ RemoteUIServlet
 		"ui/webplugin/remoteui/applet/RemoteUIApplet$2.class",
 		"ui/webplugin/remoteui/applet/RemoteUIApplet$3.class",
 		"ui/webplugin/remoteui/applet/RemoteUIApplet$4.class",
+		"ui/webplugin/remoteui/applet/RemoteUIApplet$5.class",
+		"ui/webplugin/remoteui/applet/RemoteUIApplet$6.class",
 		"ui/webplugin/remoteui/applet/RemoteUIMainPanelAdaptor.class",
 		"ui/webplugin/remoteui/applet/RemoteUIMainPanel.class",
 		"ui/webplugin/remoteui/applet/model/MDDownloadModel.class",
