@@ -88,7 +88,7 @@ RemoteUIApplet
 			
 		}else{
 		
-			dispatch_url	= _dispatch_url;
+			setDispatchURL( _dispatch_url );
 			
 			application		= true;
 		}
@@ -117,7 +117,7 @@ RemoteUIApplet
 	{
 		if ( !application ){
 			
-			dispatch_url = getDocumentBase();
+			setDispatchURL( getDocumentBase());
 		}
 		
 		try{
@@ -326,6 +326,60 @@ RemoteUIApplet
 		return( plugin_interface );
 	}
 	
+	protected void
+	setDispatchURL(
+		URL		url )
+	{
+			// we have an absolute URL here. we need to generate a relative one
+			// so that people can host the webui as virtual server if they so desire 
+		
+		String	path = url.getPath();
+		
+		if ( path != null && path.length() != 0 ){
+			
+				// if already ends with / then assume ok.
+				// e.g. http://sdsdsd/Myserver/
+			
+			if ( path.endsWith("/")){
+				
+				path = path.substring( 0, path.length()-1);
+				
+			}else{
+				
+				int	pos = path.lastIndexOf("/");
+			
+				if ( pos == -1 ){
+			
+						// no /, assume end of doc base is html file that launched the
+						// applet : http://sadsadsad/wibble.html
+					
+					path = "";
+					
+				}else{
+					
+						// virtual server case, http://dsasadsasda/MyServer/wibbble.html
+					
+					path = path.substring(0,pos);
+				}
+			}
+		}
+		
+		path += "/process.cgi";
+		
+		try{
+		    dispatch_url = 
+		    	new URL( 	url.getProtocol() + "://" +
+		    				url.getHost() + 
+							(url.getPort()==-1?"":(":" + url.getPort())) + path );
+		    
+			System.out.println( "document base = " + url + ", dispatcher = " + dispatch_url );
+			
+		}catch( Throwable  e ){
+			
+			e.printStackTrace();
+		}
+	}
+	
 	protected URL
 	getDispatchURL()
 	{
@@ -387,10 +441,6 @@ RemoteUIApplet
 		try{
 			URL	url = getDispatchURL();
 		
-		    url = new URL( 	url.getProtocol() + "://" +
-		    				url.getHost() + 
-							(url.getPort()==-1?"":(":" + url.getPort())) + "/process.cgi" );
-			
 		    // System.out.println( "Request url = " + url.toString());
 			
 			HttpURLConnection con;
@@ -539,9 +589,9 @@ RemoteUIApplet
 		if ( args.length != 1 ){
 			
 			System.err.println( "Usage: RemoteUIApplet <url of webui server>");
-			System.err.println( "    For example RemoteUIAppler http://fred.com:6883/" );
+			System.err.println( "    For example RemoteUIApplet http://fred.com:6883/" );
 			System.err.println( "    If you need user/password encode in url. e.g. http://paul:secret@fred.com:6883/" );
-			System.err.println( "    For https you'll need to set up the ketstore yourself" );
+			System.err.println( "    For https you'll need to set up the keystore yourself" );
 			
 			System.exit(1);
 		}

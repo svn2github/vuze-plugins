@@ -282,6 +282,7 @@ RemoteUIServlet
 		"plugins/utils/resourcedownloader/ResourceDownloaderException.class",
 		"plugins/utils/ShortCuts.class",
 		"plugins/update/UpdateManager.class",
+		"plugins/clientid/ClientIDManager.class",
 
 
 	};
