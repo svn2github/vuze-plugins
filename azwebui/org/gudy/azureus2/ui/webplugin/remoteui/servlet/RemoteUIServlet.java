@@ -204,6 +204,7 @@ RemoteUIServlet
 		"plugins/PluginManager.class",
 		"plugins/PluginEventListener.class",
 		"plugins/PluginConfig.class",
+		"plugins/config/ConfigParameter.class",
 		"plugins/logging/Logger.class",
 		"plugins/peers/protocol/PeerProtocolManager.class",
 		"plugins/sharing/ShareManager.class",

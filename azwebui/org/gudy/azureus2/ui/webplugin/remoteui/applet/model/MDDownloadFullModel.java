@@ -31,7 +31,6 @@ import javax.swing.table.*;
 
 import org.gudy.azureus2.plugins.download.*;
 import org.gudy.azureus2.plugins.torrent.*;
-import org.gudy.azureus2.pluginsimpl.remote.RPException;
 
 public class 
 MDDownloadFullModel
@@ -201,18 +200,14 @@ MDDownloadFullModel
 	public void
 	start(
 		int[]		rows )
+	
+		throws DownloadException
 	{
 		if ( rows.length > 0 ){
 			
 			for (int i=0;i<rows.length;i++){
 				
-				try{
-					downloads[rows[i]].restart();
-					
-				}catch( Throwable e ){
-					
-					throw( new RPException( "Start fails", e ));
-				}
+				downloads[rows[i]].restart();
 			}
 		}
 	}
@@ -225,15 +220,9 @@ MDDownloadFullModel
 			
 			for (int i=0;i<rows.length;i++){
 				
-				try{
-					boolean	current = downloads[rows[i]].isForceStart();
+				boolean	current = downloads[rows[i]].isForceStart();
 					
-					downloads[rows[i]].setForceStart( !current );
-					
-				}catch( Throwable e ){
-					
-					throw( new RPException( "Force Start fails", e ));
-				}
+				downloads[rows[i]].setForceStart( !current );
 			}
 		}
 	}
@@ -241,18 +230,14 @@ MDDownloadFullModel
 	public void
 	stop(
 		int[]		rows )
+	
+		throws DownloadException
 	{
 		if ( rows.length > 0 ){
 			
 			for (int i=0;i<rows.length;i++){
 			
-				try{
-					downloads[rows[i]].stop();
-					
-				}catch( Throwable e ){
-					
-					throw( new RPException( "Stop fails", e ));
-				}
+				downloads[rows[i]].stop();
 			}
 		}
 	}
@@ -260,18 +245,14 @@ MDDownloadFullModel
 	public void
 	remove(
 		int[]		rows )
+	
+		throws DownloadException, DownloadRemovalVetoException
 	{
 		if ( rows.length > 0 ){
 			
 			for (int i=0;i<rows.length;i++){
 			
-				try{
-					downloads[rows[i]].remove();
-					
-				}catch( Throwable e ){
-					
-					throw( new RPException( "Remove fails", e ));
-				}
+				downloads[rows[i]].remove();
 			}
 		}
 	}
@@ -282,17 +263,11 @@ MDDownloadFullModel
 	{
 		if ( rows.length > 0 ){
 			
-			try{
-				int	current = downloads[rows[0]].getPosition();
-								
-				if ( current > 0 ){
-					
-					downloads[rows[0]].moveUp();
-				}
+			int	current = downloads[rows[0]].getPosition();
+							
+			if ( current > 0 ){
 				
-			}catch( Throwable e ){
-				
-				throw( new RPException( "Move Up fails", e ));
+				downloads[rows[0]].moveUp();
 			}
 		}
 	}
@@ -304,17 +279,11 @@ MDDownloadFullModel
 	{
 		if ( rows.length > 0 ){
 			
-			try{
-				int	current = downloads[rows[0]].getPosition();
-							
-				if ( current < downloads.length ){
-					
-					downloads[rows[0]].moveDown();
-				}
-								
-			}catch( Throwable e ){
+			int	current = downloads[rows[0]].getPosition();
+						
+			if ( current < downloads.length ){
 				
-				throw( new RPException( "Move Down fails", e ));
+				downloads[rows[0]].moveDown();
 			}
 		}
 	}

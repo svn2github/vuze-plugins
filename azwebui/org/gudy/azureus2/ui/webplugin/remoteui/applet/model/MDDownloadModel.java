@@ -50,7 +50,9 @@ MDDownloadModel
 	
 	public void
 	start(
-		int[]		rows );
+		int[]		rows )
+	
+		throws DownloadException;
 	
 	public void
 	forceStart(
@@ -58,11 +60,15 @@ MDDownloadModel
 	
 	public void
 	stop(
-		int[]		rows );
+		int[]		rows )
+	
+		throws DownloadException;
 	
 	public void
 	remove(
-		int[]		rows );
+		int[]		rows )
+	
+		throws DownloadException, DownloadRemovalVetoException;
 	
 	public void
 	moveUp(

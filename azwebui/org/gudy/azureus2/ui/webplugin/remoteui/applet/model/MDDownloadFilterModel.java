@@ -192,6 +192,8 @@ MDDownloadFilterModel
 	public void
 	start(
 		int[]		rows )
+	
+		throws DownloadException
 	{
 		basis.start(mapIndexes(rows));
 	}
@@ -207,6 +209,8 @@ MDDownloadFilterModel
 	public void
 	stop(
 		int[]		rows )
+	
+		throws DownloadException
 	{
 		basis.stop(mapIndexes(rows));
 		
@@ -215,6 +219,8 @@ MDDownloadFilterModel
 	public void
 	remove(
 		int[]		rows )
+	
+		throws DownloadException, DownloadRemovalVetoException
 	{
 		basis.remove(mapIndexes(rows));
 		
