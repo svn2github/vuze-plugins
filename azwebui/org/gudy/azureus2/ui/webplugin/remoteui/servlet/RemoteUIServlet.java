@@ -160,6 +160,7 @@ RemoteUIServlet
 		"ui/webplugin/util/WUJarReader.class",
 		
 		"core3/config/COConfigurationManager.class",
+		"core3/config/StringList.class",
 		"core3/config/impl/ConfigurationManager.class",
 		"core3/config/impl/ConfigurationParameterNotFoundException.class",
 		"core3/config/ParameterListener.class",
@@ -186,6 +187,7 @@ RemoteUIServlet
 		"core3/util/TimerEvent.class",
 		"core3/util/TimerEventPeriodic.class",
 		"core3/util/TimerEventPerformer.class",
+		"core3/util/SimpleTimer.class",
 		"core3/util/ThreadPool.class",
 		"core3/util/ThreadPool$1.class",
 		"core3/util/ThreadPool$2.class",
