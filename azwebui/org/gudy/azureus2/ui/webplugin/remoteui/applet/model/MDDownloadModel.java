@@ -41,6 +41,10 @@ MDDownloadModel
 	getDownload(
 		int		row );
 	
+	public Download[]
+	getDownloads(
+		int[]	rows );
+	
 	public void
 	refresh();
 	

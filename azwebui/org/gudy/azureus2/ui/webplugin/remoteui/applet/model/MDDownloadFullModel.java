@@ -64,6 +64,20 @@ MDDownloadFullModel
 		return( downloads[row]);
 	}
 	
+	public Download[]
+	getDownloads(
+		int[]		rows )
+	{
+		Download[]	res = new Download[rows.length];
+		
+		for ( int i=0;i<res.length;i++){
+			
+			res[i] = downloads[rows[i]];
+		}
+		
+		return( res );
+	}
+	
 	public void
 	refresh()
 	{

@@ -69,6 +69,8 @@ RemoteUIMainPanel
 	protected VWStatusAreaView			status_area_view;
 	protected MDStatusAreaModel			status_area_model;
 		
+	protected MDTrackerModel			tracker_model;
+	
 	protected JTextArea		log_area;
 	protected String		current_log_text	= "";
 	
@@ -153,7 +155,22 @@ RemoteUIMainPanel
 			tb.add( remove );
 			
 			tb.addSeparator();
+
+			// host
 			
+			final JButton	host = 
+				getButton( 	"Host",
+							getImageIcon(UISwingImageRepository.getImage(
+										adapter.getResource("org/gudy/azureus2/ui/icons/host.gif"))));
+	
+			host.setToolTipText("Host");
+	
+			host.setEnabled( true );
+			
+			tb.add( host );
+				
+			tb.addSeparator();
+
 				// move up
 			
 			final JButton	move_up = 
@@ -177,7 +194,7 @@ RemoteUIMainPanel
 
 			move_down.setEnabled( false );
 			tb.add( move_down );
-			
+		
 				// open 
 			
 			final JTextField	tf = new JTextField();
@@ -267,6 +284,8 @@ RemoteUIMainPanel
 			
 			current_download_model	=	downloading_model;
 			current_download_view	=	downloading_view;
+			
+			tracker_model			= new MDTrackerModel( plugin_interface );
 			
 			MDConfigModel			config_model	= new MDConfigModel( plugin_interface );
 			
@@ -480,6 +499,37 @@ RemoteUIMainPanel
 								current_download_model.moveDown(current_download_view.getSelectedRows());
 								
 								refresh();
+								
+							}catch( Throwable e ){
+								
+								e.printStackTrace();
+								
+								reportError( e );
+							}
+						}
+					});
+			
+			host.addActionListener(
+					new ActionListener()
+					{
+						public void
+						actionPerformed(
+							ActionEvent	ev )
+						{
+							try{
+								
+								Download[] downloads = current_download_model.getDownloads(current_download_view.getSelectedRows());
+								
+								Torrent[] torrents = new Torrent[downloads.length];
+								
+								for (int i=0;i<downloads.length;i++){
+									
+									torrents[i] = downloads[i].getTorrent();
+								}
+
+								tracker_model.host( torrents );
+								
+								// refresh();
 								
 							}catch( Throwable e ){
 								
