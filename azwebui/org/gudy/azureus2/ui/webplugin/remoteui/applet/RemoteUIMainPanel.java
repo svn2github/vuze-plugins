@@ -34,6 +34,7 @@ import java.awt.event.*;
 
 import javax.swing.*;
 import javax.swing.event.*;
+import java.awt.datatransfer.*;
 
 import org.gudy.azureus2.ui.swing.*;
 
@@ -70,6 +71,10 @@ RemoteUIMainPanel
 	
 	protected int			next_refresh;
 	protected int			refresh_period;
+	
+	protected Clipboard		system_clipboard;
+	
+	protected boolean		init_complete;
 	
 	protected boolean		destroyed;
 	
@@ -486,40 +491,61 @@ RemoteUIMainPanel
 				{
 					public void
 					actionPerformed(
-							ActionEvent	ev )
+						ActionEvent	ev )
 					{
+						String	cmd = ev.getActionCommand();
+					
 						try{
-							String	url_str = tf.getText().trim();
-							
-							if ( url_str.length() == 0 ){
+							if ( cmd.equals( "enter")){
+								String	url_str = tf.getText().trim();
 								
-								throw( new Exception( "URL required" ));
-							}
-							
-							if ( !url_str.toLowerCase().startsWith( "http" )){
+								if ( url_str.length() == 0 ){
+									
+									throw( new Exception( "URL required" ));
+								}
 								
-								throw( new Exception( "Unsupported URL protocol" ));
-							}
-							
-							URL	url = new URL( url_str );
-						
-							String protocol = url.getProtocol().toLowerCase();
-							
-							if ( !protocol.toLowerCase().startsWith( "http" )){
+								if ( !url_str.toLowerCase().startsWith( "http" )){
+									
+									throw( new Exception( "Unsupported URL protocol" ));
+								}
 								
-								throw( new Exception( "Unsupported URL protocol" ));
+								URL	url = new URL( url_str );
+							
+								String protocol = url.getProtocol().toLowerCase();
+								
+								if ( !protocol.toLowerCase().startsWith( "http" )){
+									
+									throw( new Exception( "Unsupported URL protocol" ));
+								}
+								
+								TorrentDownloader dl = _pi.getTorrentManager().getURLDownloader( url );
+								
+								Torrent torrent = dl.download();
+								
+								logMessage( "Downloaded torrent: " + torrent.getName());
+								
+								download_manager.addDownload( torrent );
+							
+								refresh();
+								
+							}else if ( cmd.equals("copy")){
+																
+                                StringSelection sel = new StringSelection(tf.getSelectedText());
+                                
+                                system_clipboard.setContents(sel,sel);
+                                
+							}else if ( cmd.equals("cut") ){
+								
+								StringSelection sel = new StringSelection(tf.getSelectedText());
+                                
+                                system_clipboard.setContents(sel,sel);
+                                
+                                tf.setText("");
+                                
+							}else if ( cmd.equals("paste")){
+																
+                                tf.setText( (String)(system_clipboard.getContents(this).getTransferData(DataFlavor.stringFlavor)) );
 							}
-							
-							TorrentDownloader dl = _pi.getTorrentManager().getURLDownloader( url );
-							
-							Torrent torrent = dl.download();
-							
-							logMessage( "Downloaded torrent: " + torrent.getName());
-							
-							download_manager.addDownload( torrent );
-						
-							refresh();
-							
 						}catch( Throwable e ){
 							
 							reportError( e );
@@ -528,12 +554,52 @@ RemoteUIMainPanel
 				};
 				
 			tf.registerKeyboardAction(
-						open_action,
+						open_action, "enter",
 						KeyStroke.getKeyStroke( KeyEvent.VK_ENTER, 0 ),
 						JComponent.WHEN_FOCUSED );
 			
+			if ( system_clipboard != null  ){
+	
+				tf.registerKeyboardAction(
+							open_action, "copy",
+							KeyStroke.getKeyStroke( KeyEvent.VK_C, ActionEvent.CTRL_MASK, false),
+							JComponent.WHEN_FOCUSED );
+	                    
+				tf.registerKeyboardAction(
+							open_action, "paste",
+							KeyStroke.getKeyStroke(KeyEvent.VK_V, ActionEvent.CTRL_MASK, false),
+							JComponent.WHEN_FOCUSED );
+	            
+				tf.registerKeyboardAction(
+				            open_action, "cut",
+							KeyStroke.getKeyStroke(KeyEvent.VK_X, ActionEvent.CTRL_MASK, false),
+							JComponent.WHEN_FOCUSED );
+			}
+			
 			open.addActionListener( open_action );
 
+			try{
+				
+				/* need this to give access
+				grant codeBase "http://rolfcopter.com-" {
+				 	permission java.awt.AWTPermission "accessClipboard";
+				};
+				*/
+				
+				system_clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+                
+				logMessage( "Gained access to the system clipboard" );
+				
+			}catch( Throwable e ){
+				
+				logMessage( "Failed to access system clipboard. If (and only if) you have " +
+							"problems copy/pasting into the applet text area, amend your 'java.policy' file to include:" );
+				
+				logMessage( "    grant codeBase \"http://<webui_address:port>/*\" {" );
+				logMessage( "        permission java.awt.AWTPermission \"accessClipboard\";" );
+				logMessage( "    };" );
+				logMessage( "where <webui_address:port> is the Web UI URL. e.g. \"http://wibble.org:6883/*\"" );			
+			}
 			
 			new Thread("RemoteUIMainPanel::refresh")
 			{
@@ -549,6 +615,10 @@ RemoteUIMainPanel
 			e.printStackTrace();
 			
 			reportError( e );
+			
+		}finally{
+			
+			init_complete	= true;
 		}
 	}
 	
@@ -648,33 +718,42 @@ RemoteUIMainPanel
 	
 	public void
 	logMessage(
-		final String	str )
+		String	str )
 	{
-		SwingUtilities.invokeLater(
-			new Runnable()
-			{
-				public void
-				run()
+		String ts = new SimpleDateFormat("hh:mm:ss - ").format( new Date());
+		
+		String	text = log_area.getText()+ "\r\n" + ts + str;
+		
+		while( text.length() > 65536 ){
+			
+			int	p = text.indexOf( "\r\n" );
+			
+			if ( p == -1 ){
+				
+				break;
+			}
+			
+			text = text.substring( p+2 );
+		}
+		
+		if ( init_complete ){
+			
+			final String f_text	= text;
+			
+			SwingUtilities.invokeLater(
+				new Runnable()
 				{
-					String ts = new SimpleDateFormat("hh:mm:ss - ").format( new Date());
-					
-					String	text = log_area.getText()+ "\r\n" + ts + str;
-					
-					while( text.length() > 65536 ){
-						
-						int	p = text.indexOf( "\r\n" );
-						
-						if ( p == -1 ){
-							
-							break;
-						}
-						
-						text = text.substring( p+2 );
+					public void
+					run()
+					{
+	
+						log_area.setText( f_text );
 					}
-					
-					log_area.setText( text );
-				}
-			});
+				});
+		}else{
+			
+			log_area.setText( text );
+		}
 	}
 	
 	public void
