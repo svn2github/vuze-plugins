@@ -215,6 +215,7 @@ RemoteUIServlet
 		"plugins/download/DownloadTrackerListener.class",
 		"plugins/download/DownloadWillBeRemovedListener.class",
 		"plugins/download/DownloadPeerListener.class",
+		"plugins/peers/PeerManager.class",
 		"plugins/torrent/Torrent.class",
 		"plugins/torrent/TorrentFile.class",
 		"plugins/torrent/TorrentException.class",
