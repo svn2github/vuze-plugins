@@ -179,6 +179,7 @@ RemoteUIServlet
 		"core3/util/AEDiagnostics.class",
 		"core3/util/AEDiagnosticsEvidenceGenerator.class",
 		"core3/util/AEDiagnosticsLogger.class",
+		"core3/util/IndentWriter.class",
 		"core3/util/Timer.class",
 		"core3/util/TimerEvent.class",
 		"core3/util/TimerEventPeriodic.class",
