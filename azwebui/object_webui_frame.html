@@ -1,4 +1,4 @@
-<!-- DOCTYPE removed from this document because it was causing Netscape to ignore the hight
+<!-- DOCTYPE removed from this document because it was causing Netscape to ignore the height
 specification of the plugin and all attempts to "fix" it besides this method failed -->
 <html>
 <head>
@@ -11,7 +11,7 @@ specification of the plugin and all attempts to "fix" it besides this method fai
 <object
     classid="clsid:8AD9C840-044E-11D1-B3E9-00805F499D93"
     codebase="http://java.sun.com/products/plugin/autodl/jinstall-1_4-windows-i586.cab#Version=1,4,0,0"
-    width="100%" height="79%">
+    width="100%" height="74%">
     <param name="CODE" value="org.gudy.azureus2.ui.webplugin.remoteui.applet.RemoteUIApplet.class">
     <param name="ARCHIVE" value="remui.jar">
     <param name="type" value="application/x-java-applet;version=1.4">
@@ -22,11 +22,11 @@ specification of the plugin and all attempts to "fix" it besides this method fai
           code="org.gudy.azureus2.ui.webplugin.remoteui.applet.RemoteUIApplet.class"
           java_archive="remui.jar"
           width="100%"
-          height="79%"
-	    scriptable="false"
-	    pluginspage="http://www.java.com/en/download/manual.jsp">
-	    <noembed>
-            alt="Your browser understands the &lt;EMBED&gt; tag but isn't running the applet, for some reason."
+          height="74%"
+          scriptable="false"
+          pluginspage="http://www.java.com/en/download/manual.jsp"
+          alt="Your browser understands the &lt;EMBED&gt; tag but isn't running the applet, for some reason.">
+          <noembed>
             Your browser is completely ignoring the &lt;EMBED&gt; tag!
           </noembed>
 	</embed>
@@ -35,6 +35,10 @@ specification of the plugin and all attempts to "fix" it besides this method fai
 </div>
 <form method="post" action="object_webui_only.html" target="_blank">
  <input type="submit" value="Launch GUI only in seperate, resizable window">
+</form>
+<form method="POST" enctype="multipart/form-data" action="/upload.cgi" target="status">
+ <p>Upload a local torrent to Azureus by browsing to it OR enter a torrent URL (latter doesn't work with Opera):<br>
+ <input type="file" size="75" name="upfile" accept="application/x-bittorrent">&nbsp;&nbsp;&nbsp;<input type="submit" value="Submit"></p>
 </form>
 </body>
 </html>

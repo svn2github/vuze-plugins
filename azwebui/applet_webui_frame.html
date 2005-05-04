@@ -1,4 +1,4 @@
-<!-- DOCTYPE removed from this document because it was causing Netscape to ignore the hight
+<!-- DOCTYPE removed from this document because it was causing Netscape to ignore the height
 specification of the plugin and all attempts to "fix" it besides this method failed -->
 <html>
 <head>
@@ -12,13 +12,17 @@ specification of the plugin and all attempts to "fix" it besides this method fai
 		codebase="."
 		archive="remui.jar"
 		width="100%"
-		height="79%">
-      alt="Your browser understands the &lt;APPLET&gt; tag but isn't running the applet, for some reason."
-      Your browser is completely ignoring the &lt;APPLET&gt; tag!
+		height="74%"
+		alt="Your browser understands the &lt;APPLET&gt; tag but isn't running the applet, for some reason.">
+	Your browser is completely ignoring the &lt;APPLET&gt; tag!
     </applet>
   </div>
- <form method="post" action="applet_webui_only.html" target="_blank">
-  <input type="submit" value="Launch GUI only in seperate, resizable window">
- </form>
+  <form method="post" action="applet_webui_only.html" target="_blank">
+    <input type="submit" value="Launch GUI only in seperate, resizable window">
+  </form>
+  <form method="POST" enctype="multipart/form-data" action="/upload.cgi" target="status">
+    <p>Upload a local torrent to Azureus by browsing to it OR enter a torrent URL (latter doesn't work with Opera):<br>
+    <input type="file" size="75" name="upfile" accept="application/x-bittorrent">&nbsp;&nbsp;&nbsp;<input type="submit" value="Submit"></p>
+  </form>
 </body>
 </html>
