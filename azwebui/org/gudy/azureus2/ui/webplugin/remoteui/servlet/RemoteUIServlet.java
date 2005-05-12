@@ -100,6 +100,7 @@ RemoteUIServlet
 		"ui/webplugin/remoteui/applet/view/VWDownloadView$6.class",
 		"ui/webplugin/remoteui/applet/view/VWDownloadView$7.class",
 		"ui/webplugin/remoteui/applet/view/VWDownloadView$8.class",
+		"ui/webplugin/remoteui/applet/view/VWDownloadView$9.class",
 		"ui/webplugin/remoteui/applet/view/TableSorter$1.class",
 		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$1.class",
 		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$2.class",
