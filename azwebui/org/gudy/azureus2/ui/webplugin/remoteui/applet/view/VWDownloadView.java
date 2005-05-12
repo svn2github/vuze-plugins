@@ -26,6 +26,7 @@ package org.gudy.azureus2.ui.webplugin.remoteui.applet.view;
  *
  */
 
+import java.text.NumberFormat;
 import java.util.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -39,14 +40,21 @@ import org.gudy.azureus2.core3.util.*;
 
 public class 
 VWDownloadView 
-{
+{	
+	static NumberFormat	float_format = NumberFormat.getInstance();
+	
+	static{
+		float_format.setMaximumFractionDigits(3);
+		float_format.setMinimumFractionDigits(3);
+	}
+
 	protected JComponent	component;
 	
 	protected TableSorter	sorter;
 	protected JTable		table;
 	
 	protected ArrayList	listeners	= new ArrayList();
-	
+
 	public
 	VWDownloadView(
 		final MDDownloadModel		model )
@@ -76,7 +84,7 @@ VWDownloadView
 		
 		TableColumnModel cm = table.getColumnModel();
 		
-		int[]	max_widths = { 30, -1, 60, 90, 80, 80, 50, 50, 80, 60, 70, 50, 60 };
+		int[]	max_widths = { 30, -1, 60, 90, 80, 80, 50, 50, 80, 60, 70, 50, 60, 50 };
 		//int[]	max_widths = { 30, -1, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5 };
 		
 		for (int i=0;i<max_widths.length;i++){
@@ -89,7 +97,8 @@ VWDownloadView
 		
 		int[]	byte_columns 		= { 2, 3, 8 };
 		int[]	bytesec_columns 	= { 9, 10 };
-		int[]	rhs_columns			= { 5, 6, 7 };
+		int[]	centre_columns		= { 6, 7 };
+		int[]	rhs_columns			= { 5, 11, 13 };
 		
 		for (int i=0;i<byte_columns.length;i++){
 			
@@ -159,6 +168,31 @@ VWDownloadView
 					});
 		}
 		
+		for (int i=0;i<centre_columns.length;i++){
+			
+			TableColumn column = cm.getColumn( centre_columns[i]);
+			
+			column.setCellRenderer(
+					new DefaultTableCellRenderer()
+					{
+						public Component 
+						getTableCellRendererComponent(
+								JTable		table,
+								Object 		o_value,
+								boolean 	isSelected,
+								boolean 	hasFocus,
+								int 		row,
+								int 		column )
+						{
+							JLabel	res = (JLabel)super.getTableCellRendererComponent( table, o_value, isSelected, hasFocus, row,column );
+							
+							res.setHorizontalAlignment( JLabel.CENTER );						
+
+							return( res );
+						}
+					});
+		}
+		
 		for (int i=0;i<rhs_columns.length;i++){
 			
 			TableColumn column = cm.getColumn( rhs_columns[i]);
@@ -187,7 +221,13 @@ VWDownloadView
 									
 									o_value = s_value.substring(0,30)+"...";
 								}
+								
+							}else if ( o_value instanceof Float ){
+								
+								o_value = float_format.format(((Float)o_value).doubleValue());
+								
 							}
+
 							JLabel	res = (JLabel)super.getTableCellRendererComponent( table, o_value, isSelected, hasFocus, row,column );
 							
 							res.setHorizontalAlignment( JLabel.RIGHT );

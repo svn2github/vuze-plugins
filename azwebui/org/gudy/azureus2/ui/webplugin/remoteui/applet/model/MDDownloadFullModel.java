@@ -37,7 +37,7 @@ MDDownloadFullModel
 	extends 	AbstractTableModel
 	implements	MDDownloadModel
 {
-	public static String[]	column_names = { "#", "Name", "Size", "Downloaded", "Done", "State", "Seeds", "Peers", "Uploaded", "Up Ave", "Down Ave", "ETA", "Share Ratio" };
+	public static String[]	column_names = { "#", "Name", "Size", "Downloaded", "Done", "State", "Seeds", "Peers", "Uploaded", "Up Ave", "Down Ave", "ETA", "Share Ratio", "Avail" };
 	
 	protected DownloadManager	download_manager;
 	protected Download[]		downloads;
@@ -170,6 +170,16 @@ MDDownloadFullModel
 				sr = 0x7fffffff;
 			}
 			return(new Integer( sr));
+			
+		}else if ( col == 13 ){
+			
+			float avail = download.getStats().getAvailability();
+			
+			if ( avail < 0 ){
+				avail	= 0;
+			}
+			
+			return( new Float( avail ));
 		}
 		
 		return( null );
