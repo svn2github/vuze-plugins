@@ -297,12 +297,14 @@ RemoteUIServlet
 
 	};
 	
-	protected RPRequestHandler				request_handler;
-	protected WebPluginAccessController		access_controller;
+	private PluginInterface		plugin_interface;
+	
+	private RPRequestHandler				request_handler;
+	private WebPluginAccessController		access_controller;
 
-	protected BooleanParameter		sign_enable;
-	protected StringParameter		sign_alias;
-	protected DirectoryParameter	data_dir;
+	private BooleanParameter		sign_enable;
+	private StringParameter			sign_alias;
+	private DirectoryParameter		data_dir;
 	
 	public
 	RemoteUIServlet()
@@ -317,6 +319,8 @@ RemoteUIServlet
 		throws PluginException
 	{	
 		super.initialize( _plugin_interface );
+		
+		plugin_interface	= _plugin_interface;
 		
 		plugin_interface.getUtilities().getLocaleUtilities().integrateLocalisedMessageBundle( 
 				"org.gudy.azureus2.ui.webplugin.remoteui.servlet.internat.Messages" );
