@@ -248,6 +248,7 @@ RemoteUIServlet
 		"plugins/disk/DiskManager.class",
 		"plugins/disk/DiskManagerFileInfo.class",
 		"plugins/download/DownloadManager.class",
+		"plugins/download/DownloadManagerStats.class",
 		"plugins/download/DownloadException.class",
 		"plugins/download/Download.class",
 		"plugins/download/DownloadManagerListener.class",
