@@ -262,6 +262,7 @@ RemoteUIServlet
 		"plugins/download/DownloadTrackerListener.class",
 		"plugins/download/DownloadWillBeRemovedListener.class",
 		"plugins/download/DownloadPeerListener.class",
+		"plugins/download/session/SessionAuthenticator.class",
 		"plugins/network/ConnectionManager.class",
 		"plugins/messaging/MessageManager.class",
 		"plugins/peers/PeerManager.class",
