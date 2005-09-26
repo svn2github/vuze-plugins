@@ -29,10 +29,19 @@ package org.gudy.azureus2.ui.webplugin.remoteui.servlet;
 import org.gudy.azureus2.ui.webplugin.*;
 
 import java.io.*;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.zip.*;
+import java.net.URI;
 import java.net.URL;
 
+import org.gudy.azureus2.core3.util.FileUtil;
 import org.gudy.azureus2.core3.util.jar.AEJarBuilder;
 import org.gudy.azureus2.plugins.tracker.web.*;
 import org.gudy.azureus2.plugins.*;
@@ -69,6 +78,8 @@ RemoteUIServlet
 			"ui/icons/host.gif",		
 	};
 	
+	static String resource_names_prefix = "org/gudy/azureus2";
+		
 	static String[] resource_names = {
 			
 		"ui/common/UIImageRepository.class",
@@ -80,46 +91,12 @@ RemoteUIServlet
 		"ui/swt/IconBarEnabler.class",
 		
 		"ui/webplugin/remoteui/applet/RemoteUIApplet.class",
-		"ui/webplugin/remoteui/applet/RemoteUIApplet$1.class",
-		"ui/webplugin/remoteui/applet/RemoteUIApplet$2.class",
-		"ui/webplugin/remoteui/applet/RemoteUIApplet$3.class",
-		"ui/webplugin/remoteui/applet/RemoteUIApplet$4.class",
-		"ui/webplugin/remoteui/applet/RemoteUIApplet$5.class",
-		"ui/webplugin/remoteui/applet/RemoteUIApplet$6.class",
 		"ui/webplugin/remoteui/applet/RemoteUIMainPanelAdaptor.class",
 		"ui/webplugin/remoteui/applet/RemoteUIMainPanel.class",
 		"ui/webplugin/remoteui/applet/model/MDDownloadModel.class",
 		"ui/webplugin/remoteui/applet/view/VWDownloadView.class",
 		"ui/webplugin/remoteui/applet/view/TableSorter.class",
 		"ui/webplugin/remoteui/applet/view/TableMap.class",
-		"ui/webplugin/remoteui/applet/view/VWDownloadView$1.class",
-		"ui/webplugin/remoteui/applet/view/VWDownloadView$2.class",
-		"ui/webplugin/remoteui/applet/view/VWDownloadView$3.class",
-		"ui/webplugin/remoteui/applet/view/VWDownloadView$4.class",
-		"ui/webplugin/remoteui/applet/view/VWDownloadView$5.class",
-		"ui/webplugin/remoteui/applet/view/VWDownloadView$6.class",
-		"ui/webplugin/remoteui/applet/view/VWDownloadView$7.class",
-		"ui/webplugin/remoteui/applet/view/VWDownloadView$8.class",
-		"ui/webplugin/remoteui/applet/view/VWDownloadView$9.class",
-		"ui/webplugin/remoteui/applet/view/TableSorter$1.class",
-		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$1.class",
-		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$2.class",
-		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$3.class",
-		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$4.class",
-		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$5.class",
-		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$6.class",
-		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$7.class",
-		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$8.class",
-		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$9.class",
-		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$10.class",
-		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$11.class",
-		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$12.class",
-		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$13.class",
-		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$14.class",
-		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$15.class",
-		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$16.class",
-		"ui/webplugin/remoteui/applet/RemoteUIMainPanel$17.class",
-		"ui/webplugin/remoteui/applet/view/VWConfigView$1.class",
 		"ui/webplugin/remoteui/applet/model/MDConfigModelListener.class",
 		"ui/webplugin/remoteui/applet/model/MDConfigModel.class",
 		"ui/webplugin/remoteui/applet/view/VWConfigView.class",
@@ -134,28 +111,9 @@ RemoteUIServlet
 		"ui/webplugin/remoteui/applet/model/MDDownloadFilter.class",
 		"ui/webplugin/remoteui/applet/model/MDDownloadFullModel.class",
 		"ui/webplugin/remoteui/applet/model/MDDownloadFilterModel.class",
-		"ui/webplugin/remoteui/applet/model/MDDownloadSplitModel$1.class",
-		"ui/webplugin/remoteui/applet/model/MDDownloadFilterModel$1.class",
-		"ui/webplugin/remoteui/applet/model/MDDownloadSplitModel$2.class",
 		"ui/webplugin/remoteui/applet/model/MDTrackerModel.class",
-		"ui/webplugin/remoteui/applet/view/VWConfigView$2.class",
-		"ui/webplugin/remoteui/applet/view/VWConfigView$3.class",
-		"ui/webplugin/remoteui/applet/view/VWConfigView$4.class",
-		"ui/webplugin/remoteui/applet/view/VWConfigView$5.class",
-		"ui/webplugin/remoteui/applet/view/VWConfigView$6.class",
-		"ui/webplugin/remoteui/applet/view/VWConfigView$intValueAdapter.class",
 		"ui/webplugin/remoteui/applet/view/VWAuthorisationView.class",
-		"ui/webplugin/remoteui/applet/view/VWAuthorisationView$1.class",
-		"ui/webplugin/remoteui/applet/view/VWAuthorisationView$2.class",
-		"ui/webplugin/remoteui/applet/view/VWAuthorisationView$3.class",
 		"ui/webplugin/remoteui/applet/view/VWEncodingView.class",
-		"ui/webplugin/remoteui/applet/view/VWEncodingView$1.class",
-		"ui/webplugin/remoteui/applet/view/VWEncodingView$2.class",
-		"ui/webplugin/remoteui/applet/view/VWEncodingView$3.class",
-		"ui/webplugin/remoteui/applet/view/VWEncodingView$4.class",
-		"ui/webplugin/remoteui/applet/view/VWEncodingView$5.class",
-		"ui/webplugin/remoteui/applet/view/VWEncodingView$6.class",
-		"ui/webplugin/remoteui/applet/view/VWEncodingView$7.class",
 				
 		"core3/config/COConfigurationManager.class",
 		"core3/config/StringList.class",
@@ -163,20 +121,11 @@ RemoteUIServlet
 		"core3/config/impl/ConfigurationParameterNotFoundException.class",
 		"core3/config/ParameterListener.class",
 		"core3/util/DisplayFormatters.class",
-		"core3/util/DisplayFormatters$1.class",
-		"core3/util/DisplayFormatters$2.class",
-		"core3/util/DisplayFormatters$3.class",
 		"core3/util/Debug.class",
-		"core3/util/Debug$1.class",
 		"core3/util/AESemaphore.class",
 		"core3/util/AEThread.class",
 		"core3/util/AERunnable.class",
 		"core3/util/AEMonSem.class",
-		"core3/util/AEMonSem$monSemData.class",
-		"core3/util/AEMonSem$1.class",
-		"core3/util/AEMonSem$2.class",
-		"core3/util/AEMonSem$3.class",
-		"core3/util/AEMonSem$4.class",
 		"core3/util/AEMonitor.class",
 		"core3/util/AEDiagnostics.class",
 		"core3/util/AEDiagnosticsEvidenceGenerator.class",
@@ -188,12 +137,8 @@ RemoteUIServlet
 		"core3/util/TimerEventPerformer.class",
 		"core3/util/SimpleTimer.class",
 		"core3/util/ThreadPool.class",
-		"core3/util/ThreadPool$1.class",
-		"core3/util/ThreadPool$2.class",
-		"core3/util/ThreadPool$threadPoolWorker.class",
 		"core3/util/ThreadPoolTask.class",
 		"core3/util/SystemTime.class",
-		"core3/util/SystemTime$1.class",
 		"core3/util/jar/AEJarReader.class",		
 		
 		"core3/torrentdownloader/TorrentDownloaderException.class",
@@ -347,6 +292,58 @@ RemoteUIServlet
 		
 		access_controller = new WebPluginAccessController( _plugin_interface );
 
+		Map	package_map = new HashMap();
+		
+		buildPackageMap( package_map, getClass().getClassLoader(), "org/gudy/azureus2/plugins/PluginInterface.class" );
+		buildPackageMap( package_map, getClass().getClassLoader(), "org/gudy/azureus2/ui/webplugin/remoteui/applet/RemoteUIApplet.class" );
+		
+		List	additional_resource_names = new ArrayList();
+		
+		for (int i=0;i<resource_names.length;i++){
+			
+			String	resource = resource_names_prefix + "/" + resource_names[i];
+			
+			int	pos = resource.lastIndexOf('/');
+			
+			String	pack = resource.substring(0,pos);
+			String	clas = resource.substring(pos+1);
+			
+			pos	= clas.indexOf('.');
+			
+			clas = clas.substring(0,pos) + "$";
+			
+			List	entries = (List)package_map.get( pack );
+			
+			if ( entries == null ){
+				
+				System.out.println("no map for " + pack );
+				
+			}else{
+								
+				for (int j=0;j<entries.size();j++){
+					
+					String	entry = (String)entries.get(j);
+					
+					if ( entry.startsWith( clas )){
+										
+						additional_resource_names.add( pack.substring( resource_names_prefix.length() + 1 ) + "/" + entry );
+					}
+				}
+			}
+		}
+		
+		String[]	new_rn = new String[ resource_names.length + additional_resource_names.size()];
+		
+		System.arraycopy( resource_names, 0, new_rn, 0, resource_names.length );
+		
+		for (int i=0;i<additional_resource_names.size();i++){
+			
+			String	ar = (String)additional_resource_names.get(i);
+						
+			new_rn[resource_names.length+i] = ar;
+		}
+		
+		resource_names = new_rn;
 	}
 	
 	public boolean
@@ -371,7 +368,7 @@ RemoteUIServlet
 					AEJarBuilder.buildFromResources( 
 						os, 
 						plugin_interface.getPluginClassLoader(), 
-						"org/gudy/azureus2", 
+						resource_names_prefix, 
 						url.equals( "/remui.jar")?resource_names:resource_icon_names,
 						sign_enable.getValue()?sign_alias.getValue():null );
 				
@@ -624,6 +621,133 @@ RemoteUIServlet
 		}
 		
 		return( false );
+	}
+	
+	protected void
+	buildPackageMap(
+		Map			package_map,
+		ClassLoader	cl,
+		String		resource )
+	{
+		URL url = cl.getResource( resource );
+		
+		String	url_string = url.toString();
+		
+	    if ( url_string.startsWith("jar:file:" )){
+	    	
+	        File jar = FileUtil.getJarFileFromURL( url_string );
+	        
+	        if ( jar != null ){
+
+	        	try{
+			        JarFile jarFile = new JarFile(jar);
+			        
+			        Enumeration entries = jarFile.entries();
+			        			        
+			        while (entries.hasMoreElements()){
+			       
+			        	JarEntry entry = (JarEntry) entries.nextElement();
+			          
+			        	if ( !entry.isDirectory()){
+			        		
+			        		String	name = entry.getName();
+			        		
+			        		int	pos = name.lastIndexOf( "/" );
+			        		
+			        		String	pack 	= name.substring(0,pos);
+			        		String	term	= name.substring(pos+1);
+			        		
+			        		List	list = (List)package_map.get(pack);
+			        		
+			        		if ( list == null ){
+			        			
+			        			list = new ArrayList();
+			        			
+			        			// System.out.println( "new package: " + pack );
+			        			
+			        			package_map.put( pack, list );
+			        		}
+			        		
+			        		if ( term.indexOf( '$' ) != -1 && term.endsWith( ".class" )){
+			        			
+			        			list.add( term );
+			        		}
+			        	}
+			        }
+	        	}catch( Throwable e){
+	        		
+	        		e.printStackTrace();
+	        	}
+	        }
+	    }else{
+	    	
+	    	int	depth 	= 0;
+	    	int	pos		= 0;
+	    	
+	    	while(true){
+	    		int	p1 = resource.indexOf( "/", pos );
+	    		
+	    		if ( p1 == -1 ){
+	    			break;
+	    		}
+	    		depth++;
+	    		pos	= p1+1;
+	    	}
+	    	
+	        File root_dir = new File(URI.create(url_string));
+	        
+	        for (int i=0;i<=depth;i++){
+	        	
+	        	root_dir = root_dir.getParentFile();
+	        }
+	        	        
+	        buildPackageMap( package_map, root_dir, new ArrayList(), null );
+	    }
+	}
+	
+	protected void
+	buildPackageMap(
+		Map			package_map,
+		File		file,
+		List		list,
+		String		prefix )
+	{
+		String	name = file.getName();
+		
+		if ( file.isFile()){
+			
+			if ( name.indexOf( '$' ) != -1 && name.endsWith( ".class" )){
+							
+				list.add( name );
+			}
+		}else{
+			
+			File[]	files = file.listFiles();
+			
+			if ( prefix == null ){
+				
+				prefix = "";
+				
+			}else if ( prefix.length() == 0 ){
+				
+				prefix = name;
+				
+			}else{
+				
+				prefix = prefix+"/"+name;
+			}
+			
+			list	= new ArrayList();
+				
+			// System.out.println( "new package:" + prefix );
+			
+			package_map.put( prefix, list );
+			
+			for (int i=0;i<files.length;i++){
+			
+				buildPackageMap( package_map, files[i], list, prefix );
+			}
+		}
 	}
 }
 
