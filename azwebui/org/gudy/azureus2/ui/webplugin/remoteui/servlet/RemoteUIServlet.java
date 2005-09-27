@@ -632,7 +632,7 @@ RemoteUIServlet
 		URL url = cl.getResource( resource );
 		
 		String	url_string = url.toString();
-		
+				
 	    if ( url_string.startsWith("jar:file:" )){
 	    	
 	        File jar = FileUtil.getJarFileFromURL( url_string );
@@ -654,23 +654,26 @@ RemoteUIServlet
 			        		
 			        		int	pos = name.lastIndexOf( "/" );
 			        		
-			        		String	pack 	= name.substring(0,pos);
-			        		String	term	= name.substring(pos+1);
-			        		
-			        		List	list = (List)package_map.get(pack);
-			        		
-			        		if ( list == null ){
+			        		if ( pos != -1 ){
 			        			
-			        			list = new ArrayList();
-			        			
-			        			// System.out.println( "new package: " + pack );
-			        			
-			        			package_map.put( pack, list );
-			        		}
-			        		
-			        		if ( term.indexOf( '$' ) != -1 && term.endsWith( ".class" )){
-			        			
-			        			list.add( term );
+				        		String	pack 	= name.substring(0,pos);
+				        		String	term	= name.substring(pos+1);
+				        		
+				        		List	list = (List)package_map.get(pack);
+				        		
+				        		if ( list == null ){
+				        			
+				        			list = new ArrayList();
+				        			
+				        			// System.out.println( "new package: " + pack );
+				        			
+				        			package_map.put( pack, list );
+				        		}
+				        				        		
+				        		if ( term.indexOf( '$' ) != -1 && term.endsWith( ".class" )){
+				        			
+				        			list.add( term );
+				        		}
 			        		}
 			        	}
 			        }
