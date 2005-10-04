@@ -41,6 +41,7 @@ import java.util.zip.*;
 import java.net.URI;
 import java.net.URL;
 
+import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.FileUtil;
 import org.gudy.azureus2.core3.util.jar.AEJarBuilder;
 import org.gudy.azureus2.plugins.tracker.web.*;
@@ -116,6 +117,7 @@ RemoteUIServlet
 		"ui/webplugin/remoteui/applet/view/VWEncodingView.class",
 				
 		"core3/config/COConfigurationManager.class",
+		"core3/config/COConfigurationListener.class",
 		"core3/config/StringList.class",
 		"core3/config/impl/ConfigurationManager.class",
 		"core3/config/impl/ConfigurationParameterNotFoundException.class",
@@ -130,6 +132,7 @@ RemoteUIServlet
 		"core3/util/AEDiagnostics.class",
 		"core3/util/AEDiagnosticsEvidenceGenerator.class",
 		"core3/util/AEDiagnosticsLogger.class",
+		"core3/util/Average.class",
 		"core3/util/IndentWriter.class",
 		"core3/util/Timer.class",
 		"core3/util/TimerEvent.class",
@@ -254,6 +257,9 @@ RemoteUIServlet
 	private StringParameter			sign_alias;
 	private DirectoryParameter		data_dir;
 	
+	private File					cache_dir;
+	private boolean					use_cache;
+	
 	public
 	RemoteUIServlet()
 	{
@@ -292,6 +298,31 @@ RemoteUIServlet
 		
 		access_controller = new WebPluginAccessController( _plugin_interface );
 
+		cache_dir 	= plugin_interface.getPluginconfig().getPluginUserFile( "cache" );
+		
+		if ( cache_dir.exists() && cache_dir.isDirectory()){
+			
+			use_cache = true;
+			
+			File[]	existing = cache_dir.listFiles();
+			
+			if ( existing != null ){
+				
+				for (int i=0;i<existing.length;i++){
+					
+					if ( !existing[i].delete()){
+						
+						use_cache = false;
+						
+						break;
+					}
+				}
+			}
+		}else{
+			
+			use_cache = cache_dir.mkdirs();
+		}
+		
 		Map	package_map = new HashMap();
 		
 		buildPackageMap( package_map, getClass().getClassLoader(), "org/gudy/azureus2/plugins/PluginInterface.class" );
@@ -359,13 +390,75 @@ RemoteUIServlet
 		
 		if ( url.equals( "/remui.jar" ) || url.equals( "/remuiicons.jar" )){
 			
+			if ( use_cache ){
+				
+				File	cache_file	= new File( cache_dir, url.substring(1));
+
+				boolean	cache_file_ok = false;
+				
+				if ( cache_file.exists()){
+					
+					cache_file_ok	= true;
+					
+				}else{
+					
+					OutputStream	os = null;
+
+					try{
+						
+						os = new FileOutputStream( cache_file );
+						
+							// this code appears below as well...
+						
+						AEJarBuilder.buildFromResources( 
+								os, 
+								plugin_interface.getPluginClassLoader(), 
+								resource_names_prefix, 
+								url.equals( "/remui.jar")?resource_names:resource_icon_names,
+								sign_enable.getValue()?sign_alias.getValue():null );
+						
+					}catch( Throwable e ){
+						
+						Debug.printStackTrace(e);
+						
+					}finally{
+						
+						if ( os != null ){
+							
+							try{
+								
+								os.close();
+								
+								cache_file_ok	= true;
+								
+							}catch( Throwable e ){
+								
+								Debug.printStackTrace(e);
+							}
+						}
+					}
+				}
+				
+				if ( cache_file_ok ){
+					
+					response.useStream( "jar", new FileInputStream( cache_file ));
+					
+					return( true );
+					
+				}else{
+					
+					use_cache = false;
+				}
+			}
+			
 			OutputStream	os = null;
 			
 			try{
 				os = response.getOutputStream();
 			
-				//long latest_time = 
-					AEJarBuilder.buildFromResources( 
+					// this code appears above as well...
+				
+				AEJarBuilder.buildFromResources( 
 						os, 
 						plugin_interface.getPluginClassLoader(), 
 						resource_names_prefix, 
@@ -374,15 +467,8 @@ RemoteUIServlet
 				
 				
 				response.setContentType("application/java-archive");
-				
-				/*
-				if ( latest_time > 0 ){
-					// GRRRRRR JRE 1.4.2_04 doesn't do this right anyway. leave it for now
-					//response.setLastModified( latest_time );
-					//response.setExpires( latest_time + 60*60*1000 );
-				}
-				*/
-				
+			
+			
 				return( true );
 		
 			}catch( Throwable e ){
