@@ -77,6 +77,8 @@ RemoteUIServlet
 			"ui/icons/up.gif",		
 			"ui/icons/down.gif",		
 			"ui/icons/host.gif",		
+			"ui/icons/pause.gif",		
+			"ui/icons/resume.gif",		
 	};
 	
 	static String resource_names_prefix = "org/gudy/azureus2";

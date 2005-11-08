@@ -114,6 +114,24 @@ RemoteUIMainPanel
 			refresh.setToolTipText("Refresh");
 			
 			tb.add( refresh );
+
+			final ImageIcon pause_icon = getImageIcon( 
+					UISwingImageRepository.getImage(
+							adapter.getResource("pause.gif")));
+
+			final ImageIcon  resume_icon = getImageIcon( 
+					UISwingImageRepository.getImage(
+							adapter.getResource("resume.gif")));
+
+			final JButton	pause_resume = getButton("PauseResume", pause_icon );
+							
+
+			pause_resume.setToolTipText("Pause all");
+
+			tb.add( pause_resume );
+			
+			tb.addSeparator();
+
 			
 			JButton	start = 
 				getButton(	"Start",
@@ -415,6 +433,35 @@ RemoteUIMainPanel
 						}
 					});
 	
+			pause_resume.addActionListener(
+					new ActionListener()
+					{
+						public void
+						actionPerformed(
+							ActionEvent	ev )
+						{
+							if ( pause_resume.getIcon() == pause_icon ){
+								
+								download_manager.pauseDownloads();
+								
+								pause_resume.setIcon( resume_icon );
+								
+								pause_resume.setToolTipText( "Resume all downloads" );
+								
+								refresh();
+							}else{
+								
+								download_manager.resumeDownloads();
+								
+								pause_resume.setIcon( pause_icon );
+								
+								pause_resume.setToolTipText( "Pause all downloads" );
+								
+								refresh();
+							}
+						}
+					});
+			
 			start.addActionListener(
 					new ActionListener()
 					{
