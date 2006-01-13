@@ -173,7 +173,19 @@ RemoteUIServlet
 		"pluginsimpl/remote/ipfilter/RPIPFilter.class",
 		"pluginsimpl/remote/tracker/RPTracker.class",
 		"pluginsimpl/remote/tracker/RPTrackerTorrent.class",
-
+		
+		"pluginsimpl/remote/rpexceptions/RPDeserialiseClassMismatchException.class",
+		"pluginsimpl/remote/rpexceptions/RPDeserialiseParseException.class",
+		"pluginsimpl/remote/rpexceptions/RPInternalProcessException.class",
+		"pluginsimpl/remote/rpexceptions/RPMalformedXMLException.class",
+		"pluginsimpl/remote/rpexceptions/RPMethodAccessDeniedException.class",
+		"pluginsimpl/remote/rpexceptions/RPNoObjectIDException.class",
+		"pluginsimpl/remote/rpexceptions/RPObjectNoLongerExistsException.class",
+		"pluginsimpl/remote/rpexceptions/RPRemoteMethodInvocationException.class",
+		"pluginsimpl/remote/rpexceptions/RPThrowableAsReplyException.class",
+		"pluginsimpl/remote/rpexceptions/RPUnknownMethodException.class",
+		"pluginsimpl/remote/rpexceptions/RPUnsupportedInputTypeException.class",		
+		
 		"plugins/PluginInterface.class",
 		"plugins/PluginListener.class",
 		"plugins/PluginView.class",
@@ -185,6 +197,7 @@ RemoteUIServlet
 		"plugins/PluginConfigListener.class",
 		"plugins/config/ConfigParameter.class",
 		"plugins/logging/Logger.class",
+		"plugins/logging/LoggerChannel.class",
 		"plugins/peers/protocol/PeerProtocolManager.class",
 		"plugins/sharing/ShareManager.class",
 		"plugins/sharing/ShareException.class",
