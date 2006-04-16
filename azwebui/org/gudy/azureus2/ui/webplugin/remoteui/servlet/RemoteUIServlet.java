@@ -192,6 +192,7 @@ RemoteUIServlet
 		"plugins/PluginView.class",
 		"plugins/PluginException.class",
 		"plugins/Plugin.class",
+		"plugins/PluginEvent.class",
 		"plugins/PluginManager.class",
 		"plugins/PluginEventListener.class",
 		"plugins/PluginConfig.class",
