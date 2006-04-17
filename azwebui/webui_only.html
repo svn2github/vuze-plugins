@@ -2,16 +2,13 @@
 specification of the plugin and all attempts to "fix" it besides this method failed -->
 <html>
 <head>
- <title>Azureus Swing UI</title>
- <link rel="stylesheet" href="stylesheet.css">
+ <title>Azureus Swing UI - GUI Only</title>
 </head>
-<body>
-<h1>Azureus Swing UI</h1>
-
+<BODY scroll="no" topmargin="0" leftmargin="0" marginwidth="0" marginheight="0">
 <!--"CONVERTED_APPLET"-->
 <!-- HTML CONVERTER -->
 
-<div>
+
 <script language="JavaScript" type="text/javascript"><!--
     var _info = navigator.userAgent;
     var _ns = false;
@@ -26,7 +23,7 @@ specification of the plugin and all attempts to "fix" it besides this method fai
     </comment>
 
 <script language="JavaScript" type="text/javascript"><!--
-    if (_ie == true) document.writeln('<script src="webui_frame_embed.js"></script>');
+    if (_ie == true) document.writeln('<script src="webui_only_embed.js"></script>');
     else if (_ns == true && _ns6 == false) document.writeln('<embed ' +
 	    'type="application/x-java-applet;version=1.4" \
             CODE = "org.gudy.azureus2.ui.webplugin.remoteui.applet.RemoteUIApplet.class" \
@@ -34,7 +31,7 @@ specification of the plugin and all attempts to "fix" it besides this method fai
             ARCHIVE = "remui.jar" \
             NAME = "Swing Webui" \
             WIDTH = 100% \
-            HEIGHT = 74% \
+            HEIGHT = 100% \
             ALIGN = middle \
             VSPACE = 0 \
             HSPACE = 0 \
@@ -42,7 +39,7 @@ specification of the plugin and all attempts to "fix" it besides this method fai
             scriptable=false ' +
 	    'pluginspage="http://www.java.com/en/download/manual.jsp"><noembed><xmp>');  
 	    else
-	    document.writeln('<applet  CODE = "org.gudy.azureus2.ui.webplugin.remoteui.applet.RemoteUIApplet.class" JAVA_CODEBASE = "." ARCHIVE = "remui.jar" WIDTH = 100% HEIGHT = 74% NAME = "Swing Webui" ALIGN = middle VSPACE = 0 HSPACE = 0 MAYSCRIPT = false></xmp>'+
+	    document.writeln('<applet  CODE = "org.gudy.azureus2.ui.webplugin.remoteui.applet.RemoteUIApplet.class" JAVA_CODEBASE = "." ARCHIVE = "remui.jar" WIDTH = 100% HEIGHT = 100% NAME = "Swing Webui" ALIGN = middle VSPACE = 0 HSPACE = 0 MAYSCRIPT = false></xmp>'+
     '<PARAM NAME = CODE VALUE = "org.gudy.azureus2.ui.webplugin.remoteui.applet.RemoteUIApplet.class" >'+
     '<PARAM NAME = CODEBASE VALUE = "." >'+
     '<PARAM NAME = ARCHIVE VALUE = "remui.jar" >'+
@@ -65,14 +62,6 @@ specification of the plugin and all attempts to "fix" it besides this method fai
 -->
 <!--"END_CONVERTED_APPLET"-->
 
-</div>
-<form method="post" action="webui_only.html" target="_blank">
- <input type="submit" value="Launch GUI only in seperate, resizable window">
-</form>
-<form method="POST" enctype="multipart/form-data" action="/upload.cgi" target="status">
- <p>Upload a local torrent to Azureus by browsing to it OR enter a torrent URL (latter doesn't work with Opera):<br>
- <input type="file" size="75" name="upfile" accept="application/x-bittorrent">&nbsp;&nbsp;&nbsp;<input type="submit" value="Submit"></p>
-</form>
-<BR>
+
 </body>
 </html>
