@@ -198,6 +198,7 @@ RemoteUIServlet
 		"plugins/PluginConfig.class",
 		"plugins/PluginConfigListener.class",
 		"plugins/config/ConfigParameter.class",
+		"plugins/ipc/IPCInterface.class",
 		"plugins/logging/Logger.class",
 		"plugins/logging/LoggerChannel.class",
 		"plugins/peers/protocol/PeerProtocolManager.class",
