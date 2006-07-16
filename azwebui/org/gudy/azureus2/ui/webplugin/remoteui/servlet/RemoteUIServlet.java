@@ -217,6 +217,8 @@ RemoteUIServlet
 		"plugins/download/DownloadManagerStats.class",
 		"plugins/download/DownloadException.class",
 		"plugins/download/Download.class",
+		"plugins/download/DownloadActivationEvent.class",
+		"plugins/download/DownloadActivationListener.class",
 		"plugins/download/DownloadManagerListener.class",
 		"plugins/download/DownloadWillBeAddedListener.class",
 		"plugins/download/DownloadStats.class",
