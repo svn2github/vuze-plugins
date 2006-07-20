@@ -58,19 +58,19 @@ package org.gudy.azureus2.ui.webplugin.remoteui.applet.view;
  * @author Philip Milne
  */
 
-import java.util.*;
-
-import javax.swing.table.TableModel;
-import javax.swing.event.TableModelEvent;
-
-// Imports for picking up mouse events from the JTable. 
-
+import java.awt.event.InputEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.event.InputEvent;
+import java.util.Date;
+import java.util.Vector;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import javax.swing.JTable;
+import javax.swing.event.TableModelEvent;
 import javax.swing.table.JTableHeader;
 import javax.swing.table.TableColumnModel;
+import javax.swing.table.TableModel;
 
 public class TableSorter extends TableMap
 {
@@ -151,14 +151,43 @@ space and avoid unnecessary heap allocation.
         else if (type == String.class)
             {
                 String s1 = (String)data.getValueAt(row1, column);
-                String s2    = (String)data.getValueAt(row2, column);
-                int result = s1.compareTo(s2);
+                String s2 = (String)data.getValueAt(row2, column);
+                
+                // handle peers/seeds column correct
+                Pattern p = Pattern.compile("(\\d+)\\((\\d+)\\)");
+                Matcher m1 = p.matcher(s1);
+                Matcher m2 = p.matcher(s2);
+                if(m1.matches() && m2.matches()) {
+                	// special seeds/peers columns
+                	int connected1 = Integer.parseInt(m1.group(1));
+                	int connected2 = Integer.parseInt(m2.group(1));
+                	int total1     = Integer.parseInt(m1.group(2));
+                	int total2     = Integer.parseInt(m2.group(2));
 
-                if (result < 0)
-                    return -1;
-                else if (result > 0)
-                    return 1;
-                else return 0;
+                    if (connected1 < connected2)
+                        return -1;
+                    else if (connected1 > connected2)
+                        return 1;
+                    else {
+                        if (total1 < total2)
+                            return -1;
+                        else if (total1 > total2)
+                            return 1;
+                        else
+                            return 0;
+                   }
+               	
+                } else {
+                	// normal string column
+                    int result = s1.compareTo(s2);
+
+                    if (result < 0)
+                        return -1;
+                    else if (result > 0)
+                        return 1;
+                    else return 0;
+                }
+                
             }
         else if (type == Boolean.class)
             {
