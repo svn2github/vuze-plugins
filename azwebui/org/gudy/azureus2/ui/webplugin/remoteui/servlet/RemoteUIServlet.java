@@ -237,6 +237,8 @@ RemoteUIServlet
 		"plugins/peers/PeerManager.class",
 		"plugins/platform/PlatformManager.class",
 		"plugins/torrent/Torrent.class",
+		"plugins/torrent/TorrentCreator.class",
+		"plugins/torrent/TorrentCreatorListener.class",
 		"plugins/torrent/TorrentFile.class",
 		"plugins/torrent/TorrentException.class",
 		"plugins/torrent/TorrentEncodingException.class",
