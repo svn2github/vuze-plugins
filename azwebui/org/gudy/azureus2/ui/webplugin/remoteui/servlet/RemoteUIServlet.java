@@ -264,6 +264,7 @@ RemoteUIServlet
 		"plugins/ipfilter/IPFilterException.class",
 		"plugins/ipfilter/IPRange.class",
 		"plugins/ipfilter/IPBlocked.class",
+		"plugins/ipfilter/IPBanned.class",
 		"plugins/utils/resourcedownloader/ResourceDownloaderException.class",
 		"plugins/utils/ShortCuts.class",
 		"plugins/update/UpdateManager.class",
