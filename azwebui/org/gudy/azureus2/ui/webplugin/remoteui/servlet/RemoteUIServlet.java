@@ -566,7 +566,7 @@ RemoteUIServlet
 		}else if ( url.equals( "/upload.cgi")){
 
 			// -----------------------------7d4f2a310bca
-			//Content-Disposition: form-data; name="upfile"; filename="C:\Temp\(HH)-Demon Beast Resurrection 1-2.torrent"
+			//Content-Disposition: form-data; name="upfile"; filename="C:\Temp\banana_custard.torrent"
 			//Content-Type: application/octet-stream
 			//
 			// <data>
