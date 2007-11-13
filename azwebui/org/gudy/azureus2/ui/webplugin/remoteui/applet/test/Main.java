@@ -27,11 +27,16 @@ package org.gudy.azureus2.ui.webplugin.remoteui.applet.test;
  */
 
 import java.io.*;
+import java.util.Properties;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 
 import org.gudy.azureus2.core3.security.SESecurityManager;
+import org.gudy.azureus2.core3.util.AEMonitor;
+import org.gudy.azureus2.core3.util.AESemaphore;
+import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.plugins.*;
 // import org.gudy.azureus2.plugins.utils.*;
 
@@ -193,5 +198,53 @@ Main
 		cont.add( panel );	
 		
 		frame.setVisible(true);
-	}		
+	}	
+	
+	private static AESemaphore		init_sem 	= new AESemaphore("PluginTester");
+	private static AEMonitor		class_mon	= new AEMonitor( "PluginTester" );
+
+
+	private static Main		singleton;
+		
+	
+	public static Main
+	getSingleton()
+	{
+		try{
+			class_mon.enter();
+		
+			if ( singleton == null ){
+				
+				new AEThread2( "plugin initialiser", false )
+				{
+					public void
+					run()
+					{
+						PluginManager.registerPlugin( Main.class );
+		
+						Properties props = new Properties();
+						
+						props.put( PluginManager.PR_MULTI_INSTANCE, "true" );
+						
+						PluginManager.startAzureus( PluginManager.UI_NONE, props );
+					}
+				}.start();
+			
+				init_sem.reserve();
+			}
+			
+			return( singleton );
+			
+		}finally{
+			
+			class_mon.exit();
+		}
+	}	
+	
+	public static void
+	main(
+		String[]	args )
+	{
+		getSingleton();
+	}
 }

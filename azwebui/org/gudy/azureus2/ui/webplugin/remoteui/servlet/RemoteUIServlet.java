@@ -91,6 +91,7 @@ RemoteUIServlet
 		
 		"ui/swt/views/AbstractIView.class",
 		"ui/swt/views/IView.class",
+		"ui/swt/mainwindow/Refreshable.class",
 		"ui/swt/IconBarEnabler.class",
 		
 		"ui/webplugin/remoteui/applet/RemoteUIApplet.class",
@@ -121,6 +122,7 @@ RemoteUIServlet
 		"core3/config/COConfigurationManager.class",
 		"core3/config/COConfigurationListener.class",
 		"core3/config/StringList.class",
+		"core3/config/impl/ConfigurationDefaults.class",
 		"core3/config/impl/ConfigurationManager.class",
 		"core3/config/impl/ConfigurationParameterNotFoundException.class",
 		"core3/config/ParameterListener.class",
@@ -214,6 +216,7 @@ RemoteUIServlet
 		"plugins/ddb/DistributedDatabase.class",
 		"plugins/disk/DiskManager.class",
 		"plugins/disk/DiskManagerFileInfo.class",
+		"plugins/download/DownloadAttributeListener.class",
 		"plugins/download/DownloadManager.class",
 		"plugins/download/DownloadManagerStats.class",
 		"plugins/download/DownloadException.class",
