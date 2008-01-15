@@ -42,7 +42,6 @@ import javax.net.ssl.*;
 import org.gudy.azureus2.ui.swing.*;
 
 import org.gudy.azureus2.core3.config.*;
-import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.jar.AEJarReader;
 
 import org.gudy.azureus2.pluginsimpl.remote.*;
@@ -63,7 +62,7 @@ RemoteUIApplet
 	
 	protected AEJarReader			jar_reader;
 	
-	protected AESemaphore	dialog_sem		= new AESemaphore("RemoteUIApplet",1);
+	protected Semaphore	dialog_sem		= new Semaphore(1);
 	protected ArrayList	outstanding_dialogs	= new ArrayList();
 	
 	protected boolean	application;
@@ -582,6 +581,123 @@ RemoteUIApplet
 		super.destroy();
 	}
 	
+	private class
+	Semaphore
+	{
+		private int		dont_wait	= 0;
+		private int		waiting		= 0;
+		
+		private int		total_reserve	= 0;
+		private int		total_release	= 0;
+
+		protected
+		Semaphore(
+			int	count )
+		{
+			dont_wait		= count;
+			total_release	= count;
+		}
+		
+		public void
+		reserve()
+		{
+			reserve(0);
+		}
+		
+		public boolean
+		reserve(
+			long	millis )
+		{
+			return( reserveSupport( millis ) == 1 );
+		}
+				
+		protected int
+		reserveSupport(
+			long	millis )
+		{			
+			synchronized(this){
+
+				if ( dont_wait == 0 ){
+
+					try{
+						waiting++;
+
+						if ( millis == 0 ){
+							
+							int	spurious_count	= 0;
+							
+							while( true ){
+								
+								wait();
+								
+								if ( total_reserve == total_release ){
+									
+									spurious_count++;
+
+									if ( spurious_count > 1024 ){
+																			
+										throw( new Throwable( "die die die" ));
+									}					
+								}else{
+									
+									break;
+								}
+							}
+						}else{
+							
+							wait(millis);
+						}
+						
+						if ( total_reserve == total_release ){
+															
+							waiting--;
+							
+							return( 0 );
+						}
+							
+						total_reserve++;
+
+						return( 1 );
+
+					}catch( Throwable e ){
+
+						waiting--;
+						
+						throw( new RuntimeException("Semaphore: operation interrupted", e ));
+					}
+				}else{
+					
+					dont_wait--;
+
+					total_reserve ++;
+					
+					return( 1 );
+				}
+			}
+		}
+		
+		public void
+		release()
+		{
+			synchronized(this){
+				
+				//System.out.println( name + "::release");
+	
+				total_release++;
+	
+				if ( waiting != 0 ){
+	
+					waiting--;
+	
+					notify();
+	
+				}else{
+					
+					dont_wait++;
+				}
+			}
+		}
+	}
 	public static void
 	main(
 		String[]		args )

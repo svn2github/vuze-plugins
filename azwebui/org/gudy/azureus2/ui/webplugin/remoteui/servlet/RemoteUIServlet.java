@@ -129,7 +129,6 @@ RemoteUIServlet
 		"core3/util/Constants.class",
 		"core3/util/DisplayFormatters.class",
 		"core3/util/Debug.class",
-		"core3/util/AESemaphore.class",
 		"core3/util/AEThread.class",
 		"core3/util/AERunnable.class",
 		"core3/util/AEMonSem.class",
