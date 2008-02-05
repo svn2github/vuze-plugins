@@ -209,6 +209,7 @@ RemoteUIServlet
 		"plugins/ddb/DistributedDatabase.class",
 		"plugins/disk/DiskManager.class",
 		"plugins/disk/DiskManagerFileInfo.class",
+		"plugins/dht/mainline/MainlineDHTManager.class",
 		"plugins/download/DownloadAttributeListener.class",
 		"plugins/download/DownloadManager.class",
 		"plugins/download/DownloadManagerStats.class",
