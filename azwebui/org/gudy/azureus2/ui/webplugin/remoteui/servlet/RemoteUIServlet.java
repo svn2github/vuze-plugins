@@ -139,6 +139,8 @@ RemoteUIServlet
 		"core3/util/Average.class",
 		"core3/util/FrequencyLimitedDispatcher.class",
 		"core3/util/IndentWriter.class",
+		"core3/util/LightHashSet.class",
+		"core3/util/LightHashMap.class",
 		"core3/util/Timer.class",
 		"core3/util/TimerEvent.class",
 		"core3/util/TimerEventPeriodic.class",
