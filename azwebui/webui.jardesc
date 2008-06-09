@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="WINDOWS-1252" standalone="no"?>
+<jardesc>
+    <jar path="azwebui/webui.jar"/>
+    <options buildIfNeeded="true" compress="true" descriptionLocation="/azwebui/webui.jardesc" exportErrors="true" exportWarnings="true" includeDirectoryEntries="false" overwrite="false" saveDescription="true" storeRefactorings="false" useSourceFolders="false"/>
+    <storedRefactorings deprecationInfo="true" structuralOnly="false"/>
+    <selectedProjects/>
+    <manifest generateManifest="true" manifestLocation="" manifestVersion="1.0" reuseManifest="false" saveManifest="false" usesManifest="true">
+        <sealing sealJar="false">
+            <packagesToSeal/>
+            <packagesToUnSeal/>
+        </sealing>
+    </manifest>
+    <selectedElements exportClassFiles="true" exportJavaFiles="true" exportOutputFolder="false">
+        <javaElement handleIdentifier="=azwebui/&lt;org.gudy.azureus2.ui.webplugin.remoteui.applet.view"/>
+        <javaElement handleIdentifier="=azwebui/&lt;org.gudy.azureus2.ui.webplugin.remoteui.applet"/>
+        <javaElement handleIdentifier="=azwebui/&lt;org.gudy.azureus2.ui.webplugin.remoteui.servlet.internat"/>
+        <javaElement handleIdentifier="=azwebui/&lt;org.gudy.azureus2.ui.webplugin.remoteui.servlet"/>
+        <javaElement handleIdentifier="=azwebui/&lt;org.gudy.azureus2.ui.webplugin.remoteui.applet.model"/>
+        <javaElement handleIdentifier="=azwebui/&lt;org.gudy.azureus2.ui.webplugin.remoteui.applet.test"/>
+    </selectedElements>
+</jardesc>

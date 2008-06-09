@@ -195,7 +195,7 @@ RemoteUIMainPanel
 			final JButton	move_up = 
 				getButton( 	"Up",
 							getImageIcon(UISwingImageRepository.getImage(
-										adapter.getResource("up.gif"))));
+										adapter.getResource("up.png"))));
 
 			move_up.setToolTipText("Move Up");
 
@@ -207,7 +207,7 @@ RemoteUIMainPanel
 			final JButton	move_down = 
 				getButton( 	"Down",
 							getImageIcon(UISwingImageRepository.getImage(
-										adapter.getResource("down.gif"))));
+										adapter.getResource("down.png"))));
 
 			move_down.setToolTipText("Move Down");
 
@@ -826,7 +826,30 @@ RemoteUIMainPanel
 		
 		}else{
 			
-			return( new JButton( icon ));
+			JButton button = 
+				new JButton( icon )
+			{
+				public Dimension
+				getPreferredSize()
+				{
+					return( new Dimension( 24, 24 ));
+				}
+				
+				public Dimension
+				getMinimumSize()
+				{
+					return( getPreferredSize());
+				}
+				
+				public Dimension
+				getMaximumSize()
+				{
+					return( getPreferredSize());
+				}
+			};
+			
+			
+			return( button );
 		}
 	}
 	protected ImageIcon
