@@ -377,7 +377,7 @@ RemoteUIServlet
 			
 			if ( entries == null ){
 				
-				System.out.println("no map for " + pack );
+				System.out.println("SwingUI: no map for " + pack );
 				
 			}else{
 								
