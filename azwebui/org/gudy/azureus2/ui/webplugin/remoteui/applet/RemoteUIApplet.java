@@ -480,7 +480,7 @@ RemoteUIApplet
 				con = (HttpURLConnection) url.openConnection();
 			}
 
-			con.setRequestProperty("Connection", "close" );
+			con.setRequestProperty("Connection", "keep-alive" );
 			
 			con.setRequestMethod( "POST" );
 			
