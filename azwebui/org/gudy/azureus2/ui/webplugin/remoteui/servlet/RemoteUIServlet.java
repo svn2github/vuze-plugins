@@ -61,10 +61,10 @@ RemoteUIServlet
 	
 	protected static Properties	defaults = new Properties();
 	
-	static{
-		
+	static{	
 		defaults.put( WebPlugin.CONFIG_PORT, new Integer( DEFAULT_PORT ));
 		defaults.put( WebPlugin.PR_ENABLE_KEEP_ALIVE, new Boolean(true));
+		defaults.put( WebPlugin.PR_PAIRING_SID, "swingui" );
 	}
 	
 	static String[] resource_icon_names = {
