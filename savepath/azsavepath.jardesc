@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="WINDOWS-1252" standalone="no"?>
+<jardesc>
+    <jar path="azsavepath/azsavepath.jar"/>
+    <options buildIfNeeded="true" compress="true" descriptionLocation="/azsavepath/azsavepath.jardesc" exportErrors="true" exportWarnings="true" includeDirectoryEntries="false" overwrite="false" saveDescription="true" storeRefactorings="false" useSourceFolders="false"/>
+    <storedRefactorings deprecationInfo="true" structuralOnly="false"/>
+    <selectedProjects/>
+    <manifest generateManifest="true" manifestLocation="" manifestVersion="1.0" reuseManifest="false" saveManifest="false" usesManifest="true">
+        <sealing sealJar="false">
+            <packagesToSeal/>
+            <packagesToUnSeal/>
+        </sealing>
+    </manifest>
+    <selectedElements exportClassFiles="true" exportJavaFiles="true" exportOutputFolder="false">
+        <javaElement handleIdentifier="=azsavepath/&lt;com.aelitis.azureus.plugins.azsavepath.profiles"/>
+        <javaElement handleIdentifier="=azsavepath/&lt;com.aelitis.azureus.plugins.azsavepath.formatters"/>
+        <javaElement handleIdentifier="=azsavepath/&lt;com.aelitis.azureus.plugins.azsavepath"/>
+        <javaElement handleIdentifier="=azsavepath/&lt;com.aelitis.azureus.plugins.azsavepath.ui"/>
+        <javaElement handleIdentifier="=azsavepath/&lt;com.aelitis.azureus.plugins.azsavepath.parsers"/>
+        <javaElement handleIdentifier="=azsavepath/&lt;com.aelitis.azureus.plugins.azsavepath.messages"/>
+        <file path="/azsavepath/plugin.properties"/>
+        <javaElement handleIdentifier="=azsavepath/&lt;com.aelitis.azureus.plugins.azsavepath.datasource"/>
+        <javaElement handleIdentifier="=azsavepath/&lt;com.aelitis.azureus.plugins.azsavepath.listeners"/>
+    </selectedElements>
+</jardesc>

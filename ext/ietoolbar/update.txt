@@ -1,0 +1,7 @@
+**** Manual install required ****
+
+This plugin is an external plugin and requires manual installation.
+
+See the plugin view in Azureus for details and the readme.txt in the plugin folder.
+
+**** Manual install required ****

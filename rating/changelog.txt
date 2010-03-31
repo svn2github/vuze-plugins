@@ -1,0 +1,7 @@
+1.3 : Smaller stars, middle click on table cell sets personal rating, double 
+      click on table cell opens rating window.  More tooltip information 
+      (# of comments, personal rating).  Line under stars to indicate personal
+      rating.
+1.2 : Better integration with DHT Activity reports
+1.1 : Removed debug output
+1.0 : Initial test version

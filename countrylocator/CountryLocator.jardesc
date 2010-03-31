@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="WINDOWS-1252" standalone="no"?>
+<jardesc>
+    <jar path="countrylocator/CountryLocator.jar"/>
+    <options buildIfNeeded="true" compress="true" descriptionLocation="/countrylocator/CountryLocator.jardesc" exportErrors="true" exportWarnings="true" includeDirectoryEntries="false" overwrite="false" saveDescription="true" storeRefactorings="false" useSourceFolders="false"/>
+    <storedRefactorings deprecationInfo="true" structuralOnly="false"/>
+    <selectedProjects/>
+    <manifest generateManifest="true" manifestLocation="" manifestVersion="1.0" reuseManifest="false" saveManifest="false" usesManifest="true">
+        <sealing sealJar="false">
+            <packagesToSeal/>
+            <packagesToUnSeal/>
+        </sealing>
+    </manifest>
+    <selectedElements exportClassFiles="true" exportJavaFiles="true" exportOutputFolder="false">
+        <file path="/countrylocator/GeoIP-LICENSE.txt"/>
+        <javaElement handleIdentifier="=countrylocator/&lt;org.gudy.azureus2.countrylocator.maps"/>
+        <javaElement handleIdentifier="=countrylocator/&lt;com.maxmind.geoip.csvtodat"/>
+        <file path="/countrylocator/GeoIP.dat"/>
+        <javaElement handleIdentifier="=countrylocator/&lt;org.gudy.azureus2.countrylocator.statisticsProviders"/>
+        <file path="/countrylocator/Country2Coord.txt"/>
+        <javaElement handleIdentifier="=countrylocator/&lt;org.gudy.azureus2.countrylocator.flags25x15"/>
+        <javaElement handleIdentifier="=countrylocator/&lt;org.gudy.azureus2.countrylocator.flags18x12"/>
+        <file path="/countrylocator/readme.txt"/>
+        <javaElement handleIdentifier="=countrylocator/&lt;com.maxmind.geoip"/>
+        <javaElement handleIdentifier="=countrylocator/&lt;org.gudy.azureus2.countrylocator"/>
+        <javaElement handleIdentifier="=countrylocator/&lt;org.gudy.azureus2.countrylocator.internat"/>
+        <file path="/countrylocator/plugin.properties"/>
+    </selectedElements>
+</jardesc>

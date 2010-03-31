@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="WINDOWS-1252" standalone="no"?>
+<jardesc>
+    <jar path="azconfigbackup/azconfigbackup.jar"/>
+    <options buildIfNeeded="true" compress="true" descriptionLocation="/azconfigbackup/azconfigbackup.jardesc" exportErrors="true" exportWarnings="true" includeDirectoryEntries="false" overwrite="false" saveDescription="true" storeRefactorings="false" useSourceFolders="false"/>
+    <storedRefactorings deprecationInfo="true" structuralOnly="false"/>
+    <selectedProjects/>
+    <manifest generateManifest="true" manifestLocation="" manifestVersion="1.0" reuseManifest="false" saveManifest="false" usesManifest="true">
+        <sealing sealJar="false">
+            <packagesToSeal/>
+            <packagesToUnSeal/>
+        </sealing>
+    </manifest>
+    <selectedElements exportClassFiles="true" exportJavaFiles="true" exportOutputFolder="false">
+        <javaElement handleIdentifier="=azconfigbackup/&lt;omschaub.azconfigbackup.utilities"/>
+        <javaElement handleIdentifier="=azconfigbackup/&lt;omschaub.azconfigbackup.main"/>
+        <file path="/azconfigbackup/plugin.properties"/>
+        <javaElement handleIdentifier="=azconfigbackup/&lt;omschaub.azconfigbackup.utilities.imagerepository"/>
+        <javaElement handleIdentifier="=azconfigbackup/&lt;omschaub.azconfigbackup.utilities.commentmaker"/>
+        <javaElement handleIdentifier="=azconfigbackup/&lt;omschaub.azconfigbackup.utilities.download"/>
+    </selectedElements>
+</jardesc>

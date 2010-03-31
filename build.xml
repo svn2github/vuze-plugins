@@ -1,0 +1,164 @@
+<?xml version="1.0"?>
+
+<project default="jar+src" basedir=".">
+	<description>Plugin Builder</description>
+
+<target name="init" unless="plugin.id">
+	
+	<echo>${AZPluginDir}</echo>
+
+	<property environment="env" />
+
+	<property name="dist.dir" location="." />
+	<echo>dist.dir (Output Directory): ${dist.dir}</echo>
+
+	<condition property="source.dir" value="${eclipse.container_name}">
+			<isset property="eclipse.container_name" />
+	</condition>
+
+		<echo>${source.dir} ${eclipse.container_name}</echo>
+	<fail unless="source.dir">source.dir or eclipse.container_name not set.
+
+Variable "source.dir" or "eclipse.container_name" must be set to plugin folder
+you wish to compile.
+
+In Eclipse, Preferences->Ant->RunTime->Properties, Add Property:
+	Name: eclipse.container_name
+	value: ${container_name}
+		
+or
+		
+On the command line, add:
+		-Dsource.dir="path to plugin folder"
+	</fail>
+	<echo>source.dir: ${source.dir}</echo>
+		
+	<fail message="Plugin dir ${source.dir} does not exist">
+		<condition>
+			<not>
+			<available file="${source.dir}" type="dir"></available>
+			</not>
+		</condition>
+	</fail>
+
+
+	<property file="${source.dir}/plugin.properties">
+	</property>
+
+	<fail unless="plugin.id">
+		${source.dir}/plugin.properties does not contain a value for plugin.id
+	</fail>
+
+	<fail unless="plugin.version">
+${source.dir}/plugin.properties does not contain a value for plugin.version.
+Either put one in plugin properties, or use -Dplugin.version=M.m
+	</fail>
+	<echo>Plugin: ${plugin.id} v${plugin.version}</echo>
+
+	<property name="generic.excludes" value="**/*.jar **/*build.xml **/*.jardesc **/.classpath **/.project build/**" />
+	<property name="dist.jar.excludes" value="${generic.excludes} **/*.java " />
+
+<!--
+	<property name="libs.classpath" location="E:\AzDev\pluginlibs" />
+	<path id="libs.classpath">
+		<fileset dir="${libs.classpath}" includes="**/*.jar" />
+	</path>
+		<echo>javac classpath includes: ${libs.classpath}</echo>
+-->
+
+		<echo>
+If you have 'cannot find symbol' or 'package foo does not exist'
+compile errors, make sure you specify the
+directory with the required jar files via -lib command line option
+			</echo>
+
+		<echo>Output to ${dist.dir} as ${plugin.id}</echo>
+
+		<mkdir dir="${dist.dir}" />
+	</target>
+
+
+	<target name="compile" depends="init">
+		<echo>Compiling ${source.dir}</echo>
+
+		<javac srcdir="${source.dir}" destdir="${source.dir}" nowarn="yes" debug="true" debuglevel="lines,vars,source" source="1.4" target="1.4">
+		</javac>
+	</target>
+
+
+<!--
+if (isset(AZPluginDir))
+  -jar+src-ifAZ()
+else
+  -jar+src-notAZ()
+-->
+	<target name="jar+src" depends="init,-jar+src-ifAZ,-jar+src-notAZ">
+	</target>
+
+	<target name="-jar+src-ifAZ" if="AZPluginDir">
+		<antcall target="makejar" />
+		<antcall target="makesrc" />
+		<antcall target="-copyToAZPluginDir" />
+	</target>
+
+	<target name="-jar+src-notAZ" unless="AZPluginDir">
+		<antcall target="makejar" />
+		<antcall target="makesrc" />
+	</target>
+
+
+
+	<target name="-copyToAZPluginDir">
+	<script language="javascript">
+		<![CDATA[
+		// find a good dest name
+
+		// Requires:
+		// BSF: http://jakarta.apache.org/bsf/
+		// Rhino: http://www.mozilla.org/rhino
+
+		importClass(java.io.File)
+	
+		var sFileName;
+
+		sDir = project.getProperty("AZPluginDir") + "/" + project.getProperty("plugin.id");
+		sPrefix = project.getProperty("plugin.id") + "_" +
+		          project.getProperty("plugin.version");
+		var f;
+		i = 0;
+		sFileName = sPrefix + ".jar";
+		f = new File(sDir, sFileName);
+		while (f.exists()) {
+		  i++;
+			sFileName = sPrefix + "." + i + ".jar";
+			f = new File(sDir, sFileName);
+		}
+		
+		project.setProperty("plugin.filename", sFileName);
+
+		]]>
+	</script>
+		
+		<mkdir dir="${AZPluginDir}/${plugin.id}" />
+		<copy verbose="on" tofile="${AZPluginDir}/${plugin.id}/${plugin.filename}" file="${dist.dir}/${plugin.id}_${plugin.version}.jar"/>
+	</target>
+
+	<target name="makesrc">
+		<jar destfile="${dist.dir}/${plugin.id}_${plugin.version}_src.zip">
+			<fileset dir="${source.dir}" excludes="${generic.jar.excludes} **/*.class" />
+		</jar>
+	</target>
+
+	<target name="makejar" depends="compile">
+		<echo>jar</echo>
+		<jar destfile="${dist.dir}/${plugin.id}_${plugin.version}.jar">
+			<fileset dir="${source.dir}" excludes="${dist.jar.excludes}" />
+		</jar>
+	</target>
+
+	<target name="clean" depends="init">
+		<delete quiet="true">
+			<fileset dir="${source.dir}" includes="**/*.class" />
+		</delete>
+	</target>
+</project>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jardesc>
+    <jar path="D:/Projects/Development/azupdater/Azureus2_2.3.0.6_P2.jar"/>
+    <options buildIfNeeded="true" compress="true" descriptionLocation="/azupdater/Azureus2_2.3.0.6_P2.jardesc" exportErrors="true" exportWarnings="true" includeDirectoryEntries="false" overwrite="false" saveDescription="true" useSourceFolders="false"/>
+    <manifest generateManifest="true" manifestLocation="" manifestVersion="1.0" reuseManifest="false" saveManifest="false" usesManifest="true">
+        <sealing sealJar="false">
+            <packagesToSeal/>
+            <packagesToUnSeal/>
+        </sealing>
+    </manifest>
+    <selectedElements exportClassFiles="true" exportJavaFiles="true" exportOutputFolder="false">
+        <javaElement handleIdentifier="=azureus3/&lt;org.gudy.azureus2.update{CorePatchLevel.java"/>
+        <javaElement handleIdentifier="=azureus3/&lt;org.gudy.azureus2.update{CoreUpdateChecker.java"/>
+    </selectedElements>
+</jardesc>

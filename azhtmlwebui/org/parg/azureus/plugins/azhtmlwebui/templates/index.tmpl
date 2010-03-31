@@ -1,0 +1,474 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title><tmpl_var title>: <tmpl_var azureus_version>/<tmpl_var plugin_version></title>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<meta HTTP-EQUIV="Expires" CONTENT="-1">
+<meta name="keywords" content="BitTorrent, bt, java, client, azureus, tracker">
+<link href="styles/vuze.css" rel="stylesheet" type="text/css" title="vuze">
+<link href="styles/theme.css" rel="alternate stylesheet" type="text/css" title="theme">
+<link href="styles/oldtheme.css" rel="alternate stylesheet" type="text/css" title="oldtheme">
+<link href="styles/hs_theme.css" rel="alternate stylesheet" type="text/css" title="hs_theme">
+<link rel="shortcut icon" href="favicon.ico">
+<script type="text/javascript">
+var page_url	= unescape(escape("<tmpl_var page_js>"))
+var page_url_simple	= unescape(escape("<tmpl_var page>"))
+<tmpl_if torrent_refresh_on>
+	var tracker_enabled = <tmpl_if tracker_enabled>true<tmpl_else>false</tmpl_if>;
+	var refresh_rate	=	parseInt(<tmpl_var refresh_rate>);
+	var now = <tmpl_var refresh_rate>;
+	var seed = <tmpl_if torrent_uc_on>true<tmpl_else>false</tmpl_if>;
+	var s_search = "<tmpl_var search>";
+	var search_on = <tmpl_if search_on>true<tmpl_else>false</tmpl_if>
+	<tmpl_if view_only>	</script><tmpl_else>
+		var linkset		= new Array()
+		var categories	= new Array()
+		var hashes		= new Array()
+		
+		var state = '<tmpl_var display_state>'
+		
+		var cmd_rem = '<tmpl_var cmd_remove>'
+		var cmd_del1 = '<tmpl_var cmd_del1>'
+		var cmd_del2 = '<tmpl_var cmd_del2>'
+		var cmd_del3 = '<tmpl_var cmd_del3>'
+		
+		var cmd_movetop = '<tmpl_var cmd_movetop>'
+		var cmd_moveup = '<tmpl_var cmd_moveup>'
+		var cmd_movedn = '<tmpl_var cmd_movedown>'
+		var cmd_movebtm = '<tmpl_var cmd_movebottom>'
+		
+		var cmd_pub = '<tmpl_var cmd_pub>'
+		var cmd_host = '<tmpl_var cmd_host>'
+		
+		var cmd_track_rem = '<tmpl_var cmd_track_rem>'
+		
+		</script>
+		<script src="http://ajax.googleapis.com/ajax/libs/prototype/1.6.1.0/prototype.js" type="text/javascript"></script>
+		<script src="http://ajax.googleapis.com/ajax/libs/scriptaculous/1.8.3/effects.js" type="text/javascript"></script>
+
+		<script src="js/azhtmlwebui.js" type="text/javascript"></script>
+		
+		<script type="text/javascript">
+	        function setActiveStyleSheet(title)
+	        {
+	            if(title == "vuze" || title == "theme" || title == "oldtheme" || title == "hs_theme"){
+		            var i, a, main;
+		            for(i=0; (a = document.getElementsByTagName("link")[i]); i++) {
+		                if(a.getAttribute("rel").indexOf("style") != -1 && a.getAttribute("title"))
+		                {
+		                    a.disabled = true;
+		                    if(a.getAttribute("title") == title) a.disabled = false;
+		                    if(title == "vuze"){$('ajax_img').src='images/ajax_bk_bg.gif'} else {$('ajax_img').src='images/ajax.gif'}
+		                }
+		            }
+	            }
+	        }
+	    </script>
+		
+		<tmpl_if torrent_details>
+		<script src="js/funcs_det.js" type="text/javascript"></script>
+		</tmpl_if>
+		<script type="text/javascript">
+		<tmpl_if torrent_refresh_on>
+		var torrentManager = new TorrentManager()
+		
+		Event.observe(window, 'load', function(e) { updateTL(null); updateCatList(); });
+		//Event.observe(window, 'load', function(e) { setTimeout( "updateDisplay()", 1500) });
+		//var test = new Test()
+		</tmpl_if> /* end full access */
+		</script>
+	</tmpl_if> <!--/* end refresh on */ -->
+	
+
+<tmpl_else>
+</script>
+<script src="js/prototype.js" type="text/javascript"></script>
+<script src="js/funcs_up.js" type="text/javascript"></script>
+<script src="js/multifile.js" type="text/javascript"></script>
+</tmpl_if>
+<script type="text/javascript">
+	Event.observe( window, 'load', function(){
+		var multi_selector = new MultiSelector( $( 't_list' ), 3 );
+		multi_selector.addElement( $( 'upload' ) );
+	})
+</script>
+</head>
+
+<body onLoad="<tmpl_if torrent_refresh_on>/*start();*/ search_check();</tmpl_if> selectUploadType(1); <tmpl_if torrent_op_on>switchAutoSeeding('max_ul_speed','max_ul_speed_seed','max_ul_speed_seed_enabled',document.getElementById('max_ul_speed_auto').checked);</tmpl_if>">
+
+<div class="header">
+
+    <div class="float-right">
+    <tmpl_if torrent_refresh_on>
+
+		<tmpl_if tracker_web_enabled>&nbsp;&nbsp;&nbsp;<span class="totals"><a class="t" href="<tmpl_var tracker_url>"><tmpl_var links_tracker></a></span></tmpl_if></tmpl_if>
+	</div>
+
+    <div class="float-left">
+    	<span class="title"><tmpl_var title></span><br><small>Azureus HTML WebUI version <tmpl_var azureus_version>/<tmpl_var plugin_version></small>
+    </div>
+    <tmpl_if torrent_refresh_on>
+    <div class="searchgroup" id="search">
+    <form name="searching" action="javascript:search();" method="post">
+     <span  class="categoryheaders">
+	   		<input class="s" type="text" name="search" value="<tmpl_var search_decoded>" maxlength="25"><input class="sub" type="submit" value="Search">
+	  </span>
+	  </form>
+	</div>
+	</tmpl_if>
+
+  </div> <!-- end header -->
+
+<div class="menu">
+	<ul id="tabs">
+		<li id="tab_down" class="tab_selected">
+			<a href="#" onclick="setState(ST_DOWNLOADING);return false;"><tmpl_var tab_downloads></a> (<tmpl_if search_on><a href="index.tmpl?search=<tmpl_var search>"><tmpl_var nb_torrents_dl>/<tmpl_var total_dling_torrents></a><tmpl_else><span id="dls"><tmpl_var nb_torrents_dl></span></tmpl_if>)</li>
+		<li id="tab_seed">
+			<a href="#" onclick="setState(ST_SEEDING);return false;"><tmpl_var tab_seeds></a> (<tmpl_if search_on><a href="index.tmpl?d=s&amp;search=<tmpl_var search>"><tmpl_var nb_torrents_cd>/<tmpl_var total_uling_torrents></a><tmpl_else><span id="cds"><tmpl_var nb_torrents_cd></span></tmpl_if>)</li>
+		
+		<li id="tab_comp">
+			<a href="#" onclick="setState(ST_COMPLETED);return false;"><tmpl_var tab_completed></a> (<tmpl_if search_on><a href="index.tmpl?d=c&amp;search=<tmpl_var search>"><tmpl_var nb_torrents_co>/<tmpl_var total_cted_torrents></a><tmpl_else><span id="cos"><tmpl_var nb_torrents_co></span></tmpl_if>)</li>
+		
+		<li id="tab_options">
+			<a href="#" onclick="displayOptions();return false"><tmpl_var tab_options></a></li>
+		<li id="tab_upload">
+			<a href="javascript:void(0);" onclick="toggleUpload();return false;">Upload</a></li>
+	</ul>
+</div>
+
+<tmpl_if torrent_refresh_on>
+<tmpl_if torrent_details><tmpl_else>
+
+<div id="actions">
+	<span><a href="javascript:void(0);" onclick="selectTorrents(true)">Select All</a></span>
+	<span><a href="javascript:void(0);" onclick="selectTorrents(false)">Select None</a></span>
+	<select id="cat_list" onchange="assignCategory( this.value ); this.selectedIndex = 0;">
+	<option value="--">Select category</option>
+	</select>
+	
+	<select id="act_list" onchange="javascript: takeAction( this.value ); this.selectedIndex = 0">
+	<option value="--">Select action</option>
+	<option value="--">--</option>
+	<option value="0"><tmpl_var cmd_start></option>
+	<option value="1"><tmpl_var cmd_stop></option>
+	<option value="2"><tmpl_var cmd_force></option>
+	<option value="3"><tmpl_var cmd_unforce></option>
+	</select>
+	
+	<select id="rem_list" onchange="javascript: removeAction( this.value ); this.selectedIndex = 0">
+	<option value="--">Select remove</option>
+	<option value="--">--</option>
+	<option value="0"><tmpl_var cmd_remove></option>
+	<option value="--">--</option>
+	<option value="1"><tmpl_var cmd_del1></option>
+	<option value="2"><tmpl_var cmd_del2></option>
+	<option value="3"><tmpl_var cmd_del3></option>
+	</select>
+	
+	<select id="css_list" onchange="javascript: setActiveStyleSheet( this.value ); ">
+	<option value="--">Select style</option>
+	<option value="--">--</option>
+	<option value="vuze">Vuze</option>
+	<option value="--">--</option>
+	<option value="theme">Theme</option>
+	<option value="oldtheme">Oldtheme</option>
+	<option value="hs_theme">Hs_theme</option>
+	</select>
+	<div id="ajax" style="float:right;display:none"><img id="ajax_img" src="images/ajax_bk_bg.gif" alt="processing..."/></div>
+</div>
+</tmpl_if>
+</tmpl_if>
+<div id="upDiv" style="display:none;">
+	<span id="up_msg" class="totals"></span>
+            
+    <form name="myform" action="#" id="myform">
+               
+    	<input class="none" type="radio" name="torrent" value="local" onClick="selectUploadType(0);">Local torrents<br>
+    	<input class="none" type="radio" name="torrent" value="url" onClick="selectUploadType(1);" checked>Urls [; separated]<br><br>
+
+    	
+    </form>
+    <div id="url">
+    <span class="totals">Urls [; separated]:</span>
+    <form name="myform_url" action="javascript:urlUpload();" method="GET" id="myform_url">
+
+			<input type="hidden" name="d" value="u">
+    		<input type="text" size="60" name="upurl">
+			<br><br>
+
+    	<input class="submit" type="submit" value="Upload!">
+    	
+    </form>
+    </div>
+    <div id="local">
+    <span class="totals">Local torrents:</span>
+        <form name="myform_local" action="index.tmpl?local=1" method="POST" ENCTYPE="multipart/form-data" id="myform_local" target="UploadTarget">
+
+    		<input type="file" size="40" id="upload" name="upfile_1">
+			<br><br>
+
+    	<input class="submit" type="submit" value="Upload!">
+    	
+    	</form>
+    <br/><br/>
+    	<div id="t_list">
+    	</div>
+    </div>
+</div>
+
+<div id="options" style="display:none;">
+<span id="msg" class="totals" style="display: none"><tmpl_var op_set_msg></span>
+
+         <table cellpadding="2" cellspacing="0" class="azcontent_op" id="t3">
+
+           <tr class="trtorrent_odd">
+             <td><tmpl_var max_active_txt></td>
+             <td><input type="text" id="max_active" name="max_active" value="<tmpl_var max_active>" size="4" <tmpl_if view_only>disabled</tmpl_if>></td>
+           </tr>
+           
+           <tr class="trtorrent_odd">
+             <td><input class="none" type="checkbox" id="max_active_seed_enabled" <tmpl_if max_active_seed_enabled>checked</tmpl_if> onClick="switchOnlySeeding('max_active_seed',this.checked)" <tmpl_if view_only>disabled</tmpl_if>><label for="max_active_seed_enabled"><tmpl_var max_active_seed_txt></label></td>
+             <td><input type="text" id="max_active_seed" name="max_active_seed" value="<tmpl_var max_active_seed>" size="4" <tmpl_if max_active_seed_enabled><tmpl_else>disabled</tmpl_if>></td>
+           </tr>
+           
+           <tr class="trtorrent">
+             <td><tmpl_var max_dls_txt></td>
+             <td><input type="text" id="max_dl" name="max_dl" value="<tmpl_var max_dl>" size="4" <tmpl_if view_only>disabled</tmpl_if>></td>
+           </tr>
+           
+           <tr class="trtorrent_odd">
+             <td><tmpl_var max_conn_pertorrent_txt></td>
+             <td><input type="text" id="max_conn_pertorrent" name="max_conn_pertorrent" value="<tmpl_var max_conn_pertorrent>" size="4" <tmpl_if view_only>disabled</tmpl_if>></td>
+           </tr>
+           
+           <tr class="trtorrent_odd">
+             <td><tmpl_var max_conn_txt></td>
+             <td><input type="text" id="max_conn" name="max_conn" value="<tmpl_var max_conn>" size="4" <tmpl_if view_only>disabled</tmpl_if>></td>
+           </tr>
+           
+           <tr class="trtorrent">
+             <td><tmpl_var max_down_txt></td>
+             <td><input type="text" id="max_dl_speed" name="max_dl_speed" value="<tmpl_var max_dl_speed_o>" size="4" <tmpl_if view_only>disabled</tmpl_if>></td>
+           </tr>
+           
+           <tr class="trtorrent_odd">
+             <td colspan="2"><input class="none" type="checkbox" id="max_ul_speed_auto" <tmpl_if max_ul_speed_auto_on>checked</tmpl_if> onClick="switchAutoSeeding('max_ul_speed','max_ul_speed_seed','max_ul_speed_seed_enabled',this.checked)" <tmpl_if auto_speed_not_avail>disabled</tmpl_if> <tmpl_if view_only><tmpl_if auto_speed_not_avail><tmpl_else>disabled</tmpl_if></tmpl_if>><label for="max_ul_speed_auto"><tmpl_var max_up_speed_auto_txt></label></td>
+           </tr>
+           
+          <tr class="trtorrent_odd">
+             <td><tmpl_var max_up_txt></td>
+             <td><input type="text" id="max_ul_speed" name="max_ul_speed" value="<tmpl_var max_ul_speed_o>" size="4" <tmpl_if view_only>disabled</tmpl_if>></td>
+           </tr>
+          
+           <tr class="trtorrent_odd">
+             <td><input class="none" type="checkbox" id="max_ul_speed_seed_enabled" <tmpl_if max_ul_speed_seed_enabled>checked</tmpl_if> onClick="switchOnlySeeding('max_ul_speed_seed',this.checked)" <tmpl_if view_only>disabled</tmpl_if>><label for="max_ul_speed_seed_enabled"><tmpl_var max_up_seed_txt></label></td>
+             <td><input type="text" id="max_ul_speed_seed" name="max_ul_speed_seed_o" value="<tmpl_var max_ul_speed_seed_o>" size="4" <tmpl_if max_ul_speed_seed_enabled><tmpl_else>disabled</tmpl_if>></td>
+           </tr>
+           
+           <tr class="trtorrent">
+             <td><tmpl_var max_ups_txt></td>
+             <td><input type="text" id="max_ups" name="max_ups" value="<tmpl_var max_ups>" size="4" <tmpl_if view_only>disabled</tmpl_if>></td>
+           </tr>
+           
+           <tr class="trtorrent">
+             <td><tmpl_var max_ups_seed_txt></td>
+             <td><input type="text" id="max_ups_seed" name="max_ups_seed" value="<tmpl_var max_ups_seed>" size="4" <tmpl_if view_only>disabled</tmpl_if>></td>
+           </tr>
+           
+           <tr class="trtorrent_odd">
+             <td colspan="2"><input class="none" type="checkbox" id="comp_tab" <tmpl_if comp_tab>checked</tmpl_if> <tmpl_if view_only>disabled</tmpl_if>><label for="comp_tab"><tmpl_var comp_tab_txt></label></td>
+           </tr>
+           
+           <tr class="trtorrent">
+             <td><tmpl_var pagination_per_page_txt></td>
+             <td><input type="text" id="pagination_per_page" name="pagination_per_page" value="<tmpl_var pagination_per_page>" size="4" <tmpl_if view_only>disabled</tmpl_if>></td>
+           </tr>
+           
+           <tr class="trtorrent_odd">
+             <td><tmpl_if view_only><tmpl_else><br/><span class="totals"><a href="javascript:setParams()"><tmpl_var options_set></a></span></tmpl_if></td>
+             <td><br/><span><a href="javascript:void(0);" onclick="displayOptions(false)" style="float:right">Close</a></span></td>
+           </tr>
+
+         </table>           
+</div>
+<div id="content" class="content">
+    <table align="center" class="azborder" cellpadding="0" cellspacing="0" border="0">
+      <tr> 
+        <td valign="top"> 
+        
+        <tmpl_if torrent_dl_on>
+        
+            <table align="center" cellpadding="4" cellspacing="0" class="azcontent" id="t1">
+              <tr id="tr_down"> 
+              	  <th>-</th>
+              	  <th>#</th>
+                  <th><tmpl_var th_torrent></th>
+                  <th>&nbsp;</th>
+                  <th>&nbsp;</th>
+                  <th><tmpl_var th_category></th>
+                  <th><tmpl_var th_status></th>
+                  <th><tmpl_var th_size></th>
+                  <th class="d"><tmpl_var th_downloaded></th>
+                  <th><tmpl_var th_uploaded></th>
+                  <th class="d"><tmpl_var th_done></th>
+                  <th class="d"><tmpl_var th_DLspeed></th>
+                  <th><tmpl_var th_ULspeed></th>
+                  <th><tmpl_var th_seeds></th>
+                  <th><tmpl_var th_peers></th>
+                  <th><tmpl_var th_shareRatio></th>
+                  <th class="d"><tmpl_var th_ETA></th>
+                  <th><tmpl_var th_availability></th>
+              </tr>
+            </table>
+          </td>
+	  </tr>
+      <tr>
+      <td>
+      <div id="pagin"></div>
+      </td>
+      </tr>
+      <tr id="stats">
+   		<td align="center">
+   			<span id="s_stats" class="totals"></span>
+   		</td>
+			</tmpl_if>
+            
+            <tmpl_if torrent_details>
+            <br />
+            <tmpl_if error>
+              <tmpl_var error_header>:<br />
+              <span class="error"><tmpl_var errormsg></span>
+            <tmpl_else>
+              <span class="name"><tmpl_var name></span><br />
+              <br />
+              <div class="float-left">
+              <span class="section"><tmpl_var transfer_header></span><br />
+              <table class="details">
+                <tr>
+                  <th><tmpl_var status_msg></th>
+                  <td><b><tmpl_var status></b></td>
+                <tr>
+                  <th><tmpl_var elapsed_msg></th>
+                  <td><tmpl_var elapsed></td>
+                </tr>
+                <tr>
+                  <th><tmpl_var eta_msg></th>
+                  <td><tmpl_var eta></td>
+                </tr>
+                <tr>
+                  <th><tmpl_var uploaded_msg></th>
+                  <td><tmpl_var uploaded></td>
+                </tr>
+                <tr>
+                  <th><tmpl_var downloaded_msg></th>
+                  <td><tmpl_var downloaded></td>
+                </tr>
+                <tr>
+                  <th><tmpl_var ratio_msg></th>
+                  <td><tmpl_var ratio></td>
+                </tr>
+                <tr>
+                  <th><tmpl_var uploadspeed_msg></th>
+                  <td><tmpl_var uploadspeed></td>
+                </tr>
+                <tr>
+                  <th><tmpl_var downloadspeed_msg></th>
+                  <td><tmpl_var downloadspeed></td>
+                </tr>
+                <tr>
+                  <th><tmpl_var conseeds_msg></th>
+                  <td><tmpl_var conseeds> <tmpl_var connected><br/><tmpl_var scrapeseeds> <tmpl_var in_swarm></td>
+                </tr>
+                <tr>
+                  <th><tmpl_var conleechers_msg></th>
+                  <td><tmpl_var conleechers> <tmpl_var connected><br/><tmpl_var scrapeleechers> <tmpl_var in_swarm></td>
+                </tr>
+              </table>
+              </div>
+              <div class="float-left">
+              <span class="section"><tmpl_var info_header></span>
+              <table class="details">
+                <tr>
+                  <th><tmpl_var saving_to_msg></th>
+                  <td><tmpl_var saving_to></td>
+                </tr>
+                <tr>
+                  <th><tmpl_var size_msg></th>
+                  <td><tmpl_var size></td>
+                </tr>
+                <tr>
+                  <th><tmpl_var hash_msg></th>
+                  <td><tmpl_var hash></td>
+                </tr>
+                <tr>
+                  <th><tmpl_var created_by_msg></th>
+                  <td><tmpl_var created_by></td>
+                </tr>
+                <tr>
+                  <th><tmpl_var created_on_msg></th>
+                  <td><tmpl_var created_on></td>
+                </tr>
+                <tr>
+                  <th><tmpl_var comment_msg></th>
+                  <td><tmpl_var comment></td>
+                </tr>
+                <tr>
+                  <th><tmpl_var announce_url_msg></th>
+                  <td><tmpl_var announce_url></td>
+                </tr>
+              </table>
+              </div>
+              <br />
+              <div style="clear: left;">
+              <span class="section"><tmpl_var files_header></span><br />
+              <table align="center" cellpadding="4" cellspacing="0" class="azcontent">
+              <tr>
+                <th><tmpl_var filename_hd></th>
+                <th class="right"><tmpl_var filesize_hd></th>
+                <th class="right"><tmpl_var filepercent_hd></th>
+                <th>&nbsp;&nbsp;</th>
+                <th><tmpl_var filepriority_hd></th>
+              </tr>
+              <tmpl_loop files>
+              <tr class="trtorrent<tmpl_if __ODD__>_odd</tmpl_if>">
+                <td><tmpl_var filename></td>
+                <td align="right"><tmpl_var size></td>
+                <td align="right"><tmpl_var percent></td>
+                <td>&nbsp;</td>
+                <td width="25%">
+                	<span id="p<tmpl_var __COUNTER__>">
+                	<form name="f<tmpl_var __COUNTER__>">
+                		<select id="s<tmpl_var __COUNTER__>" onchange="javascript:ajax_priority( '<tmpl_var hash>', '<tmpl_var __COUNTER__>', this.selectedIndex);"
+                				onclick="javascript:document.getElementById('msg<tmpl_var __COUNTER__>').innerHTML='&nbsp;'">
+                			<option value="0" <tmpl_if p_del>selected</tmpl_if>>Delete</option>
+                			<option value="1" <tmpl_if p_dnd>selected</tmpl_if>>Do Not Download</option>
+                			<option value="2" <tmpl_if p_norm>selected</tmpl_if>>Normal</option>
+                			<option value="3" <tmpl_if p_high>selected</tmpl_if>>High Priority</option>
+                		</select>
+                	</form>
+                	</span>
+                	<span id="msg<tmpl_var __COUNTER__>">&nbsp;
+                	</span>
+                </td>
+              </tr>
+              </tmpl_loop>
+              </table>
+              </div>
+            </tmpl_if>
+      	</td>
+            </tmpl_if>
+        
+      </tr>
+      <tr> 
+        <td height="20">&nbsp;</td>
+      </tr>
+
+    </table>
+
+</div>
+<iframe id="UploadTarget" name="UploadTarget" src="" style="width:0px;height:0px;border:0"></iframe>
+<div id="debug" style="height:200px;overflow: scroll;border:1px solid blue;display:none">
+</div>
+</body>
+</html>

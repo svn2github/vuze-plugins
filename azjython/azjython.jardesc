@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="WINDOWS-1252" standalone="no"?>
+<jardesc>
+    <jar path="azjython/azjython.jar"/>
+    <options buildIfNeeded="true" compress="true" descriptionLocation="/azjython/azjython.jardesc" exportErrors="true" exportWarnings="true" includeDirectoryEntries="false" overwrite="false" saveDescription="true" storeRefactorings="false" useSourceFolders="false"/>
+    <storedRefactorings deprecationInfo="true" structuralOnly="false"/>
+    <selectedProjects/>
+    <manifest generateManifest="true" manifestLocation="" manifestVersion="1.0" reuseManifest="false" saveManifest="false" usesManifest="true">
+        <sealing sealJar="false">
+            <packagesToSeal/>
+            <packagesToUnSeal/>
+        </sealing>
+    </manifest>
+    <selectedElements exportClassFiles="true" exportJavaFiles="true" exportOutputFolder="false">
+        <file path="/azjython/plugin.properties"/>
+        <javaElement handleIdentifier="=azjython/&lt;azjython.py"/>
+        <javaElement handleIdentifier="=azjython/&lt;com.aelitis.azureus.plugins.azjython.messages"/>
+        <javaElement handleIdentifier="=azjython/&lt;com.aelitis.azureus.plugins.azjython.utils"/>
+        <javaElement handleIdentifier="=azjython/&lt;com.aelitis.azureus.plugins.azjython"/>
+        <javaElement handleIdentifier="=azjython/&lt;com.aelitis.azureus.plugins.azjython.interactive"/>
+    </selectedElements>
+</jardesc>
