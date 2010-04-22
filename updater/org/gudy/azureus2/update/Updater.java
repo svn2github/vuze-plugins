@@ -47,9 +47,10 @@ Updater
 	
   		// change these and you'll need to change the UpdateInstaller !!!!
   
-	protected static final String	UPDATE_DIR 			= "updates";
-	protected static final String	ACTIONS_FILE		= "install.act";
-	protected static final String	FAIL_FILE			= "install.fail";
+	protected static final String	UPDATE_DIR 				= "updates";
+	protected static final String	ACTIONS_LEGACY_FILE		= "install.act";
+	protected static final String	ACTIONS_UTF8_FILE		= "install.act.utf8";
+	protected static final String	FAIL_FILE				= "install.fail";
 	
 	public static void 
 	main(
@@ -469,17 +470,41 @@ Updater
 	
 		try{
 			
-			File	commands = new File( inst_dir, ACTIONS_FILE );
+			LineNumberReader	lnr = null;
 			
-			if ( !commands.exists()){
+			{
+				File	commands = new File( inst_dir, ACTIONS_UTF8_FILE );
 				
-				log( "    command file '" + ACTIONS_FILE + "' not found, aborting");
-				
-				return;
+				if ( commands.exists()){
+						
+					try{
+						lnr = new LineNumberReader( new InputStreamReader( new FileInputStream( commands ), "UTF-8" ));
+						
+						log( "using utf-8 commands" );
+						
+					}catch( Throwable e ){
+						
+						log( "utf8 file failed to open" );
+						
+						log( e );
+					}
+				}
 			}
 			
-			LineNumberReader	lnr = new LineNumberReader( new FileReader( commands ));
+			if ( lnr == null ){
 				
+				File	commands = new File( inst_dir, ACTIONS_LEGACY_FILE );
+				
+				if ( !commands.exists()){
+					
+					log( "    command file '" + ACTIONS_LEGACY_FILE + "' not found, aborting");
+					
+					return;
+				}
+				
+				lnr = new LineNumberReader( new FileReader( commands ));
+			}
+			
 			String	failed = null;
 			
 			while(true){
