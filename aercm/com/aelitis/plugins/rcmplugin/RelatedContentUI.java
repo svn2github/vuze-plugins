@@ -207,24 +207,6 @@ RelatedContentUI
 				ui_manager.createBasicPluginConfigModel(
 					ConfigSection.SECTION_ROOT, "Associations");
 			
-			final BooleanParameter enabled = 
-				config_model.addBooleanParameter2( 
-					"rcm.config.enabled", "rcm.config.enabled",
-					manager.isUIEnabled());
-			
-			enabled.addListener(
-					new ParameterListener()
-					{
-						public void 
-						parameterChanged(
-							Parameter param) 
-						{
-							manager.setUIEnabled( enabled.getValue());
-							
-							buildSideBar();
-						}
-					});
-			
 			final IntParameter max_results = 
 				config_model.addIntParameter2( 
 					"rcm.config.max_results", "rcm.config.max_results",
@@ -256,10 +238,7 @@ RelatedContentUI
 							manager.setMaxSearchLevel( max_level.getValue());
 						}
 					});
-			
-			enabled.addEnabledOnSelection( max_results );
-			enabled.addEnabledOnSelection( max_level );
-			
+						
 			main_view_info = new MainViewInfo();
 
 			hookMenus();
@@ -410,9 +389,6 @@ RelatedContentUI
 		final MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
 		mdi.registerEntry(SideBar.SIDEBAR_SECTION_RELATED_CONTENT, new MdiEntryCreationListener() {
 			public MdiEntry createMDiEntry(String id) {
-				if ( !manager.isUIEnabled()){
-					return null;
-				}
 				
 				MdiEntry mdiEntry = mdi.createEntryFromSkinRef(
 						null,
@@ -483,11 +459,6 @@ RelatedContentUI
 			}
 		});
 				
-		if ( !manager.isUIEnabled()){
-			
-			return;
-		}
-			
 		if ( !root_menus_added ){
 			
 			root_menus_added = true;
