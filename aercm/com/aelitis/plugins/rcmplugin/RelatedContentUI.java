@@ -193,8 +193,6 @@ RelatedContentUI
 			ui_setup = true;
 		}
 		
-		mdi		= mdi;
-
 		try{	
 			manager 	= RelatedContentManager.getSingleton();
 
@@ -204,8 +202,7 @@ RelatedContentUI
 			}
 			
 			BasicPluginConfigModel config_model = 
-				ui_manager.createBasicPluginConfigModel(
-					ConfigSection.SECTION_ROOT, "Associations");
+				ui_manager.createBasicPluginConfigModel( "Associations" );
 			
 			final IntParameter max_results = 
 				config_model.addIntParameter2( 
@@ -394,7 +391,7 @@ RelatedContentUI
 						null,
 						SideBar.SIDEBAR_SECTION_RELATED_CONTENT, "rcmview",
 						main_view_info.getTitle(),
-						main_view_info, null, true, -1  );
+						main_view_info, null, false, -1  );
 
 				mdiEntry.setImageLeftID( "image.sidebar.rcm" );
 				

@@ -33,6 +33,7 @@ import java.util.ResourceBundle;
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.Plugin;
+import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.PluginListener;
 import org.gudy.azureus2.plugins.ui.UIInstance;
@@ -54,7 +55,15 @@ RCMPlugin
 	public void
 	initialize(
 		PluginInterface		plugin_interface )
+	
+		throws PluginException
 	{
+		if ( plugin_interface.getUtilities().compareVersions( plugin_interface.getAzureusVersion(), "4.4.0.5" ) < 0 ){
+			
+			throw( new PluginException( "Plugin requires Vuze version 4.4.0.5 or higher" ));
+		}
+		
+		
 		try{
 			plugin_interface.getUtilities().registerSearchProvider(
 				new SearchProvider()
