@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 
+import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.Plugin;
@@ -52,6 +53,10 @@ public class
 RCMPlugin 
 	implements Plugin
 {
+	static{
+		COConfigurationManager.setParameter( "rcm.persist", true );
+	}
+	
 	public void
 	initialize(
 		PluginInterface		plugin_interface )
