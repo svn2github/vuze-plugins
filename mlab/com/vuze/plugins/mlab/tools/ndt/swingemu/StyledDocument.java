@@ -40,7 +40,16 @@ StyledDocument
 	
 		throws BadLocationException
 	{
-		System.out.println( "append: " + s );
+		Tcpbw100UIWrapperListener listener = Tcpbw100UIWrapper.current_adapter;
+		
+		if ( listener != null ){
+			
+			listener.reportDetail( s );
+			
+		}else{
+		
+			System.out.println( "doc: " + s );
+		}
 		
 		str += s;
 	}

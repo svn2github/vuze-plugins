@@ -25,6 +25,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 
 import org.gudy.azureus2.core3.util.AEThread2;
+import org.gudy.azureus2.core3.util.DisplayFormatters;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
@@ -39,6 +40,8 @@ import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 
 import com.vuze.plugins.mlab.tools.ndt.Tcpbw100;
+import com.vuze.plugins.mlab.tools.ndt.swingemu.Tcpbw100UIWrapper;
+import com.vuze.plugins.mlab.tools.ndt.swingemu.Tcpbw100UIWrapperListener;
 import com.vuze.plugins.mlab.tools.shaperprobe.ShaperProbe;
 
 public class 
@@ -124,7 +127,45 @@ MLabPlugin
 							public void
 							run()
 							{
-								Tcpbw100.main( new String[]{ "ndt.iupui.donar.measurement-lab.org" });
+								new Tcpbw100UIWrapper(
+									new Tcpbw100UIWrapperListener()
+									{
+										public void
+										reportSummary(
+											String		str )
+										{
+											System.out.println( "s: " + str );
+										}
+										
+										public void
+										reportDetail(
+											String		str )
+										{
+											System.out.println( "d: " + str );
+										}
+									});
+								
+								Tcpbw100 test = Tcpbw100.mainSupport( new String[]{ "ndt.iupui.donar.measurement-lab.org" });
+								
+								long	up_bps = 0;
+								
+								try{
+									up_bps = (long)(Double.parseDouble( test.get_c2sspd())*1000000);
+									
+								}catch( Throwable e ){
+								}
+								
+								long	down_bps = 0;
+								
+								try{
+									down_bps = (long)(Double.parseDouble( test.get_s2cspd())*1000000);
+									
+								}catch( Throwable e ){
+								}
+								
+								System.out.println( 
+										"Completed: up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( up_bps ) +
+										", down=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( down_bps ));
 							}
 						});
 				}

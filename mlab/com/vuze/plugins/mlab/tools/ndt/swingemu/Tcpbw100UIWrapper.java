@@ -22,46 +22,14 @@
 package com.vuze.plugins.mlab.tools.ndt.swingemu;
 
 public class 
-JTextArea 
-	extends Component
+Tcpbw100UIWrapper 
 {
-	private String text = "";
+	public static Tcpbw100UIWrapperListener		current_adapter;
 	
-	public 
-	JTextArea(
-		String		str,
-		int			a,
-		int			b )
+	public
+	Tcpbw100UIWrapper(
+		Tcpbw100UIWrapperListener	adapter )
 	{
-		text	= str;
-	}
-	
-	public void
-	append(
-		String		str )
-	{
-		Tcpbw100UIWrapperListener listener = Tcpbw100UIWrapper.current_adapter;
-		
-		if ( listener != null ){
-			
-			listener.reportSummary( str );
-			
-		}else{
-			
-			System.out.println( "text: " + str );
-		}
-		
-		text += str;
-	}
-	
-	public String
-	getText()
-	{
-		return( text );
-	}
-	
-	public void
-	selectAll()
-	{
+		current_adapter	= adapter;
 	}
 }

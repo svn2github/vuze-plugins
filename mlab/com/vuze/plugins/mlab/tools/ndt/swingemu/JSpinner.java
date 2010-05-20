@@ -25,15 +25,23 @@ public class
 JSpinner
 	extends Component
 {
+	private SpinnerNumberModel		model;
+	
 	public int
 	getValue()
 	{
-		return( 0 );
+		if ( model == null ){
+		
+			return( 0 );
+		}
+		
+		return( model.getValue());
 	}
 	
 	public void
 	setModel(
-		SpinnerNumberModel	model )
+		SpinnerNumberModel	_model )
 	{
+		model = _model;
 	}
 }

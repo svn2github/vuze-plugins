@@ -21,12 +21,22 @@
 
 package com.vuze.plugins.mlab.tools.ndt.swingemu;
 
-public class SpinnerNumberModel {
+public class 
+SpinnerNumberModel 
+{
+	private int		value;
 
 	public void
 	setValue(
 		int	 i )
 	{
+		value	= i;
+	}
+	
+	public int
+	getValue()
+	{
+		return( value );
 	}
 	
 	public void

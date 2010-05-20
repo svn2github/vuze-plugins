@@ -2760,6 +2760,11 @@ class MyTextPane extends JTextPane
 
   public static void main(String[] args)
   {
+	  mainSupport( args );
+  }
+  
+  public static Tcpbw100 mainSupport(String[] args)
+  {
     JFrame frame = new JFrame("ANL/Internet2 NDT (applet)");
     if (args.length != 1) {
       System.out.println("Usage: java -jar Tcpbw100.jar " + "HOST");
@@ -2780,7 +2785,9 @@ class MyTextPane extends JTextPane
     applet.start();
     frame.setVisible(true);
     
-    applet.runtest();
+    applet.new TestWorker().run();
+    
+    return( applet );
   }
 
 } // class: Tcpbw100
