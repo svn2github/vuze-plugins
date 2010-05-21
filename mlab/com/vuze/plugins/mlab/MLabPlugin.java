@@ -129,6 +129,9 @@ MLabPlugin
 							public void
 							run()
 							{
+								logger.log( "Starting NDT Test" );
+								logger.log( "-----------------" );
+								
 								new Tcpbw100UIWrapper(
 									new Tcpbw100UIWrapperListener()
 									{
@@ -164,6 +167,8 @@ MLabPlugin
 								}catch( Throwable e ){
 								}
 								
+								logger.log( "" );
+								
 								logger.log( 
 										"Completed: up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( up_bps ) +
 										", down=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( down_bps ));
@@ -188,6 +193,9 @@ MLabPlugin
 								public void
 								run()
 								{
+									logger.log( "Starting ShaperProbe Test" );
+									logger.log( "-----------------" );
+
 									ShaperProbe sp = 
 										ShaperProbe.run(
 											plugin_interface,
@@ -204,8 +212,10 @@ MLabPlugin
 									long up_bps 	= sp.getUpBitsPerSec()/8;
 									long down_bps 	= sp.getDownBitsPerSec()/8;
 									
-									long shape_up_bps 		= sp.getUpBitsPerSec()/8;
-									long shape_down_bps 	= sp.getDownBitsPerSec()/8;
+									long shape_up_bps 		= sp.getShapeUpBitsPerSec()/8;
+									long shape_down_bps 	= sp.getShapeDownBitsPerSec()/8;
+									
+									logger.log( "" );
 									
 									logger.log( 
 											"Completed: up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( up_bps ) +

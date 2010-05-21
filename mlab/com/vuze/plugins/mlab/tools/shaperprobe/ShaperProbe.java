@@ -216,16 +216,18 @@ ShaperProbe
 				getLong(
 					String	str )
 				{
-					int	pos = str.trim().indexOf( ' ' );
+					str = str.trim();
+					
+					int	pos = str.indexOf( ' ' );
 					
 					if ( pos != -1 ){
 						
-						str = str.substring( 0, pos );
+						str = str.substring( 0, pos ).trim();
 					}
 					
 						// kbps
 					
-					return( Long.parseLong( str.trim()) * 1024 );
+					return( Long.parseLong( str ) * 1024 );
 				}
 			}.start();
 			
