@@ -31,8 +31,6 @@ import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
 import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.config.ActionParameter;
-import org.gudy.azureus2.plugins.ui.config.BooleanParameter;
-import org.gudy.azureus2.plugins.ui.config.IntParameter;
 import org.gudy.azureus2.plugins.ui.config.Parameter;
 import org.gudy.azureus2.plugins.ui.config.ParameterListener;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
@@ -43,6 +41,7 @@ import com.vuze.plugins.mlab.tools.ndt.Tcpbw100;
 import com.vuze.plugins.mlab.tools.ndt.swingemu.Tcpbw100UIWrapper;
 import com.vuze.plugins.mlab.tools.ndt.swingemu.Tcpbw100UIWrapperListener;
 import com.vuze.plugins.mlab.tools.shaperprobe.ShaperProbe;
+import com.vuze.plugins.mlab.tools.shaperprobe.ShaperProbeListener;
 
 public class 
 MLabPlugin
@@ -57,9 +56,12 @@ MLabPlugin
 	{
 		plugin_interface	= _plugin_interface;
 		
-		logger				= plugin_interface.getLogger().getTimeStampedChannel( "MLab" ); 
+		logger				= plugin_interface.getLogger().getChannel( "MLab" ); 
 
-
+		logger.setDiagnostic();
+		
+		logger.setForce( true );
+		
 		LocaleUtilities loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
 
 		loc_utils.integrateLocalisedMessageBundle( "com.vuze.plugins.mlab.internat.Messages" );
@@ -134,14 +136,13 @@ MLabPlugin
 										reportSummary(
 											String		str )
 										{
-											System.out.println( "s: " + str );
+											logger.log( str.trim());
 										}
 										
 										public void
 										reportDetail(
 											String		str )
 										{
-											System.out.println( "d: " + str );
 										}
 									});
 								
@@ -150,7 +151,7 @@ MLabPlugin
 								long	up_bps = 0;
 								
 								try{
-									up_bps = (long)(Double.parseDouble( test.get_c2sspd())*1000000);
+									up_bps = (long)(Double.parseDouble( test.get_c2sspd())*1000000)/8;
 									
 								}catch( Throwable e ){
 								}
@@ -158,12 +159,12 @@ MLabPlugin
 								long	down_bps = 0;
 								
 								try{
-									down_bps = (long)(Double.parseDouble( test.get_s2cspd())*1000000);
+									down_bps = (long)(Double.parseDouble( test.get_s2cspd())*1000000)/8;
 									
 								}catch( Throwable e ){
 								}
 								
-								System.out.println( 
+								logger.log( 
 										"Completed: up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( up_bps ) +
 										", down=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( down_bps ));
 							}
@@ -187,7 +188,31 @@ MLabPlugin
 								public void
 								run()
 								{
-									ShaperProbe.run( plugin_interface );
+									ShaperProbe sp = 
+										ShaperProbe.run(
+											plugin_interface,
+											new ShaperProbeListener()
+											{
+												public void 
+												reportSummary(
+													String str) 
+												{
+													logger.log( str.trim());
+												}
+											});
+									
+									long up_bps 	= sp.getUpBitsPerSec()/8;
+									long down_bps 	= sp.getDownBitsPerSec()/8;
+									
+									long shape_up_bps 		= sp.getUpBitsPerSec()/8;
+									long shape_down_bps 	= sp.getDownBitsPerSec()/8;
+									
+									logger.log( 
+											"Completed: up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( up_bps ) +
+											", down=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( down_bps ) +
+											", shape_up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( shape_up_bps ) +
+											", shape_down=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( shape_down_bps ));
+
 								}
 							});
 				}

@@ -1,5 +1,5 @@
 /*
- * Created on May 20, 2010
+ * Created on May 21, 2010
  * Created by Paul Gardner
  * 
  * Copyright 2010 Vuze, Inc.  All rights reserved.
@@ -19,38 +19,12 @@
  */
 
 
-package com.vuze.plugins.mlab.tools.ndt.swingemu;
+package com.vuze.plugins.mlab.tools.shaperprobe;
 
-public class 
-StyledDocument 
+public interface 
+ShaperProbeListener 
 {
-	public String str = "";
-	
-	public int
-	getLength()
-	{
-		return( str.length());
-	}
-	
 	public void
-	insertString(
-		int		offset,
-		String	s,
-		Object	x )
-	
-		throws BadLocationException
-	{
-		Tcpbw100UIWrapperListener listener = Tcpbw100UIWrapper.current_adapter;
-		
-		if ( listener != null ){
-			
-			listener.reportSummary( s );
-			
-		}else{
-		
-			System.out.println( "doc: " + s );
-		}
-		
-		str += s;
-	}
+	reportSummary(
+		String		str );
 }

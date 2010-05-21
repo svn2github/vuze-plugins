@@ -21,17 +21,20 @@
 
 package com.vuze.plugins.mlab.tools.shaperprobe;
 
+import java.io.*;
+
+/*
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Toolkit;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.io.*;
-
 import javax.swing.JFrame;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
+*/
 
+import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.Debug;
@@ -41,9 +44,27 @@ import org.gudy.azureus2.plugins.PluginInterface;
 public class 
 ShaperProbe 
 {
-	public static void
+	private long	up_bps;
+	private long	down_bps;
+	
+	private long	shape_up_bps;
+	private long	shape_down_bps;
+	
+	
+	public static ShaperProbe
 	run(
-		PluginInterface		plugin_interface )
+		PluginInterface				plugin_interface,
+		final ShaperProbeListener	listener )
+	{
+		ShaperProbe sp = new ShaperProbe( plugin_interface, listener );
+		
+		return( sp );
+	}
+		
+	private
+	ShaperProbe(
+		PluginInterface				plugin_interface,
+		final ShaperProbeListener	listener )
 	{
 		try{	
 			String[] command;
@@ -81,51 +102,15 @@ ShaperProbe
 			final OutputStream	os 	= process.getOutputStream();
 			final InputStream 	es 	= process.getErrorStream();
 			
-			final boolean[] done = {false};
+			final AESemaphore processor_sem = new AESemaphore( "waiter" );
 			
-			new AEThread2( "ProcessReader" )
+			new AEThread2( "ProcessReader:is" )
 			{
-				private JFrame 		frame;
-				private JTextArea	area;
+				private int	mode = 0;
 				
 				public void
 				run()
-				{
-					frame = new JFrame( "ShaperProbe" );
-					
-					area = new JTextArea();
-					
-					JScrollPane	scroller = new JScrollPane( area );
-					
-					frame.getContentPane().add( scroller, BorderLayout.CENTER );
-										
-					frame.addWindowListener(
-						new WindowAdapter() 
-						{
-							public void 
-							windowClosing(
-								WindowEvent e )
-							{
-								frame.dispose();
-							}
-						});
-					
-					frame.setSize( new Dimension( 400, 600 ));
-						
-					Toolkit kit = Toolkit.getDefaultToolkit();
-					
-					Dimension screenSize = kit.getScreenSize();
-
-					int screenWidth = (int)screenSize.getWidth(); 
-					
-					int screenHeight = (int)screenSize.getHeight();
-
-					frame.setLocation(
-							((screenWidth / 2) - (frame.getWidth()/2)),
-							((screenHeight / 2) - (frame.getHeight()/2)));
-					
-					frame.setVisible( true );
-					
+				{					
 					String	line = "";
 					
 					try{						
@@ -141,9 +126,131 @@ ShaperProbe
 							}									
 							
 							line += new String( buffer, 0, len );
+															
+							while( true ){
 								
-							System.out.println( line );
+								int	pos = line.indexOf( '\n' );
+								
+								if ( pos == -1 ){
+										
+									break;
+								}
+								
+								String	x = line.substring(0,pos).trim();
+								
+								if ( x.length() > 0 ){
+									
+									logLine( x );
+								}
+								
+								line = line.substring(pos+1);
+								
+							}
+						}
+					}catch( Throwable e ){
+						
+						Debug.out( e );
+						
+					}finally{
+						
+						try{
+							if ( line.length() > 0 ){
+								
+								logLine( line );
+							}
+						}finally{
 							
+							processor_sem.release();
+						}
+					}
+				}
+				
+				protected void
+				logLine(
+					String	str )
+				{
+					if ( str.contains( "traffic shapers" )){
+						
+						mode	= 1;
+					}
+					
+					if ( mode == 0 ){
+					
+						if ( up_bps == 0 && str.startsWith( "Upstream:" )){
+							
+							up_bps = getLong( str.substring( 9 ));
+							
+						}else if ( down_bps == 0 && str.startsWith( "Downstream:" )){
+							
+							down_bps = getLong( str.substring( 11 ));
+	
+						}
+					}else{
+						
+						if ( str.contains( "Downstream:" )){
+							
+							mode = 2;
+							
+						}else{
+							
+							if ( str.contains( "Shaping rate:" )){
+								
+								long rate = getLong( str.substring( 13 ));
+								
+								if ( mode == 1 ){
+								
+									shape_up_bps = rate;
+									
+								}else{
+									
+									shape_down_bps = rate;
+								}
+								
+							}
+						}
+					}
+					listener.reportSummary( str );
+				}
+				
+				protected long
+				getLong(
+					String	str )
+				{
+					int	pos = str.trim().indexOf( ' ' );
+					
+					if ( pos != -1 ){
+						
+						str = str.substring( 0, pos );
+					}
+					
+						// kbps
+					
+					return( Long.parseLong( str.trim()) * 1024 );
+				}
+			}.start();
+			
+			
+			new AEThread2( "ProcessReader:es" )
+			{
+				public void
+				run()
+				{	
+					String	line = "";
+					
+					try{						
+						while( true ){
+							
+							byte[] buffer = new byte[32*1024];
+							
+							int	len = es.read( buffer );
+							
+							if ( len <= 0 ){
+								
+								break;
+							}									
+							
+							line += new String( buffer, 0, len );
+															
 							while( true ){
 								
 								int	pos = line.indexOf( '\n' );
@@ -166,12 +273,19 @@ ShaperProbe
 						}
 					}catch( Throwable e ){
 						
-						if ( line.length() > 0 ){
-							
-							logLine( line );
-						}
-						
 						Debug.out( e );
+						
+					}finally{
+						
+						try{
+							if ( line.length() > 0 ){
+								
+								logLine( line );
+							}
+						}finally{
+						
+							processor_sem.release();
+						}
 					}
 				}
 				
@@ -179,10 +293,7 @@ ShaperProbe
 				logLine(
 					String	str )
 				{
-					if ( area != null ){
-						
-						area.setText( area.getText() + str + "\n" );
-					}
+					listener.reportSummary( str );
 				}
 			}.start();
 			
@@ -191,10 +302,9 @@ ShaperProbe
 				
 			}finally{
 				
-				synchronized( done ){
+				processor_sem.reserve();
+				processor_sem.reserve();
 				
-					done[0] = true;
-				}
 			}
 		}catch( Throwable e ){
 			
@@ -234,5 +344,29 @@ ShaperProbe
 		}
 
 		return( name );
+	}
+	
+	public long
+	getUpBitsPerSec()
+	{
+		return( up_bps );
+	}
+	
+	public long
+	getDownBitsPerSec()
+	{
+		return( down_bps );
+	}
+	
+	public long
+	getShapeUpBitsPerSec()
+	{
+		return( shape_up_bps );
+	}
+	
+	public long
+	getShapeDownBitsPerSec()
+	{
+		return( shape_down_bps );
 	}
 }

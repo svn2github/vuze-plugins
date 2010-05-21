@@ -44,7 +44,7 @@ JTextArea
 		
 		if ( listener != null ){
 			
-			listener.reportSummary( str );
+			listener.reportDetail( str );
 			
 		}else{
 			
