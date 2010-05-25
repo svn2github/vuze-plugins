@@ -23,10 +23,14 @@ package com.vuze.plugins.mlab;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.gudy.azureus2.core3.util.AEThread2;
+import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.DisplayFormatters;
 import org.gudy.azureus2.plugins.*;
+import org.gudy.azureus2.plugins.ipc.IPCInterface;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
 import org.gudy.azureus2.plugins.ui.UIManager;
@@ -36,12 +40,15 @@ import org.gudy.azureus2.plugins.ui.config.ParameterListener;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
+import org.gudy.azureus2.ui.swt.Utils;
+import org.gudy.azureus2.ui.swt.speedtest.SpeedTestWizard;
 
 import com.vuze.plugins.mlab.tools.ndt.Tcpbw100;
 import com.vuze.plugins.mlab.tools.ndt.swingemu.Tcpbw100UIWrapper;
 import com.vuze.plugins.mlab.tools.ndt.swingemu.Tcpbw100UIWrapperListener;
 import com.vuze.plugins.mlab.tools.shaperprobe.ShaperProbe;
 import com.vuze.plugins.mlab.tools.shaperprobe.ShaperProbeListener;
+import com.vuze.plugins.mlab.ui.MLabWizard;
 
 public class 
 MLabPlugin
@@ -50,6 +57,9 @@ MLabPlugin
 	private PluginInterface		plugin_interface;
 	private LoggerChannel		logger;
 
+	private ActionParameter ndt_button;
+	private ActionParameter sp_button; 
+	
 	public void
 	initialize(
 		PluginInterface	_plugin_interface )
@@ -113,118 +123,171 @@ MLabPlugin
 		config_model.addLabelParameter2( "mlab.info" );
 		config_model.addHyperlinkParameter2( "mlab.link", loc_utils.getLocalisedMessageText( "mlab.link.url" ));
 		
-		final ActionParameter ndt = config_model.addActionParameter2( "mlab.tool.ndt", "mlab.run" );
+		ndt_button = config_model.addActionParameter2( "mlab.tool.ndt", "mlab.run" );
 		
-		ndt.addListener(
+		ndt_button.addListener(
 			new ParameterListener()
 			{
 				public void 
 				parameterChanged(
 					Parameter param ) 
 				{
-					runTool(
-						ndt,
-						new Runnable()
-						{
-							public void
-							run()
-							{
-								logger.log( "Starting NDT Test" );
-								logger.log( "-----------------" );
-								
-								new Tcpbw100UIWrapper(
-									new Tcpbw100UIWrapperListener()
-									{
-										public void
-										reportSummary(
-											String		str )
-										{
-											logger.log( str.trim());
-										}
-										
-										public void
-										reportDetail(
-											String		str )
-										{
-										}
-									});
-								
-								Tcpbw100 test = Tcpbw100.mainSupport( new String[]{ "ndt.iupui.donar.measurement-lab.org" });
-								
-								long	up_bps = 0;
-								
-								try{
-									up_bps = (long)(Double.parseDouble( test.get_c2sspd())*1000000)/8;
-									
-								}catch( Throwable e ){
-								}
-								
-								long	down_bps = 0;
-								
-								try{
-									down_bps = (long)(Double.parseDouble( test.get_s2cspd())*1000000)/8;
-									
-								}catch( Throwable e ){
-								}
-								
-								logger.log( "" );
-								
-								logger.log( 
-										"Completed: up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( up_bps ) +
-										", down=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( down_bps ));
-							}
-						});
+					runNDT( null );
 				}
 			});
 		
-		final ActionParameter sp = config_model.addActionParameter2( "mlab.tool.shaperprobe", "mlab.run" );
+		sp_button = config_model.addActionParameter2( "mlab.tool.shaperprobe", "mlab.run" );
 		
-		sp.addListener(
+		sp_button.addListener(
 			new ParameterListener()
 			{
 				public void 
 				parameterChanged(
 					Parameter param ) 
 				{
-					runTool(
-							sp,
-							new Runnable()
+					runShaperProbe( null );
+				}
+			});
+	}
+	
+	protected void
+	runNDT(
+		final toolListener	listener )
+	{
+		runTool(
+			ndt_button,
+			new Runnable()
+			{
+				public void
+				run()
+				{
+					logger.log( "Starting NDT Test" );
+					logger.log( "-----------------" );
+					
+					new Tcpbw100UIWrapper(
+						new Tcpbw100UIWrapperListener()
+						{
+							public void
+							reportSummary(
+								String		str )
 							{
-								public void
-								run()
+								str = str.trim();
+								
+								logger.log( str.trim());
+								
+								if ( listener != null ){
+									
+									listener.reportSummary( str );
+								}
+							}
+							
+							public void
+							reportDetail(
+								String		str )
+							{
+								str = str.trim();
+								
+								if ( listener != null ){
+									
+									listener.reportDetail( str );
+								}
+							}
+						});
+					
+					Tcpbw100 test = Tcpbw100.mainSupport( new String[]{ "ndt.iupui.donar.measurement-lab.org" });
+					
+					long	up_bps = 0;
+					
+					try{
+						up_bps = (long)(Double.parseDouble( test.get_c2sspd())*1000000)/8;
+						
+					}catch( Throwable e ){
+					}
+					
+					long	down_bps = 0;
+					
+					try{
+						down_bps = (long)(Double.parseDouble( test.get_s2cspd())*1000000)/8;
+						
+					}catch( Throwable e ){
+					}
+					
+					logger.log( "" );
+					
+					logger.log( 
+							"Completed: up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( up_bps ) +
+							", down=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( down_bps ));
+					
+					if ( listener != null ){
+						
+						Map<String,Object>	results = new HashMap<String, Object>();
+						
+						results.put( "up", up_bps );
+						results.put( "down", down_bps );
+						
+						listener.complete( results );
+					}
+				}
+			});
+	}
+	
+	protected void
+	runShaperProbe(
+		final toolListener	listener )
+	{
+		runTool(
+			sp_button,
+			new Runnable()
+			{
+				public void
+				run()
+				{
+					logger.log( "Starting ShaperProbe Test" );
+					logger.log( "-----------------" );
+
+					ShaperProbe sp = 
+						ShaperProbe.run(
+							plugin_interface,
+							new ShaperProbeListener()
+							{
+								public void 
+								reportSummary(
+									String str) 
 								{
-									logger.log( "Starting ShaperProbe Test" );
-									logger.log( "-----------------" );
-
-									ShaperProbe sp = 
-										ShaperProbe.run(
-											plugin_interface,
-											new ShaperProbeListener()
-											{
-												public void 
-												reportSummary(
-													String str) 
-												{
-													logger.log( str.trim());
-												}
-											});
+									logger.log( str.trim());
 									
-									long up_bps 	= sp.getUpBitsPerSec()/8;
-									long down_bps 	= sp.getDownBitsPerSec()/8;
+									if ( listener != null ){
 									
-									long shape_up_bps 		= sp.getShapeUpBitsPerSec()/8;
-									long shape_down_bps 	= sp.getShapeDownBitsPerSec()/8;
-									
-									logger.log( "" );
-									
-									logger.log( 
-											"Completed: up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( up_bps ) +
-											", down=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( down_bps ) +
-											", shape_up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( shape_up_bps ) +
-											", shape_down=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( shape_down_bps ));
-
+										listener.reportSummary( str );
+									}
 								}
 							});
+					
+					long up_bps 	= sp.getUpBitsPerSec()/8;
+					long down_bps 	= sp.getDownBitsPerSec()/8;
+					
+					long shape_up_bps 		= sp.getShapeUpBitsPerSec()/8;
+					long shape_down_bps 	= sp.getShapeDownBitsPerSec()/8;
+					
+					logger.log( "" );
+					
+					logger.log( 
+							"Completed: up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( up_bps ) +
+							", down=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( down_bps ) +
+							", shape_up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( shape_up_bps ) +
+							", shape_down=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( shape_down_bps ));
+
+					if ( listener != null ){
+						
+						Map<String,Object>	results = new HashMap<String, Object>();
+						
+						results.put( "up", up_bps );
+						results.put( "down", down_bps );
+						results.put( "shape_up", shape_up_bps );
+						results.put( "shape_down", shape_down_bps );
+						
+						listener.complete( results );
+					}
 				}
 			});
 	}
@@ -255,6 +318,68 @@ MLabPlugin
 	public void
 	unload()
 	{
+	}
+	
+	public void
+	runTest(
+		Map<String,Object>		args,
+		final IPCInterface		callback )
+	{
+		Utils.execSWTThread(
+			new Runnable()
+			{
+				public void
+				run()
+				{
+					new MLabWizard( MLabPlugin.this, callback );
+				}
+			});
 		
+		runNDT(
+			new toolListener()
+			{
+				public void
+				reportSummary(
+					String		str )
+				{
+					
+				}
+				
+				public void
+				reportDetail(
+					String		str )
+				{
+					
+				}
+				
+				public void
+				complete(
+					Map<String,Object>	results )
+				{
+					try{
+						callback.invoke( "complete", new Object[]{ results });
+						
+					}catch( Throwable e ){
+						
+						Debug.out( e );
+					}
+				}
+			});
+	}
+	
+	private interface
+	toolListener
+	{
+		public void
+		reportSummary(
+			String		str );
+		
+		public void
+		reportDetail(
+			String		str );
+		
+		public void
+		complete(
+			Map<String,Object>	results );
 	}
 }
