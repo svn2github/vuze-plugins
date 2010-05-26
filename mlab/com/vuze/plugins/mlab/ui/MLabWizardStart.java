@@ -29,6 +29,8 @@ import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Label;
 import org.gudy.azureus2.core3.internat.MessageText;
+import org.gudy.azureus2.ui.swt.components.LinkLabel;
+import org.gudy.azureus2.ui.swt.mainwindow.Colors;
 import org.gudy.azureus2.ui.swt.wizard.AbstractWizardPanel;
 import org.gudy.azureus2.ui.swt.wizard.IWizardPanel;
 
@@ -55,15 +57,28 @@ MLabWizardStart
 		GridLayout layout = new GridLayout();
 		layout.numColumns = 1;
 		rootPanel.setLayout(layout);
+		rootPanel.setBackground( Colors.white );
 		
 		Image img = wizard.getImage( "com/vuze/plugins/mlab/ui/resources/mlab.png" );
 		
-		Label l = new Label( rootPanel, SWT.NULL );
+		Label img_label = new Label( rootPanel, SWT.INHERIT_DEFAULT );
         GridData gridData = new GridData(GridData.FILL_BOTH);
-		l.setLayoutData(gridData);
-
-		
-		l.setImage( img );
+        img_label.setLayoutData(gridData);
+        img_label.setImage( img );
+        img_label.setBackground( Colors.white );
+        
+		Label info_label = new Label( rootPanel, SWT.WRAP );
+		gridData = new GridData(GridData.FILL_BOTH);
+		info_label.setLayoutData(gridData);
+		info_label.setBackground( Colors.white );
+		info_label.setText( MessageText.getString( "mlab.info" ));
+ 
+		LinkLabel link = new LinkLabel( rootPanel, "mlab.link", MessageText.getString( "mlab.link.url" ));
+        link.getlabel().setBackground( Colors.white );
+        
+		Label next_label = new Label( rootPanel, SWT.NULL );
+		next_label.setBackground( Colors.white );
+		next_label.setText( MessageText.getString("mlab.wizard.intro.next"));
 	}
 	
 	public boolean 

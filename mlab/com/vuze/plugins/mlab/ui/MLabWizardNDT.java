@@ -44,6 +44,7 @@ import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.gudy.azureus2.core3.util.TimerEventPeriodic;
 import org.gudy.azureus2.ui.swt.TextViewerWindow;
 import org.gudy.azureus2.ui.swt.Utils;
+import org.gudy.azureus2.ui.swt.mainwindow.Colors;
 import org.gudy.azureus2.ui.swt.wizard.AbstractWizardPanel;
 import org.gudy.azureus2.ui.swt.wizard.IWizardPanel;
 
@@ -112,12 +113,13 @@ MLabWizardNDT
 		layout = new GridLayout();
 		layout.numColumns = 1;
 		progress_panel.setLayout(layout);
+		progress_panel.setBackground( Colors.white );
 
 		final ProgressBar prog = new ProgressBar( progress_panel, SWT.HORIZONTAL );
 	   	gridData = new GridData(GridData.FILL_HORIZONTAL );
     	gridData.horizontalSpan = 1;
     	prog.setLayoutData(gridData);
-
+    	prog.setBackground( Colors.white );
 		prog.setMinimum(0);
 		prog.setMaximum(100);	
 		
@@ -126,11 +128,13 @@ MLabWizardNDT
 		layout = new GridLayout();
 		layout.numColumns = 3;
 		status_panel.setLayout(layout);
-
+		status_panel.setBackground( Colors.white );
+		
 		result_label	= new Label( status_panel, SWT.NULL );
 	   	gridData = new GridData(GridData.FILL_HORIZONTAL );
 	   	result_label.setLayoutData(gridData);
-
+	   	result_label.setBackground( Colors.white );
+	   	
 	   	Button details_button = new Button( status_panel, SWT.NULL );
 	   	details_button.setText( MessageText.getString( "mlab.wizard.details" ));
 		
