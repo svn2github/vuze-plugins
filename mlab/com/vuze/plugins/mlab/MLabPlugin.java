@@ -30,6 +30,7 @@ import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.DisplayFormatters;
 import org.gudy.azureus2.plugins.*;
+import org.gudy.azureus2.plugins.ipc.IPCException;
 import org.gudy.azureus2.plugins.ipc.IPCInterface;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
@@ -58,6 +59,8 @@ MLabPlugin
 
 	private ActionParameter ndt_button;
 	private ActionParameter sp_button; 
+	
+	private boolean test_active;
 	
 	public void
 	initialize(
@@ -234,8 +237,11 @@ MLabPlugin
 									logger.log( str.trim());
 									
 									if ( listener != null ){
+									
+										if ( !str.startsWith( "Click" )){
 										
-										listener.reportSummary( str );
+											listener.reportSummary( str );
+										}
 									}
 								}
 								
@@ -286,11 +292,16 @@ MLabPlugin
 						
 						logger.log( "" );
 						
-						logger.log( 
-								"Completed: up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( up_bps ) +
-								", down=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( down_bps ));
+						String complete_str = 	
+							"Completed: up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( up_bps ) +
+							", down=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( down_bps );
+
+						logger.log( complete_str );
 						
 						if ( listener != null ){
+							
+							listener.reportSummary( complete_str );
+							listener.reportDetail( complete_str );
 							
 							Map<String,Object>	results = new HashMap<String, Object>();
 							
@@ -395,6 +406,12 @@ MLabPlugin
 		}.start();
 	}
 	
+	public PluginInterface
+	getPluginInterface()
+	{
+		return( plugin_interface );
+	}
+	
 	public void
 	unload()
 	{
@@ -404,14 +421,69 @@ MLabPlugin
 	runTest(
 		Map<String,Object>		args,
 		final IPCInterface		callback )
+	
+		throws IPCException
 	{
+		synchronized( this ){
+			
+			if ( test_active ){
+				
+				throw( new IPCException( "Test already active" ));
+			}
+			
+			plugin_interface.getPluginProperties().put( "plugin.unload.disabled", "true" );
+			
+			test_active = true;
+		}
+		
 		Utils.execSWTThread(
 			new Runnable()
 			{
 				public void
 				run()
 				{
-					new MLabWizard( MLabPlugin.this, callback );
+					IPCInterface wrapper = 
+						new IPCInterface()
+						{
+							public Object 
+							invoke(
+								String methodName, 
+								Object[] params ) 
+							
+								throws IPCException
+							{
+								synchronized( MLabPlugin.this ){
+									
+									test_active = false;
+									
+									plugin_interface.getPluginProperties().put( "plugin.unload.disabled", "false" );
+								}
+								
+								return( callback.invoke( methodName, params ));
+							}
+						
+							public boolean 
+							canInvoke( 
+								String methodName, 
+								Object[] params )
+							{
+								return( callback.canInvoke( methodName, params ));
+							}
+						};
+					
+					try{
+						new MLabWizard( MLabPlugin.this, wrapper );
+						
+					}catch( Throwable e ){
+						
+						try{
+							wrapper.invoke( "error", new Object[]{ e } );
+							
+						}catch( Throwable f ){
+						}
+						
+						Debug.out( e );
+					}
 				}
 			});
 	}

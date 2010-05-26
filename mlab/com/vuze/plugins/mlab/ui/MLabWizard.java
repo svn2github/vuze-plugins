@@ -21,6 +21,12 @@
 
 package com.vuze.plugins.mlab.ui;
 
+import java.io.InputStream;
+import java.util.*;
+
+import org.eclipse.swt.graphics.Image;
+import org.eclipse.swt.graphics.ImageData;
+import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.ipc.IPCInterface;
 import org.gudy.azureus2.ui.swt.wizard.Wizard;
 
@@ -32,6 +38,14 @@ MLabWizard
 {
 	private MLabPlugin		plugin;
 	private IPCInterface	callback;
+	
+	private List<Image>	images = new ArrayList<Image>();
+	
+	private long		up_rate;
+	private long		down_rate;
+	
+	private boolean		downloads_paused;
+	private boolean		finished;
 	
 	public
 	MLabWizard(
@@ -54,11 +68,91 @@ MLabWizard
 		return( plugin );
 	}
 	
+	protected Image
+	getImage(
+		String		res )
+	{
+		InputStream is = getClass().getClassLoader().getResourceAsStream( res);
+		
+		if ( is != null ){
+		        
+			ImageData imageData = new ImageData( is );
+		    
+			Image img = new Image( getDisplay(), imageData );
+			
+			images.add( img );
+			
+			return( img );
+		}
+		
+		return( null );
+	}
+	
+	protected boolean
+	pauseDownloads()
+	{
+		if ( downloads_paused ){
+			
+			return( false );
+		}
+		
+		downloads_paused = true;
+		
+		plugin.getPluginInterface().getDownloadManager().pauseDownloads();
+		
+		return( true );
+	}
+	
+	protected void
+	setRates(
+		long		_up,
+		long		_down )
+	{
+		up_rate		= _up;
+		down_rate	= _down;
+	}
+	
 	public void 
 	onClose()
 	{
 		super.onClose();
 		
-		// TODO: IPC
+		if ( downloads_paused ){
+			
+			plugin.getPluginInterface().getDownloadManager().resumeDownloads();
+		}
+		
+		try{
+			if ( finished ){
+				
+				Map<String,Object> args = new HashMap<String,Object>();
+				
+				args.put( "up", up_rate );
+				args.put( "down", down_rate );
+				
+				callback.invoke( "results", new Object[]{ args });
+				
+			}else{
+				
+				callback.invoke( "cancelled", new Object[]{});
+
+			}
+		}catch( Throwable e ){
+			
+			Debug.out( e );
+		}
+		
+		for ( Image img: images ){
+			
+			img.dispose();
+		}
+	}
+	
+	public void
+	finish()
+	{
+		finished	= true;
+		
+		close();
 	}
 }

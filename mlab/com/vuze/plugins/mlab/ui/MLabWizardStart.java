@@ -21,11 +21,13 @@
 
 package com.vuze.plugins.mlab.ui;
 
+
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
-import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Label;
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.ui.swt.wizard.AbstractWizardPanel;
 import org.gudy.azureus2.ui.swt.wizard.IWizardPanel;
@@ -44,9 +46,8 @@ MLabWizardStart
 	public void 
 	show() 
 	{
-		Display display = wizard.getDisplay();
-		wizard.setTitle(MessageText.getString( "mlab.wizard.intro" ));
-        wizard.setCurrentInfo( MessageText.getString("mlab.wizard.stuff") );
+		wizard.setTitle(MessageText.getString( "mlab.wizard.intro.title" ));
+        wizard.setCurrentInfo( "" );
         wizard.setPreviousEnabled(false);
         wizard.setFinishEnabled(false);
 
@@ -54,10 +55,15 @@ MLabWizardStart
 		GridLayout layout = new GridLayout();
 		layout.numColumns = 1;
 		rootPanel.setLayout(layout);
-
-        Composite panel = new Composite(rootPanel, SWT.NULL);
+		
+		Image img = wizard.getImage( "com/vuze/plugins/mlab/ui/resources/mlab.png" );
+		
+		Label l = new Label( rootPanel, SWT.NULL );
         GridData gridData = new GridData(GridData.FILL_BOTH);
-		panel.setLayoutData(gridData);
+		l.setLayoutData(gridData);
+
+		
+		l.setImage( img );
 	}
 	
 	public boolean 
