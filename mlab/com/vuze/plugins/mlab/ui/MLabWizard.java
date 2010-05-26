@@ -30,21 +30,35 @@ public class
 MLabWizard
 	extends Wizard
 {
+	private MLabPlugin		plugin;
+	private IPCInterface	callback;
+	
 	public
 	MLabWizard(
 		MLabPlugin		_plugin,
 		IPCInterface	_callback )
 	{
 		super( "mlab.wizard.title" );
+	
+		plugin		= _plugin;
+		callback	= _callback;
 		
 		MLabWizardStart panel = new MLabWizardStart( this );
 		
 		setFirstPanel( panel );
 	}
 
+	protected MLabPlugin
+	getPlugin()
+	{
+		return( plugin );
+	}
+	
 	public void 
 	onClose()
 	{
 		super.onClose();
+		
+		// TODO: IPC
 	}
 }

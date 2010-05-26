@@ -32,7 +32,7 @@ import org.gudy.azureus2.ui.swt.wizard.IWizardPanel;
 
 public class 
 MLabWizardStart
-	extends AbstractWizardPanel 
+	extends AbstractWizardPanel<MLabWizard> 
 {
 	protected
 	MLabWizardStart(
@@ -69,6 +69,6 @@ MLabWizardStart
 	public IWizardPanel 
 	getNextPanel() 
 	{
-		return( new MLabWizardNDT((MLabWizard)wizard, this ));
+		return( new MLabWizardNDT( wizard, this ));
 	}
 }

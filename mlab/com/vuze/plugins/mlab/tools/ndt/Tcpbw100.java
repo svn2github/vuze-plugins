@@ -63,7 +63,6 @@ as Operator of Argonne National Laboratory (http://miranda.ctd.anl.gov:7123/).
  */
 import java.io.*;
 import java.net.*;
-import java.net.Socket;
 /*
 import java.awt.*;
 import java.awt.event.*;
@@ -102,6 +101,10 @@ import com.vuze.plugins.mlab.tools.ndt.swingemu.*;
 // Workaround for remote JavaScript start method
 import java.security.AccessController;
 import java.security.PrivilegedAction;
+
+import org.gudy.azureus2.core3.security.SESecurityManager;
+import org.gudy.azureus2.core3.util.AESemaphore;
+import org.gudy.azureus2.core3.util.Debug;
 
 
 public class Tcpbw100 extends JApplet implements ActionListener
@@ -2745,7 +2748,6 @@ class MyTextPane extends JTextPane
 		}
 	}  // actionPerformed()
 
-
 	public class clsFrame extends JFrame {
 		public clsFrame() {
 			addWindowListener(new WindowAdapter() {
@@ -2758,9 +2760,116 @@ class MyTextPane extends JTextPane
 		}
 	} // class: clsFrame
 
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	private ThreadGroup thread_group;
+	
+	public void
+	killIt()
+	{
+		while( !thread_group.isDestroyed()){
+			
+			Thread[] threads = new Thread[thread_group.activeCount()];
+			
+			thread_group.enumerate( threads );
+		
+			int	done = 0;
+			
+			for ( int i=0;i<threads.length;i++){
+				
+				if ( threads[i] != null ){
+					
+					done++;
+					
+					SESecurityManager.stopThread( threads[i] );
+				}
+			}
+			
+			if ( done == 0 ){
+				
+				try{
+					thread_group.destroy();
+					
+					break;
+					
+				}catch( Throwable e ){
+					
+					e.printStackTrace();
+				}
+			}
+			
+			try{
+				Thread.sleep(250);
+				
+			}catch( Throwable e ){	
+			}
+		}
+	}
+	
+	public void
+	runIt()
+	{
+		final AESemaphore sem = new AESemaphore( "waiter" );
+		
+		thread_group = new 
+			ThreadGroup( "NDT" )
+			{
+				public void 
+				uncaughtException(
+					Thread t, 
+					Throwable e) 
+				{
+					Debug.out( e );
+				}
+			};
+		
+		thread_group.setDaemon( true );
+		
+		Thread t = 
+			new Thread( 
+				thread_group,
+				new Runnable()
+				{
+					public void
+					run()
+					{
+						try{
+							new TestWorker().run();
+							
+						}catch( Throwable e ){
+						
+							if ( !( e instanceof ThreadDeath )){
+							
+								Debug.out( e );
+							}
+						}finally{
+							
+							sem.release();
+						}
+					}
+				});
+		
+		t.setDaemon( true );
+		
+		t.start();
+		
+		sem.reserve();
+	}
+	
+
   public static void main(String[] args)
   {
-	  mainSupport( args );
+	  Tcpbw100 test = mainSupport( args );
+	  
+	  test.runIt();
   }
   
   public static Tcpbw100 mainSupport(String[] args)
@@ -2784,9 +2893,7 @@ class MyTextPane extends JTextPane
     applet.init();
     applet.start();
     frame.setVisible(true);
-    
-    applet.new TestWorker().run();
-    
+        
     return( applet );
   }
 

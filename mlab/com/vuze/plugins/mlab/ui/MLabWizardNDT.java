@@ -21,23 +21,34 @@
 
 package com.vuze.plugins.mlab.ui;
 
+import java.util.Map;
+
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.custom.StyledText;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Display;
 import org.gudy.azureus2.core3.internat.MessageText;
+import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.ui.swt.Utils;
 import org.gudy.azureus2.ui.swt.wizard.AbstractWizardPanel;
 import org.gudy.azureus2.ui.swt.wizard.IWizardPanel;
 
+import com.vuze.plugins.mlab.MLabPlugin;
+import com.vuze.plugins.mlab.MLabPlugin.*;
+
 public class 
 MLabWizardNDT 
-	extends AbstractWizardPanel 
+	extends AbstractWizardPanel<MLabWizard> 
 {
+	private StyledText			log;
+	private MLabPlugin.ToolRun	runner;
+	
 	protected
 	MLabWizardNDT(
-		MLabWizard				wizard,
-		AbstractWizardPanel		prev )
+		MLabWizard							wizard,
+		AbstractWizardPanel<MLabWizard>		prev )
 	{
 		super( wizard, prev );
 	}
@@ -56,9 +67,54 @@ MLabWizardNDT
 		layout.numColumns = 1;
 		rootPanel.setLayout(layout);
 
-        Composite panel = new Composite(rootPanel, SWT.NULL);
-        GridData gridData = new GridData(GridData.FILL_BOTH);
-		panel.setLayoutData(gridData);
+		
+	   	log = new StyledText(rootPanel,SWT.READ_ONLY | SWT.V_SCROLL | SWT.H_SCROLL | SWT.BORDER);
+    	GridData gridData = new GridData(GridData.FILL_BOTH);
+    	gridData.horizontalSpan = 1;
+    	log.setLayoutData(gridData);
+
+    	runner = wizard.getPlugin().
+			runNDT(
+				new ToolListener()
+				{
+					public void
+					reportSummary(
+						final String		str )
+					{
+						Utils.execSWTThread(
+							new Runnable()
+							{
+								public void
+								run()
+								{
+									if ( !log.isDisposed()){
+									
+										log.append( str + "\n" );
+									}
+								}
+							});
+					}
+					
+					public void
+					reportDetail(
+						String		str )
+					{
+						
+					}
+					
+					public void
+					complete(
+						Map<String,Object>	results )
+					{
+						try{
+							// callback.invoke( "complete", new Object[]{ results });
+							
+						}catch( Throwable e ){
+							
+							Debug.out( e );
+						}
+					}
+				});
 	}
 	
 	public boolean 
@@ -73,9 +129,15 @@ MLabWizardNDT
 		return( null );
 	}
 	
-	 public boolean 
-	 isPreviousEnabled() 
-	 {
-		 return( false );
-	 }
+	public boolean 
+	isPreviousEnabled() 
+	{
+		return( false );
+	}
+
+	public void
+	cancelled()
+	{
+		runner.cancel();
+	}
 }

@@ -23,9 +23,9 @@ package com.vuze.plugins.mlab;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
+import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.DisplayFormatters;
@@ -41,7 +41,6 @@ import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.gudy.azureus2.ui.swt.Utils;
-import org.gudy.azureus2.ui.swt.speedtest.SpeedTestWizard;
 
 import com.vuze.plugins.mlab.tools.ndt.Tcpbw100;
 import com.vuze.plugins.mlab.tools.ndt.swingemu.Tcpbw100UIWrapper;
@@ -150,10 +149,68 @@ MLabPlugin
 			});
 	}
 	
-	protected void
+	public ToolRun
 	runNDT(
-		final toolListener	listener )
+		final ToolListener	listener )
 	{
+		final ToolRun run = 
+			new ToolRun()
+			{
+				private List<ToolRunListener>	listeners = new ArrayList<ToolRunListener>();
+				private boolean	cancelled;
+				
+				public void 
+				cancel() 
+				{
+					List<ToolRunListener> copy;
+					
+					synchronized( this ){
+					
+						cancelled = true;
+						
+						copy = new ArrayList<ToolRunListener>( listeners );
+					}
+					
+					for ( ToolRunListener l: copy ){
+						
+						try{
+							l.cancelled();
+							
+						}catch( Throwable e ){
+							
+							Debug.out( e );
+						}
+					}
+				}
+				
+				public void
+				addListener(
+					ToolRunListener		l )
+				{
+					boolean	inform = false;
+					
+					synchronized( this ){
+						
+						inform = cancelled;
+						
+						listeners.add( l );
+					}
+					
+					if ( inform ){
+						
+						try{
+							l.cancelled();
+							
+						}catch( Throwable e ){
+							
+							Debug.out( e );
+						}
+					}
+				}
+			};
+			
+		final AESemaphore	sem = new AESemaphore( "waiter" );
+		
 		runTool(
 			ndt_button,
 			new Runnable()
@@ -161,79 +218,102 @@ MLabPlugin
 				public void
 				run()
 				{
-					logger.log( "Starting NDT Test" );
-					logger.log( "-----------------" );
-					
-					new Tcpbw100UIWrapper(
-						new Tcpbw100UIWrapperListener()
-						{
-							public void
-							reportSummary(
-								String		str )
+					try{
+						logger.log( "Starting NDT Test" );
+						logger.log( "-----------------" );
+						
+						new Tcpbw100UIWrapper(
+							new Tcpbw100UIWrapperListener()
 							{
-								str = str.trim();
-								
-								logger.log( str.trim());
-								
-								if ( listener != null ){
+								public void
+								reportSummary(
+									String		str )
+								{
+									str = str.trim();
 									
-									listener.reportSummary( str );
+									logger.log( str.trim());
+									
+									if ( listener != null ){
+										
+										listener.reportSummary( str );
+									}
 								}
-							}
+								
+								public void
+								reportDetail(
+									String		str )
+								{
+									str = str.trim();
+									
+									if ( listener != null ){
+										
+										listener.reportDetail( str );
+									}
+								}
+							});
+						
+						final Tcpbw100 test = Tcpbw100.mainSupport( new String[]{ "ndt.iupui.donar.measurement-lab.org" });
+						
+						run.addListener(
+							new ToolRunListener()
+							{
+								public void
+								cancelled()
+								{
+									test.killIt();
+								}
+							});
+						
+						sem.release();
+						
+						test.runIt();
+						
+						long	up_bps = 0;
+						
+						try{
+							up_bps = (long)(Double.parseDouble( test.get_c2sspd())*1000000)/8;
 							
-							public void
-							reportDetail(
-								String		str )
-							{
-								str = str.trim();
-								
-								if ( listener != null ){
-									
-									listener.reportDetail( str );
-								}
-							}
-						});
-					
-					Tcpbw100 test = Tcpbw100.mainSupport( new String[]{ "ndt.iupui.donar.measurement-lab.org" });
-					
-					long	up_bps = 0;
-					
-					try{
-						up_bps = (long)(Double.parseDouble( test.get_c2sspd())*1000000)/8;
+						}catch( Throwable e ){
+						}
 						
-					}catch( Throwable e ){
-					}
-					
-					long	down_bps = 0;
-					
-					try{
-						down_bps = (long)(Double.parseDouble( test.get_s2cspd())*1000000)/8;
+						long	down_bps = 0;
 						
-					}catch( Throwable e ){
-					}
-					
-					logger.log( "" );
-					
-					logger.log( 
-							"Completed: up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( up_bps ) +
-							", down=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( down_bps ));
-					
-					if ( listener != null ){
+						try{
+							down_bps = (long)(Double.parseDouble( test.get_s2cspd())*1000000)/8;
+							
+						}catch( Throwable e ){
+						}
 						
-						Map<String,Object>	results = new HashMap<String, Object>();
+						logger.log( "" );
 						
-						results.put( "up", up_bps );
-						results.put( "down", down_bps );
+						logger.log( 
+								"Completed: up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( up_bps ) +
+								", down=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( down_bps ));
 						
-						listener.complete( results );
+						if ( listener != null ){
+							
+							Map<String,Object>	results = new HashMap<String, Object>();
+							
+							results.put( "up", up_bps );
+							results.put( "down", down_bps );
+							
+							listener.complete( results );
+						}
+					}finally{
+						
+						sem.release();
 					}
 				}
 			});
+		
+		sem.reserve();
+		
+		return( run );
 	}
 	
 	protected void
 	runShaperProbe(
-		final toolListener	listener )
+		final ToolListener	listener )
 	{
 		runTool(
 			sp_button,
@@ -334,41 +414,28 @@ MLabPlugin
 					new MLabWizard( MLabPlugin.this, callback );
 				}
 			});
-		
-		runNDT(
-			new toolListener()
-			{
-				public void
-				reportSummary(
-					String		str )
-				{
-					
-				}
-				
-				public void
-				reportDetail(
-					String		str )
-				{
-					
-				}
-				
-				public void
-				complete(
-					Map<String,Object>	results )
-				{
-					try{
-						callback.invoke( "complete", new Object[]{ results });
-						
-					}catch( Throwable e ){
-						
-						Debug.out( e );
-					}
-				}
-			});
 	}
 	
-	private interface
-	toolListener
+	public interface
+	ToolRun
+	{
+		public void
+		cancel();
+		
+		public void
+		addListener(
+			ToolRunListener		l );
+	}
+	
+	public interface
+	ToolRunListener
+	{
+		public void
+		cancelled();
+	}
+	
+	public interface
+	ToolListener
 	{
 		public void
 		reportSummary(
