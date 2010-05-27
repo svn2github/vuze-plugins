@@ -12,10 +12,12 @@
     </manifest>
     <selectedElements exportClassFiles="true" exportJavaFiles="true" exportOutputFolder="false">
         <javaElement handleIdentifier="=mlabplugin/&lt;com.vuze.plugins.mlab.internat"/>
+        <javaElement handleIdentifier="=mlabplugin/&lt;com.vuze.plugins.mlab.tools.ndt.swingemu"/>
+        <javaElement handleIdentifier="=mlabplugin/&lt;com.vuze.plugins.mlab.ui"/>
+        <javaElement handleIdentifier="=mlabplugin/&lt;com.vuze.plugins.mlab.ui.resources"/>
         <javaElement handleIdentifier="=mlabplugin/&lt;com.vuze.plugins.mlab.tools.ndt"/>
         <javaElement handleIdentifier="=mlabplugin/&lt;com.vuze.plugins.mlab"/>
         <javaElement handleIdentifier="=mlabplugin/&lt;com.vuze.plugins.mlab.tools.shaperprobe"/>
-        <file path="/mlabplugin/plugin.properties"/>
     </selectedElements>
     <fatjar builder="org.eclipse.jdt.ui.plain_jar_builder" launchConfig=""/>
 </jardesc>

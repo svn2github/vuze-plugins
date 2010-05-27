@@ -146,7 +146,7 @@ MLabWizardNDT
 				handleEvent(
 					Event arg0 )
 				{
-					new TextViewerWindow( "sdsd", "sdsd", details.toString());
+					new TextViewerWindow( "mlab.wizard.details.title", "mlab.wizard.details.info", details.toString());
 				}
 			});
 	   	
@@ -180,39 +180,42 @@ MLabWizardNDT
     	
 		root_panel.layout( true );
 		
-		prog_timer = 
-			SimpleTimer.addPeriodicEvent(
-				"ProgressUpdater",
-				250,
-				new TimerEventPerformer()
-				{					
-					public void 
-					perform(
-						TimerEvent event ) 
-					{
-						if ( progress_panel.isDisposed()){
-							
-							prog_timer.cancel();
-							
-						}else if ( stack_layout.topControl == progress_panel ){
-							
-							Utils.execSWTThread(
-									new Runnable()
-									{
-										public void
-										run()
+		if ( prog_timer == null ){
+			
+			prog_timer = 
+				SimpleTimer.addPeriodicEvent(
+					"ProgressUpdater",
+					250,
+					new TimerEventPerformer()
+					{					
+						public void 
+						perform(
+							TimerEvent event ) 
+						{
+							if ( progress_panel.isDisposed()){
+								
+								prog_timer.cancel();
+								
+							}else if ( stack_layout.topControl == progress_panel ){
+								
+								Utils.execSWTThread(
+										new Runnable()
 										{
-											if ( !prog.isDisposed()){
-											
-												prog.setSelection( ( prog_value++ )%100 );
+											public void
+											run()
+											{
+												if ( !prog.isDisposed()){
+												
+													prog.setSelection( ( prog_value++ )%100 );
+												}
 											}
-										}
-									});
+										});
+							}
 						}
-					}
-				});
-		
-		runTest();
+					});
+			
+			runTest();
+		}
 	}
 	
 	private void
@@ -240,11 +243,14 @@ MLabWizardNDT
 									public void
 									run()
 									{
-										log.append( "." );
-										
-										if ( f_i == 49 ){
+										if ( !log.isDisposed()){
 											
-											log.append( "\n" );
+											log.append( "." );
+											
+											if ( f_i == 49 ){
+												
+												log.append( "\n" );
+											}
 										}
 									}
 								});

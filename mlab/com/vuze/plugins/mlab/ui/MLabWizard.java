@@ -27,6 +27,8 @@ import java.util.*;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.ImageData;
 import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.plugins.download.Download;
+import org.gudy.azureus2.plugins.download.DownloadManager;
 import org.gudy.azureus2.plugins.ipc.IPCInterface;
 import org.gudy.azureus2.ui.swt.wizard.Wizard;
 
@@ -90,17 +92,41 @@ MLabWizard
 	
 	protected boolean
 	pauseDownloads()
-	{
+	{		
 		if ( downloads_paused ){
 			
 			return( false );
 		}
+	
+		DownloadManager download_manager = plugin.getPluginInterface().getDownloadManager();
+
+		Download[] downloads = download_manager.getDownloads();
 		
-		downloads_paused = true;
+		boolean	active = false;
+
+		for ( Download d: downloads ){
+			
+			int state = d.getState();
+			
+			if ( state != Download.ST_ERROR && state != Download.ST_STOPPED ){
+				
+				active = true;
+				
+				break;
+			}
+		}
 		
-		plugin.getPluginInterface().getDownloadManager().pauseDownloads();
-		
-		return( true );
+		if ( active ){
+			
+			downloads_paused = true;
+			
+			download_manager.pauseDownloads();
+			
+			return( true );
+		}else{
+			
+			return( false );
+		}
 	}
 	
 	protected void
