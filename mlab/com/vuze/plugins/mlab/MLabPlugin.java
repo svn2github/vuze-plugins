@@ -292,16 +292,25 @@ MLabPlugin
 						
 						logger.log( "" );
 						
-						String complete_str = 	
-							"Completed: up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( up_bps ) +
-							", down=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( down_bps );
-
-						logger.log( complete_str );
+						String	result_str;
+						
+						if ( up_bps == 0 || down_bps == 0 ){
+							
+							result_str  = "No results were received. Either the test server is unavailable or network problems are preventing the test from running correctly. Please try again.";
+							
+						}else{
+							
+							result_str = 	
+								"Completed: up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( up_bps ) +
+								", down=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( down_bps );
+						}
+						
+						logger.log( result_str );
 						
 						if ( listener != null ){
 							
-							listener.reportSummary( complete_str );
-							listener.reportDetail( complete_str );
+							listener.reportSummary( result_str );
+							listener.reportDetail( result_str );
 							
 							Map<String,Object>	results = new HashMap<String, Object>();
 							
