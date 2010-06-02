@@ -1,0 +1,36 @@
+#remotesearch_container {position:fixed;left:0;top:75px;bottom:0;width:100%;padding:0;margin:0;border:0;border-top:1px solid #667A8A}
+#remotesearch_container iframe {width:100%;height:100%;padding:0;margin:0;border:0}
+
+div.torrent_global_menu ul.search {background-position:0 12px;}
+div.torrent_global_menu ul li#search_li {width:270px;}
+
+li#remote_search div div.toolbar_image, li#remote_search.disabled div:active div.toolbar_image, li#remote_search.disabled div:hover div.toolbar_image {
+	background-position: left -192px;
+}
+li#remote_search div:active div.toolbar_image {
+	background-position: right -192px;
+}
+ul.search li#remote_search div div.toolbar_image, ul.search li#remote_search.disabled div:active div.toolbar_image, ul.search li#remote_search.disabled div:hover div.toolbar_image {
+	background-position: left -224px;
+}
+ul.search li#remote_search div:active div.toolbar_image {
+	background-position: right -224px;
+}
+li#search_btn div div.toolbar_image, li#search_btn.disabled div:active div.toolbar_image, li#search_btn.disabled div:hover div.toolbar_image {
+	background-position: left -257px;
+}
+li#search_btn div:active div.toolbar_image {
+	background-position: right -257px;
+}
+
+.search_term, .search_term form, .search_term input {/*float:left;*/}
+.search_term a {margin-left:6px;color:#264356}
+div.torrent_global_menu ul li div.search_term {padding:3px 16px}
+div.torrent_global_menu ul li div.search_term form {padding-top:0px}
+div.torrent_global_menu ul li div.search_term #search_input { margin-right:10px;
+padding:1px 5px;font-size:18px; width:245px;border:1px solid #c3c3c3;background-color: #f7f7f7;color:#97a4ae;height:22px}
+div.torrent_global_menu ul li div.search_term #search_submit {position:absolute;top:-500px;padding:2px 4px;border:1px solid #97A7BB;
+background-color:transparent;font-size:12px;color:#013B61}
+
+div.torrent_global_menu ul li {width:54px}
+div.torrent_global_menu ul li#remote_search {width:44px}
