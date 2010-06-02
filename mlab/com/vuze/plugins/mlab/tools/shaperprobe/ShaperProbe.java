@@ -44,15 +44,21 @@ import org.gudy.azureus2.plugins.PluginInterface;
 public class 
 ShaperProbe 
 {
+	private PluginInterface			plugin_interface;
+	private ShaperProbeListener		listener;
+	
 	private long	up_bps;
 	private long	down_bps;
 	
 	private long	shape_up_bps;
 	private long	shape_down_bps;
 	
+	private volatile Process 	process;
+	private volatile boolean 	cancelled;
+	
 	
 	public static ShaperProbe
-	run(
+	createIt(
 		PluginInterface				plugin_interface,
 		final ShaperProbeListener	listener )
 	{
@@ -63,8 +69,15 @@ ShaperProbe
 		
 	private
 	ShaperProbe(
-		PluginInterface				plugin_interface,
-		final ShaperProbeListener	listener )
+		PluginInterface				_plugin_interface,
+		ShaperProbeListener			_listener )
+	{
+		plugin_interface 	= _plugin_interface;
+		listener			= _listener;
+	}
+	
+	public void
+	runIt()
 	{
 		try{	
 			String[] command;
@@ -96,7 +109,23 @@ ShaperProbe
 				command = new String[]{ app.getAbsolutePath() };
 			}
 			
-			Process process = Runtime.getRuntime().exec( command );
+			if ( cancelled ){
+				
+				throw( new Exception( "Cancelled" ));
+			}
+			
+			process = Runtime.getRuntime().exec( command );
+			
+			if ( cancelled ){
+				
+				process.getInputStream().close();
+				
+				process.destroy();
+				
+				process = null;
+				
+				throw( new Exception( "Cancelled" ));
+			}
 			
 			final InputStream 	is 	= process.getInputStream();
 			final OutputStream	os 	= process.getOutputStream();
@@ -301,6 +330,8 @@ ShaperProbe
 			
 			try{
 				process.waitFor();
+			
+				process = null;
 				
 			}finally{
 				
@@ -310,7 +341,27 @@ ShaperProbe
 			}
 		}catch( Throwable e ){
 			
-			Debug.out( e );
+			if ( process != null ){
+				
+				try{
+					process.destroy();
+					
+				}catch( Throwable f ){					
+				}
+			}
+		}
+	}
+	
+	public void
+	killIt()
+	{
+		cancelled = true;
+			
+		Process proc = process;
+		
+		if ( proc != null ){
+			
+			proc.destroy();
 		}
 	}
 	

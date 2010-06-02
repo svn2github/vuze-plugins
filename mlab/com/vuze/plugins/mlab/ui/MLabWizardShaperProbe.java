@@ -42,7 +42,7 @@ import org.gudy.azureus2.core3.util.SimpleTimer;
 import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.gudy.azureus2.core3.util.TimerEventPeriodic;
-import org.gudy.azureus2.ui.swt.TextViewerWindow;
+import org.gudy.azureus2.ui.swt.Messages;
 import org.gudy.azureus2.ui.swt.Utils;
 import org.gudy.azureus2.ui.swt.mainwindow.Colors;
 import org.gudy.azureus2.ui.swt.wizard.AbstractWizardPanel;
@@ -52,7 +52,7 @@ import com.vuze.plugins.mlab.MLabPlugin;
 import com.vuze.plugins.mlab.MLabPlugin.*;
 
 public class 
-MLabWizardNDT 
+MLabWizardShaperProbe 
 	extends AbstractWizardPanel<MLabWizard> 
 {
 	private StyledText			log;
@@ -62,6 +62,7 @@ MLabWizardNDT
 	
 	private Composite			root_panel;
 	
+	private TimerEventPeriodic	prog_timer;
 	private StackLayout 		stack_layout;
 	private Composite 			progress_panel;
 	private Composite 			status_panel;
@@ -70,12 +71,9 @@ MLabWizardNDT
 	
 	private int	prog_value = 0;
 
-	private StringBuffer summary = new StringBuffer();
-	private StringBuffer details = new StringBuffer();
-		
 	
 	protected
-	MLabWizardNDT(
+	MLabWizardShaperProbe(
 		MLabWizard							wizard,
 		AbstractWizardPanel<MLabWizard>		prev )
 	{
@@ -85,8 +83,8 @@ MLabWizardNDT
 	public void 
 	show() 
 	{
-		wizard.setTitle(MessageText.getString( "mlab.wizard.ndt.title" ));
-        wizard.setCurrentInfo( MessageText.getString( "mlab.wizard.ndt.info" ));
+		wizard.setTitle(MessageText.getString( "mlab.wizard.sp.title" ));
+        wizard.setCurrentInfo( MessageText.getString( "mlab.wizard.sp.info" ));
         wizard.setPreviousEnabled(false);
         wizard.setFinishEnabled(false);
 
@@ -110,6 +108,37 @@ MLabWizardNDT
         
         controlPanel.setLayout( stack_layout );
         
+        Composite start_panel 	= new Composite( controlPanel, SWT.NONE);
+		layout = new GridLayout();
+		layout.numColumns = 3;
+		start_panel.setLayout(layout);
+		start_panel.setBackground( Colors.white );
+		
+		Label start_label	= new Label( start_panel, SWT.WRAP );
+	   	gridData = new GridData(GridData.FILL_HORIZONTAL );
+	   	start_label.setLayoutData(gridData);
+	   	start_label.setBackground( Colors.white );
+	   	Messages.setLanguageText( start_label, "mlab.wizard.sp.start" );
+	   	
+	   	Button start_button = new Button( start_panel, SWT.NULL );
+	   	start_button.setText( MessageText.getString( "mlab.wizard.start" ));
+		
+	   	start_button.addListener(
+			SWT.Selection,
+			new Listener()
+			{
+				public void 
+				handleEvent(
+					Event arg0 )
+				{
+					stack_layout.topControl = progress_panel;
+			    											
+					root_panel.layout( true, true );
+					
+					runTest();				}
+			});
+        
+        
 		progress_panel 	= new Composite( controlPanel, SWT.NONE);
 		layout = new GridLayout();
 		layout.numColumns = 1;
@@ -127,7 +156,7 @@ MLabWizardNDT
 		
 		status_panel 	= new Composite( controlPanel, SWT.NONE);
 		layout = new GridLayout();
-		layout.numColumns = 3;
+		layout.numColumns = 2;
 		status_panel.setLayout(layout);
 		status_panel.setBackground( Colors.white );
 		
@@ -136,23 +165,10 @@ MLabWizardNDT
 	   	result_label.setLayoutData(gridData);
 	   	result_label.setBackground( Colors.white );
 	   	
-	   	Button details_button = new Button( status_panel, SWT.NULL );
-	   	details_button.setText( MessageText.getString( "mlab.wizard.details" ));
-		
-	   	details_button.addListener(
-			SWT.Selection,
-			new Listener()
-			{
-				public void 
-				handleEvent(
-					Event arg0 )
-				{
-					new TextViewerWindow( "mlab.wizard.details.title", "mlab.wizard.details.info", details.toString());
-				}
-			});
 	   	
 		retest_button = new Button( status_panel, SWT.NULL );
 		retest_button.setText( MessageText.getString( "mlab.wizard.retest" ));
+		retest_button.setEnabled( false );
 		
 		retest_button.addListener(
 			SWT.Selection,
@@ -176,17 +192,18 @@ MLabWizardNDT
 				}
 			});
 		
-		long up = wizard.getUploadRate();
-
-		if ( up == 0 ){
+		stack_layout.topControl = start_panel;
+    	
+		root_panel.layout( true );
+		
+		cancelled = false;
+		
+		wizard.setFinishEnabled( true );
+		wizard.setPreviousEnabled( true );
+		
+		if ( prog_timer == null ){
 			
-			stack_layout.topControl = progress_panel;
-			
-			retest_button.setEnabled( false );
-
-			final TimerEventPeriodic[] 	f_prog_timer = { null };
-
-			f_prog_timer[0] =
+			prog_timer = 
 				SimpleTimer.addPeriodicEvent(
 					"ProgressUpdater",
 					250,
@@ -198,10 +215,8 @@ MLabWizardNDT
 						{
 							if ( progress_panel.isDisposed()){
 								
-								if ( f_prog_timer[0] != null ){
+								prog_timer.cancel();
 								
-									f_prog_timer[0].cancel();
-								}
 							}else if ( stack_layout.topControl == progress_panel ){
 								
 								Utils.execSWTThread(
@@ -219,34 +234,14 @@ MLabWizardNDT
 							}
 						}
 					});
-			
-			runTest();
-			
-		}else{
-			
-			wizard.setFinishEnabled( true );
-			wizard.setNextEnabled( true );
-			
-			stack_layout.topControl = status_panel;
-			 	
-			log.setText( summary.toString());
-			
-			result_label.setText( 
-					MessageText.getString( "mlab.wizard.results",
-					new String[]{ wizard.getRateString( up ) }));
 		}
-		
-		root_panel.layout( true );
-		
-		cancelled = false;
 	}
 	
 	private void
 	runTest()
 	{
 		wizard.setFinishEnabled( false );
-				
-		wizard.setNextEnabled( false );
+		wizard.setPreviousEnabled( false );
 		
 		if ( wizard.pauseDownloads()){
 			
@@ -309,21 +304,13 @@ MLabWizardNDT
 		}
 		
 	   	runner = wizard.getPlugin().
-			runNDT(
+			runShaperProbe(
 				new ToolListener()
 				{
-					{
-						summary.setLength(0);
-						details.setLength(0);
-					}
-					
 					public void
 					reportSummary(
 						final String		str )
 					{
-						summary.append( str );
-						summary.append( "\n" );
-
 						Utils.execSWTThread(
 							new Runnable()
 							{
@@ -351,8 +338,6 @@ MLabWizardNDT
 					reportDetail(
 						String		str )
 					{
-						details.append( str );
-						details.append( "\n" );
 					}
 					
 					public void
@@ -368,32 +353,45 @@ MLabWizardNDT
 										try{
 											if ( !root_panel.isDisposed()){
 											
-												Long	up 		= (Long)results.get( "up" );
-												Long	down 	= (Long)results.get( "down" );
+												Long	up 			= (Long)results.get( "up" );
+												Long	down 		= (Long)results.get( "down" );
+												Long	shape_up 	= (Long)results.get( "shape_up" );
+												Long	shape_down 	= (Long)results.get( "shape_down" );
 												
-												if ( up == null || up == 0 ){
+												long existing_up 	= wizard.getUploadRate();
+												long existing_down 	= wizard.getDownloadRate();
+												
+												if ( shape_up == null || shape_up == 0 ){
 													
-													result_label.setText( MessageText.getString( "mlab.wizard.noresults" ) );
+													result_label.setText( 
+														MessageText.getString( 
+															"mlab.wizard.sp.noresults",
+															new String[]{ wizard.getRateString( existing_up ) }));
 													
+												}else if ( shape_up >= existing_up ){
+													
+													result_label.setText( 
+															MessageText.getString( 
+																"mlab.wizard.sp.results2",
+																new String[]{ wizard.getRateString( existing_up ) }));												
 												}else{
 													
 													result_label.setText( 
-														MessageText.getString( "mlab.wizard.results",
-														new String[]{ wizard.getRateString( up ) }));
+														MessageText.getString(
+															"mlab.wizard.sp.results1",
+															new String[]{ wizard.getRateString( shape_up ) }));
 													
-													wizard.setRates( up, down==null?0:down );
-													
-													wizard.setFinishEnabled( true );
-																										
-													wizard.setNextEnabled( true );
+													wizard.setRates( shape_up, existing_down );
 												}
+												
+												wizard.setFinishEnabled( true );
+												wizard.setPreviousEnabled( true );
 												
 												retest_button.setEnabled( true );
 												
 												stack_layout.topControl = status_panel;
 		
-												root_panel.layout( true, true );
-												
+												root_panel.layout( true, true );												
 											}
 										}finally{ 
 											
@@ -401,7 +399,6 @@ MLabWizardNDT
 										}
 									}
 								});
-	
 					}
 				});
 	   	
@@ -420,7 +417,7 @@ MLabWizardNDT
 	public IWizardPanel 
 	getNextPanel() 
 	{
-		return( new MLabWizardShaperProbe( wizard, this ));
+		return( null );
 	}
 	
 	public boolean 

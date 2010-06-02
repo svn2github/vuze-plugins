@@ -156,62 +156,8 @@ MLabPlugin
 	runNDT(
 		final ToolListener	listener )
 	{
-		final ToolRun run = 
-			new ToolRun()
-			{
-				private List<ToolRunListener>	listeners = new ArrayList<ToolRunListener>();
-				private boolean	cancelled;
-				
-				public void 
-				cancel() 
-				{
-					List<ToolRunListener> copy;
-					
-					synchronized( this ){
-					
-						cancelled = true;
-						
-						copy = new ArrayList<ToolRunListener>( listeners );
-					}
-					
-					for ( ToolRunListener l: copy ){
-						
-						try{
-							l.cancelled();
-							
-						}catch( Throwable e ){
-							
-							Debug.out( e );
-						}
-					}
-				}
-				
-				public void
-				addListener(
-					ToolRunListener		l )
-				{
-					boolean	inform = false;
-					
-					synchronized( this ){
-						
-						inform = cancelled;
-						
-						listeners.add( l );
-					}
-					
-					if ( inform ){
-						
-						try{
-							l.cancelled();
-							
-						}catch( Throwable e ){
-							
-							Debug.out( e );
-						}
-					}
-				}
-			};
-			
+		final ToolRun run = new ToolRunImpl();
+		
 		final AESemaphore	sem = new AESemaphore( "waiter" );
 		
 		runTool(
@@ -221,6 +167,8 @@ MLabPlugin
 				public void
 				run()
 				{
+					boolean	completed = false;
+					
 					try{
 						logger.log( "Starting NDT Test" );
 						logger.log( "-----------------" );
@@ -307,6 +255,8 @@ MLabPlugin
 						
 						logger.log( result_str );
 						
+						completed = true;
+						
 						if ( listener != null ){
 							
 							listener.reportSummary( result_str );
@@ -322,6 +272,11 @@ MLabPlugin
 					}finally{
 						
 						sem.release();
+						
+						if ( !completed && listener != null ){
+							
+							listener.complete( new HashMap<String, Object>());
+						}
 					}
 				}
 			});
@@ -331,10 +286,14 @@ MLabPlugin
 		return( run );
 	}
 	
-	protected void
+	public ToolRun
 	runShaperProbe(
 		final ToolListener	listener )
 	{
+		final ToolRun run = new ToolRunImpl();
+		
+		final AESemaphore	sem = new AESemaphore( "waiter" );
+
 		runTool(
 			sp_button,
 			new Runnable()
@@ -342,54 +301,86 @@ MLabPlugin
 				public void
 				run()
 				{
-					logger.log( "Starting ShaperProbe Test" );
-					logger.log( "-----------------" );
-
-					ShaperProbe sp = 
-						ShaperProbe.run(
-							plugin_interface,
-							new ShaperProbeListener()
-							{
-								public void 
-								reportSummary(
-									String str) 
+					boolean completed = false;
+					
+					try{
+						logger.log( "Starting ShaperProbe Test" );
+						logger.log( "-----------------" );
+	
+						final ShaperProbe sp = 
+							ShaperProbe.createIt(
+								plugin_interface,
+								new ShaperProbeListener()
 								{
-									logger.log( str.trim());
-									
-									if ( listener != null ){
-									
-										listener.reportSummary( str );
+									public void 
+									reportSummary(
+										String str) 
+									{
+										logger.log( str.trim());
+										
+										if ( listener != null ){
+										
+											listener.reportSummary( str );
+										}
 									}
-								}
-							});
-					
-					long up_bps 	= sp.getUpBitsPerSec()/8;
-					long down_bps 	= sp.getDownBitsPerSec()/8;
-					
-					long shape_up_bps 		= sp.getShapeUpBitsPerSec()/8;
-					long shape_down_bps 	= sp.getShapeDownBitsPerSec()/8;
-					
-					logger.log( "" );
-					
-					logger.log( 
-							"Completed: up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( up_bps ) +
-							", down=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( down_bps ) +
-							", shape_up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( shape_up_bps ) +
-							", shape_down=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( shape_down_bps ));
-
-					if ( listener != null ){
+								});
 						
-						Map<String,Object>	results = new HashMap<String, Object>();
+						run.addListener(
+								new ToolRunListener()
+								{
+									public void
+									cancelled()
+									{
+										sp.killIt();
+									}
+								});
+							
+						sem.release();
+							
+						sp.runIt();
 						
-						results.put( "up", up_bps );
-						results.put( "down", down_bps );
-						results.put( "shape_up", shape_up_bps );
-						results.put( "shape_down", shape_down_bps );
+						long up_bps 	= sp.getUpBitsPerSec()/8;
+						long down_bps 	= sp.getDownBitsPerSec()/8;
 						
-						listener.complete( results );
+						long shape_up_bps 		= sp.getShapeUpBitsPerSec()/8;
+						long shape_down_bps 	= sp.getShapeDownBitsPerSec()/8;
+						
+						logger.log( "" );
+						
+						logger.log( 
+								"Completed: up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( up_bps ) +
+								", down=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( down_bps ) +
+								", shape_up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( shape_up_bps ) +
+								", shape_down=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( shape_down_bps ));
+	
+						completed = true;
+						
+						if ( listener != null ){
+							
+							Map<String,Object>	results = new HashMap<String, Object>();
+							
+							results.put( "up", up_bps );
+							results.put( "down", down_bps );
+							results.put( "shape_up", shape_up_bps );
+							results.put( "shape_down", shape_down_bps );
+							
+							listener.complete( results );
+						}
+					}finally{
+						
+						sem.release();
+						
+						if ( !completed && listener != null ){
+							
+							listener.complete( new HashMap<String, Object>());
+						}
 					}
 				}
 			});
+		
+		sem.reserve();
+		
+		return( run );
 	}
 	
 	protected void
@@ -506,6 +497,63 @@ MLabPlugin
 		public void
 		addListener(
 			ToolRunListener		l );
+	}
+	
+	private class
+	ToolRunImpl
+		implements ToolRun
+	{
+		private List<ToolRunListener>	listeners = new ArrayList<ToolRunListener>();
+		private boolean	cancelled;
+		
+		public void 
+		cancel() 
+		{
+			List<ToolRunListener> copy;
+			
+			synchronized( this ){
+			
+				cancelled = true;
+				
+				copy = new ArrayList<ToolRunListener>( listeners );
+			}
+			
+			for ( ToolRunListener l: copy ){
+				
+				try{
+					l.cancelled();
+					
+				}catch( Throwable e ){
+					
+					Debug.out( e );
+				}
+			}
+		}
+		
+		public void
+		addListener(
+			ToolRunListener		l )
+		{
+			boolean	inform = false;
+			
+			synchronized( this ){
+				
+				inform = cancelled;
+				
+				listeners.add( l );
+			}
+			
+			if ( inform ){
+				
+				try{
+					l.cancelled();
+					
+				}catch( Throwable e ){
+					
+					Debug.out( e );
+				}
+			}
+		}
 	}
 	
 	public interface

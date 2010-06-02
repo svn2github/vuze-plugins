@@ -27,6 +27,7 @@ import java.util.*;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.ImageData;
 import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.DisplayFormatters;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.download.DownloadManager;
 import org.gudy.azureus2.plugins.ipc.IPCInterface;
@@ -54,7 +55,7 @@ MLabWizard
 		MLabPlugin		_plugin,
 		IPCInterface	_callback )
 	{
-		super( "mlab.wizard.title" );
+		super( "mlab.wizard.title", false, 550 );
 	
 		plugin		= _plugin;
 		callback	= _callback;
@@ -136,6 +137,26 @@ MLabWizard
 	{
 		up_rate		= _up;
 		down_rate	= _down;
+	}
+	
+	protected long
+	getUploadRate()
+	{
+		return( up_rate );
+	}
+	
+	protected long
+	getDownloadRate()
+	{
+		return( down_rate );
+	}
+	
+	protected String
+	getRateString(
+		long	rate )
+	{
+		return( DisplayFormatters.formatByteCountToKiBEtcPerSec( rate ) + " (" + 
+				DisplayFormatters.formatByteCountToBitsPerSec( rate ) + ")" );
 	}
 	
 	public void 
