@@ -225,6 +225,10 @@ ShareExporterPlugin
 											{
 												
 											}
+											
+											public void resourceModified(ShareResource old_resource,
+													ShareResource new_resource) {
+											}
 										});
 									
 									ShareResource[]	shares = plugin_interface.getShareManager().getShares();
