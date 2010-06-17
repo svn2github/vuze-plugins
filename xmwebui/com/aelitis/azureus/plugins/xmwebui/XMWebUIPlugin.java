@@ -959,7 +959,7 @@ XMWebUIPlugin
 						
 						if ( index >= 0 && index <= files.length ){
 							
-							files[index].setPriority( true );
+							files[index].setPriority( 1 );
 						}
 					}
 				}
@@ -972,7 +972,7 @@ XMWebUIPlugin
 						
 						if ( index >= 0 && index <= files.length ){
 							
-							files[index].setPriority( false );
+							files[index].setPriority( 0 );
 						}
 					}
 				}
@@ -985,7 +985,7 @@ XMWebUIPlugin
 						
 						if ( index >= 0 && index <= files.length ){
 							
-							files[index].setPriority( false );
+							files[index].setPriority( 0 );
 						}
 					}
 				}
@@ -1311,7 +1311,7 @@ XMWebUIPlugin
 							
 							obj.put( "bytesCompleted", new Long( file.getDownloaded()));
 							obj.put( "wanted", new Boolean( !file.isSkipped()));
-							obj.put( "priority", new Long( file.isPriority()?1:0));
+							obj.put( "priority", new Long( file.getPriority()>0?1:0));
 						}
 						
 						value = stats_list;
