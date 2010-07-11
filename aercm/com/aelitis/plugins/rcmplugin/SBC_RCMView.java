@@ -25,21 +25,36 @@ import java.util.regex.Pattern;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.CLabel;
 import org.eclipse.swt.events.*;
-import org.eclipse.swt.layout.*;
+import org.eclipse.swt.layout.FormAttachment;
+import org.eclipse.swt.layout.FormData;
+import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.*;
 
 import org.gudy.azureus2.core3.internat.MessageText;
+import org.gudy.azureus2.core3.util.Base32;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.UrlUtils;
+import org.gudy.azureus2.plugins.ui.UIManager;
+import org.gudy.azureus2.plugins.ui.tables.TableColumn;
+import org.gudy.azureus2.plugins.ui.tables.TableColumnCreationListener;
+import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.pluginsimpl.local.PluginInitializer;
-import org.gudy.azureus2.ui.swt.*;
-import org.gudy.azureus2.ui.swt.views.table.*;
+import org.gudy.azureus2.ui.swt.Messages;
+import org.gudy.azureus2.ui.swt.Utils;
+import org.gudy.azureus2.ui.swt.views.table.TableViewFilterCheck;
+import org.gudy.azureus2.ui.swt.views.table.TableViewSWT;
+import org.gudy.azureus2.ui.swt.views.table.TableViewSWTMenuFillListener;
 import org.gudy.azureus2.ui.swt.views.table.impl.TableViewSWTImpl;
 
-import com.aelitis.azureus.core.*;
-import com.aelitis.azureus.core.content.*;
+import com.aelitis.azureus.core.AzureusCore;
+import com.aelitis.azureus.core.AzureusCoreFactory;
+import com.aelitis.azureus.core.AzureusCoreRunningListener;
+import com.aelitis.azureus.core.content.RelatedContent;
+import com.aelitis.azureus.core.content.RelatedContentManager;
+import com.aelitis.azureus.core.content.RelatedContentManagerListener;
 import com.aelitis.azureus.ui.UIFunctions;
 import com.aelitis.azureus.ui.UIFunctionsManager;
+import com.aelitis.azureus.ui.common.ToolBarEnabler;
 import com.aelitis.azureus.ui.common.table.*;
 import com.aelitis.azureus.ui.common.updater.UIUpdatable;
 import com.aelitis.azureus.ui.selectedcontent.*;
@@ -48,20 +63,15 @@ import com.aelitis.azureus.ui.swt.mdi.MdiEntrySWT;
 import com.aelitis.azureus.ui.swt.mdi.MultipleDocumentInterfaceSWT;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinObject;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectContainer;
-import com.aelitis.azureus.ui.swt.toolbar.ToolBarEnablerSelectedContent;
 import com.aelitis.azureus.ui.swt.views.skin.SkinView;
 import com.aelitis.azureus.ui.swt.views.skin.sidebar.SideBar;
 import com.aelitis.plugins.rcmplugin.columns.*;
-
-import org.gudy.azureus2.plugins.ui.UIManager;
-import org.gudy.azureus2.plugins.ui.tables.*;
-import org.gudy.azureus2.plugins.ui.tables.TableColumn;
 
 
 public class 
 SBC_RCMView
 	extends SkinView
-	implements UIUpdatable, IconBarEnabler, TableViewFilterCheck<RelatedContent>
+	implements UIUpdatable, ToolBarEnabler, TableViewFilterCheck<RelatedContent>
 {
 	public static final String TABLE_RCM = "RCM";
 
@@ -112,7 +122,7 @@ SBC_RCMView
 			
 			mdi_entry = mdi.getCurrentEntrySWT();
 			
-			mdi_entry.setIconBarEnabler(this);
+			mdi_entry.addToolbarEnabler(this);
 
 			if ( !mdi_entry.getId().equals( SideBar.SIDEBAR_SECTION_RELATED_CONTENT )){
 		
@@ -127,14 +137,13 @@ SBC_RCMView
 			Composite parent = (Composite) soFilterArea.getControl();
 			FormData fd;
 			CLabel lblFilter = new CLabel(parent, SWT.CENTER);
-			Messages.setLanguageText(lblFilter, "MyTorrentsView.filter");
 			fd = Utils.getFilledFormData();
 			fd.right = null;
 			lblFilter.setLayoutData(fd);
 
 			txtFilter = new Text(parent, SWT.BORDER);
 			fd = new FormData();
-			fd.left = new FormAttachment(lblFilter, 10);
+			fd.left = new FormAttachment(50);
 			fd.top = new FormAttachment(lblFilter, 0, SWT.CENTER);
 			fd.right = new FormAttachment(100, -10);
 			txtFilter.setLayoutData(fd);
@@ -388,24 +397,18 @@ SBC_RCMView
 			public void 
 			selected(
 				TableRowCore[] rows) 
-			{				
+			{
 				ArrayList<ISelectedContent>	valid = new ArrayList<ISelectedContent>();
-				
+
 				for (int i=0;i<rows.length;i++){
 					
 					final RelatedContent rc = (RelatedContent)rows[i].getDataSource();
 					
 					if ( rc.getHash() != null ){
-
-						valid.add(
-							new ToolBarEnablerSelectedContent( SBC_RCMView.this )
-							{
-								public DownloadUrlInfo 
-								getDownloadInfo() 
-								{
-									return(	new DownloadUrlInfo( UrlUtils.getMagnetURI( rc.getHash())));
-								}
-							});
+						SelectedContent sc = new SelectedContent(Base32.encode(rc.getHash()), rc.getTitle());
+						sc.setDownloadInfo(new DownloadUrlInfo(
+								UrlUtils.getMagnetURI(rc.getHash()) + "&dn=" + rc.getTitle()));
+						valid.add(sc);
 					}
 				}
 				
@@ -804,39 +807,28 @@ SBC_RCMView
 		control.layout(true);
 	}
 	
-	public boolean 
-	isEnabled(
-		String key )
-	{
-		if ( key.equals( "remove" )){
-	
-			return( tv_related_content.getSelectedDataSources().size() > 0 );
+	public void refreshToolBar(Map<String, Boolean> list) {
+		if (tv_related_content == null) {
+			return;
 		}
-		
-		return( false );
+		list.put("remove", tv_related_content.getSelectedDataSources().size() > 0 );
 	}
-	
-	public boolean 
-	isSelected(
-		String key )
-	{
-		return( false );
-	}
-	
-	public void 
-	itemActivated(
-		String key )
-	{
-		Object[] _related_content = tv_related_content.getSelectedDataSources().toArray();
 
-		if ( _related_content.length > 0 ){
+	public boolean toolBarItemActivated(String itemKey) {
+		if (itemKey.equals("remove")) {
+			Object[] _related_content = tv_related_content.getSelectedDataSources().toArray();
 			
-			RelatedContent[] related_content = new RelatedContent[_related_content.length];
-	
-			System.arraycopy( _related_content, 0, related_content, 0, related_content.length );
-			
-			manager.delete( related_content );
+			if ( _related_content.length > 0 ){
+				
+				RelatedContent[] related_content = new RelatedContent[_related_content.length];
+				
+				System.arraycopy( _related_content, 0, related_content, 0, related_content.length );
+				
+				manager.delete( related_content );
+			}
+			return true;
 		}
+		return false;
 	}
 	
 	

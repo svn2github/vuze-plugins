@@ -499,7 +499,9 @@ RelatedContentUI
 						{
 							for ( RCMItem item: rcm_item_map.values()){
 								
-								item.getTreeItem().dispose();
+								if (item.getTreeItem() != null) {
+									item.getTreeItem().dispose();
+								}
 							}
 							
 					      	manager.reset();
