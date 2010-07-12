@@ -1982,9 +1982,10 @@ UPnPMediaServerContentDirectory
 		}
 			
 		protected String
-		getProtocolInfo()
+		getProtocolInfo(
+			String	attributes )
 		{
-			return( "http-get:*:" + content_type + ":*" );
+			return( "http-get:*:" + content_type + ":" + attributes );
 		}
 		
 		protected String
@@ -1996,13 +1997,44 @@ UPnPMediaServerContentDirectory
 		}
 		
 		protected String
-		getResource(
+		getResources(
 			String		host,
 			int			client_type )
 		{
+			String res = getResource( host, client_type, "*" );
+			
+			if ( client_type != CT_XBOX && item_class.equals( CONTENT_VIDEO )){
+				
+				try{
+					DiskManagerFileInfo		file = content_file.getFile();
+					
+					String	file_name = file.getFile().getName();
+
+						// hack to see if we can get something to work for Sony Bravia
+					
+					if ( file_name.toLowerCase().endsWith( ".vob" )){
+				
+						String attr = "DLNA.ORG_PN=MPEG_PS_NTSC;DLNA.ORG_OP=01;DLNA.ORG_CI=1;DLNA.ORG_FLAGS=01700000000000000000000000000000";
+						
+						res += getResource( host, client_type, attr );
+					}
+				}catch( Throwable e ){
+					
+				}
+			}
+			
+			return( res );
+		}
+		
+		protected String
+		getResource(
+			String		host,
+			int			client_type,
+			String		protocol_info_attributes )
+		{
 			LinkedHashMap<String,String>	attributes = new LinkedHashMap<String,String>();
 			
-			attributes.put( "protocolInfo", getProtocolInfo());
+			attributes.put( "protocolInfo", getProtocolInfo( protocol_info_attributes ));
 			attributes.put( "size", String.valueOf( getFile().getLength()));
 			
 			if ( item_class.equals( CONTENT_VIDEO )){
@@ -2114,7 +2146,7 @@ UPnPMediaServerContentDirectory
 				"<upnp:class>" + hacked_class + "</upnp:class>" +
 				//"<upnp:icon>" + escapeXML( "http://" + host + ":" + media_server.getContentServer().getPort() + "/blah" ) + "</upnp:icon>" +
 				//"<albumArtURI>" + escapeXML( "http://" + host + ":" + media_server.getContentServer().getPort() + "/blah" ) + "</albumArtURI>" +
-				getResource( host, client_type );
+				getResources( host, client_type );
 			
 			if ( client_type == CT_XBOX ){
 				

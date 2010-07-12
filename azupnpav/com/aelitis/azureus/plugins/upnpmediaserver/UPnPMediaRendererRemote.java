@@ -229,7 +229,7 @@ UPnPMediaRendererRemote
 			
 			UPnPActionInvocation	invoke = prepare.getInvocation();
 			
-			invoke.addArgument( "RemoteProtocolInfo", item.getProtocolInfo());
+			invoke.addArgument( "RemoteProtocolInfo", item.getProtocolInfo( "*" ));
 			invoke.addArgument( "PeerConnectionManager", "" );
 			invoke.addArgument( "PeerConnectionID", "-1" );
 			invoke.addArgument( "Direction", "Input" );
