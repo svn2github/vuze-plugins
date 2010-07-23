@@ -48,6 +48,7 @@ import com.vuze.plugins.mlab.tools.ndt.swingemu.Tcpbw100UIWrapper;
 import com.vuze.plugins.mlab.tools.ndt.swingemu.Tcpbw100UIWrapperListener;
 import com.vuze.plugins.mlab.tools.shaperprobe.ShaperProbe;
 import com.vuze.plugins.mlab.tools.shaperprobe.ShaperProbeListener;
+import com.vuze.plugins.mlab.ui.MLabVzWizard;
 import com.vuze.plugins.mlab.ui.MLabWizard;
 
 public class 
@@ -420,7 +421,8 @@ MLabPlugin
 	public void
 	runTest(
 		Map<String,Object>		args,
-		final IPCInterface		callback )
+		final IPCInterface		callback,
+		final boolean autoApply )
 	
 		throws IPCException
 	{
@@ -459,7 +461,7 @@ MLabPlugin
 									plugin_interface.getPluginProperties().put( "plugin.unload.disabled", "false" );
 								}
 								
-								return( callback.invoke( methodName, params ));
+								return( callback == null ? null : callback.invoke( methodName, params ));
 							}
 						
 							public boolean 
@@ -467,12 +469,17 @@ MLabPlugin
 								String methodName, 
 								Object[] params )
 							{
-								return( callback.canInvoke( methodName, params ));
+								return( callback == null ? true : callback.canInvoke( methodName, params ));
 							}
 						};
 					
 					try{
-						new MLabWizard( MLabPlugin.this, wrapper );
+						if (autoApply) {
+							MLabVzWizard wizard = new MLabVzWizard(MLabPlugin.this, wrapper);
+							wizard.open();
+						} else {
+							new MLabWizard( MLabPlugin.this, wrapper );
+						}
 						
 					}catch( Throwable e ){
 						
