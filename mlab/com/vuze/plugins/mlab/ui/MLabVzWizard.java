@@ -7,6 +7,7 @@ import org.eclipse.swt.events.MouseEvent;
 import org.eclipse.swt.events.MouseListener;
 import org.eclipse.swt.widgets.ProgressBar;
 import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.widgets.Text;
 
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.config.impl.TransferSpeedValidator;
@@ -617,6 +618,15 @@ public class MLabVzWizard
 	protected void appendLog(String string) {
 		lg.append(string);
 		soDetails.setText(lg.toString());
+		Utils.execSWTThread(new AERunnable() {
+			public void runSupport() {
+				Text text = soDetails.getTextControl();
+				if (text != null && !text.isDisposed()) {
+					text.setSelection(text.getText().length());
+					text.showSelection();
+				}
+			}
+		});
 	}
 
 	protected boolean pauseDownloads() {
