@@ -31,6 +31,8 @@ import com.vuze.plugins.mlab.MLabPlugin.ToolListener;
 
 public class MLabVzWizard
 {
+	private static final int SHAPER_PROBE_MIN_UPRATE = 400*1024;
+	
 	protected static final String PATH_SKIN_DEFS = "com/vuze/plugins/mlab/ui/resources/";
 	
 	private final int BUTTON_OK = 0;
@@ -605,6 +607,8 @@ public class MLabVzWizard
 
 				}
 
+				calculateLimits();
+				
 				boxTest.closeWithButtonVal(BUTTON_OK);
 			}
 		});
@@ -667,6 +671,10 @@ public class MLabVzWizard
 	}
 
 	private boolean shouldRunShaperProbe() {
-		return true;
+			// we only want to run this on people with high upload rates as there are limited server
+			// resources for this test and this seems a reasonable way of limiting things as it is
+			// most likely that those with high initial upload rates are subject to burst-shaping
+		
+		return( up_rate >= SHAPER_PROBE_MIN_UPRATE );
 	}
 }
