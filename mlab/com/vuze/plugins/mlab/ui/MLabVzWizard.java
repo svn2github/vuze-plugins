@@ -34,6 +34,8 @@ public class MLabVzWizard
 	private static final int SHAPER_PROBE_MIN_UPRATE = 400*1024;
 	
 	protected static final String PATH_SKIN_DEFS = "com/vuze/plugins/mlab/ui/resources/";
+
+	private static final String FILE_SKINIMAGES_DEFS = "images";
 	
 	private final int BUTTON_OK = 0;
 
@@ -127,10 +129,7 @@ public class MLabVzWizard
 			BUTTON_OK,
 			SWT.CANCEL
 		});
-		boxTest.setButtonEnableStates(new boolean[] {
-			true,
-			false
-		});
+		boxTest.setButtonEnabled(BUTTON_OK, false);
 
 		boxTest.setListener(new VuzeMessageBoxListener() {
 			public void shellReady(Shell shell, SWTSkinObjectContainer soExtra) {
@@ -263,10 +262,9 @@ public class MLabVzWizard
 		// Images stored in plugin must be loaded using our classloader, so
 		// we put the image ref in their own properties file and load them in a
 		// new SkinProperties
-		//SWTSkinPropertiesImpl imageProps = new SWTSkinPropertiesImpl(
-		//		loader, BurnGlobals.PATH_SKIN_DEFS,
-		//		BurnGlobals.FILE_SKINIMAGES_DEFS);
-		//skin.getImageLoader(skinProperties).addSkinProperties(imageProps);
+		SWTSkinPropertiesImpl imageProps = new SWTSkinPropertiesImpl(loader,
+				PATH_SKIN_DEFS, FILE_SKINIMAGES_DEFS);
+		skin.getImageLoader(skinProperties).addSkinProperties(imageProps);
 	}
 
 	private void pauseAndRun(final AERunnable run) {
