@@ -31,6 +31,8 @@ import com.vuze.plugins.mlab.MLabPlugin.ToolListener;
 public class MLabVzWizard
 {
 	protected static final String PATH_SKIN_DEFS = "com/vuze/plugins/mlab/ui/resources/";
+	
+	private final int BUTTON_OK = 0;
 
 	private volatile MLabPlugin.ToolRun runner;
 
@@ -82,7 +84,7 @@ public class MLabVzWizard
 		box.setSubTitle("");
 
 		box.setButtonVals(new Integer[] {
-			0,
+			BUTTON_OK,
 			SWT.CANCEL
 		});
 
@@ -119,7 +121,7 @@ public class MLabVzWizard
 		boxTest.setSubTitle("");
 
 		boxTest.setButtonVals(new Integer[] {
-			0,
+			BUTTON_OK,
 			SWT.CANCEL
 		});
 		boxTest.setButtonEnableStates(new boolean[] {
@@ -336,7 +338,7 @@ public class MLabVzWizard
 						}
 					});
 				} else {
-					boxTest.close(1);
+					boxTest.closeWithButtonVal(BUTTON_OK);
 				}
 
 				runner = null;
@@ -360,7 +362,7 @@ public class MLabVzWizard
 		boxTest.setSubTitle("");
 
 		boxTest.setButtonVals(new Integer[] {
-			0,
+			BUTTON_OK,
 			SWT.CANCEL
 		});
 
@@ -602,7 +604,7 @@ public class MLabVzWizard
 
 				}
 
-				boxTest.close(1);
+				boxTest.closeWithButtonVal(BUTTON_OK);
 			}
 		});
 
