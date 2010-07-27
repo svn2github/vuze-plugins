@@ -22,6 +22,8 @@
 package com.vuze.plugins.mlab.tools.shaperprobe;
 
 import java.io.*;
+import java.util.HashMap;
+import java.util.Map;
 
 /*
 import java.awt.BorderLayout;
@@ -79,9 +81,12 @@ ShaperProbe
 	public void
 	runIt()
 	{
-		try{	
-			String[] command;
-			
+		try{				
+			if ( cancelled ){
+				
+				throw( new Exception( "Cancelled" ));
+			}
+
 			if ( Constants.isOSX ){
 				
 				File app = new File( plugin_interface.getPluginDirectoryName(),	"ShaperProbe" );
@@ -100,21 +105,16 @@ ShaperProbe
 						app.getAbsolutePath().replaceAll(" ", "\\ ")
 					});
 					
-				command = new String[]{ app.getAbsolutePath() };
+				String[] command = new String[]{ app.getAbsolutePath() };
+				
+				process = Runtime.getRuntime().exec( command );
 
 			}else{
 				
 				File app = new File( plugin_interface.getPluginDirectoryName(),	"ShaperProbeC.exe");
 				
-				command = new String[]{ app.getAbsolutePath() };
+				process = createProcessBuilder( app.getParentFile(), new String[]{ app.getAbsolutePath() }).start();
 			}
-			
-			if ( cancelled ){
-				
-				throw( new Exception( "Cancelled" ));
-			}
-			
-			process = Runtime.getRuntime().exec( command );
 			
 			if ( cancelled ){
 				
@@ -350,6 +350,55 @@ ShaperProbe
 				}
 			}
 		}
+	}
+	
+	public static ProcessBuilder 
+	createProcessBuilder(
+		File 		workingDir,
+		String[] 	cmd) 
+	
+		throws IOException 
+	{
+		ProcessBuilder pb;
+
+		Map<String, String> newEnv = new HashMap<String, String>();
+		newEnv.putAll(System.getenv());
+		newEnv.put("LANG", "C.UTF-8");
+
+		if ( Constants.isWindows ){
+			String[] i18n = new String[cmd.length + 2];
+			i18n[0] = "cmd";
+			i18n[1] = "/C";
+			i18n[2] = escapeDosCmd(cmd[0]);
+			for (int counter = 1; counter < cmd.length; counter++) {
+				if (cmd[counter].length() == 0) {
+					i18n[counter + 2] = "";
+				} else {
+					String envName = "JENV_" + counter;
+					i18n[counter + 2] = "%" + envName + "%";
+					newEnv.put(envName, cmd[counter]);
+				}
+			}
+			cmd = i18n;
+		}
+
+		pb = new ProcessBuilder(cmd);
+		Map<String, String> env = pb.environment();
+		env.putAll(newEnv);
+
+		if (workingDir != null) {
+			pb.directory(workingDir);
+		}
+		return pb;
+	}
+	
+	private static String 
+	escapeDosCmd(
+		String string )
+	{
+		String s = string.replaceAll("([&%^])", "^$1");
+		s = s.replaceAll("'", "\"'\"");
+		return s;
 	}
 	
 	public void

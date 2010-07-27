@@ -58,6 +58,9 @@ MLabPlugin
 	private PluginInterface		plugin_interface;
 	private LoggerChannel		logger;
 
+	private BasicPluginConfigModel 	config_model;
+	private BasicPluginViewModel	view_model;
+	
 	private ActionParameter ndt_button;
 	private ActionParameter sp_button; 
 	
@@ -81,7 +84,7 @@ MLabPlugin
 
 		UIManager	ui_manager	= plugin_interface.getUIManager();
 		
-		final BasicPluginViewModel	view_model = ui_manager.createBasicPluginViewModel( "mlab.name" );
+		view_model = ui_manager.createBasicPluginViewModel( "mlab.name" );
 
 		view_model.getActivity().setVisible( false );
 		view_model.getProgress().setVisible( false );
@@ -103,6 +106,7 @@ MLabPlugin
 						Throwable	error )
 					{
 						if ( str.length() > 0 ){
+							
 							view_model.getLogArea().appendText( str + "\n" );
 						}
 						
@@ -118,8 +122,7 @@ MLabPlugin
 					}
 				});		
 		
-		BasicPluginConfigModel config_model = 
-			ui_manager.createBasicPluginConfigModel( "mlab.name" );
+		config_model = ui_manager.createBasicPluginConfigModel( "mlab.name" );
 
 		view_model.setConfigSectionID( "mlab.name" );
 		
@@ -177,13 +180,15 @@ MLabPlugin
 						new Tcpbw100UIWrapper(
 							new Tcpbw100UIWrapperListener()
 							{
+								private LinkedList<String>	history = new LinkedList<String>();
+								
 								public void
 								reportSummary(
 									String		str )
 								{
 									str = str.trim();
 									
-									logger.log( str.trim());
+									log( str );
 									
 									if ( listener != null ){
 									
@@ -200,11 +205,31 @@ MLabPlugin
 								{
 									str = str.trim();
 									
+									log( str );
+									
 									if ( listener != null ){
 										
 										listener.reportDetail( str );
 									}
 								}
+								
+								private void
+								log(
+									String	str )
+								{
+									synchronized( history ){
+										
+										if ( history.size() > 0 && history.getLast().equals( str )){
+											
+											return;
+										}
+										
+										history.add( str );
+									}
+									
+									logger.log( str );
+								}
+						
 							});
 						
 						final Tcpbw100 test = Tcpbw100.mainSupport( new String[]{ "ndt.iupui.donar.measurement-lab.org" });
@@ -416,13 +441,22 @@ MLabPlugin
 	public void
 	unload()
 	{
+		if ( config_model != null ){
+			
+			config_model.destroy();
+		}
+		
+		if ( view_model != null ){
+			
+			view_model.destroy();
+		}
 	}
 	
 	public void
 	runTest(
 		Map<String,Object>		args,
 		final IPCInterface		callback,
-		final boolean autoApply )
+		final boolean 			autoApply )
 	
 		throws IPCException
 	{
@@ -474,10 +508,14 @@ MLabPlugin
 						};
 					
 					try{
-						if (autoApply) {
-							MLabVzWizard wizard = new MLabVzWizard(MLabPlugin.this, wrapper);
+						if ( autoApply ){
+							
+							MLabVzWizard wizard = new MLabVzWizard( MLabPlugin.this, wrapper);
+							
 							wizard.open();
-						} else {
+							
+						}else{
+							
 							new MLabWizard( MLabPlugin.this, wrapper );
 						}
 						
