@@ -27,6 +27,7 @@ import java.util.*;
 
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.AEThread2;
+import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.DisplayFormatters;
 import org.gudy.azureus2.plugins.*;
@@ -142,18 +143,21 @@ MLabPlugin
 				}
 			});
 		
-		sp_button = config_model.addActionParameter2( "mlab.tool.shaperprobe", "mlab.run" );
-		
-		sp_button.addListener(
-			new ParameterListener()
-			{
-				public void 
-				parameterChanged(
-					Parameter param ) 
+		if ( Constants.isWindows || Constants.isOSX ){
+			
+			sp_button = config_model.addActionParameter2( "mlab.tool.shaperprobe", "mlab.run" );
+			
+			sp_button.addListener(
+				new ParameterListener()
 				{
-					runShaperProbe( null );
-				}
-			});
+					public void 
+					parameterChanged(
+						Parameter param ) 
+					{
+						runShaperProbe( null );
+					}
+				});
+		}
 	}
 	
 	public ToolRun

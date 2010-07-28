@@ -36,6 +36,7 @@ import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.ProgressBar;
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.AEThread2;
+import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.DisplayFormatters;
 import org.gudy.azureus2.core3.util.SimpleTimer;
@@ -225,7 +226,8 @@ MLabWizardNDT
 		}else{
 			
 			wizard.setFinishEnabled( true );
-			wizard.setNextEnabled( true );
+			
+			setNextEnabled( true );
 			
 			stack_layout.topControl = status_panel;
 			 	
@@ -242,11 +244,25 @@ MLabWizardNDT
 	}
 	
 	private void
+	setNextEnabled(
+		boolean	enabled )
+	{
+		if ( Constants.isWindows || Constants.isOSX ){
+		
+			wizard.setNextEnabled( enabled );
+			
+		}else{
+			
+			wizard.setNextEnabled( false );
+		}
+	}
+
+	private void
 	runTest()
 	{
 		wizard.setFinishEnabled( false );
 				
-		wizard.setNextEnabled( false );
+		setNextEnabled( false );
 		
 		if ( wizard.pauseDownloads()){
 			
@@ -385,7 +401,7 @@ MLabWizardNDT
 													
 													wizard.setFinishEnabled( true );
 																										
-													wizard.setNextEnabled( true );
+													setNextEnabled( true );
 												}
 												
 												retest_button.setEnabled( true );
@@ -420,7 +436,7 @@ MLabWizardNDT
 	public IWizardPanel 
 	getNextPanel() 
 	{
-		return( new MLabWizardShaperProbe( wizard, this ));
+		return(( Constants.isWindows || Constants.isOSX)?new MLabWizardShaperProbe( wizard, this ):null);
 	}
 	
 	public boolean 

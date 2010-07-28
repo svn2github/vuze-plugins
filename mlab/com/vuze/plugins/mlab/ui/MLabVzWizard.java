@@ -655,13 +655,14 @@ public class MLabVzWizard
 			}
 		}
 
-		if (active) {
+		if ( active ){
 
 			downloads_paused = true;
 
 			download_manager.pauseDownloads();
 
 			return (true);
+			
 		} else {
 
 			return (false);
@@ -673,6 +674,13 @@ public class MLabVzWizard
 			// resources for this test and this seems a reasonable way of limiting things as it is
 			// most likely that those with high initial upload rates are subject to burst-shaping
 		
-		return( up_rate >= SHAPER_PROBE_MIN_UPRATE );
+		if ( Constants.isWindows || Constants.isOSX ){
+		
+			return( up_rate >= SHAPER_PROBE_MIN_UPRATE );
+			
+		}else{
+			
+			return( false );
+		}
 	}
 }
