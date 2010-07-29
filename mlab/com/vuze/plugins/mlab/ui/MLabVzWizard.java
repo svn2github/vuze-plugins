@@ -71,9 +71,17 @@ public class MLabVzWizard
 
 	private boolean limitsApplied;
 
-	public MLabVzWizard(MLabPlugin mLabPlugin, IPCInterface callback) {
+	private final boolean allowShaperProbeLogic;
+
+	public MLabVzWizard(MLabPlugin mLabPlugin, IPCInterface callback,
+			Map<String, Object> args) {
 		this.mLabPlugin = mLabPlugin;
 		this.callback = callback;
+		if (args != null && (args.get("allowShaperProbeLogic") instanceof Boolean)) {
+			allowShaperProbeLogic = ((Boolean) args.get("allowShaperProbeLogic")).booleanValue();
+		} else {
+			allowShaperProbeLogic = false;
+		}
 	}
 
 	public void open() {
@@ -676,7 +684,13 @@ public class MLabVzWizard
 		
 		if ( Constants.isWindows || Constants.isOSX ){
 		
-			return( up_rate >= SHAPER_PROBE_MIN_UPRATE );
+			boolean needsShapreProbe = up_rate >= SHAPER_PROBE_MIN_UPRATE;
+			if (allowShaperProbeLogic) {
+				return needsShapreProbe;
+			} else {
+  			COConfigurationManager.setParameter ( "needsShaperProbe",  needsShapreProbe);
+  			return false;
+			}
 			
 		}else{
 			

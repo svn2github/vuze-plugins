@@ -458,7 +458,7 @@ MLabPlugin
 	
 	public void
 	runTest(
-		Map<String,Object>		args,
+		final Map<String,Object>		args,
 		final IPCInterface		callback,
 		final boolean 			autoApply )
 	
@@ -514,7 +514,7 @@ MLabPlugin
 					try{
 						if ( autoApply ){
 							
-							MLabVzWizard wizard = new MLabVzWizard( MLabPlugin.this, wrapper);
+							MLabVzWizard wizard = new MLabVzWizard( MLabPlugin.this, wrapper, args);
 							
 							wizard.open();
 							
