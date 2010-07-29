@@ -59,6 +59,7 @@ MLabPlugin
 	private PluginInterface		plugin_interface;
 	private LoggerChannel		logger;
 
+	private LocaleUtilities 		loc_utils;
 	private BasicPluginConfigModel 	config_model;
 	private BasicPluginViewModel	view_model;
 	
@@ -79,7 +80,7 @@ MLabPlugin
 		
 		logger.setForce( true );
 		
-		LocaleUtilities loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
+		loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
 
 		loc_utils.integrateLocalisedMessageBundle( "com.vuze.plugins.mlab.internat.Messages" );
 
@@ -434,6 +435,13 @@ MLabPlugin
 				}
 			}
 		}.start();
+	}
+	
+	public String
+	getLocalisedText(
+		String		key )
+	{
+		return( loc_utils.getLocalisedMessageText( key ));
 	}
 	
 	public PluginInterface

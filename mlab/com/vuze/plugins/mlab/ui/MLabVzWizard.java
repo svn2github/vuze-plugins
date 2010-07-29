@@ -279,7 +279,7 @@ public class MLabVzWizard
 		final int waitCycles = pauseDownloads() ? 50 : 0;
 		if (waitCycles > 0) {
 
-			appendLog("Pausing downloads before performing test.");
+			appendLog( mLabPlugin.getLocalisedText( "mlab.log.pausing.downloads" ));
 		}
 
 		new AEThread2("waiter") {
@@ -684,14 +684,30 @@ public class MLabVzWizard
 		
 		if ( Constants.isWindows || Constants.isOSX ){
 		
-			boolean needsShapreProbe = up_rate >= SHAPER_PROBE_MIN_UPRATE;
-			if (allowShaperProbeLogic) {
-				return needsShapreProbe;
-			} else {
-  			COConfigurationManager.setParameter ( "needsShaperProbe",  needsShapreProbe);
-  			return false;
-			}
+			boolean needsShaperProbe = up_rate >= SHAPER_PROBE_MIN_UPRATE;
 			
+			if ( allowShaperProbeLogic ){
+				
+				return( needsShaperProbe );
+				
+			}else{
+				
+				if ( needsShaperProbe ){
+					
+					appendLog( mLabPlugin.getLocalisedText( "mlab.log.shaperprobe.disabled" ));
+					
+						// in the absence of actually doing the required test make a 
+						// worst-case assumption
+					
+					up_rate = up_rate / 2;
+					
+					calculateLimits();
+				}
+				
+				COConfigurationManager.setParameter ( "needsShaperProbe",  needsShaperProbe);
+				
+				return( false );
+			}
 		}else{
 			
 			return( false );
