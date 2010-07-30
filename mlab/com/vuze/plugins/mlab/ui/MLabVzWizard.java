@@ -152,8 +152,52 @@ public class MLabVzWizard
 				SWTSkinObject soProgressA = skin.getSkinObject("speedtest-progress", so);
 				if (soProgressA instanceof SWTSkinObjectContainer) {
 					SWTSkinObjectContainer soProgress = (SWTSkinObjectContainer) soProgressA;
-					ProgressBar pb = new ProgressBar(soProgress.getComposite(),
-							SWT.INDETERMINATE);
+					final ProgressBar pb = new ProgressBar(soProgress.getComposite(), SWT.NULL);
+					
+					final int CYCLE_MILLIS = 60*1000;
+
+					pb.setMinimum( 0 );
+					pb.setMaximum( CYCLE_MILLIS );
+					
+					new AEThread2( "ProgressUpdater" )
+					{						
+						final long start_time = SystemTime.getMonotonousTime();
+						
+						public void
+						run()
+						{
+							while( !pb.isDisposed()){
+								
+								try{
+									Thread.sleep(250);
+									
+								}catch( Throwable e ){
+									
+									break;
+								}
+								
+								Utils.execSWTThread(
+									new Runnable()
+									{
+										public void
+										run()
+										{
+											if ( pb.isDisposed() || !pb.isVisible()){
+												
+												return;
+											}
+											
+											long elapsed = SystemTime.getMonotonousTime() - start_time;
+											
+											int x = (int)( elapsed % CYCLE_MILLIS );
+											
+											pb.setSelection( x );
+										}
+									});
+							}
+						}
+					}.start();
+					
 					pb.setLayoutData(Utils.getFilledFormData());
 				}
 
