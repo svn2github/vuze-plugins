@@ -12,7 +12,7 @@ var dialog;
 // actually 523.10.3). We need 3.1 for CSS animation (dialog sheets) but as it
 // degrades gracefully let's not worry too much.
 var Safari3 = testSafari3();
-var iPhone = RegExp("(iPhone|iPod)").test(navigator.userAgent);
+var iPhone = RegExp("(iPhone|iPod|Android)").test(navigator.userAgent);
 if (iPhone) var scroll_timeout;
 
 function testSafari3()
