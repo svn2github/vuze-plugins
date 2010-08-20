@@ -798,7 +798,9 @@ UPnPMediaServerContentServer
 						
 						return;
 					}
-					
+					if (url.startsWith("http")) {
+						url = url.replaceFirst("^http://[^/]+", "");
+					}
 					
 					int	pos = url.indexOf( ' ' );
 					
