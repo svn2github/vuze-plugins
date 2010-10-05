@@ -329,7 +329,7 @@ Updater
 	  			
 	  				// only for Sun JVM
 	  			
-	  			if ( vendor != null && vendor.toLowerCase().startsWith( "sun" )){
+	  			if ( vendor != null && ( vendor.toLowerCase().startsWith( "sun" ) || vendor.toLowerCase().startsWith( "oracle" ))){
 	  				
 		  			String	max_mem = (String)update_properties.get( "max_mem" );
 		  			
