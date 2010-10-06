@@ -1931,12 +1931,24 @@ UPnPMediaServer
 										url = url.replaceAll( "RootDevice", "RootDeviceXbox" );
 									}
 									
+									String AV_Client_Info = (String)headers.get( "x-av-client-info" );
+									
+										// hack to drop in black-background icons for bravia
+									
+									if ( AV_Client_Info != null && AV_Client_Info.toLowerCase().contains( "bravia" )){
+																			
+										if ( url.endsWith( ".jpg" )){
+											
+											url = url.substring( 0, url.length()-4 ) + "b.jpg";
+										}
+									}
+								
 									String resource = "/com/aelitis/azureus/plugins/upnpmediaserver/resources" + url;
 						
 									InputStream stream = getClass().getResourceAsStream( resource );
 									
 									if ( stream != null ){
-										
+																				
 										try{
 											if ( url.startsWith( "/RootDevice" )){
 												

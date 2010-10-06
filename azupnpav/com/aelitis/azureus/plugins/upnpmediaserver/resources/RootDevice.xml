@@ -19,6 +19,13 @@
       <UDN>%UUID%</UDN>
       <iconList>
         <icon>
+          <mimetype>image/png</mimetype>
+		  <width>120</width>
+		  <height>120</height>
+		  <depth>24</depth>
+		  <url>/Vuze120x120.png</url>
+		</icon>
+        <icon>
           <mimetype>image/jpeg</mimetype>
 		  <width>120</width>
 		  <height>120</height>
@@ -26,11 +33,25 @@
 		  <url>/Vuze120x120.jpg</url>
 		</icon>
         <icon>
+          <mimetype>image/png</mimetype>
+		  <width>48</width>
+		  <height>48</height>
+		  <depth>24</depth>
+		  <url>/Vuze48x48.png</url>
+		</icon>
+        <icon>
           <mimetype>image/jpeg</mimetype>
 		  <width>48</width>
 		  <height>48</height>
 		  <depth>24</depth>
 		  <url>/Vuze48x48.jpg</url>
+		</icon>
+	    <icon>
+          <mimetype>image/png</mimetype>
+		  <width>32</width>
+		  <height>32</height>
+		  <depth>24</depth>
+		  <url>/Vuze32x32.png</url>
 		</icon>
 	    <icon>
           <mimetype>image/jpeg</mimetype>
