@@ -21,12 +21,16 @@
 package com.aelitis.plugins.rcmplugin;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 
 import org.eclipse.swt.widgets.TreeItem;
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.AERunnable;
+import org.gudy.azureus2.core3.util.AESemaphore;
+import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.AsyncDispatcher;
 import org.gudy.azureus2.core3.util.ByteArrayHashMap;
 import org.gudy.azureus2.core3.util.ByteFormatter;
@@ -56,11 +60,17 @@ import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 import com.aelitis.azureus.core.AzureusCore;
 import com.aelitis.azureus.core.AzureusCoreFactory;
 import com.aelitis.azureus.core.AzureusCoreRunningListener;
+import com.aelitis.azureus.core.cnetwork.ContentNetwork;
 import com.aelitis.azureus.core.content.ContentException;
 import com.aelitis.azureus.core.content.RelatedContent;
 import com.aelitis.azureus.core.content.RelatedContentLookupListener;
 import com.aelitis.azureus.core.content.RelatedContentManager;
 import com.aelitis.azureus.core.content.RelatedContentManagerListener;
+import com.aelitis.azureus.core.subs.Subscription;
+import com.aelitis.azureus.core.subs.SubscriptionException;
+import com.aelitis.azureus.core.subs.SubscriptionLookupListener;
+import com.aelitis.azureus.core.subs.SubscriptionManager;
+import com.aelitis.azureus.core.subs.SubscriptionManagerFactory;
 import com.aelitis.azureus.core.util.CopyOnWriteList;
 
 import com.aelitis.azureus.ui.UIFunctions;
@@ -455,14 +465,33 @@ RelatedContentUI
 				return mdiEntry;
 			}
 		});
-				
+		
+		mdi.showEntryByID( SideBar.SIDEBAR_SECTION_RELATED_CONTENT );
+		
 		if ( !root_menus_added ){
 			
 			root_menus_added = true;
 			
 			MenuManager menu_manager = ui_manager.getMenuManager();
 
-			MenuItem menu_item = menu_manager.addMenuItem( parent_id, "v3.activity.button.readall" );
+			MenuItem menu_item = menu_manager.addMenuItem( parent_id, "rcm.menu.findsubs" );
+			
+			menu_item.addListener( 
+					new MenuItemListener() 
+					{
+						public void 
+						selected(
+							MenuItem menu, Object target ) 
+						{
+					      	lookupSubscriptions();
+						}
+					});
+
+			menu_item = menu_manager.addMenuItem( parent_id, "sep1" );
+
+			menu_item.setStyle( MenuItem.STYLE_SEPARATOR );
+		
+			menu_item = menu_manager.addMenuItem( parent_id, "v3.activity.button.readall" );
 			
 			menu_item.addListener( 
 					new MenuItemListener() 
@@ -509,7 +538,7 @@ RelatedContentUI
 					});
 			
 			
-			menu_item = menu_manager.addMenuItem( parent_id, "sep" );
+			menu_item = menu_manager.addMenuItem( parent_id, "sep2" );
 
 			menu_item.setStyle( MenuItem.STYLE_SEPARATOR );
 			
@@ -560,7 +589,7 @@ RelatedContentUI
 			
 			if (  existing_si == null ){
 	
-				final RCMItem new_si = new RCMItem( hash );
+				final RCMItem new_si = new RCMItemContent( hash );
 				
 				rcm_item_map.put( hash, new_si );
 				
@@ -744,6 +773,84 @@ RelatedContentUI
 			ViewTitleInfoManager.refreshTitleInfo( this );
 		}
 	}
+		
+	private void
+	lookupSubscriptions()
+	{
+		final byte[] subs_hash = { 0 };
+		
+		synchronized( this ){
+			
+			final RCMItem existing_si = rcm_item_map.get( subs_hash );
+			
+			if (  existing_si == null ){
+	
+				final RCMItem new_si = new RCMItemSubscriptions( subs_hash );
+				
+				rcm_item_map.put( subs_hash, new_si );
+				
+				Utils.execSWTThread(
+					new Runnable()
+					{
+						public void
+						run()
+						{
+							synchronized( RelatedContentUI.this ){
+
+								if ( new_si.isDestroyed()){
+									
+									return;
+								}
+								
+								RCMView view = new RCMView( SideBar.SIDEBAR_SECTION_RELATED_CONTENT, "Swarm Subscriptions" );
+								
+								new_si.setView( view );
+								
+								String key = "RCM_" + ByteFormatter.encodeString( subs_hash );
+								
+								MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
+								
+								MdiEntry	entry = mdi.createEntryFromSkinRef(
+										SideBar.SIDEBAR_SECTION_RELATED_CONTENT,
+										key, "rcmview",
+										view.getTitle(),
+										view, null, true, -1 );
+								
+								new_si.setMdiEntry(entry);
+								
+								if (entry instanceof SideBarEntrySWT){
+									
+									new_si.setTreeItem( ((SideBarEntrySWT)entry).getTreeItem() );
+								}
+								
+								new_si.activate();
+							}
+						}
+					});
+			}else{
+				
+				Utils.execSWTThread(
+						new Runnable()
+						{
+							public void
+							run()
+							{
+								ViewTitleInfoManager.refreshTitleInfo( existing_si.getView());
+								
+								MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
+								MdiEntry mainEntry = mdi.getEntry(SideBar.SIDEBAR_SECTION_RELATED_CONTENT );
+								
+								if ( mainEntry != null ){
+									
+									ViewTitleInfoManager.refreshTitleInfo( mainEntry.getViewTitleInfo());
+								}
+								
+								existing_si.activate();
+							}
+						});
+			}
+		}
+	}
 	
 	private static final String SPINNER_IMAGE_ID 	= "image.sidebar.vitality.dl";
 
@@ -772,14 +879,50 @@ RelatedContentUI
 		x.setVisible( true );
 	}
 	
-	public class
+	public interface
 	RCMItem
-		implements RelatedContentEnumerator, MdiCloseListener
+		extends RelatedContentEnumerator, MdiCloseListener
+	{	
+		public void
+		contentRemoved(
+			RelatedContent[]	rc );
+		
+		public void
+		updateNumUnread();
+		
+		public void
+		setTreeItem(
+			TreeItem		ti );
+		
+		public TreeItem
+		getTreeItem();
+		
+		public void
+		setView(
+			RCMView		v );
+		
+		public RCMView
+		getView();
+		
+		public void
+		setMdiEntry(
+			MdiEntry _sb_entry );
+		
+		public void
+		activate();
+		
+		public boolean
+		isDestroyed();
+	}
+	
+	public class
+	RCMItemContent
+		implements RCMItem
 	{	
 		private byte[]				hash;
 		
 		private RCMView				view;
-		private MdiEntry		sb_entry;
+		private MdiEntry			sb_entry;
 		private TreeItem			tree_item;
 		private boolean				destroyed;
 		
@@ -794,15 +937,15 @@ RelatedContentUI
 		private boolean	lookup_complete;
 		
 		protected
-		RCMItem(
+		RCMItemContent(
 			byte[]		_hash )
 		{
 			hash		= _hash;
 		}
 		
-		protected void
+		public void
 		setMdiEntry(
-				MdiEntry _sb_entry )
+			MdiEntry _sb_entry )
 		{
 			sb_entry	= _sb_entry;
 			
@@ -828,7 +971,7 @@ RelatedContentUI
 						contentFound(
 							RelatedContent[]	content )
 						{
-							synchronized( RCMItem.this ){
+							synchronized( RCMItemContent.this ){
 							
 								if ( !destroyed ){
 								
@@ -859,7 +1002,7 @@ RelatedContentUI
 						public void
 						lookupComplete()
 						{	
-							synchronized( RCMItem.this ){
+							synchronized( RCMItemContent.this ){
 								
 								lookup_complete = true;
 							}
@@ -884,7 +1027,7 @@ RelatedContentUI
 			}
 		}
 		
-		protected void
+		public void
 		setTreeItem(
 			TreeItem		_tree_item )
 		{
@@ -892,13 +1035,13 @@ RelatedContentUI
 
 		}
 		
-		protected void 
+		public void 
 		contentRemoved(
 			RelatedContent[] content ) 
 		{
 			boolean deleted = false;
 			
-			synchronized( RCMItem.this ){
+			synchronized( RCMItemContent.this ){
 									
 				for ( RelatedContent c: content ){
 						
@@ -915,10 +1058,10 @@ RelatedContentUI
 			}
 		}
 		
-		protected void
+		public void
 		updateNumUnread()
 		{
-			synchronized( RCMItem.this ){
+			synchronized( RCMItemContent.this ){
 				
 				int	num = 0;
 				
@@ -976,7 +1119,7 @@ RelatedContentUI
 			}
 		}
 		
-		protected TreeItem
+		public TreeItem
 		getTreeItem()
 		{
 			return( tree_item );
@@ -988,20 +1131,20 @@ RelatedContentUI
 			return( sb_entry );
 		}
 		
-		protected void
+		public void
 		setView(
 			RCMView		_view )
 		{
 			view	= _view;
 		}
 		
-		protected RCMView
+		public RCMView
 		getView()
 		{
 			return( view );
 		}
 		
-		protected boolean
+		public boolean
 		isDestroyed()
 		{
 			return( destroyed );
@@ -1040,6 +1183,399 @@ RelatedContentUI
 				
 				mdi.showEntryByID(sb_entry.getId());
 			}
+		}
+	}
+	
+	
+	public class
+	RCMItemSubscriptions
+		implements RCMItem
+	{	
+		private byte[]				hash;
+		
+		private RCMView				view;
+		private MdiEntry			sb_entry;
+		private TreeItem			tree_item;
+		private boolean				destroyed;
+		
+		private MdiEntryVitalityImage	spinner;
+		
+		private List<RelatedContent>	content_list = new ArrayList<RelatedContent>();
+		
+		private int	num_unread;
+		
+		private CopyOnWriteList<RelatedContentEnumeratorListener>	listeners = new CopyOnWriteList<RelatedContentEnumeratorListener>();
+		
+		private boolean	lookup_complete;
+		
+		protected
+		RCMItemSubscriptions(
+			byte[]		_hash )
+		{
+			hash		= _hash;
+		}
+		
+		public void
+		setMdiEntry(
+			MdiEntry _sb_entry )
+		{
+			sb_entry	= _sb_entry;
+			
+			sb_entry.setDatasource( this );
+			
+			sb_entry.addListener( this );
+			
+			spinner = sb_entry.addVitalityImage( SPINNER_IMAGE_ID );
+
+			try{
+				showIcon( spinner, null );
+						
+				new AEThread2( "async" )
+				{
+					private Map<String,SubsRelatedContent>	s_map = new HashMap<String,SubsRelatedContent>();
+					
+					public void 
+					run()
+					{
+						try{
+							SubscriptionManager subs_man = SubscriptionManagerFactory.getSingleton();
+							
+							RelatedContent[] content = manager.getRelatedContent();
+							
+							final AESemaphore sem = new AESemaphore( "rcm", 16 );
+							
+							for ( RelatedContent c: content ){
+								
+								byte[] hash = c.getHash();
+								
+								try{
+									sem.reserve();
+									
+									subs_man.lookupAssociations(
+										hash,
+										new SubscriptionLookupListener()
+										{
+											public void
+											found(
+												byte[]					hash,
+												Subscription			subscription )
+											{
+												RelatedContent[] content;
+												
+												synchronized( RCMItemSubscriptions.this ){
+														
+													String id = subscription.getID();
+													
+													SubsRelatedContent existing = s_map.get( id );
+													
+													if ( existing == null ){
+														
+														existing = new SubsRelatedContent( subscription );
+														
+														s_map.put( id, existing );
+														
+														content = new RelatedContent[]{ existing };
+														
+													}else{
+														
+														existing.setRank( existing.getRank() + 1 );
+														
+														return;
+													}
+													
+													if ( !destroyed ){
+													
+														for ( RelatedContent c: content ){
+														
+															if ( !content_list.contains( c )){
+															
+																content_list.add( c );
+															}
+														}
+													}
+												}
+												
+												updateNumUnread();
+												
+												for ( RelatedContentEnumeratorListener listener: listeners ){
+													
+													try{
+														listener.contentFound( content );
+														
+													}catch( Throwable e ){
+														
+														Debug.out( e );
+													}
+												}
+											}
+											
+											public void
+											complete(
+												byte[]					hash,
+												Subscription[]			subscriptions )
+											{
+												sem.release();
+											}
+											
+											public void
+											failed(
+												byte[]					hash,
+												SubscriptionException	error )
+											{
+												sem.release();
+											}
+										});
+									
+								}catch( Throwable e ){
+									
+									sem.release();
+								}
+							}
+						}finally{
+							
+							synchronized( RCMItemSubscriptions.this ){
+								
+								lookup_complete = true;
+							}
+							
+							hideIcon( spinner );
+						}
+					}
+				}.start();
+
+			}catch( Throwable e ){
+				
+				lookup_complete = true;
+				
+				Debug.out( e );
+				
+				hideIcon( spinner );
+			}
+		}
+		
+		public void
+		setTreeItem(
+			TreeItem		_tree_item )
+		{
+			tree_item	= _tree_item;
+
+		}
+		
+		public void 
+		contentRemoved(
+			RelatedContent[] content ) 
+		{
+			boolean deleted = false;
+			
+			synchronized( RCMItemSubscriptions.this ){
+									
+				for ( RelatedContent c: content ){
+						
+					if ( content_list.remove( c )){
+														
+						deleted = true;
+					}
+				}
+			}
+			
+			if ( deleted ){
+			
+				updateNumUnread();
+			}
+		}
+		
+		public void
+		updateNumUnread()
+		{
+			synchronized( RCMItemSubscriptions.this ){
+				
+				int	num = 0;
+				
+				for ( RelatedContent c: content_list ){
+					
+					if ( c.isUnread()){
+						
+						num++;
+					}
+				}
+				
+				if ( num != num_unread ){
+					
+					num_unread = num;
+					
+					final int f_num = num;
+										
+					async_dispatcher.dispatch(
+						new AERunnable()
+						{
+							public void
+							runSupport()
+							{
+								if ( async_dispatcher.getQueueSize() > 0 ){
+									
+									return;
+								}
+								
+								view.setNumUnread( f_num );
+							}
+						});
+				}
+			}
+		}
+		
+		public void
+		enumerate(
+			final RelatedContentEnumeratorListener	listener )
+		{
+			RelatedContent[]	already_found;
+			 
+			synchronized( this ){
+				
+				if ( !lookup_complete ){
+					
+					listeners.add( listener );
+				}
+				
+				already_found = content_list.toArray( new RelatedContent[ content_list.size()]);
+			}
+			
+			if ( already_found.length > 0 ){
+				
+				listener.contentFound( already_found );
+			}
+		}
+		
+		public TreeItem
+		getTreeItem()
+		{
+			return( tree_item );
+		}
+		
+		protected MdiEntry
+		getSideBarEntry()
+		{
+			return( sb_entry );
+		}
+		
+		public void
+		setView(
+			RCMView		_view )
+		{
+			view	= _view;
+		}
+		
+		public RCMView
+		getView()
+		{
+			return( view );
+		}
+		
+		public boolean
+		isDestroyed()
+		{
+			return( destroyed );
+		}
+		
+		public void 
+		mdiEntryClosed(
+			MdiEntry entry,
+			boolean userClosed )
+		{
+			destroy();
+		}
+		
+		protected void
+		destroy()
+		{
+			synchronized( this ){
+			
+				content_list.clear();
+				
+				destroyed = true;
+			}
+			
+			synchronized( RelatedContentUI.this ){
+					
+				rcm_item_map.remove( hash );
+			}
+		}
+		
+		public void 
+		activate() 
+		{
+			MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
+			
+			if ( mdi != null && sb_entry != null ){
+				
+				mdi.showEntryByID(sb_entry.getId());
+			}
+		}
+	}
+	
+	public class
+	SubsRelatedContent
+		extends RelatedContent
+	{
+		private Subscription	subscription;
+		
+		private int rank;
+		
+		private
+		SubsRelatedContent(
+			Subscription	subs )
+		{
+			super( subs.getName(), new byte[0], subs.getNameEx(), -1, -1, (int)(subs.getCachedPopularity()<<16), (byte)ContentNetwork.CONTENT_NETWORK_UNKNOWN );
+			
+			subscription = subs;
+		}
+		
+		public void
+		setRank(
+			int		r )
+		{
+			rank = r;
+		}
+		
+		public int
+		getRank()
+		{
+			return( rank );
+		}
+
+		public int 
+		getLevel() 
+		{
+			return( 0 );
+		}
+		
+		public boolean 
+		isUnread() 
+		{
+			return( !subscription.isSubscribed() );
+		}
+		
+		public void 
+		setUnread(
+			boolean unread )
+		{
+			subscription.setSubscribed( !unread );
+		}
+		
+		public Download
+		getRelatedToDownload()
+		{
+			return( null );
+		}
+
+		public int 
+		getLastSeenSecs() 
+		{
+			return 0;
+		}
+		
+		public void 
+		delete() 
+		{
 		}
 	}
 }

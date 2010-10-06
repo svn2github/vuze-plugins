@@ -37,6 +37,7 @@ import com.aelitis.azureus.ui.common.table.TableColumnCore;
 import com.aelitis.azureus.ui.swt.shells.main.MainWindow;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinFactory;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinProperties;
+import com.aelitis.plugins.rcmplugin.RelatedContentUI;
 
 /**
  * @author TuxPaper
@@ -137,12 +138,19 @@ public class ColumnRC_Actions
 		boolean downloadable = rc.getHash() != null;
 
 		String s;
-		s = "<A HREF=\"search\">" + MessageText.getString("Button.search") + "</A>";
-		if (downloadable) {
-			s += " | <A HREF=\"dl\">"
-				+ MessageText.getString("v3.MainWindow.button.download") + "</A>";
-		}
+		
+		if ( rc instanceof RelatedContentUI.SubsRelatedContent ){
+			
+			s = "<A HREF=\"subscribe\">" + "Subscribe" + "</A>";
 
+		}else{
+			s = "<A HREF=\"search\">" + MessageText.getString("Button.search") + "</A>";
+			if (downloadable) {
+				s += " | <A HREF=\"dl\">"
+					+ MessageText.getString("v3.MainWindow.button.download") + "</A>";
+			}
+		}
+		
 		if (!cell.setSortValue(s) && cell.isValid()) {
 			return;
 		}
@@ -200,6 +208,8 @@ public class ColumnRC_Actions
 						String	title = rc.getTitle();
 						
 						MainWindow.doSearch( title );
+					} else if (hitUrl.url.equals("subscribe")) {
+						rc.setUnread( false );
 					}
 				}
 

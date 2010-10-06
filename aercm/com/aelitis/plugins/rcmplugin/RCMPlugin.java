@@ -39,6 +39,7 @@ import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.PluginListener;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
+import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.gudy.azureus2.plugins.utils.search.SearchException;
 import org.gudy.azureus2.plugins.utils.search.SearchInstance;
 import org.gudy.azureus2.plugins.utils.search.SearchObserver;
@@ -68,6 +69,9 @@ RCMPlugin
 			throw( new PluginException( "Plugin requires Vuze version 4.4.0.5 or higher" ));
 		}
 		
+		LocaleUtilities loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
+
+		loc_utils.integrateLocalisedMessageBundle( "com.aelitis.plugins.rcmplugin.internat.Messages" );
 		
 		try{
 			plugin_interface.getUtilities().registerSearchProvider(
