@@ -25,15 +25,11 @@ import java.util.regex.Pattern;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.CLabel;
 import org.eclipse.swt.events.*;
-import org.eclipse.swt.layout.FormAttachment;
-import org.eclipse.swt.layout.FormData;
-import org.eclipse.swt.layout.GridLayout;
+import org.eclipse.swt.layout.*;
 import org.eclipse.swt.widgets.*;
 
 import org.gudy.azureus2.core3.internat.MessageText;
-import org.gudy.azureus2.core3.util.Base32;
-import org.gudy.azureus2.core3.util.Debug;
-import org.gudy.azureus2.core3.util.UrlUtils;
+import org.gudy.azureus2.core3.util.*;
 import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.tables.TableColumn;
 import org.gudy.azureus2.plugins.ui.tables.TableColumnCreationListener;
@@ -63,6 +59,7 @@ import com.aelitis.azureus.ui.swt.mdi.MdiEntrySWT;
 import com.aelitis.azureus.ui.swt.mdi.MultipleDocumentInterfaceSWT;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinObject;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectContainer;
+import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectTextbox;
 import com.aelitis.azureus.ui.swt.views.skin.SkinView;
 import com.aelitis.azureus.ui.swt.views.skin.sidebar.SideBar;
 import com.aelitis.plugins.rcmplugin.columns.*;
@@ -100,6 +97,16 @@ SBC_RCMView
 
 	private RelatedContentManagerListener current_rcm_listener;
 
+	protected int minSeeds;
+
+	private boolean showUnknownSeeds = true;
+
+	private long createdMsAgo;
+
+	private int minRank;
+
+	private boolean showPrivate = true;
+
 	public Object 
 	skinObjectInitialShow(
 		SWTSkinObject skinObject, Object params ) 
@@ -132,26 +139,115 @@ SBC_RCMView
 			}
 		}
 
+		SWTSkinObjectTextbox soFilterBox = (SWTSkinObjectTextbox) getSkinObject("filterbox");
+		if (soFilterBox != null) {
+			txtFilter = soFilterBox.getTextControl();
+		}
+
 		SWTSkinObject soFilterArea = getSkinObject("filterarea");
 		if (soFilterArea != null) {
 			Composite parent = (Composite) soFilterArea.getControl();
+	
 			FormData fd;
-			CLabel lblFilter = new CLabel(parent, SWT.CENTER);
+			Composite cMinSeeds = new Composite(parent, SWT.NONE);
+			cMinSeeds.setLayout(new GridLayout(2, false));
 			fd = Utils.getFilledFormData();
 			fd.right = null;
-			lblFilter.setLayoutData(fd);
-
-			txtFilter = new Text(parent, SWT.BORDER);
-			fd = new FormData();
-			fd.left = new FormAttachment(50);
-			fd.top = new FormAttachment(lblFilter, 0, SWT.CENTER);
-			fd.right = new FormAttachment(100, -10);
-			txtFilter.setLayoutData(fd);
+			cMinSeeds.setLayoutData(fd);
 			
+			Label lblMinSeeds = new Label(cMinSeeds, SWT.NONE);
+			lblMinSeeds.setText("Min Seeds:");
+			Spinner spinMinSeeds = new Spinner(cMinSeeds, SWT.BORDER);
+			spinMinSeeds.setMinimum(0);
+			spinMinSeeds.setSelection(minSeeds);
+			spinMinSeeds.addListener(SWT.Selection, new Listener() {
+				public void handleEvent(Event event) {
+					minSeeds = ((Spinner) event.widget).getSelection();
+					refilter();
+				}
+			});
+			Button chkShowUnknownSeeds = new Button(cMinSeeds, SWT.CHECK);
+			chkShowUnknownSeeds.setText("Show unknown seeds");
+			chkShowUnknownSeeds.setSelection(showUnknownSeeds);
+			chkShowUnknownSeeds.addListener(SWT.Selection, new Listener() {
+				public void handleEvent(Event event) {
+					showUnknownSeeds = ((Button) event.widget).getSelection();
+					refilter();
+				}
+			});
+			GridData gridData = new GridData();
+			gridData.horizontalSpan = 2;
+			chkShowUnknownSeeds.setLayoutData(gridData);
+
+			Composite cCreatedAgo = new Composite(parent, SWT.NONE);
+			cCreatedAgo.setLayout(new GridLayout(2, false));
+			fd = Utils.getFilledFormData();
+			fd.left = new FormAttachment(cMinSeeds);
+			fd.right = null;
+			cCreatedAgo.setLayoutData(fd);
+			Label lblCreatedAgo = new Label(cCreatedAgo, SWT.NONE);
+			lblCreatedAgo.setText("Created Ago (days):");
+			Spinner spinCreatedAgo = new Spinner(cCreatedAgo, SWT.BORDER);
+			spinCreatedAgo.setMinimum(0);
+			spinCreatedAgo.setSelection((int) (createdMsAgo / 86400000L));
+			spinCreatedAgo.addListener(SWT.Selection, new Listener() {
+				public void handleEvent(Event event) {
+					createdMsAgo = ((Spinner) event.widget).getSelection() * 86400L*1000L;
+					refilter();
+				}
+			});
+			
+			Composite cMinRank = new Composite(parent, SWT.NONE);
+			cMinRank.setLayout(new GridLayout(2, false));
+			fd = Utils.getFilledFormData();
+			fd.left = new FormAttachment(cCreatedAgo);
+			fd.right = null;
+			cMinRank.setLayoutData(fd);
+			Label lblMinRank = new Label(cMinRank, SWT.NONE);
+			lblMinRank.setText("Min Rank:");
+			Spinner spinMinRank = new Spinner(cMinRank, SWT.BORDER);
+			spinMinRank.setMinimum(0);
+			spinMinRank.setSelection(minRank);
+			spinMinRank.addListener(SWT.Selection, new Listener() {
+				public void handleEvent(Event event) {
+					minRank = ((Spinner) event.widget).getSelection();
+					refilter();
+				}
+			});
+			
+
+			Composite cChecks = new Composite(parent, SWT.NONE);
+			cChecks.setLayout(new GridLayout(1, false));
+			fd = Utils.getFilledFormData();
+			fd.left = new FormAttachment(cMinRank);
+			fd.right = null;
+			cChecks.setLayoutData(fd);
+			Button chkShowPrivate = new Button(cChecks, SWT.CHECK);
+			chkShowPrivate.setSelection(showPrivate );
+			chkShowPrivate.addListener(SWT.Selection, new Listener() {
+				public void handleEvent(Event event) {
+					showPrivate = ((Button) event.widget).getSelection();
+					refilter();
+				}
+			});
+			
+
 			parent.layout(true);
 		}
 
 		return null;
+	}
+
+	private boolean isOurContent(RelatedContent c) {
+		return ((c.getSeeds() >= minSeeds) || (showUnknownSeeds && c.getSeeds() < 0)) 
+			&& (createdMsAgo == 0 || (SystemTime.getCurrentTime() - c.getPublishDate() < createdMsAgo))
+			&& ((c.getRank() >= minRank))
+			&& (showPrivate || c.getHash() != null);
+	}
+
+
+	protected void refilter() {
+		tv_related_content.refilter();
 	}
 
 
@@ -601,14 +697,18 @@ SBC_RCMView
 															break;
 														}
 														
-														new_content.add( c2 );
+														if (isOurContent(c2)) {
+															new_content.add( c2 );
+														}
 													}
 												}									
 											}else{
 												
 												if ( new_content != null ){
-													
-													new_content.add( c );
+													if (isOurContent(c)) {
+  													
+  													new_content.add( c );
+													}
 												}
 											}
 										}
@@ -647,6 +747,7 @@ SBC_RCMView
 											});
 									}
 								}
+
 							});
 					}
 				}
@@ -802,6 +903,7 @@ SBC_RCMView
 					{
 					}
 				});
+		
 		tv_related_content.initialize( table_parent );
 
 		control.layout(true);
@@ -850,6 +952,10 @@ SBC_RCMView
 
 	// @see org.gudy.azureus2.ui.swt.views.table.TableViewFilterCheck#filterCheck(java.lang.Object, java.lang.String, boolean)
 	public boolean filterCheck(RelatedContent ds, String filter, boolean regex) {
+		if (!isOurContent(ds)) {
+			return false;
+		}
+
 		if ( filter == null || filter.length() == 0 ){
 			
 			return( true );
