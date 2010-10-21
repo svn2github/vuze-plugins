@@ -149,7 +149,7 @@ SBC_RCMView
 			Composite parent = (Composite) soFilterArea.getControl();
 	
 			FormData fd;
-			Composite cMinSeeds = new Composite(parent, SWT.NONE);
+			Composite cMinSeeds = new Composite(parent, SWT.BORDER);
 			cMinSeeds.setLayout(new GridLayout(2, false));
 			fd = Utils.getFilledFormData();
 			fd.right = null;
@@ -179,7 +179,7 @@ SBC_RCMView
 			gridData.horizontalSpan = 2;
 			chkShowUnknownSeeds.setLayoutData(gridData);
 
-			Composite cCreatedAgo = new Composite(parent, SWT.NONE);
+			Composite cCreatedAgo = new Composite(parent, SWT.BORDER);
 			cCreatedAgo.setLayout(new GridLayout(2, false));
 			fd = Utils.getFilledFormData();
 			fd.left = new FormAttachment(cMinSeeds);
@@ -197,7 +197,7 @@ SBC_RCMView
 				}
 			});
 			
-			Composite cMinRank = new Composite(parent, SWT.NONE);
+			Composite cMinRank = new Composite(parent, SWT.BORDER);
 			cMinRank.setLayout(new GridLayout(2, false));
 			fd = Utils.getFilledFormData();
 			fd.left = new FormAttachment(cCreatedAgo);
@@ -216,13 +216,14 @@ SBC_RCMView
 			});
 			
 
-			Composite cChecks = new Composite(parent, SWT.NONE);
+			Composite cChecks = new Composite(parent, SWT.BORDER);
 			cChecks.setLayout(new GridLayout(1, false));
 			fd = Utils.getFilledFormData();
 			fd.left = new FormAttachment(cMinRank);
 			fd.right = null;
 			cChecks.setLayoutData(fd);
 			Button chkShowPrivate = new Button(cChecks, SWT.CHECK);
+			chkShowPrivate.setText("Show Private");
 			chkShowPrivate.setSelection(showPrivate );
 			chkShowPrivate.addListener(SWT.Selection, new Listener() {
 				public void handleEvent(Event event) {
