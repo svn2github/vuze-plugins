@@ -1933,13 +1933,19 @@ UPnPMediaServer
 									
 									String AV_Client_Info = (String)headers.get( "x-av-client-info" );
 									
-										// hack to drop in black-background icons for bravia
+										// hack to drop in black-background icons for bravia and sony blu-rays
 									
-									if ( AV_Client_Info != null && AV_Client_Info.toLowerCase().contains( "bravia" )){
-																			
-										if ( url.endsWith( ".jpg" )){
+									if ( AV_Client_Info != null ){
+										
+										AV_Client_Info = AV_Client_Info.toLowerCase();
+										
+										if ( 	AV_Client_Info.contains( "bravia" ) ||
+												( AV_Client_Info.contains( "sony" ) && AV_Client_Info.contains( "blu-ray" ))){
+														
+											if ( url.endsWith( ".jpg" )){
 											
-											url = url.substring( 0, url.length()-4 ) + "b.jpg";
+												url = url.substring( 0, url.length()-4 ) + "b.jpg";
+											}
 										}
 									}
 								
