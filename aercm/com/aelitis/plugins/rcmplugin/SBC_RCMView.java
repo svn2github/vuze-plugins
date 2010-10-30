@@ -182,7 +182,7 @@ SBC_RCMView
 			Composite cCreatedAgo = new Composite(parent, SWT.BORDER);
 			cCreatedAgo.setLayout(new GridLayout(2, false));
 			fd = Utils.getFilledFormData();
-			fd.left = new FormAttachment(cMinSeeds);
+			fd.left = new FormAttachment(cMinSeeds, 2);
 			fd.right = null;
 			cCreatedAgo.setLayoutData(fd);
 			Label lblCreatedAgo = new Label(cCreatedAgo, SWT.NONE);
@@ -200,7 +200,7 @@ SBC_RCMView
 			Composite cMinRank = new Composite(parent, SWT.BORDER);
 			cMinRank.setLayout(new GridLayout(2, false));
 			fd = Utils.getFilledFormData();
-			fd.left = new FormAttachment(cCreatedAgo);
+			fd.left = new FormAttachment(cCreatedAgo, 2);
 			fd.right = null;
 			cMinRank.setLayoutData(fd);
 			Label lblMinRank = new Label(cMinRank, SWT.NONE);
@@ -219,7 +219,7 @@ SBC_RCMView
 			Composite cChecks = new Composite(parent, SWT.BORDER);
 			cChecks.setLayout(new GridLayout(1, false));
 			fd = Utils.getFilledFormData();
-			fd.left = new FormAttachment(cMinRank);
+			fd.left = new FormAttachment(cMinRank, 2);
 			fd.right = null;
 			cChecks.setLayoutData(fd);
 			Button chkShowPrivate = new Button(cChecks, SWT.CHECK);
