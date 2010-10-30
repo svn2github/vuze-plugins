@@ -466,7 +466,7 @@ RelatedContentUI
 			}
 		});
 		
-		mdi.showEntryByID( SideBar.SIDEBAR_SECTION_RELATED_CONTENT );
+		mdi.loadEntryByID( SideBar.SIDEBAR_SECTION_RELATED_CONTENT, false );
 		
 		if ( !root_menus_added ){
 			
