@@ -53,6 +53,7 @@ import com.aelitis.azureus.ui.UIFunctionsManager;
 import com.aelitis.azureus.ui.common.ToolBarEnabler;
 import com.aelitis.azureus.ui.common.table.*;
 import com.aelitis.azureus.ui.common.updater.UIUpdatable;
+import com.aelitis.azureus.ui.mdi.MdiEntry;
 import com.aelitis.azureus.ui.selectedcontent.*;
 import com.aelitis.azureus.ui.swt.UIFunctionsManagerSWT;
 import com.aelitis.azureus.ui.swt.mdi.MdiEntrySWT;
@@ -62,6 +63,7 @@ import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectContainer;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectTextbox;
 import com.aelitis.azureus.ui.swt.views.skin.SkinView;
 import com.aelitis.azureus.ui.swt.views.skin.sidebar.SideBar;
+import com.aelitis.plugins.rcmplugin.RelatedContentUI.RCMItemContent;
 import com.aelitis.plugins.rcmplugin.columns.*;
 
 
@@ -88,7 +90,7 @@ SBC_RCMView
 	
 	private TableViewSWT<RelatedContent> tv_related_content;
 
-	private MdiEntrySWT 	mdi_entry;
+	private MdiEntry 	mdi_entry;
 	private Composite			table_parent;
 	private boolean				space_reserved;
 	
@@ -107,6 +109,8 @@ SBC_RCMView
 
 	private boolean showPrivate = true;
 
+	private Object ds;
+
 	public Object 
 	skinObjectInitialShow(
 		SWTSkinObject skinObject, Object params ) 
@@ -122,21 +126,21 @@ SBC_RCMView
 				}
 			});
 
-
 		MultipleDocumentInterfaceSWT mdi = UIFunctionsManagerSWT.getUIFunctionsSWT().getMDISWT();
 		
 		if ( mdi != null ){
-			
-			mdi_entry = mdi.getCurrentEntrySWT();
-			
-			mdi_entry.addToolbarEnabler(this);
 
-			if ( !mdi_entry.getId().equals( SideBar.SIDEBAR_SECTION_RELATED_CONTENT )){
-		
+			if ( ds instanceof RCMItemContent ){
+				mdi_entry = ((RCMItemContent) ds).getSideBarEntry();
 				manager.reserveTemporarySpace();
 				
 				space_reserved = true;
+			} else {
+				mdi_entry = mdi.getEntry( SideBar.SIDEBAR_SECTION_RELATED_CONTENT );
 			}
+			
+			mdi_entry.addToolbarEnabler(this);
+
 		}
 
 		SWTSkinObjectTextbox soFilterBox = (SWTSkinObjectTextbox) getSkinObject("filterbox");
@@ -239,6 +243,12 @@ SBC_RCMView
 		return null;
 	}
 
+	// @see com.aelitis.azureus.ui.swt.skin.SWTSkinObjectAdapter#dataSourceChanged(com.aelitis.azureus.ui.swt.skin.SWTSkinObject, java.lang.Object)
+	public Object dataSourceChanged(SWTSkinObject skinObject, Object params) {
+		ds = params;
+		return super.dataSourceChanged(skinObject, params);
+	}
+	
 	private boolean isOurContent(RelatedContent c) {
 		return ((c.getSeeds() >= minSeeds) || (showUnknownSeeds && c.getSeeds() < 0)) 
 			&& (createdMsAgo == 0 || (SystemTime.getCurrentTime() - c.getPublishDate() < createdMsAgo))
