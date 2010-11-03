@@ -1246,6 +1246,11 @@ RelatedContentUI
 								
 								byte[] hash = c.getHash();
 								
+								if ( hash == null ){
+									
+									continue;
+								}
+								
 								try{
 									sem.reserve();
 									
