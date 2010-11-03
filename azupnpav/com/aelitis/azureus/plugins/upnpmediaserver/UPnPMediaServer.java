@@ -132,6 +132,8 @@ UPnPMediaServer
 		"http-get:*:image/jpeg:DLNA.ORG_PN=JPEG_MED;DLNA.ORG_CI=1;DLNA.ORG_FLAGS=00f00000000000000000000000000000,"+
 		"http-get:*:image/jpeg:DLNA.ORG_PN=JPEG_LRG;DLNA.ORG_CI=1;DLNA.ORG_FLAGS=00f00000000000000000000000000000,"+
 		"http-get:*:image/jpeg:DLNA.ORG_PN=JPEG_TN;DLNA.ORG_CI=1;DLNA.ORG_FLAGS=00f00000000000000000000000000000,"+
+		"http-get:*:image/png:DLNA.ORG_PN=PNG_LRG;DLNA.ORG_CI=1;DLNA.ORG_FLAGS=00f00000000000000000000000000000,"+
+		"http-get:*:image/gif:DLNA.ORG_PN=GIF_LRG;DLNA.ORG_CI=1;DLNA.ORG_FLAGS=00f00000000000000000000000000000,"+
 		"http-get:*:audio/L16;rate=32000;channels=2:DLNA.ORG_PN=LPCM_low;DLNA.ORG_CI=1;DLNA.ORG_FLAGS=01700000000000000000000000000000,"+
 		"http-get:*:audio/L16;rate=24000;channels=2:DLNA.ORG_PN=LPCM_low;DLNA.ORG_CI=1;DLNA.ORG_FLAGS=01700000000000000000000000000000,"+
 		"http-get:*:audio/L16;rate=16000;channels=1:DLNA.ORG_PN=LPCM_low;DLNA.ORG_CI=1;DLNA.ORG_FLAGS=01700000000000000000000000000000,"+
@@ -2767,6 +2769,8 @@ UPnPMediaServer
 						content	child = children.get(i);
 						
 						boolean vis = isVisible( child, az_filters, az_filter_args );
+						
+						// System.out.println( child.getName() + " -> " + vis );
 						
 						if ( vis ){
 							

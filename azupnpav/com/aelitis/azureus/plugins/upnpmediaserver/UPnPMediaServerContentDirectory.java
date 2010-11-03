@@ -146,6 +146,7 @@ UPnPMediaServerContentDirectory
 		{ "jpe",  "image/jpeg", 				CONTENT_IMAGE },
 		{ "jpeg", "image/jpeg", 				CONTENT_IMAGE },
 		{ "jpg",  "image/jpeg", 				CONTENT_IMAGE },
+		{ "png",  "image/png", 					CONTENT_IMAGE },
 		{ "jfif", "image/pipeg",		 		CONTENT_IMAGE },
 		{ "tif",  "image/tiff", 				CONTENT_IMAGE },
 		{ "tiff", "image/tiff", 				CONTENT_IMAGE },
@@ -2003,18 +2004,51 @@ UPnPMediaServerContentDirectory
 		{
 			String res = getResource( host, client_type, "*" );
 			
-			if ( client_type != CT_XBOX && item_class.equals( CONTENT_VIDEO )){
+			if ( client_type != CT_XBOX ){
 				
 				try{
+					String attr = null;
+
 					DiskManagerFileInfo		file = content_file.getFile();
 					
 					String	file_name = file.getFile().getName();
 
-						// hack to see if we can get something to work for Sony Bravia
+					String	lc_fn = file_name.toLowerCase();
 					
-					if ( file_name.toLowerCase().endsWith( ".vob" )){
-				
-						String attr = "DLNA.ORG_PN=MPEG_PS_NTSC;DLNA.ORG_OP=01;DLNA.ORG_CI=1;DLNA.ORG_FLAGS=01700000000000000000000000000000";
+					if ( item_class.equals( CONTENT_VIDEO )){
+										
+						if ( lc_fn.endsWith( ".vob" )){
+					
+							attr = "DLNA.ORG_PN=MPEG_PS_NTSC;DLNA.ORG_OP=01;DLNA.ORG_CI=1;DLNA.ORG_FLAGS=01700000000000000000000000000000";							
+						}
+					}else if ( item_class.equals( CONTENT_AUDIO )){
+												
+						if ( lc_fn.endsWith( ".mp3" )){
+							
+							attr = "DLNA.ORG_PN=MP3;DLNA.ORG_OP=01;DLNA.ORG_FLAGS=01700000000000000000000000000000";
+							
+						}else if ( lc_fn.toLowerCase().endsWith( ".wma" )){
+							
+							attr = "DLNA.ORG_PN=WMABASE;DLNA.ORG_OP=11;DLNA.ORG_FLAGS=01700000000000000000000000000000";
+						}
+			
+					}else if ( item_class.equals( CONTENT_IMAGE )){
+													
+						if ( lc_fn.endsWith( ".jpg" ) || lc_fn.endsWith( ".jpeg" )){
+							
+							attr = "DLNA.ORG_PN=JPEG_MED;DLNA.ORG_CI=1;DLNA.ORG_FLAGS=00f00000000000000000000000000000";
+							
+						}else if ( lc_fn.endsWith( ".png" )){
+							
+							attr = "DLNA.ORG_PN=PNG_LRG;DLNA.ORG_CI=1;DLNA.ORG_FLAGS=00f00000000000000000000000000000";
+								
+						}else if ( lc_fn.endsWith( ".gif" )){
+							
+							attr = "DLNA.ORG_PN=GIF_LRG;DLNA.ORG_CI=1;DLNA.ORG_FLAGS=00f00000000000000000000000000000";
+						}
+					}
+					
+					if ( attr != null ){
 						
 						res += getResource( host, client_type, attr );
 					}
