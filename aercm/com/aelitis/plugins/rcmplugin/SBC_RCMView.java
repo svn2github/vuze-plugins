@@ -23,7 +23,6 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.custom.CLabel;
 import org.eclipse.swt.events.*;
 import org.eclipse.swt.layout.*;
 import org.eclipse.swt.widgets.*;
@@ -35,7 +34,6 @@ import org.gudy.azureus2.plugins.ui.tables.TableColumn;
 import org.gudy.azureus2.plugins.ui.tables.TableColumnCreationListener;
 import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.pluginsimpl.local.PluginInitializer;
-import org.gudy.azureus2.ui.swt.Messages;
 import org.gudy.azureus2.ui.swt.Utils;
 import org.gudy.azureus2.ui.swt.views.table.TableViewFilterCheck;
 import org.gudy.azureus2.ui.swt.views.table.TableViewSWT;
@@ -56,7 +54,6 @@ import com.aelitis.azureus.ui.common.updater.UIUpdatable;
 import com.aelitis.azureus.ui.mdi.MdiEntry;
 import com.aelitis.azureus.ui.selectedcontent.*;
 import com.aelitis.azureus.ui.swt.UIFunctionsManagerSWT;
-import com.aelitis.azureus.ui.swt.mdi.MdiEntrySWT;
 import com.aelitis.azureus.ui.swt.mdi.MultipleDocumentInterfaceSWT;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinObject;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectContainer;
@@ -64,6 +61,7 @@ import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectTextbox;
 import com.aelitis.azureus.ui.swt.views.skin.SkinView;
 import com.aelitis.azureus.ui.swt.views.skin.sidebar.SideBar;
 import com.aelitis.plugins.rcmplugin.RelatedContentUI.RCMItemContent;
+import com.aelitis.plugins.rcmplugin.RelatedContentUI.RCMItemSubscriptions;
 import com.aelitis.plugins.rcmplugin.columns.*;
 
 
@@ -132,6 +130,13 @@ SBC_RCMView
 
 			if ( ds instanceof RCMItemContent ){
 				mdi_entry = ((RCMItemContent) ds).getSideBarEntry();
+				manager.reserveTemporarySpace();
+				
+				space_reserved = true;
+				
+			}else if ( ds instanceof RCMItemSubscriptions ){
+				
+				mdi_entry = ((RCMItemSubscriptions) ds).getSideBarEntry();
 				manager.reserveTemporarySpace();
 				
 				space_reserved = true;
