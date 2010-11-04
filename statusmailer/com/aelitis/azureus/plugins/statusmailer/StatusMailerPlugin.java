@@ -374,6 +374,11 @@ StatusMailerPlugin
 	downloadAdded(
 		Download	download )
 	{
+		if ( download.getFlag( Download.FLAG_LOW_NOISE )){
+			
+			return;
+		}
+		
 		log.log( "Download added:" + download.getName());
 		
 		int	share_ratio = download.getStats().getShareRatio();
@@ -409,6 +414,11 @@ StatusMailerPlugin
 	downloadRemoved(
 		Download	download )
 	{
+		if ( download.getFlag( Download.FLAG_LOW_NOISE )){
+			
+			return;
+		}
+		
 		log.log( "Download removed:" + download.getName());
 		
 		download_ratios.remove( download );
@@ -427,6 +437,11 @@ StatusMailerPlugin
 		int				old_state,
 		int				new_state )
 	{
+		if ( download.getFlag( Download.FLAG_LOW_NOISE )){
+			
+			return;
+		}
+		
 		log.log( 	"Download state changed:" + 
 					download.getName() + ": " + Download.ST_NAMES[old_state] + " -> " + Download.ST_NAMES[new_state] );
 
