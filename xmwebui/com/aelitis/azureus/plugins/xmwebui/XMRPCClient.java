@@ -37,7 +37,7 @@ XMRPCClient
 		String[]		args )
 	{
 		try{
-			HttpURLConnection connection = (HttpURLConnection)new URL( "http://192.168.0.125:9091/transmission/rpc" ).openConnection();
+			HttpURLConnection connection = (HttpURLConnection)new URL( "http://192.168.0.100:9091/transmission/rpc" ).openConnection();
 			
 			connection.setRequestMethod( "POST" );
 			
@@ -99,8 +99,14 @@ XMRPCClient
 			
 			request.put( "arguments", arg_map );
 
+			File f = new File( "C:\\temp\\b.torrent" );
+			
+			String url = f.toURL().toExternalForm();
+			
+			System.out.println( "Adding " + url );
+			
 			arg_map.put( "paused", "true");
-			arg_map.put( "filename", "http://www.mininova.org/get/2963304" );
+			arg_map.put( "filename", url );
 			
 			pw.println( JSONUtils.encodeToJSON( request ));
 			

@@ -701,12 +701,20 @@ XMWebUIPlugin
 							
 							COConfigurationManager.setParameter("network.transport.encrypted.require", required );
 						}
+					}else if ( key.equals( "seedRatioLimit" )){
+						
+						float	ratio = ((Number)val).floatValue();
+
+						COConfigurationManager.setParameter( "Stop Ratio", ratio );
+						
 					}else{
 						
 						System.out.println( "Unhandled session-set field: " + key );
 					}
 				}
 			}		
+			
+			float stop_ratio = COConfigurationManager.getFloatParameter( "Stop Ratio" );
 			
 			result.put( "alt-speed-down", new Long( 0 ) );				// number     max global download speed (in K/s)
 			result.put( "alt-speed-enabled", FALSE );       			// boolean    true means use the alt speeds
@@ -729,13 +737,14 @@ XMWebUIPlugin
 			result.put( "port-forwarding-enabled", FALSE );  			// boolean    true means enabled
 			result.put( "rpc-version", new Long( 6 ));              	// number     the current RPC API version
 			result.put( "rpc-version-minimum", new Long( 6 ));      	// number     the minimum RPC API version supported
-			result.put( "seedRatioLimit", new Double(1.0) );          	// double     the default seed ratio for torrents to use
-			result.put( "seedRatioLimited", FALSE );         			// boolean    true if seedRatioLimit is honored by default
-			result.put( "speed-limit-down", new Long(  down_limit ));         	// number     max global download speed (in K/s)
-			result.put( "speed-limit-down-enabled", down_limit==0?FALSE:TRUE ); 			// boolean    true means enabled
-			result.put( "speed-limit-up", new Long( up_limit ));           	// number     max global upload speed (in K/s)
-			result.put( "speed-limit-up-enabled", up_limit==0?FALSE:TRUE );   			// boolean    true means enabled
-			result.put( "version", plugin_interface.getPluginVersion() );                  			// string     long version string "$version ($revision)"
+			result.put( "seedRatioLimit", new Double(stop_ratio) );          	// double     the default seed ratio for torrents to use
+			result.put( "seedRatioLimited", stop_ratio>0 );         			// boolean    true if seedRatioLimit is honored by default
+			result.put( "speed-limit-down", new Long(  down_limit ));         		// number     max global download speed (in K/s)
+			result.put( "speed-limit-down-enabled", down_limit==0?FALSE:TRUE ); 	// boolean    true means enabled
+			result.put( "speed-limit-up", new Long( up_limit ));           			// number     max global upload speed (in K/s)
+			result.put( "speed-limit-up-enabled", up_limit==0?FALSE:TRUE );   		// boolean    true means enabled
+			result.put( "version", plugin_interface.getPluginVersion() );           // string     
+			result.put( "az-version", Constants.AZUREUS_VERSION );                  // string     
 			
 		}else if ( method.equals( "torrent-add" )){
 			
@@ -912,6 +921,9 @@ XMWebUIPlugin
 			JSONArray priority_normal	= (JSONArray)args.get( "priority-normal" );
 			JSONArray priority_low		= (JSONArray)args.get( "priority-low" );
 			
+			Long	speed_limit_down	= (Long)args.get( "speedLimitDownload" );
+			Long	speed_limit_up		= (Long)args.get( "speedLimitUpload" );
+
 			for ( Download download: downloads ){
 				
 				Torrent t = download.getTorrent();
@@ -920,6 +932,16 @@ XMWebUIPlugin
 					
 					continue;
 				}
+				
+				if ( speed_limit_down != null ){
+					
+					download.setDownloadRateLimitBytesPerSecond( speed_limit_down.intValue());
+				}
+				
+				if ( speed_limit_up != null ){
+					
+					download.setUploadRateLimitBytesPerSecond( speed_limit_up.intValue());
+				}			
 				
 				DownloadManager	core_download = PluginCoreUtils.unwrap( download );
 									
@@ -1151,6 +1173,12 @@ XMWebUIPlugin
 						value = new Long( stats.getDownloaded());
 					}else if ( field.equals( "id" )){		
 						value = new Long( getID( download ));
+					}else if ( field.equals( "trackerSeeds" )){
+						DownloadScrapeResult scrape = download.getLastScrapeResult();
+						value = new Long( scrape==null?0:scrape.getSeedCount());
+					}else if ( field.equals( "trackerLeechers" )){
+						DownloadScrapeResult scrape = download.getLastScrapeResult();
+						value = new Long( scrape==null?0:scrape.getNonSeedCount());
 					}else if ( field.equals( "leechers" )){	
 						if ( pm == null ){
 							value = new Long(0);
@@ -1177,6 +1205,10 @@ XMWebUIPlugin
 						value = new Long( stats.getDownloadAverage());
 					}else if ( field.equals( "rateUpload" )){
 						value = new Long( stats.getUploadAverage());
+					}else if ( field.equals( "speedLimitDownload" )){	
+						value = new Long( download.getDownloadRateLimitBytesPerSecond());
+					}else if ( field.equals( "speedLimitUpload" )){
+						value = new Long( download.getUploadRateLimitBytesPerSecond());
 					}else if ( field.equals( "seeders" )){
 						if ( pm == null ){
 							value = new Long(-1);
