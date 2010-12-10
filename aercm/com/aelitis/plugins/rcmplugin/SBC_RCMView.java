@@ -469,6 +469,8 @@ SBC_RCMView
 
 		if ( space_reserved ){
 		
+			space_reserved = false;
+			
 			manager.releaseTemporarySpace();
 		}
 		
