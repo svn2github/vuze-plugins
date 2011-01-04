@@ -924,6 +924,12 @@ XMWebUIPlugin
 			Long	speed_limit_down	= (Long)args.get( "speedLimitDownload" );
 			Long	speed_limit_up		= (Long)args.get( "speedLimitUpload" );
 
+			Long	l_uploaded_ever		= (Long)args.get( "uploadedEver" );
+			Long	l_downloaded_ever 	= (Long)args.get( "downloadedEver" );
+
+			long	uploaded_ever 	= l_uploaded_ever==null?-1:l_uploaded_ever.longValue();
+			long	downloaded_ever = l_downloaded_ever==null?-1:l_downloaded_ever.longValue();
+					
 			for ( Download download: downloads ){
 				
 				Torrent t = download.getTorrent();
@@ -1009,6 +1015,17 @@ XMWebUIPlugin
 							
 							files[index].setPriority( 0 );
 						}
+					}
+				}
+				
+				if ( uploaded_ever != -1 || downloaded_ever != -1 ){
+					
+						// new method in 4511 B31
+					
+					try{
+						download.getStats().resetUploadedDownloaded( uploaded_ever, downloaded_ever );
+						
+					}catch( Throwable e ){
 					}
 				}
 			}
