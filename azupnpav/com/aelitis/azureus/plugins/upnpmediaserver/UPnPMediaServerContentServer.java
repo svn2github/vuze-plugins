@@ -62,6 +62,7 @@ UPnPMediaServerContentServer
 	
 	private UPnPMediaServer	plugin;
 	private int				port;
+	private InetAddress		first_bind_ip;
 	
 	private ThreadPool		thread_pool;
 	private PluginInterface	plugin_interface;
@@ -181,6 +182,8 @@ UPnPMediaServerContentServer
 		
 			port = ssc.socket().getLocalPort();
 		}
+		
+		first_bind_ip	= bind_ips[0];
 		
 			// ok, we're bound to one - set up accepters and bind to any others as
 			// required
@@ -500,6 +503,12 @@ UPnPMediaServerContentServer
 	getPort()
 	{
 		return( port );
+	}
+	
+	protected InetAddress
+	getBindIP()
+	{
+		return( first_bind_ip );
 	}
 	
 	protected int

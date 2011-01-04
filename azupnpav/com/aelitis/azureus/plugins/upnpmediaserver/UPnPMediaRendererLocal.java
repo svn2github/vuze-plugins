@@ -31,13 +31,16 @@ UPnPMediaRendererLocal
 {
 	private static int	next_id	= 0;
 	
+	private UPnPMediaServer		server;
 	private IPCInterface		callback;
 	private int					id;
 	
 	protected
 	UPnPMediaRendererLocal(
+		UPnPMediaServer	_server,
 		IPCInterface	_callback )
 	{
+		server		= _server;
 		callback	= _callback;
 		
 		synchronized( UPnPMediaRendererLocal.class ){
@@ -66,7 +69,7 @@ UPnPMediaRendererLocal
 		try{
 			callback.invoke(
 				"mediaServerPlay",
-				new Object[]{ item.getURI( "127.0.0.1", stream_id ), new Integer( item.getID()), new Integer( stream_id )} );
+				new Object[]{ item.getURI( server.getLocalIP(), stream_id ), new Integer( item.getID()), new Integer( stream_id )} );
 			
 		}catch( Throwable e ){
 			

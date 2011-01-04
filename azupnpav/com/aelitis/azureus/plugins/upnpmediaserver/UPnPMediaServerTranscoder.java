@@ -77,7 +77,7 @@ UPnPMediaServerTranscoder
 		
 		ipc = pi.getIPC();
 		
-		transcoder_server_socket = new ServerSocket( 0, 50, InetAddress.getByName( "127.0.0.1" ));
+		transcoder_server_socket = new ServerSocket( 0, 50, InetAddress.getByName( plugin.getLocalIP() ));
 		
 		new AEThread2( "UPnPMSTranscoder", true )
 		{

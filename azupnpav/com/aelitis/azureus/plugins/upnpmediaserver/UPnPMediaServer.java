@@ -1171,7 +1171,7 @@ UPnPMediaServer
 						if ( item != null ){
 						
 							try{
-								plugin_interface.getUIManager().copyToClipBoard( item.getURI( "127.0.0.1", -1 ));
+								plugin_interface.getUIManager().copyToClipBoard( item.getURI( getLocalIP(), -1 ));
 								
 							}catch( Throwable e ){
 								
@@ -1435,7 +1435,7 @@ UPnPMediaServer
 	addLocalRenderer(
 		IPCInterface	callback )
 	{
-		UPnPMediaRendererLocal	renderer = new UPnPMediaRendererLocal( callback );
+		UPnPMediaRendererLocal	renderer = new UPnPMediaRendererLocal( this, callback );
 		
 		synchronized( renderers ){
 			
@@ -1568,7 +1568,7 @@ UPnPMediaServer
 			if ( item != null ){
 
 				try{
-					return item.getURI( "127.0.0.1", -1 );
+					return item.getURI( getLocalIP(), -1 );
 
 				}catch( Throwable e ){
 
@@ -2009,7 +2009,7 @@ UPnPMediaServer
 								
 								if ( host == null ){
 									
-									host = "127.0.0.1";
+									host = getLocalIP();
 									
 								}else{
 									
@@ -2336,6 +2336,23 @@ UPnPMediaServer
 		PluginConfig	config = plugin_interface.getPluginconfig();
 		
 		config.setPluginParameter( "content_port", port, true );
+	}
+	
+	public String
+	getLocalIP()
+	{
+		UPnPMediaServerContentServer cs = content_server;
+		
+		InetAddress bip = cs==null?null:cs.getBindIP();
+		
+		if ( bip == null ){
+			
+			return( "127.0.0.1" );
+			
+		}else{
+			
+			return( bip.getHostAddress());
+		}
 	}
 	
 	protected void
@@ -3066,7 +3083,7 @@ UPnPMediaServer
 			throw( new IPCException( "Failed to find item for id '" + id + "'" ));
 		}
 		
-		String url = item.getURI( "127.0.0.1", -1 );
+		String url = item.getURI( getLocalIP(), -1 );
 		
 		/* no point in this - it'll match the "." in the host name...
 		int lastDot = url.lastIndexOf(".");
