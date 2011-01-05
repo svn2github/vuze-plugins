@@ -537,6 +537,8 @@ UPnPMediaServerContentServer
 		
 		private int			stream_id	= -1;
 		
+		private boolean		action_is_download;
+		
 		private volatile DiskManagerRequest	active_request;
 		
 		protected
@@ -824,6 +826,8 @@ UPnPMediaServerContentServer
 					
 					UPnPMediaServerContentDirectory.contentItem	item			= null;
 					
+					action_is_download = false;
+					
 					if ( url.startsWith( "/Platform" )){
 											
 						int	q_pos = url.indexOf('?');
@@ -897,6 +901,12 @@ UPnPMediaServerContentServer
 											}
 											
 										}catch( Throwable  e){
+										}
+									}else if ( lhs.equals( "action" )){
+										
+										if ( rhs.equals( "download" )){
+											
+											action_is_download = true;
 										}
 									}
 								}
@@ -1387,6 +1397,15 @@ UPnPMediaServerContentServer
 			writeb( "Connection: " + (close_connection?"Close":"Keep-Alive") + NL );
 			writeb( "Cache-Control: no-cache" + NL );
 			writeb( "Expires: 0" + NL );
+			
+			if ( action_is_download ){
+				
+				writeb( "Content-Type: application/octet-stream" + NL );
+				writeb( "Content-Transfer-Encoding: binary" + NL );
+				writeb( "Content-Disposition: attachment; filename=\"" + item.getFile().getFile( true ).getName() + "\"" + NL );
+				
+				return;
+			}
 			
 			/* DLNA.ORG_CI: conversion indicator parameter (integer)
 			 *     0 not transcoded
