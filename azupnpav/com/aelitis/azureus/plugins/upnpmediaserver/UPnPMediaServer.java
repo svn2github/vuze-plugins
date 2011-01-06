@@ -56,6 +56,7 @@ import org.gudy.azureus2.plugins.ipc.IPCInterface;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
 import org.gudy.azureus2.plugins.tracker.Tracker;
+import org.gudy.azureus2.plugins.tracker.web.TrackerAuthenticationAdapter;
 import org.gudy.azureus2.plugins.tracker.web.TrackerAuthenticationListener;
 import org.gudy.azureus2.plugins.tracker.web.TrackerWebContext;
 import org.gudy.azureus2.plugins.tracker.web.TrackerWebPageGenerator;
@@ -103,6 +104,8 @@ import com.aelitis.azureus.core.content.AzureusContentFile;
 import com.aelitis.azureus.core.content.AzureusContentFilter;
 import com.aelitis.azureus.core.util.CopyOnWriteList;
 import com.aelitis.azureus.core.util.UUIDGenerator;
+import com.aelitis.azureus.plugins.upnp.UPnPMapping;
+import com.aelitis.azureus.plugins.upnp.UPnPPlugin;
 import com.aelitis.azureus.plugins.upnpmediaserver.ui.UPnPMediaServerUI;
 import com.aelitis.azureus.plugins.upnpmediaserver.ui.swt.UPnPMediaServerUISWT;
 import com.aelitis.net.upnp.UPnP;
@@ -204,7 +207,7 @@ UPnPMediaServer
 	private boolean enable_upnp			= true;
 	private boolean enable_lan_publish	= true;
 	private int		stream_port			= 0;
-	
+
 	private UPnPMediaServerUI		media_server_ui;
 	
 	private List	logged_searches  = new ArrayList();
@@ -223,13 +226,17 @@ UPnPMediaServer
 		
 	private byte[]					BLANK_PASSWORD;
 
+		
+	private BooleanParameter 		stream_port_upnp_param;
 	
 	private BooleanParameter 		main_auth;
+	private BooleanParameter 		main_auth_ext_only;
 	private StringParameter			main_username;
 	private PasswordParameter		main_password;
 
 	private BooleanParameter 		http_enable_param;
 	private IntParameter 			http_port_param;
+	private BooleanParameter 		http_port_upnp_param;
 	private UPnPMediaServerHTTP		http_server;
 	private BooleanParameter 		http_auth;
 	private BooleanParameter 		http_auth_same;
@@ -378,11 +385,13 @@ UPnPMediaServer
 								setContentPort( 0 );
 							}
 							
-							createContentServer( active_port );
+							createContentServer( active_port, false );
 						}
 					}
 				});
 			
+			stream_port_upnp_param = config_model.addBooleanParameter2( "upnpmediaserver.stream_port_upnp", "upnpmediaserver.stream_port_upnp", false );
+
 			String	default_name = null;
 			
 			try{
@@ -539,12 +548,14 @@ UPnPMediaServer
 			
 				// main password
 			
-			main_auth		= config_model.addBooleanParameter2( "upnpmediaserver.auth.enable", "upnpmediaserver.auth.enable", false );
+			main_auth				= config_model.addBooleanParameter2( "upnpmediaserver.auth.enable", "upnpmediaserver.auth.enable", false );
+			main_auth_ext_only		= config_model.addBooleanParameter2( "upnpmediaserver.auth.ext_only", "upnpmediaserver.auth.ext_only", false );
 
 			main_username 	= config_model.addStringParameter2( "upnpmediaserver.auth.user", "upnpmediaserver.auth.user", "" );
 			
 			main_password 	= config_model.addPasswordParameter2( "upnpmediaserver.auth.password", "upnpmediaserver.auth.password", PasswordParameter.ET_SHA1, new byte[0] );
 
+			main_auth.addEnabledOnSelection( main_auth_ext_only );
 			main_auth.addEnabledOnSelection( main_username );
 			main_auth.addEnabledOnSelection( main_password );
 					
@@ -554,6 +565,7 @@ UPnPMediaServer
 							enable_upnp_p,
 							stream_port_p,
 							active_port,
+							stream_port_upnp_param,
 							snp,
 							sort_order, sort_order_ascending, 
 							show_percent_done,
@@ -561,7 +573,7 @@ UPnPMediaServer
 							separate_by_category,
 							enable_publish_p,
 							speed_lab, speed_bit_rate_mult, speed_min_kb_sec, speed_max_kb_sec,
-							main_auth, main_username, main_password,
+							main_auth, main_auth_ext_only, main_username, main_password,
 					});
 
 			
@@ -571,6 +583,8 @@ UPnPMediaServer
 			http_enable_param = config_model.addBooleanParameter2("upnpmediaserver.http_enable", "upnpmediaserver.http_enable", false);
 
 			http_port_param = config_model.addIntParameter2( "upnpmediaserver.http_port", "upnpmediaserver.http_port", HTTP_PORT_DEFAULT );
+			
+			http_port_upnp_param = config_model.addBooleanParameter2( "upnpmediaserver.http_port_upnp", "upnpmediaserver.http_port_upnp", false );
 			
 			http_auth		= config_model.addBooleanParameter2( "upnpmediaserver.httpauth.enable", "upnpmediaserver.httpauth.enable", false );
 			
@@ -588,7 +602,8 @@ UPnPMediaServer
 			http_auth_same.addDisabledOnSelection( http_password );
 
 			http_enable_param.addEnabledOnSelection( http_port_param );
-			http_enable_param.addEnabledOnSelection( http_auth );
+			http_enable_param.addEnabledOnSelection( http_port_upnp_param );
+			http_enable_param.addEnabledOnSelection( http_auth );	
 			http_enable_param.addEnabledOnSelection( http_auth_same );
 			http_enable_param.addEnabledOnSelection( http_username );
 			http_enable_param.addEnabledOnSelection( http_password );
@@ -598,7 +613,7 @@ UPnPMediaServer
 				"upnpmediaserver.http_group",
 				new Parameter[]{
 						http_enable_param,
-						http_port_param,
+						http_port_param, http_port_upnp_param, 
 						http_auth, http_auth_same, http_username, http_password,
 				});
 			
@@ -649,7 +664,7 @@ UPnPMediaServer
 					}
 				});
 			
-			createContentServer( active_port );
+			createContentServer( active_port, true );
 			
 			content_directory = new UPnPMediaServerContentDirectory( this );
 	
@@ -722,6 +737,54 @@ UPnPMediaServer
 		}
 	}
 	
+	private void
+	handleUPnP(
+		int			port,
+		String		name,
+		boolean		enabled )
+	{
+		PluginInterface pi_upnp = plugin_interface.getPluginManager().getPluginInterfaceByClass( UPnPPlugin.class );
+		
+		if ( pi_upnp == null ){
+			
+			log( "No UPnP plugin available, not attempting port mapping");
+			
+		}else{
+			
+			PluginConfig config = plugin_interface.getPluginconfig();
+			
+			String	key = "upnp.port.for." + name;
+			
+			int	existing_port = config.getPluginIntParameter( key, 0 );
+			
+			if ( !enabled || ( existing_port != 0 && existing_port != port )){
+				
+				log( "Removing UPnP mapping: port=" + existing_port + ", name='" + name + "'"  );
+				
+				UPnPMapping m = ((UPnPPlugin)pi_upnp.getPlugin()).addMapping( name, true, existing_port, false );
+				
+				m.destroy();
+				
+				config.setPluginParameter( key, 0 );
+			}
+			
+			if ( enabled ){
+				
+				log( "Creating UPnP mapping: port=" + port + ", name='" + name + "'"  );
+				
+				((UPnPPlugin)pi_upnp.getPlugin()).addMapping( name, true, port, true );
+				
+				config.setPluginParameter( key, port );
+			}
+		}
+	}
+	
+	private void
+	doContentUPnP()
+	{
+		handleUPnP( content_server==null?0:content_server.getPort(), "Media Server Content", stream_port_upnp_param.getValue());
+	}
+	
 	protected int
 	getAverageBitRateMultiplier()
 	{
@@ -742,7 +805,8 @@ UPnPMediaServer
 	
 	private void
 	createContentServer(
-		InfoParameter	info )
+		InfoParameter	info,
+		boolean			init )
 	{
 		if ( content_server != null ){
 			
@@ -762,6 +826,10 @@ UPnPMediaServer
 		
 			info.setValue( String.valueOf( active_port));
 			
+			if ( !init ){
+			
+				doContentUPnP();
+			}
 		}catch( Throwable e ){
 			
 			log( "Failed to initialise content server", e );
@@ -772,6 +840,61 @@ UPnPMediaServer
 	getContentServer()
 	{
 		return( content_server );
+	}
+	
+	protected boolean
+	authContentPort()
+	{
+		return( main_auth.getValue());
+	}
+	
+	protected boolean
+	doContentAuth(
+		String			client_address,
+		String			user,
+		String			password )
+	{
+		if ( !main_auth.getValue()){
+			
+			return( true );
+		}
+		
+		if ( main_auth_ext_only.getValue()){
+						
+			if ( client_address == null ){
+				
+				return( false );
+			}
+			
+			try{
+				InetAddress ia = InetAddress.getByName( client_address );
+			
+				if( ia.isLoopbackAddress() || ia.isLinkLocalAddress() || ia.isSiteLocalAddress()){
+					
+					return( true );
+				}
+				
+			}catch( Throwable e ){
+				
+				Debug.out( e );
+				
+				return( false );
+			}
+		}
+		
+		byte[]	p_sha1 = main_password.getValue();
+		
+		if ( p_sha1.length == 0 || Arrays.equals( p_sha1, BLANK_PASSWORD )){
+			
+			return( true );
+		}
+		
+		if ( !user.equals( main_username.getValue())){
+			
+			return( false );
+		}
+		
+		return( Arrays.equals( p_sha1, plugin_interface.getUtilities().getSecurityManager().calculateSHA1( password.getBytes())));		
 	}
 	
 	protected boolean
@@ -1720,6 +1843,8 @@ UPnPMediaServer
 			
 			if ( enable_upnp ){
 				
+				doContentUPnP();
+				
 				UPnPAdapter adapter = 
 					new UPnPAdapter()
 					{
@@ -1815,39 +1940,37 @@ UPnPMediaServer
 							Tracker.PR_HTTP );
 				
 				ssdp_web_context.addAuthenticationListener(
-					new TrackerAuthenticationListener()
+					new TrackerAuthenticationAdapter()
 					{
 						public boolean
 						authenticate(
+							String		headers,
 							URL			resource,
-							String		r_user,
-							String		r_password )
+							String		user,
+							String		password )
 						{
-							if ( !main_auth.getValue()){
-								
-								return( true );
-							}
-							
-							byte[]	p_sha1 = main_password.getValue();
-							
-							if ( p_sha1.length == 0 || Arrays.equals( p_sha1, BLANK_PASSWORD )){
-								
-								return( true );
-							}
-							
-							if ( !r_user.equals( main_username.getValue())){
-								
-								return( false );
-							}
-							
-							return( Arrays.equals( p_sha1, plugin_interface.getUtilities().getSecurityManager().calculateSHA1(r_password.getBytes())));
+							return( doContentAuth( getHeaderField( headers, "X-Real-IP" ), user, password ));
 						}
 						
-						public byte[]
-						authenticate(
-							URL			resource,
-							String		user )
+						private String
+						getHeaderField(
+							String	headers,
+							String	field )
 						{
+							String lc_headers = headers.toLowerCase();
+							
+							int p1 = lc_headers.indexOf( field.toLowerCase() + ":" );
+							
+							if ( p1 != -1 ){
+							
+								int	p2 = lc_headers.indexOf( '\n', p1 );
+								
+								if ( p2 != -1 ){
+									
+									return( headers.substring( p1+field.length()+1, p2 ).trim());
+								}
+							}
+							
 							return( null );
 						}
 					});
@@ -2233,6 +2356,8 @@ UPnPMediaServer
 				if ( http_enable_param.getValue()){
 					
 					http_server = new UPnPMediaServerHTTP( this, http_port_param.getValue());
+											
+					handleUPnP(http_port_param.getValue(), "Media Server HTTP", http_port_upnp_param.getValue());
 				}
 				
 				timer2_event = timer2.addPeriodicEvent(

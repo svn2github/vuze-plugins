@@ -28,6 +28,7 @@ import java.nio.channels.ServerSocketChannel;
 import java.io.*;
 import java.util.*;
 
+import org.bouncycastle.util.encoders.Base64;
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Average;
@@ -773,6 +774,46 @@ UPnPMediaServerContentServer
 						return;
 					}
 					
+					if ( plugin.authContentPort()){
+						
+						String	auth = headers.get( "authorization" );
+						
+						boolean	ok = false;
+						
+						if ( auth != null ){
+							
+							int	pos = auth.indexOf( ' ' );
+							
+							auth = auth.substring( pos+1 ).trim();
+							
+							String decoded = new String( Base64.decode(auth));
+
+								// username:password
+											
+							int	cp = decoded.indexOf(':');
+							
+							String	user = decoded.substring(0,cp);
+							String  pw	 = decoded.substring(cp+1);
+
+							ok = plugin.doContentAuth( socket.getInetAddress().getHostAddress(), user, pw );
+						}
+						
+						if ( !ok ){
+							
+							writeb( "HTTP/1.1 401 BAD" + NL );
+							writeb( "WWW-Authenticate: Basic realm=\"Vuze Media Server\"" + NL );						
+							writeb( "Connection: close" + NL + NL );
+							
+							writeb( "Access Denied" + NL );
+	
+							writef();
+							
+							close_connection = true;
+							
+							continue;
+						}
+					}
+										
 					String	connection_header = headers.get( "connection" );
 									
 					if ( command.endsWith( "1.0" )){
@@ -809,7 +850,9 @@ UPnPMediaServerContentServer
 						
 						return;
 					}
-					if (url.startsWith("http")) {
+					
+					if ( url.startsWith("http")){
+						
 						url = url.replaceFirst("^http://[^/]+", "");
 					}
 					
