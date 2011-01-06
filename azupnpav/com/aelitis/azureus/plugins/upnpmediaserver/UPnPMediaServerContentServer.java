@@ -252,9 +252,7 @@ UPnPMediaServerContentServer
 									successfull_accepts++;
 									
 									String	ip = socket.getInetAddress().getHostAddress();			
-										
-										// TODO: permission checks???
-									
+																			
 									processor	proc = new processor( ip, socket, processor_num++ );
 									
 									thread_pool.run( proc );
@@ -774,7 +772,7 @@ UPnPMediaServerContentServer
 						return;
 					}
 					
-					if ( plugin.authContentPort()){
+					if ( plugin.authContentPort( ip )){
 						
 						String	auth = headers.get( "authorization" );
 						
@@ -795,7 +793,7 @@ UPnPMediaServerContentServer
 							String	user = decoded.substring(0,cp);
 							String  pw	 = decoded.substring(cp+1);
 
-							ok = plugin.doContentAuth( socket.getInetAddress().getHostAddress(), user, pw );
+							ok = plugin.doContentAuth( ip, user, pw );
 						}
 						
 						if ( !ok ){

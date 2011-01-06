@@ -843,9 +843,42 @@ UPnPMediaServer
 	}
 	
 	protected boolean
-	authContentPort()
+	authContentPort(
+		String		client_address )
 	{
-		return( main_auth.getValue());
+		if ( !main_auth.getValue()){
+			
+			return( false );
+		}
+		
+		if ( main_auth_ext_only.getValue()){
+			
+			if ( client_address == null ){
+				
+				log( "Authentication failed, client address unavailable" );
+				
+				return( true );
+			}
+			
+			try{
+				InetAddress ia = InetAddress.getByName( client_address );
+			
+				if ( ia.isLoopbackAddress() || ia.isLinkLocalAddress() || ia.isSiteLocalAddress()){
+					
+					return( false );
+				}
+				
+			}catch( Throwable e ){
+				
+				Debug.out( e );
+				
+				log( "Authentication failed", e );
+				
+				return( true );
+			}
+		}
+		
+		return( true );
 	}
 	
 	protected boolean
@@ -858,30 +891,7 @@ UPnPMediaServer
 			
 			return( true );
 		}
-		
-		if ( main_auth_ext_only.getValue()){
-						
-			if ( client_address == null ){
 				
-				return( false );
-			}
-			
-			try{
-				InetAddress ia = InetAddress.getByName( client_address );
-			
-				if( ia.isLoopbackAddress() || ia.isLinkLocalAddress() || ia.isSiteLocalAddress()){
-					
-					return( true );
-				}
-				
-			}catch( Throwable e ){
-				
-				Debug.out( e );
-				
-				return( false );
-			}
-		}
-		
 		byte[]	p_sha1 = main_password.getValue();
 		
 		if ( p_sha1.length == 0 || Arrays.equals( p_sha1, BLANK_PASSWORD )){
@@ -891,10 +901,19 @@ UPnPMediaServer
 		
 		if ( !user.equals( main_username.getValue())){
 			
+			log( "Authentication failed: userame '" + user + "' invalid, client=" + client_address );
+			
 			return( false );
 		}
 		
-		return( Arrays.equals( p_sha1, plugin_interface.getUtilities().getSecurityManager().calculateSHA1( password.getBytes())));		
+		boolean ok = Arrays.equals( p_sha1, plugin_interface.getUtilities().getSecurityManager().calculateSHA1( password.getBytes()));
+		
+		if ( !ok ){
+			
+			log( "Authentication failed: incorrect password, client=" + client_address );
+		}
+		
+		return( ok );
 	}
 	
 	protected boolean
@@ -1949,7 +1968,14 @@ UPnPMediaServer
 							String		user,
 							String		password )
 						{
-							return( doContentAuth( getHeaderField( headers, "X-Real-IP" ), user, password ));
+							String	client = getHeaderField( headers, "X-Real-IP" );
+							
+							if ( authContentPort( client )){
+							
+								return( doContentAuth( client, user, password ));
+							}
+							
+							return( true );
 						}
 						
 						private String
