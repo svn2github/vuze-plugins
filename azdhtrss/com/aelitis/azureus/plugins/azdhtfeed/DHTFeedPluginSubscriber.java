@@ -33,6 +33,7 @@ import java.util.*;
 
 import org.gudy.azureus2.core3.util.Base32;
 import org.gudy.azureus2.core3.util.HashWrapper;
+import org.gudy.azureus2.core3.util.UrlUtils;
 import org.gudy.azureus2.plugins.PluginConfig;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabase;
@@ -80,6 +81,7 @@ DHTFeedPluginSubscriber
 	
 	private Set					replicated_signed_data	= new HashSet();
 	
+	private int					port;
 	private BooleanParameter 	subscribe_port_local;
 	
 	private boolean				initialised;
@@ -108,10 +110,12 @@ DHTFeedPluginSubscriber
 	
 	protected void
 	initialise(
-		int					port,
+		int					_port,
 		int					refresh_mins,
 		BooleanParameter 	_subscribe_port_local)
 	{
+		port	= _port;
+		
 		if ( !initialised ){
 			
 			initialised	= true;
@@ -894,17 +898,74 @@ DHTFeedPluginSubscriber
 			}
 		}
 		
-		int	pos = url.indexOf( "feed=" );
+		int	pos = url.indexOf( '?' );
 		
 		if ( pos == -1 ){
+			
+			List<subscriptionRecord> records;
+			
+			synchronized( this ){
+				
+				records = new ArrayList<subscriptionRecord>( subscription_records.values());
+			}
+			
+			Collections.sort(
+				records,
+				new Comparator<subscriptionRecord>()
+				{
+					public int 
+					compare(
+						subscriptionRecord o1,
+						subscriptionRecord o2) 
+					{
+						return( o1.getFeedName().compareTo( o2.getFeedName()));
+					}
+				});
+			
+			PrintWriter pw = new PrintWriter( new OutputStreamWriter( response.getOutputStream(), "UTF-8" ));
+			
+			response.setContentType( "text/html; charset=utf-8" );
+			
+			pw.println( "<HTML><HEAD><TITLE>DDB Subscriptions</TITLE></HEAD><BODY>");
+			
+			for ( subscriptionRecord record: records ){
+			
+				String	name = record.getFeedName();
+			
+				pw.println( "<UL><A HREF=\"http://127.0.0.1:" + port + "/content?feed=" + UrlUtils.encode( name ) + "\">" + name + "</a>" );
+			}
+			
+			pw.println( "</BODY></HTML>" );
+			
+			pw.flush();
+			
+			return( true );
+		}
+		
+		String[] 	args = url.substring( pos+1 ).split( "&" );
+		
+		String	feed_name = null;
+		
+		for ( String arg: args ){
+			
+			String[] bits = arg.split( "=" );
+			
+			if ( bits.length == 2 ){
+				
+				if ( bits[0].equalsIgnoreCase( "feed" )){
+					
+					feed_name = UrlUtils.decode( bits[1] );
+				}
+			}
+		}
+		
+		if ( feed_name == null ){
 			
 			response.setReplyStatus( 404 );
 			
 			return( true );
 		}
-		
-		String	feed_name = URLDecoder.decode( url.substring( pos+5), "UTF-8" );
-		
+				
 			// test for locally published content first to avoid interference with idiots that
 			// subscribe to a local feed explicitly :P
 		
