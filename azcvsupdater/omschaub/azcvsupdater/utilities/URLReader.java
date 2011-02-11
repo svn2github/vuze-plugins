@@ -22,20 +22,25 @@ import omschaub.azcvsupdater.main.StatusBoxUtils;
 import omschaub.azcvsupdater.main.Tab1;
 import omschaub.azcvsupdater.main.Tab1_Subtab_1;
 import omschaub.azcvsupdater.main.View;
+import omschaub.azcvsupdater.main.Constants;
 
+import org.json.simple.*;
 
 public class URLReader {
 
-    /** Holds the url which was parsed out of the sourceforge site */
+    /** Holds the torrent url which was parsed out of the JSON file */
     private static String cvsurl;
     
-    /** Holds the timestamp from sourceforge site */
+    /** Holds the HTTP JAR download url which was parsed out of the JSON file */
+    private static String jarurl;
+
+    /** Holds the timestamp from the JSON file */
     private static String serverTimeStampVersion;
     
-    /** Holds the long of time from sourceforge site */
+    /** Holds the long of time from the JSON file */
     private static long whenLastModified;
     
-    /** Holds the string for the time when last Modified form sourceforge site */
+    /** Holds the string for the time when last Modified from the JSON file */
     private static String whenLastModifiedString;
     
     /**Holds the old version */
@@ -100,6 +105,14 @@ public class URLReader {
         return cvsurl;
     }
     
+    /**
+     * Gets the jarurl that was parsed from the main getURL function
+     * @return String jarurl
+     */
+    public static String get_jarurl(){
+        return jarurl;
+    }
+    
     /** 
      * Gets the long value parsed from the main getURL function
      * @return long whenLastModified
@@ -115,7 +128,7 @@ public class URLReader {
         Thread getURL_thread = new Thread () {
             public void run () {
                 try {
-                        URL azureuscvs = new URL("http://azureus.sourceforge.net/cvs/latest.php");
+                        URL azureuscvs = new URL(Constants.VUZE_DEV_JSON_URL);
                         BufferedReader in = new BufferedReader(new InputStreamReader(azureuscvs.openStream()));
                         old_version = Tab1_Subtab_1.version;
                         
@@ -124,10 +137,29 @@ public class URLReader {
                         serverTimeStampVersion = "Checking....";
 
                         String inputLine;
-                                           
+                        String AzVersion;
+                        String AzBuild;
+                        
+                        StringBuilder builder = new StringBuilder();
+                        for (String line = null; (line = in.readLine()) != null;) {
+                            builder.append(line).append("\n");
+                        }
+                        in.close();
+                        //System.out.println(builder.toString()); 
+                        
+                        JSONObject obj = (JSONObject) JSONValue.parse(builder.toString());
+                        JSONObject versions = (JSONObject) obj.get("versions");
+                        JSONObject clientdev = null;
+                        if (versions != null) { 
+                            clientdev = (JSONObject) versions.get("client-dev");
+                        }
+                        // avoid possible NPE by a crude trick, assumes obj != null
+                        if (clientdev == null) { 
+                            clientdev =  obj;
+                        }
                         
                         //first line is date
-                        if((inputLine = in.readLine()) != null)
+                        if((inputLine = (String) clientdev.get("timestamp")) != null)
                         {
                             whenLastModifiedString = inputLine;
                         }
@@ -136,18 +168,29 @@ public class URLReader {
                             whenLastModifiedString = "Checking....";
                         }
                         
-                        //second line is version
-                        if((inputLine = in.readLine()) != null)
+                        //second field is version, and is parsed from version & build fields
+                        if(((AzVersion = (String) clientdev.get("version")) != null) &&
+                           ((AzBuild = (String) clientdev.get("build")) != null))
                         {
-                            Tab1_Subtab_1.version = inputLine;
+                        	Tab1_Subtab_1.version = 
+                        		"Azureus" + AzVersion + "-B" + AzBuild + ".jar";
                         }
                         else
                         {
                             Tab1_Subtab_1.version = "Checking....";
                         }
                         
-                        //third line is url
-                        if((inputLine = in.readLine()) != null){
+                        //third field is JAR HTTP url
+                        if((inputLine = (String) clientdev.get("jar_url")) != null){
+                            jarurl = inputLine;
+                        }
+                        else
+                        {
+                            jarurl = null;
+                        } 
+
+                        //fourth field is torrent url
+                        if((inputLine = (String) clientdev.get("torrent_url")) != null){
                             cvsurl = inputLine;
                         }
                         else
@@ -163,7 +206,6 @@ public class URLReader {
                                         Tab1.listTable.deselectAll();
                             }
                         });
-                        in.close();
 
                         try {
                             Thread.sleep(5000);

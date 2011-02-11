@@ -28,6 +28,8 @@ import omschaub.azcvsupdater.utilities.DirectoryUtils;
 import omschaub.azcvsupdater.utilities.Restart;
 import omschaub.azcvsupdater.utilities.StackX;
 import omschaub.azcvsupdater.utilities.TorrentUtils;
+import omschaub.azcvsupdater.utilities.URLReader;
+import omschaub.azcvsupdater.main.Constants;
 
 
 
@@ -155,7 +157,7 @@ public class MainCVSGet extends DownloadImp{
         if (Tab1_Subtab_1.version.equals("Checking...."))
             return;
         AltCVSGet altget = new AltCVSGet();
-        altget.setURL("http://azureus.sourceforge.net/cvs/" + Tab1_Subtab_1.version);
+        altget.setURL(URLReader.get_jarurl());
         altget.setDir(DirectoryUtils.getBackupDirectory() + System.getProperty("file.separator"));
         altget.setFileName(Tab1_Subtab_1.version);
         altget.initialize();

@@ -7,8 +7,10 @@ package omschaub.azcvsupdater.main;
 
 public final class Constants {
 
-	final static String AZUREUS_CHANGELOG_URL = "http://azureus.cvs.sourceforge.net/azureus/azureus2/ChangeLog.txt?revision=HEAD";
-    final static String AZUREUS_COMMITLOG_URL = "http://fisheye1.atlassian.com/changelog/azureus/";
-    final static String AZUREUS_CVS_URL = "http://azureus.sourceforge.net/index_CVS.php";
+    public final static String AZUREUS_CHANGELOG_URL = "http://svn.vuze.com/public/client/trunk/azureus2/src/ChangeLog.txt";
+    public final static String AZUREUS_COMMITLOG_URL = "http://sourceforge.net/mailarchive/forum.php?forum_name=azureus-commitlog";
+    public final static String AZUREUS_CVS_URL       = "http://dev.vuze.com/";
+    public final static String VUZE_DEV_JSON_URL     = "http://dev.vuze.com/versions.json";
+    public final static String VUZE_JIRA_URL         = "https://jira.vuze.com/browse/SUP"; 
     
 }

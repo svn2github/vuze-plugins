@@ -13,6 +13,7 @@ import omschaub.azcvsupdater.main.Tab1Utils;
 import omschaub.azcvsupdater.main.Tab6Utils;
 import omschaub.azcvsupdater.main.View;
 import omschaub.azcvsupdater.utilities.ButtonStatus;
+import omschaub.azcvsupdater.main.Constants;
 
 
 
@@ -49,7 +50,7 @@ public class AltCVSGet extends DownloadImp{
             e.printStackTrace();
         }       
         
-        StatusBoxUtils.mainStatusAdd(" Since this alternate method to download the CVS is unstable (be sure to check file size), no auto insert/restart allowed",2);
+        StatusBoxUtils.mainStatusAdd(" Since this alternate method to download the Dev Beta is unstable (be sure to check file size), no auto insert/restart allowed",2);
         ButtonStatus.set(true, true, false, true, true);
         Tab1Utils.loadDirectory(View.getPluginInterface().getPluginconfig().getPluginIntParameter("Azureus_TableSort",2));
         
@@ -73,7 +74,7 @@ public class AltCVSGet extends DownloadImp{
     }
     public void failedCommands(){
         Tab1.downloadVisible(false, true);
-        StatusBoxUtils.mainStatusAdd(" Download by torrent AND http failed.. check http://azureus.sourceforge.net/index_CVS.php",2);
+        StatusBoxUtils.mainStatusAdd(" Download by torrent AND http failed.. check " + Constants.AZUREUS_CVS_URL,2);
         ButtonStatus.set(true, true, false, true, true);
         Tab1Utils.loadDirectory(View.getPluginInterface().getPluginconfig().getPluginIntParameter("Azureus_TableSort",2));
     }

@@ -88,7 +88,7 @@ public class Tab1_Subtab_3 {
         final Button autoDownload_Radio = new Button(autoDownloadComp,SWT.CHECK);
         autoDownload_Radio.setSelection(View.getPluginInterface().getPluginconfig().getPluginBooleanParameter("AutoDownload"));
         //autoDownload_Radio.setText((View.getPluginInterface().getPluginconfig().getPluginBooleanParameter("AutoDownload"))?"On  ":"Off");
-        autoDownload_Radio.setToolTipText("Automatically download latest CVS version");
+        autoDownload_Radio.setToolTipText("Automatically download latest Dev Beta version");
         autoDownload_Radio.pack();
 
         Label autoDownload_end = new Label (autoDownloadComp,SWT.NULL);
@@ -120,7 +120,7 @@ public class Tab1_Subtab_3 {
         autoInsert_Check.setSelection(View.getPluginInterface().getPluginconfig().getPluginBooleanParameter("AutoInsert",false));
         //autoInsert_Check.setText((View.getPluginInterface().getPluginconfig().getPluginBooleanParameter("AutoInsert"))?"On  ":"Off");
         autoInsert_Check.pack();
-        autoInsert_Check.setToolTipText("After a successful Auto Download, this option will insert the file to be updated the next time Azureus restarts");
+        autoInsert_Check.setToolTipText("After a successful Auto Download, this option will insert the file to be updated the next time Vuze restarts");
         
         
         Label autoRestart = new Label (autoRestartComp,SWT.NULL );
@@ -140,7 +140,7 @@ public class Tab1_Subtab_3 {
         }
         //autoRestart_Check.setText((View.getPluginInterface().getPluginconfig().getPluginBooleanParameter("AutoRestart"))?"On  ":"Off");
         autoRestart_Check.pack();
-        autoRestart_Check.setToolTipText("Instead of waiting until the next restart of Azureus, this option will restart Azureus immediately, inserting the Auto Downloaded CVS version");
+        autoRestart_Check.setToolTipText("Instead of waiting until the next restart of Vuze, this option will restart Vuze immediately, inserting the Auto Downloaded Dev Beta version");
         
         final Label autoSeed_label = new Label(autoRestartComp, SWT.NULL);
         autoSeed_label.setText("Force Continual Seeding of Latest Download:");
@@ -280,7 +280,7 @@ public class Tab1_Subtab_3 {
         
         
         Label topLabel = new Label(tb_and_label,SWT.NULL);
-        topLabel.setText("Current CVS backup location is:");
+        topLabel.setText("Current Beta backup location is:");
         
         backupDirectory = new Label(tb_and_label,SWT.NULL);
         backupDirectory.setText(DirectoryUtils.getBackupDirectory());

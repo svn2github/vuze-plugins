@@ -98,13 +98,13 @@ public class Tab1 {
         //tabsOnTabs.setSimple(true);
         
         TabItem ctab_Item1 = new TabItem(tabsOnTabs,SWT.NULL);
-        ctab_Item1.setText("CVS Web Information");
+        ctab_Item1.setText("Dev Beta Version Information");
         
         mini_comp1 = Tab1_Subtab_1.open(tabsOnTabs);
         ctab_Item1.setControl(mini_comp1);
         
         TabItem ctab_Item2 = new TabItem(tabsOnTabs,SWT.NULL);
-        ctab_Item2.setText("CVS Information Links");
+        ctab_Item2.setText("Information Links");
         
         Tab1_Subtab_2 subTab2 = new Tab1_Subtab_2();
         Composite subTab2_comp = subTab2.open(tabsOnTabs);
@@ -139,19 +139,19 @@ public class Tab1 {
 	  	GridLayout cvsTableGroup_layout = new GridLayout();
 	  	cvsTableGroup_layout.numColumns = 3;
 	  	cvsTableGroup.setLayout(cvsTableGroup_layout);
-	  	cvsTableGroup.setText("Current CVS Backups");
+	  	cvsTableGroup.setText("Current Beta Backups");
 		
         //Toolbar for listTable
         ToolBar list_tb = new ToolBar(cvsTableGroup, SWT.FLAT | SWT.HORIZONTAL);
         
         //Refresh on list_tb
         refresh = new ToolItem(list_tb,SWT.PUSH);
-        refresh.setToolTipText("Refresh the Current CVS Backup Table");
+        refresh.setToolTipText("Refresh the current Beta backup table");
         refresh.setImage(ImageRepository.getImage("refresh"));
         refresh.addListener(SWT.Selection, new Listener() {
             public void handleEvent(Event e) {
                 Tab1Utils.loadDirectory(View.getPluginInterface().getPluginconfig().getPluginIntParameter("Azureus_TableSort",2));
-                StatusBoxUtils.mainStatusAdd(" CVS Table Refreshed",0);
+                StatusBoxUtils.mainStatusAdd(" Beta table refreshed",0);
                 Tab6Utils.refreshLists();
                 URLReader.newGetURL();
               //  listTable.setTopIndex(listTable.getItemCount()-1);

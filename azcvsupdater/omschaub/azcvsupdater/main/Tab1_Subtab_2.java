@@ -37,27 +37,40 @@ public class Tab1_Subtab_2 {
         composite.setLayoutData(gridData);
         
         
-        Label changelog = new Label(composite,SWT.NULL);
-        changelog.setText("Azureus Changelog");
-        changelog.setForeground(View.getDisplay().getSystemColor(SWT.COLOR_BLUE));
-        changelog.setCursor(View.getDisplay().getSystemCursor(SWT.CURSOR_HAND));
-        changelog.setToolTipText("Open the current Azureus changelog in your default browser");
-        changelog.addListener(SWT.MouseDown, new Listener() {
+        Label devList = new Label(composite,SWT.NULL);
+        devList.setText("Vuze Dev site");
+        devList.setForeground(View.getDisplay().getSystemColor(SWT.COLOR_BLUE));
+        devList.setCursor(View.getDisplay().getSystemCursor(SWT.CURSOR_HAND));
+        devList.setToolTipText("Open the Vuze Dev site in your default browser");
+        devList.addListener(SWT.MouseDown, new Listener() {
             public void handleEvent(Event e) {
-            	try {View.getPluginInterface().getUIManager().openURL(new URL(Constants.AZUREUS_CHANGELOG_URL));}
+            	try {View.getPluginInterface().getUIManager().openURL(new URL(Constants.AZUREUS_CVS_URL));}
             	catch (Exception uie) {}
                 }
             });
         
         
         Label mailList = new Label(composite,SWT.NULL);
-        mailList.setText("Azureus Commitlog");
+        mailList.setText("Commitlog at Sourceforge");
         mailList.setForeground(View.getDisplay().getSystemColor(SWT.COLOR_BLUE));
         mailList.setCursor(View.getDisplay().getSystemCursor(SWT.CURSOR_HAND));
-        mailList.setToolTipText("Open the Azureus commit log in your default browser");
+        mailList.setToolTipText("Open the Vuze commitlog in your default browser");
         mailList.addListener(SWT.MouseDown, new Listener() {
             public void handleEvent(Event e) {
             	try {View.getPluginInterface().getUIManager().openURL(new URL(Constants.AZUREUS_COMMITLOG_URL));}
+            	catch (Exception uie) {}
+                }
+            });
+        
+        
+        Label JIRAsite = new Label(composite,SWT.NULL);
+        JIRAsite.setText("Vuze JIRA");
+        JIRAsite.setForeground(View.getDisplay().getSystemColor(SWT.COLOR_BLUE));
+        JIRAsite.setCursor(View.getDisplay().getSystemCursor(SWT.CURSOR_HAND));
+        JIRAsite.setToolTipText("Open the Vuze JIRA bug tracker in your default browser");
+        JIRAsite.addListener(SWT.MouseDown, new Listener() {
+            public void handleEvent(Event e) {
+            	try {View.getPluginInterface().getUIManager().openURL(new URL(Constants.VUZE_JIRA_URL));}
             	catch (Exception uie) {}
                 }
             });

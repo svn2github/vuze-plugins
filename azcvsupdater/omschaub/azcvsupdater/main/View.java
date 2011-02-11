@@ -152,8 +152,8 @@ public class View implements UISWTViewEventListener {
 		CTabItem tab1 = new CTabItem(tab,SWT.NONE);
 		tab6 = new CTabItem(tab,SWT.NONE);
 		
-		tab1.setText("CVS Update");
-		tab6.setText("Insert / Backup Files");
+		tab1.setText("Dev Beta Update");
+		tab6.setText("Insert Beta File");
 		
         tab1.setImage(ImageRepository.getImage("bullet"));
         tab6.setImage(ImageRepository.getImage("bullet"));

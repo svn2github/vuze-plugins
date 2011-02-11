@@ -17,6 +17,7 @@ import omschaub.azcvsupdater.utilities.URLReader;
 import omschaub.azcvsupdater.utilities.download.AltCVSGet;
 import omschaub.azcvsupdater.utilities.download.MainCVSGetManual;
 import omschaub.azcvsupdater.utilities.imagerepository.ImageRepository;
+import omschaub.azcvsupdater.main.Constants;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Cursor;
@@ -68,12 +69,6 @@ public class Tab1_Subtab_1 {
         composite2_layout.marginHeight = 3;
         composite2_layout.verticalSpacing = 0;
         cvsgroup.setLayout(composite2_layout);
-        //cvsgroup.setText("CVS Web Page Information (Updates every " + (View.getPluginInterface().getPluginconfig().getPluginIntParameter("WebUpdatePeriod")) + " minutes)");
-        
-        
-        
-        
-//Display Latest Version --- inside cvsgroup        
         
 
         
@@ -99,7 +94,7 @@ public class Tab1_Subtab_1 {
         gridData = new GridData(GridData.HORIZONTAL_ALIGN_BEGINNING  );
         gridData.horizontalSpan = 1;
         displayVersion.setLayoutData(gridData);
-        displayVersion.setText("Latest Version: ");
+        displayVersion.setText("Latest version: ");
         
         
         //Colored Version -- in mini_comp1
@@ -119,7 +114,7 @@ public class Tab1_Subtab_1 {
                 catch (Exception exc) {}
             }
         });
-        version_color.setToolTipText("Double click to check the Azureus CVS Page, right click to copy URL to clipboard");
+        version_color.setToolTipText("Double click to check the Vuze Dev page, right click to copy URL to clipboard");
         
         Menu popupmenu_link = new Menu(View.composite_for_tab1);
         
@@ -152,7 +147,7 @@ public class Tab1_Subtab_1 {
         
         serverTimeStamp = new Label(mini_comp1,SWT.NULL);
         serverTimeStamp.setLayoutData(gridData);
-        serverTimeStamp.setText("Latest Version Released: ");
+        serverTimeStamp.setText("Latest version released: ");
         
             
         //Colored TimeStamp -- in mini_comp
@@ -174,7 +169,7 @@ public class Tab1_Subtab_1 {
             }
         });
         
-        timestamp_color.setToolTipText("Double click to check the Azureus CVS Page, right click to copy URL to clipboard");
+        timestamp_color.setToolTipText("Double click to check the Vuze Dev page, right click to copy URL to clipboard");
         timestamp_color.setMenu(popupmenu_link);
         
         try{
@@ -238,7 +233,7 @@ public class Tab1_Subtab_1 {
         nextAutoCheck.setText("Next Auto Check: " +  View.getPluginInterface().getPluginconfig().getPluginStringParameter("dateNextTime","Checking..."));
         
         Label updates = new Label(mini_comp_version,SWT.NULL);
-        updates.setText("CVS Web Page Information Updates Every " + (View.getPluginInterface().getPluginconfig().getPluginIntParameter("WebUpdatePeriod")) + " Minutes");
+        updates.setText("Beta version information updates every " + (View.getPluginInterface().getPluginconfig().getPluginIntParameter("WebUpdatePeriod")) + " Minutes");
         gridData = new GridData(GridData.HORIZONTAL_ALIGN_BEGINNING);
         gridData.horizontalSpan = 3;
         updates.setLayoutData(gridData);
@@ -324,7 +319,7 @@ public class Tab1_Subtab_1 {
                 if (version.equals("Checking...."))
                     return;
                 AltCVSGet altget = new AltCVSGet();
-                altget.setURL("http://torrents.aelitis.com:88/files/" + version);
+                altget.setURL(URLReader.get_jarurl());
                 altget.setDir(DirectoryUtils.getBackupDirectory() + System.getProperty("file.separator"));
                 altget.setFileName(version);
                 altget.initialize();
