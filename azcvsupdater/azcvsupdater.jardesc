@@ -14,8 +14,11 @@
         <javaElement handleIdentifier="=azcvsupdater/&lt;omschaub.azcvsupdater.utilities"/>
         <javaElement handleIdentifier="=azcvsupdater/&lt;omschaub.azcvsupdater.main"/>
         <file path="/azcvsupdater/plugin.properties"/>
-        <javaElement handleIdentifier="=azcvsupdater/&lt;omschaub.azcvsupdater.utilities.imagerepository"/>
         <javaElement handleIdentifier="=azcvsupdater/&lt;omschaub.azcvsupdater.utilities.commentmaker"/>
+        <javaElement handleIdentifier="=azcvsupdater/&lt;org.json.simple.parser"/>
+        <javaElement handleIdentifier="=azcvsupdater/&lt;org.json.simple"/>
+        <javaElement handleIdentifier="=azcvsupdater/&lt;omschaub.azcvsupdater.utilities.imagerepository"/>
         <javaElement handleIdentifier="=azcvsupdater/&lt;omschaub.azcvsupdater.utilities.download"/>
     </selectedElements>
+    <fatjar builder="org.eclipse.jdt.ui.plain_jar_builder" launchConfig=""/>
 </jardesc>
