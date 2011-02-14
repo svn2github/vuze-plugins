@@ -932,7 +932,7 @@ DHTFeedPluginSubscriber
 			
 				String	name = record.getFeedName();
 			
-				pw.println( "<UL><A HREF=\"http://127.0.0.1:" + port + "/content?feed=" + UrlUtils.encode( name ) + "\">" + name + "</a>" );
+				pw.println( "<LI><A HREF=\"http://127.0.0.1:" + port + "/content?feed=" + UrlUtils.encode( name ) + "\">" + name + "</A></LI>" );
 			}
 			
 			pw.println( "</BODY></HTML>" );

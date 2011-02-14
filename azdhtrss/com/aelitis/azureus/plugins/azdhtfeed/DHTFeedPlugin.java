@@ -30,6 +30,7 @@ import java.security.interfaces.RSAPublicKey;
 import java.util.HashMap;
 
 
+import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Base32;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.*;
@@ -96,18 +97,21 @@ DHTFeedPlugin
 		
 		ta_category		= plugin_interface.getTorrentManager().getAttribute( TorrentAttribute.TA_CATEGORY );
 		
-		UIManager	ui_manager = plugin_interface.getUIManager();
+		final UIManager	ui_manager = plugin_interface.getUIManager();
 		
 		BasicPluginConfigModel config_model = ui_manager.createBasicPluginConfigModel( "plugins", "azdhtfeed.name");
 
+		config_model.addHyperlinkParameter2( "azdhtfeed.wiki", "http://wiki.vuze.com/w/Distributed_Database_Trusted_Feed" );
+		
 		final BooleanParameter 	subscribe_enable 		= config_model.addBooleanParameter2( "subscribe.enable", "azdhtfeed.subscribe.enable", true );
 		
 		LabelParameter	subscribe_info = config_model.addLabelParameter2( "azdhtfeed.subscribe.info" );
 		
 		final StringParameter	subscribe_name			= config_model.addStringParameter2( "subscribe.name", "azdhtfeed.subscribe.name", "" );
 		
-		final IntParameter		subscribe_port 			= config_model.addIntParameter2( "subscribe.port", "azdhtfeed.subscribe.port", DEFAULT_PORT );
-		final BooleanParameter	subscribe_port_local	= config_model.addBooleanParameter2( "subscribe.port.local", "azdhtfeed.subscribe.port.local", true );
+		final IntParameter			subscribe_port 			= config_model.addIntParameter2( "subscribe.port", "azdhtfeed.subscribe.port", DEFAULT_PORT );
+		final BooleanParameter		subscribe_port_local	= config_model.addBooleanParameter2( "subscribe.port.local", "azdhtfeed.subscribe.port.local", true );
+		final HyperlinkParameter	subscribe_port_browse	= config_model.addHyperlinkParameter2( "azdhtfeed.subscribe.port.test", "http://127.0.0.1:" + subscribe_port.getValue() + "/" );
 		
 		final ActionParameter	subscribe_button			= config_model.addActionParameter2( "azdhtfeed.subscribe.button.info", "azdhtfeed.subscribe.button" );
 
@@ -141,6 +145,7 @@ DHTFeedPlugin
 						subscribe_name, 
 						subscribe_port, 
 						subscribe_port_local,
+						subscribe_port_browse,
 						subscribe_button,
 						unsubscribe_button,
 						subscribe_refresh_button,
@@ -150,6 +155,7 @@ DHTFeedPlugin
 		subscribe_enable.addEnabledOnSelection( subscribe_name );
 		subscribe_enable.addEnabledOnSelection( subscribe_port );
 		subscribe_enable.addEnabledOnSelection( subscribe_port_local );
+		subscribe_enable.addEnabledOnSelection( subscribe_port_browse );
 		subscribe_enable.addEnabledOnSelection( subscribe_button );
 		subscribe_enable.addEnabledOnSelection( unsubscribe_button );
 		subscribe_enable.addEnabledOnSelection( subscribe_refresh_button );
@@ -442,7 +448,50 @@ DHTFeedPlugin
 															public void
 															run()
 															{
-																subscriber.subscribe( subscribe_name.getValue().trim());
+																final int[] ok = { 0 };
+																
+																new AEThread2( "" ){
+																	public void
+																	run()
+																	{
+																		try{
+																			Thread.sleep(2500);
+																		
+																			synchronized( ok ){
+																				
+																				if ( ok[0] != 0 ){
+																					
+																					return;
+																				}
+																			}
+																			
+																			ui_manager.showMessageBox(
+																					"azdhtfeed.msg.async.title",
+																					"azdhtfeed.msg.async.msg",
+																					UIManagerEvent.MT_OK );
+																			
+																		}catch( Throwable e ){
+																			
+																			Debug.out( e);
+																		}
+																	}
+																}.start();
+																
+																boolean res = subscriber.subscribe( subscribe_name.getValue().trim());
+																
+																synchronized( ok ){
+																
+																	ok[0] = res?1:2;
+																}
+																
+																if ( !res ){
+																	
+																	ui_manager.showMessageBox(
+																			"azdhtfeed.msg.failed.title",
+																			"azdhtfeed.msg.failed.msg",
+																			UIManagerEvent.MT_OK );
+																	
+																}
 															}
 														});
 											}							
@@ -665,6 +714,8 @@ DHTFeedPlugin
 	
 		throws Exception
 	{
+		log.log( "Download of " + resource  + " starts" );
+		
 		ResourceDownloader	rd;
 		
 		String	lc = resource.toLowerCase();
@@ -694,7 +745,11 @@ DHTFeedPlugin
 	
 		InputStream	is = rd.download();
 				
-		return( new downloadDetails(is, (String)rd.getProperty( ResourceDownloader.PR_STRING_CONTENT_TYPE )));
+		downloadDetails result = new downloadDetails(is, (String)rd.getProperty( ResourceDownloader.PR_STRING_CONTENT_TYPE ));
+		
+		log.log( "Download of " + resource  + " completed" );
+		
+		return( result );
 	}
 	
 	protected byte[]
