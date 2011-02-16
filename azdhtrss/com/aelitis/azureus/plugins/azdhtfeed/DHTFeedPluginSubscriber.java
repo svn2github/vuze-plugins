@@ -667,6 +667,9 @@ DHTFeedPluginSubscriber
 			try{
 				Download	d = plugin_interface.getDownloadManager().addDownload( t, f, subscribe_data_dir );
 				
+				d.setFlag( Download.FLAG_DISABLE_AUTO_FILE_MOVE, true );
+				d.setFlag( Download.FLAG_LOW_NOISE, true );
+
 				d.setForceStart( true );
 							
 				record.setTime( time );
