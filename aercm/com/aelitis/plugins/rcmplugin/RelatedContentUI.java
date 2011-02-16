@@ -85,6 +85,8 @@ import com.aelitis.azureus.ui.swt.views.skin.sidebar.SideBarEntrySWT;
 public class 
 RelatedContentUI 
 {		
+	private static final String SIDEBAR_SECTION_RELATED_CONTENT = "RelatedContent";
+
 	private static RelatedContentUI	singleton;
 	
 	public static synchronized RelatedContentUI
@@ -389,15 +391,15 @@ RelatedContentUI
 	protected void
 	buildSideBar()
 	{		
-		final String parent_id = "sidebar." + SideBar.SIDEBAR_SECTION_RELATED_CONTENT;
+		final String parent_id = "sidebar." + SIDEBAR_SECTION_RELATED_CONTENT;
 
 		final MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
-		mdi.registerEntry(SideBar.SIDEBAR_SECTION_RELATED_CONTENT, new MdiEntryCreationListener() {
+		mdi.registerEntry(SIDEBAR_SECTION_RELATED_CONTENT, new MdiEntryCreationListener() {
 			public MdiEntry createMDiEntry(String id) {
 				
 				MdiEntry mdiEntry = mdi.createEntryFromSkinRef(
 						null,
-						SideBar.SIDEBAR_SECTION_RELATED_CONTENT, "rcmview",
+						SIDEBAR_SECTION_RELATED_CONTENT, "rcmview",
 						main_view_info.getTitle(),
 						main_view_info, null, false, -1  );
 
@@ -464,7 +466,7 @@ RelatedContentUI
 			}
 		});
 		
-		mdi.loadEntryByID( SideBar.SIDEBAR_SECTION_RELATED_CONTENT, false );
+		mdi.loadEntryByID( SIDEBAR_SECTION_RELATED_CONTENT, false );
 		
 		if ( !root_menus_added ){
 			
@@ -604,7 +606,7 @@ RelatedContentUI
 									return;
 								}
 								
-								RCMView view = new RCMView( SideBar.SIDEBAR_SECTION_RELATED_CONTENT, name );
+								RCMView view = new RCMView( SIDEBAR_SECTION_RELATED_CONTENT, name );
 								
 								new_si.setView( view );
 								
@@ -612,7 +614,7 @@ RelatedContentUI
 								
 								MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
 								MdiEntry	entry = mdi.createEntryFromSkinRef(
-										SideBar.SIDEBAR_SECTION_RELATED_CONTENT,
+										SIDEBAR_SECTION_RELATED_CONTENT,
 										key, "rcmview",
 										view.getTitle(),
 										view, null, true, -1 );
@@ -662,7 +664,7 @@ RelatedContentUI
 								ViewTitleInfoManager.refreshTitleInfo( existing_si.getView());
 								
 								MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
-								MdiEntry mainEntry = mdi.getEntry(SideBar.SIDEBAR_SECTION_RELATED_CONTENT );
+								MdiEntry mainEntry = mdi.getEntry(SIDEBAR_SECTION_RELATED_CONTENT );
 								
 								if ( mainEntry != null ){
 									
@@ -800,7 +802,7 @@ RelatedContentUI
 									return;
 								}
 								
-								RCMView view = new RCMView( SideBar.SIDEBAR_SECTION_RELATED_CONTENT, "Swarm Subscriptions" );
+								RCMView view = new RCMView( SIDEBAR_SECTION_RELATED_CONTENT, "Swarm Subscriptions" );
 								
 								new_si.setView( view );
 								
@@ -809,7 +811,7 @@ RelatedContentUI
 								MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
 								
 								MdiEntry	entry = mdi.createEntryFromSkinRef(
-										SideBar.SIDEBAR_SECTION_RELATED_CONTENT,
+										SIDEBAR_SECTION_RELATED_CONTENT,
 										key, "rcmview",
 										view.getTitle(),
 										view, null, true, -1 );
@@ -836,7 +838,7 @@ RelatedContentUI
 								ViewTitleInfoManager.refreshTitleInfo( existing_si.getView());
 								
 								MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
-								MdiEntry mainEntry = mdi.getEntry(SideBar.SIDEBAR_SECTION_RELATED_CONTENT );
+								MdiEntry mainEntry = mdi.getEntry(SIDEBAR_SECTION_RELATED_CONTENT );
 								
 								if ( mainEntry != null ){
 									
