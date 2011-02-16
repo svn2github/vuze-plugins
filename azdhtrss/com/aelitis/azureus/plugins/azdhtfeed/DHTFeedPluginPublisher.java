@@ -47,6 +47,7 @@ import java.util.TimeZone;
 
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.SystemTime;
+import org.gudy.azureus2.core3.util.TorrentUtils;
 import org.gudy.azureus2.plugins.PluginConfig;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabase;
@@ -62,6 +63,7 @@ import org.gudy.azureus2.plugins.torrent.TorrentAttribute;
 import org.gudy.azureus2.plugins.utils.UTTimer;
 import org.gudy.azureus2.plugins.utils.UTTimerEvent;
 import org.gudy.azureus2.plugins.utils.UTTimerEventPerformer;
+import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 
 public class 
 DHTFeedPluginPublisher 
@@ -734,7 +736,9 @@ DHTFeedPluginPublisher
 			}
 				
 			t.setComplete( publish_data_dir );
-			
+
+			TorrentUtils.setFlag( PluginCoreUtils.unwrap( t ), TorrentUtils.TORRENT_FLAG_LOW_NOISE, true );
+
 			File	torrent_file = new File( file_act.toString() + ".torrent" );
 			
 			t.writeToFile( torrent_file );
@@ -748,7 +752,7 @@ DHTFeedPluginPublisher
 				
 				log.log( "Failed to rename '" + file_tmp + "' to '" + file_act + "'" );
 			}
-
+			
 			Download d = download_manager.addDownload( t, torrent_file, publish_data_dir );
 			
 			d.setFlag( Download.FLAG_DISABLE_AUTO_FILE_MOVE, true );

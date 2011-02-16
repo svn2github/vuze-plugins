@@ -33,6 +33,7 @@ import java.util.*;
 
 import org.gudy.azureus2.core3.util.Base32;
 import org.gudy.azureus2.core3.util.HashWrapper;
+import org.gudy.azureus2.core3.util.TorrentUtils;
 import org.gudy.azureus2.core3.util.UrlUtils;
 import org.gudy.azureus2.plugins.PluginConfig;
 import org.gudy.azureus2.plugins.PluginInterface;
@@ -61,6 +62,7 @@ import org.gudy.azureus2.plugins.utils.UTTimerEventPerformer;
 import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloaderFactory;
 import org.gudy.azureus2.plugins.utils.xml.simpleparser.SimpleXMLParserDocument;
 import org.gudy.azureus2.plugins.utils.xml.simpleparser.SimpleXMLParserDocumentNode;
+import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 
 import com.aelitis.azureus.plugins.magnet.MagnetPlugin;
 
@@ -660,6 +662,8 @@ DHTFeedPluginSubscriber
 
 			Torrent	t = plugin_interface.getTorrentManager().createFromBEncodedData( data );
 			
+			TorrentUtils.setFlag( PluginCoreUtils.unwrap( t ), TorrentUtils.TORRENT_FLAG_LOW_NOISE, true );
+
 			File	f = new File( subscribe_data_dir, t.getName() + ".torrent" );
 			
 			t.writeToFile( f );
