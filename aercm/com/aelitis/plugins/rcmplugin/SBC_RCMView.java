@@ -141,7 +141,7 @@ SBC_RCMView
 				
 				space_reserved = true;
 			} else {
-				mdi_entry = mdi.getEntry( SideBar.SIDEBAR_SECTION_RELATED_CONTENT );
+				mdi_entry = mdi.getEntry( RelatedContentUI.SIDEBAR_SECTION_RELATED_CONTENT );
 			}
 			
 			mdi_entry.addToolbarEnabler(this);

@@ -85,7 +85,7 @@ import com.aelitis.azureus.ui.swt.views.skin.sidebar.SideBarEntrySWT;
 public class 
 RelatedContentUI 
 {		
-	private static final String SIDEBAR_SECTION_RELATED_CONTENT = "RelatedContent";
+	public static final String SIDEBAR_SECTION_RELATED_CONTENT = "RelatedContent";
 
 	private static RelatedContentUI	singleton;
 	
