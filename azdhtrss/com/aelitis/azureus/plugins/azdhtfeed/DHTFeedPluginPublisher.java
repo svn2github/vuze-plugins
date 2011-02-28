@@ -735,9 +735,12 @@ DHTFeedPluginPublisher
 				}
 			}
 				
-			t.setComplete( publish_data_dir );
-
 			TorrentUtils.setFlag( PluginCoreUtils.unwrap( t ), TorrentUtils.TORRENT_FLAG_LOW_NOISE, true );
+
+				// gotta do this after setting the flag as it causes a copy of the torrent to be cached
+				// and re-read on addition and the flag has to be in the cache....
+			
+			t.setComplete( publish_data_dir );
 
 			File	torrent_file = new File( file_act.toString() + ".torrent" );
 			
