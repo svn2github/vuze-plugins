@@ -1,0 +1,12 @@
+2.1
+  * BUG: Somehow the case-sensitiv was reactivated in 2.0. I have created some test cases. Hopefully it now stays case-insensitiv.
+  * BUG: you had to add .* in front and back. I have changed it, too. The plugin will add .* to the test if it is missing.
+  * NEW: added a timeout setting. If the server with the rss feed is to slow it will not wait infinitiv for the response.
+  * NEW: added a "fast check" setting. If it is set, the plugin will not connect to the server to check if the link is a torrent (it is 
+         faster, but links like http://torrents.unknown/server?torrentid=2346278467823 will not be recognized as a torrent)
+2.2
+  * NEW: History Setting: Activate it will store all added torrents (url) to the config file
+         if a torrent will be found again it will not be added a second time
+         
+ 
+        
