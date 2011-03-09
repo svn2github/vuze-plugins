@@ -108,8 +108,8 @@ public class SampleMainViewPlugin1 implements UnloadablePlugin {
 					view = null;
 					break;
 
-				case UISWTViewEvent.TYPE_DATASOURCES_CHANGED:
-					System.out.println("TYPE_DATASOURCES_CHANGED Called");
+				case UISWTViewEvent.TYPE_DATASOURCE_CHANGED:
+					System.out.println("TYPE_DATASOURCE_CHANGED Called");
 					break;
 
 				case UISWTViewEvent.TYPE_FOCUSGAINED:

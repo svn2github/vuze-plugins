@@ -28,11 +28,14 @@ import org.eclipse.swt.events.MouseAdapter;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.*;
-import org.gudy.azureus2.plugins.PluginInterface;
-import org.gudy.azureus2.plugins.PluginView;
+
+import org.gudy.azureus2.ui.swt.Messages;
 import org.gudy.azureus2.ui.swt.Utils;
 import org.gudy.azureus2.ui.swt.config.BooleanParameter;
 import org.gudy.azureus2.ui.swt.mainwindow.Colors;
+import org.gudy.azureus2.ui.swt.plugins.UISWTView;
+import org.gudy.azureus2.ui.swt.plugins.UISWTViewEvent;
+import org.gudy.azureus2.ui.swt.plugins.UISWTViewEventListener;
 
 import com.azureus.plugins.aznetmon.util.CdnMonitorTimeUtils;
 import com.azureus.plugins.aznetmon.main.RSTPacketStats;
@@ -41,7 +44,8 @@ import com.azureus.plugins.aznetmon.main.DataListener;
 import java.text.DecimalFormat;
 
 
-public class RSTView extends PluginView {
+// NOT USED!?!?!?!!!?
+public class RSTView implements UISWTViewEventListener {
 
     private Display rDisplay;
 
@@ -53,30 +57,19 @@ public class RSTView extends PluginView {
     Button refresh;
     Table table;
     
-    PluginInterface pluginInterface;
+		private UISWTView swtView;
   
-    public RSTView(PluginInterface _pluginInterface) {
-        pluginInterface = _pluginInterface;
+    public RSTView() {
     }
 	
-	/**
-	 * The PluginMain name, as it'll be seen within the Plugins Menu in azureus
-	 */
-	public String getPluginViewName() {
-		return "ISP Network Monitor";
-	}
-	
-	/**
-	 * The plugin Title, used for its Tab name in the main window
-	 */
-	public String getFullTitle() {		
+	private String getFullTitle() {		
 		return "ISP Network Monitor";
 	}
 
     /**
 	 * Here stands any GUI initialisation
 	 */
-	public void initialize(Composite parent) {
+	private void initialize(Composite parent) {
 
 
         //Have a Group to visit the wiki page at the top.
@@ -207,11 +200,10 @@ public class RSTView extends PluginView {
 
     }
 
-    public void delete(){
+    private void delete(){
 
         //remove timers here!!
         
-        super.delete();
     }
 
 
@@ -219,7 +211,7 @@ public class RSTView extends PluginView {
      * This method will be called after initialization, in order to grab this
      * view composite.
      */
-    public Composite getComposite() {
+    private Composite getComposite() {
         return pluginComposite;
     }
 
@@ -324,4 +316,35 @@ public class RSTView extends PluginView {
         });
     }//enableRefreshButton
 
+  	public boolean eventOccurred(UISWTViewEvent event) {
+      switch (event.getType()) {
+        case UISWTViewEvent.TYPE_CREATE:
+        	swtView = (UISWTView)event.getData();
+        	swtView.setTitle(getFullTitle());
+          break;
+
+        case UISWTViewEvent.TYPE_DESTROY:
+          delete();
+          break;
+
+        case UISWTViewEvent.TYPE_INITIALIZE:
+          initialize((Composite)event.getData());
+          break;
+
+        case UISWTViewEvent.TYPE_LANGUAGEUPDATE:
+        	Messages.updateLanguageForControl(getComposite());
+          break;
+
+        case UISWTViewEvent.TYPE_DATASOURCE_CHANGED:
+          break;
+          
+        case UISWTViewEvent.TYPE_FOCUSGAINED:
+        	break;
+          
+        case UISWTViewEvent.TYPE_REFRESH:
+          break;
+      }
+
+      return true;
+    }
 }

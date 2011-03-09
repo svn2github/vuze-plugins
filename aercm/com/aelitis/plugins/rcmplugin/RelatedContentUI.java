@@ -401,7 +401,7 @@ RelatedContentUI
 						null,
 						SIDEBAR_SECTION_RELATED_CONTENT, "rcmview",
 						main_view_info.getTitle(),
-						main_view_info, null, false, -1  );
+						main_view_info, null, false, null  );
 
 				mdiEntry.setImageLeftID( "image.sidebar.rcm" );
 				
@@ -617,37 +617,12 @@ RelatedContentUI
 										SIDEBAR_SECTION_RELATED_CONTENT,
 										key, "rcmview",
 										view.getTitle(),
-										view, null, true, -1 );
+										view, null, true, null );
 								
 								new_si.setMdiEntry(entry);
 								if (entry instanceof SideBarEntrySWT) {
 									new_si.setTreeItem( ((SideBarEntrySWT)entry).getTreeItem() );
 								}
-								
-								/*
-								TreeItem  tree_item = 
-									side_bar.createTreeItemFromIView(
-										SideBar.SIDEBAR_SECTION_RELATED_CONTENT, 
-										view,
-										key, 
-										null, 
-										true, 
-										true,
-										false );
-										
-									SideBarEntrySWT	entry = SideBar.getEntry( key );
-																
-									new_si.setTreeItem( tree_item, entry );
-								*/
-																
-									
-								/*
-								PluginInterface pi = PluginInitializer.getDefaultInterface();
-								UIManager uim = pi.getUIManager();
-								MenuManager menuManager = uim.getMenuManager();
-								
-								MenuItem menuItem;
-								*/
 								
 								new_si.activate();
 							}
@@ -814,7 +789,7 @@ RelatedContentUI
 										SIDEBAR_SECTION_RELATED_CONTENT,
 										key, "rcmview",
 										view.getTitle(),
-										view, null, true, -1 );
+										view, null, true, null );
 								
 								new_si.setMdiEntry(entry);
 								
