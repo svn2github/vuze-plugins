@@ -553,7 +553,10 @@ UPnPMediaServerContentDirectory
 	{
 		if ( media_server.useCategories()){
 
-			contentChanged( downloads_container, acf );
+			synchronized( lock ){
+			
+				contentChanged( downloads_container, acf );
+			}
 		}
 	}
 	
