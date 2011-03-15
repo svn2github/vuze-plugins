@@ -281,7 +281,7 @@ public class SpeedSchedulerThread extends Thread implements ScheduleChangeListen
 						
 						while(ex.hasNext())
 						{
-							if(torrent_cat.compareTo(ex.next())==0)
+							if(torrent_cat.compareTo((String) ex.next())==0)
 							{
 								not_in = true;
 							}
@@ -342,7 +342,7 @@ public class SpeedSchedulerThread extends Thread implements ScheduleChangeListen
 						Iterator ex = categoryExclude.iterator();
 						while(ex.hasNext())
 						{
-							if(torrent_cat.compareTo(ex.next())==0)
+							if(torrent_cat.compareTo((String) ex.next())==0)
 							{
 								not_in = true;
 							}
