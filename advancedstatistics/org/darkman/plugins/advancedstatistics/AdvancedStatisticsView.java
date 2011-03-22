@@ -142,7 +142,7 @@ public class AdvancedStatisticsView implements UISWTViewEventListener {
           if(viewProgress != null) viewProgress.delete();
   		if(viewActivity != null) viewActivity.delete();
   		if(viewTransfer != null) viewTransfer.delete();
-  		if(!folder.isDisposed()) Utils.disposeComposite(folder);
+  		if(folder != null && !folder.isDisposed()) Utils.disposeComposite(folder);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
