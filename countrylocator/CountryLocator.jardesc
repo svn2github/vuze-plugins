@@ -12,8 +12,8 @@
     </manifest>
     <selectedElements exportClassFiles="true" exportJavaFiles="true" exportOutputFolder="false">
         <file path="/countrylocator/GeoIP-LICENSE.txt"/>
-        <javaElement handleIdentifier="=countrylocator/&lt;org.gudy.azureus2.countrylocator.maps"/>
         <javaElement handleIdentifier="=countrylocator/&lt;com.maxmind.geoip.csvtodat"/>
+        <javaElement handleIdentifier="=countrylocator/&lt;org.gudy.azureus2.countrylocator.maps"/>
         <file path="/countrylocator/GeoIP.dat"/>
         <javaElement handleIdentifier="=countrylocator/&lt;org.gudy.azureus2.countrylocator.statisticsProviders"/>
         <file path="/countrylocator/Country2Coord.txt"/>
@@ -25,4 +25,5 @@
         <javaElement handleIdentifier="=countrylocator/&lt;org.gudy.azureus2.countrylocator.internat"/>
         <file path="/countrylocator/plugin.properties"/>
     </selectedElements>
+    <fatjar builder="org.eclipse.jdt.ui.plain_jar_builder" launchConfig=""/>
 </jardesc>
