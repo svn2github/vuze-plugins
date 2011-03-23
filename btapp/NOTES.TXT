@@ -1,0 +1,17 @@
+TODOS
+=====
+
+- BtApp Plugin download/installation progress
+
+- Security Authorization (+UI)
+
+- Expand config params plugins can get/set
+
+- api_torrent_file_open needs to prompt user
+
+- the keys() functions need optimizing.  Right now the whole map is generated (with values) and the keys are plucked from it
+
+- most set methods not implemented
+
+- uBrowse crawls when iterating through a torrent with many files (> 20) on my MacBook Pro
+
