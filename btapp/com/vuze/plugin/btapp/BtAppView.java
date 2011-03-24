@@ -4,17 +4,14 @@ import java.io.*;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.*;
+import java.util.List;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.browser.*;
-import org.eclipse.swt.events.DisposeEvent;
-import org.eclipse.swt.events.DisposeListener;
+import org.eclipse.swt.events.*;
 import org.eclipse.swt.graphics.Image;
-import org.eclipse.swt.layout.FillLayout;
-import org.eclipse.swt.layout.GridData;
-import org.eclipse.swt.widgets.Composite;
-import org.eclipse.swt.widgets.Display;
-import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.layout.*;
+import org.eclipse.swt.widgets.*;
 
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.util.*;
@@ -33,6 +30,7 @@ import org.gudy.azureus2.ui.swt.components.shell.ShellFactory;
 import org.gudy.azureus2.ui.swt.plugins.UISWTView;
 import org.gudy.azureus2.ui.swt.plugins.UISWTViewEvent;
 import org.gudy.azureus2.ui.swt.plugins.UISWTViewEventListener;
+import org.json.simple.JSONValue;
 
 import com.aelitis.azureus.ui.mdi.MdiEntry;
 import com.aelitis.azureus.ui.swt.UIFunctionsManagerSWT;
@@ -81,6 +79,14 @@ public class BtAppView
 	private UISWTView swtView;
 
 	private String title;
+
+	private Composite cTopArea;
+
+	private Composite cOptionsArea;
+
+	private Label lblTitle;
+
+	private boolean disposeOnFocusOut = true;
 
 	private static String encodeToJavascript(List list) {
 		StringBuffer sb = new StringBuffer();
@@ -770,6 +776,11 @@ public class BtAppView
 				break;
 
 			case UISWTViewEvent.TYPE_FOCUSLOST:
+				if (disposeOnFocusOut) {
+					unloadApp();
+				}
+				break;
+
 			case UISWTViewEvent.TYPE_DESTROY:
 				unloadApp();
 				break;
@@ -930,6 +941,12 @@ public class BtAppView
 	}
 
 	private void loadApp(Composite parent) {
+		if (btAppWebServ != null) {
+			return;
+		}
+		GridLayout layout = new GridLayout();
+		layout.horizontalSpacing = layout.verticalSpacing = layout.marginHeight = layout.marginWidth = 0;
+		parent.setLayout(layout);
 
 		loadBTAPPfile(basePath);
 
@@ -940,7 +957,62 @@ public class BtAppView
 			return;
 		}
 
+		FormData fd;
+		cTopArea = new Composite(parent, SWT.NONE);
+		GridData gd = new GridData(GridData.FILL_HORIZONTAL);
+		cTopArea.setLayoutData(gd);
+		FormLayout formLayout = new FormLayout();
+		cTopArea.setLayout(formLayout);
+
+		lblTitle = new Label(cTopArea, SWT.WRAP);
+		lblTitle.setText(title);
+
+		Button btnOptions = new Button(cTopArea, SWT.TOGGLE);
+		btnOptions.setText("Options >>");
+
+		cOptionsArea = new Composite(cTopArea, SWT.BORDER);
+		fd = new FormData();
+		fd.top = new FormAttachment(btnOptions);
+		fd.bottom = new FormAttachment(100, 0);
+		fd.left = new FormAttachment(0, 0);
+		fd.right = new FormAttachment(100, 0);
+		fd.height = 1;
+		cOptionsArea.setLayoutData(fd);
+		cOptionsArea.setLayout(new FormLayout());
+		cOptionsArea.setVisible(false);
+
+		fd = new FormData();
+		fd.bottom = new FormAttachment(btnOptions, 0, SWT.CENTER);
+		lblTitle.setLayoutData(fd);
+
+		fd = new FormData();
+		fd.left = null;
+		fd.right = new FormAttachment(100, -1);
+		btnOptions.setLayoutData(fd);
+
+		btnOptions.addSelectionListener(new SelectionAdapter() {
+			public void widgetSelected(SelectionEvent e) {
+				if (((Button) e.widget).getSelection()) {
+					showOptionsArea();
+				} else {
+					hideOptionsArea();
+				}
+			}
+		});
+
+		Button btnDisposeOnLostSelection = new Button(cOptionsArea, SWT.CHECK);
+		btnDisposeOnLostSelection.setText("Dispose of browser when switching away from view");
+		fd = new FormData();
+		btnDisposeOnLostSelection.setLayoutData(fd);
+		btnDisposeOnLostSelection.setSelection(disposeOnFocusOut);
+		btnDisposeOnLostSelection.addListener(SWT.DefaultSelection, new Listener() {
+			public void handleEvent(Event event) {
+				disposeOnFocusOut = ((Button) event.widget).getSelection();
+			}
+		});
+
 		browser = new Browser(parent, SWT.NONE);
+		browser.setLayoutData(new GridData(GridData.FILL_BOTH));
 
 		try {
 			InputStream is = BtAppView.class.getResourceAsStream("btapp.js");
@@ -956,8 +1028,6 @@ public class BtAppView
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-
-		//browser.execute(js);
 
 		browserFunction = new BrowserFunction(browser, "bt2vuze") {
 
@@ -1001,18 +1071,23 @@ public class BtAppView
 		};
 
 		browser.setUrl("http://127.0.0.1:" + btAppWebServ.getPort() + "/index.html");
-		//browser.setUrl("file://" + basePath + "/index.html");
 		browser.addLocationListener(new LocationListener() {
 			public void changed(LocationEvent event) {
 				synchronized (rateLimiterList) {
-					isRateLimiting = false;
+					setRateLimiting(false);
 					rateLimiterList.clear();
 				}
 				browser.execute(jsBtApp);
 			}
 
 			public void changing(LocationEvent event) {
-				log("URL CHANGING TO " + event.location);
+				if (!event.location.startsWith("http://127.0.0.1:")) {
+					log("LAUNCHING " + event.location);
+					Utils.launch(event.location);
+					event.doit = false;
+				} else {
+					log("URL CHANGING TO " + event.location);
+				}
 			}
 		});
 
@@ -1035,7 +1110,7 @@ public class BtAppView
 					}
 
 					public void changing(LocationEvent event) {
-						log("URL WANNA OPEN " + event.location);
+						log("Popup: URL: " + event.location);
 					}
 				});
 				shell.addDisposeListener(new DisposeListener() {
@@ -1047,11 +1122,24 @@ public class BtAppView
 			}
 		});
 
-		//browser.setText(s);
-
-		browser.setLayoutData(new GridData(GridData.FILL_BOTH));
-
 		browser.getParent().layout(true);
+	}
+
+	protected void showOptionsArea() {
+		//FormData fd = new FormData();
+		FormData fd = (FormData) cOptionsArea.getLayoutData();
+		fd.height = -1;
+		cOptionsArea.setLayoutData(fd);
+		cTopArea.getParent().layout(true, true);
+		cOptionsArea.setVisible(true);
+	}
+
+	protected void hideOptionsArea() {
+		FormData fd = (FormData) cOptionsArea.getLayoutData();
+		fd.height = 1;
+		cOptionsArea.setLayoutData(fd);
+		cOptionsArea.setVisible(false);
+		cTopArea.getParent().layout(true, true);
 	}
 
 	private void loadBTAPPfile(final File basePath) {
@@ -1082,6 +1170,9 @@ public class BtAppView
 						if (swtView != null) {
 							swtView.setTitle(val);
 						}
+						// lame way to give the plugin a name in the menu
+						pi.getPluginconfig().setPluginParameter(
+								"Views.plugins.btapp." + btappid + ".title", title);
 					}
 				}
 			}
@@ -1092,8 +1183,12 @@ public class BtAppView
 		try {
 			File stashFile = pi.getPluginconfig().getPluginUserFile(
 					getAppId() + ".stash");
-			String s = FileUtil.readFileAsString(stashFile, -1);
-			mapStash.putAll(JSONUtils.decodeJSON(s));
+			Reader reader = new InputStreamReader(new FileInputStream(stashFile),
+					"utf-8");
+			Object object = JSONValue.parse(reader);
+			if (object instanceof Map) {
+				mapStash.putAll((Map) object);
+			}
 		} catch (Exception e) {
 			log("StashLoad: " + e.getMessage());
 		}
@@ -1133,7 +1228,7 @@ public class BtAppView
 		sb.append(title);
 		sb.append(":");
 		sb.append(rateLimiterList.size());
-		if (isRateLimiting) {
+		if (isRateLimiting()) {
 			sb.append("*");
 		}
 		sb.append("] ");
@@ -1144,32 +1239,32 @@ public class BtAppView
 	protected Object processFunction(String func, Object[] args) {
 		try {
 			synchronized (rateLimiterList) {
-  			reduceRateLimiterList();
-  			int count = rateLimiterList.size();
-  			if (count <= 1) {
-  				if (isRateLimiting) {
-  					isRateLimiting = false;
-  					log("Rate Limiting OFF");
-  				}
-  			} else if (count >= RATE_LIMITER_MAX) {
-  				if (!isRateLimiting) {
-  					isRateLimiting = true;
-  					log("Rate Limiting ON");
-  				}
-  			}
-  			long now = pi.getUtilities().getCurrentSystemTime();
-  			rateLimiterList.add(now);
-  
-  			if (isRateLimiting) {
-  				Display display = Display.getDefault();
-  				while (!display.isDisposed() && display.readAndDispatch()) {
-  				}
-  				long now2 = pi.getUtilities().getCurrentSystemTime();
-  				long sleepFor = 10 - (now2 - now);
-  				if (sleepFor > 0) {
-  					Thread.sleep(sleepFor);
-  				}
-  			}
+				reduceRateLimiterList();
+				int count = rateLimiterList.size();
+				if (count <= 1) {
+					if (isRateLimiting()) {
+						setRateLimiting(false);
+						log("Rate Limiting OFF");
+					}
+				} else if (count >= RATE_LIMITER_MAX) {
+					if (!isRateLimiting()) {
+						setRateLimiting(true);
+						log("Rate Limiting ON");
+					}
+				}
+				long now = pi.getUtilities().getCurrentSystemTime();
+				rateLimiterList.add(now);
+
+				if (isRateLimiting()) {
+					Display display = Display.getDefault();
+					while (!display.isDisposed() && display.readAndDispatch()) {
+					}
+					long now2 = pi.getUtilities().getCurrentSystemTime();
+					long sleepFor = 10 - (now2 - now);
+					if (sleepFor > 0) {
+						Thread.sleep(sleepFor);
+					}
+				}
 			}
 		} catch (Exception e) {
 		}
@@ -1287,17 +1382,18 @@ public class BtAppView
 
 	private void reduceRateLimiterList() {
 		synchronized (rateLimiterList) {
-  		if (pi == null) {
-  			return;
-  		}
-  		long gracePeriod = pi.getUtilities().getCurrentSystemTime() - 3000;
-  		if (rateLimiterList.size() > 0) {
-  			Long first = rateLimiterList.getFirst();
-  			while (first != null && first < gracePeriod) {
-  				rateLimiterList.removeFirst();
-  				first = rateLimiterList.size() == 0 ? null : rateLimiterList.getFirst();
-  			}
-  		}
+			if (pi == null) {
+				return;
+			}
+			long gracePeriod = pi.getUtilities().getCurrentSystemTime() - 3000;
+			if (rateLimiterList.size() > 0) {
+				Long first = rateLimiterList.getFirst();
+				while (first != null && first < gracePeriod) {
+					rateLimiterList.removeFirst();
+					first = rateLimiterList.size() == 0 ? null
+							: rateLimiterList.getFirst();
+				}
+			}
 		}
 	}
 
@@ -1341,8 +1437,8 @@ public class BtAppView
 
 	private void unloadApp() {
 		synchronized (rateLimiterList) {
-  		isRateLimiting = false;
-  		rateLimiterList.clear();
+			setRateLimiting(false);
+			rateLimiterList.clear();
 		}
 
 		if (btAppWebServ != null) {
@@ -1351,6 +1447,8 @@ public class BtAppView
 		}
 
 		if (mapStash.size() > 0) {
+			// We don't use pi.getUtilities().writeResilientBEncodedFile(..) because
+			// it has a history of not working with certain non-ASCII map keys
 			File stashFile = pi.getPluginconfig().getPluginUserFile(
 					getAppId() + ".stash");
 			FileUtil.writeStringAsFile(stashFile, JSONUtils.encodeToJSON(mapStash));
@@ -1361,6 +1459,9 @@ public class BtAppView
 
 		Utils.execSWTThread(new Runnable() {
 			public void run() {
+				if (cTopArea != null && !cTopArea.isDisposed()) {
+					cTopArea.dispose();
+				}
 				if (browser != null && !browser.isDisposed()) {
 					browser.dispose();
 				}
@@ -1369,5 +1470,29 @@ public class BtAppView
 				}
 			}
 		});
+	}
+
+	public void setRateLimiting(boolean isRateLimiting) {
+		if (this.isRateLimiting == isRateLimiting) {
+			return;
+		}
+		this.isRateLimiting = isRateLimiting;
+		Utils.execSWTThread(new Runnable() {
+			public void run() {
+				if (lblTitle == null || lblTitle.isDisposed()) {
+					return;
+				}
+				String s = title;
+				if (isRateLimiting()) {
+					s += " (Rate Limiting to prevent CPU suckage)";
+				}
+				lblTitle.setText(s);
+				lblTitle.getParent().layout();
+			}
+		});
+	}
+
+	public boolean isRateLimiting() {
+		return isRateLimiting;
 	}
 }

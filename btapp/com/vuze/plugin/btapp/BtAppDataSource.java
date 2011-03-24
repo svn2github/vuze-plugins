@@ -1,5 +1,7 @@
 package com.vuze.plugin.btapp;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -7,31 +9,71 @@ import java.util.regex.Pattern;
 
 import org.eclipse.swt.browser.Browser;
 
+import org.gudy.azureus2.core3.util.FileUtil;
+
 import com.aelitis.azureus.util.MapUtils;
 
 public class BtAppDataSource
 {
 	private Map<String, String> properties = new HashMap<String, String>();
 
-	private String appId = "?";
+	private String btappid = "?";
 	
 	private static final String keys[] = { "category", "name", "btapp_url", "publisher", "version", "descr" };
 	private static final String displayKeys[] = { "category", "name", "version", "publisher" };
 	private static final int displayWidths[] = { 100, 200, 100, 150 };
+	
+	private long accessMode = BtAppView.PRIV_LOCAL;
 
 	public BtAppDataSource(Map map, Browser browser) {
 		for (String key : keys) {
 			properties.put(key, getAndDecode(browser, map, key, ""));
 		}
-		String url = properties.get("btapp_url");
-		if (url != null) {
-			Pattern pattern = Pattern.compile("/([^/]+)\\.btapp");
-			Matcher matcher = pattern.matcher(url);
-			
-			// http://apps.bittorrent.com/outspark/outspark.btapp
-			if (matcher.find()) {
-				appId = Integer.toHexString(matcher.group(1).hashCode());
+		btappid = properties.get("btappid");
+		if (btappid == null) {
+  		String url = properties.get("btapp_url");
+  		if (url != null) {
+  			Pattern pattern = Pattern.compile("/([^/]+)\\.btapp");
+  			Matcher matcher = pattern.matcher(url);
+  			
+  			// http://apps.bittorrent.com/outspark/outspark.btapp
+  			if (matcher.find()) {
+  				btappid = Integer.toHexString(matcher.group(1).hashCode());
+  			}
+  		}
+		}
+	}
+	
+	public BtAppDataSource(File basePath) {
+		File file = new File(basePath, "btapp");
+		btappid = file.getParentFile().getName();
+		if (!file.exists()) {
+			return;
+		}
+		try {
+			String s = FileUtil.readFileAsString(file, 0xffff);
+			String[] lines = s.split("[\r\n]+");
+			for (String line : lines) {
+				String[] sections = line.split(":", 2);
+				if (sections.length == 2) {
+					String id = sections[0].toLowerCase();
+					String val = sections[1].trim();
+					if (id.equals("access")) {
+						if (val.equalsIgnoreCase("list_restricted")) {
+							accessMode = BtAppView.PRIV_READALL;
+						}
+						if (val.equalsIgnoreCase("restricted")) {
+							accessMode = BtAppView.PRIV_READALL | BtAppView.PRIV_WRITEALL;
+						}
+					} else if (id.equals("description")) {
+						properties.put("descr", val);
+					} else if (!properties.containsKey(id)) {
+						properties.put(id, val);
+					}
+				}
 			}
+
+		} catch (IOException e) {
 		}
 	}
 
@@ -58,7 +100,7 @@ public class BtAppDataSource
 	}
 
 	public String getOurAppId() {
-		return appId;
+		return btappid;
 	}
 
 	public static int getDisplayWidth(String name) {
@@ -69,5 +111,13 @@ public class BtAppDataSource
 			}
 		}
 		return 100;
+	}
+
+	public void setAccessMode(long accessMode) {
+		this.accessMode = accessMode;
+	}
+
+	public long getAccessMode() {
+		return accessMode;
 	}
 }

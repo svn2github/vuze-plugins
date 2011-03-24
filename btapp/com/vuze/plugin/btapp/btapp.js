@@ -42,14 +42,17 @@ if (true) {
 		stash: {
 			all : function() { return vzWrapAndEval(bt2vuze('stash.all')) }, 
 		  keys : function() { return bt2vuze('stash.keys') }, 
-		  //get : function(key) { var o = vzWrapAndEval(bt2vuze('stash.get', key)); if (o == null) return undefined; return unescape(o) }, 
-		  //set : function(key, val) { return vzWrapAndEval(bt2vuze('stash.set', key, escape(val))) }, 
-		  get : function(key) { var o = bt2vuze('stash.get', key); if (o == null) return undefined; return o; }, 
-		  set : function(key, val) { bt2vuze('stash.set', key, val) }, 
+		  get : function(key) {
+		  	var o = bt2vuze('stash.get', key); 
+		  	if (o == null) throw "key '" + key + "' not in stash";
+		  	return o;
+		  }, 
+		  set : function(key, val) { bt2vuze('stash.set', key, val) },
 		},
 		
 		log : function(key) { return vzWrapAndEval(bt2vuze('log', key)) }, 
 		resource : function(key) { return vzWrapAndEval(bt2vuze('resource', key)) }, 
+		sendmsg : function(key, x, y, s) { alert("sendmsg(" + key + ", ..) not supported") },
 	};
 	
 	// The 'peer' variable in vzTorrent

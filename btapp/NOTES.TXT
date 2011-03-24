@@ -11,7 +11,7 @@ TODOS
 
 - the keys() functions need optimizing.  Right now the whole map is generated (with values) and the keys are plucked from it
 
-- most set methods not implemented
+- most set methods not implemented (only stash.set and events.set implemented)
 
 - uBrowse crawls when iterating through a torrent with many files (> 20) on my MacBook Pro
 

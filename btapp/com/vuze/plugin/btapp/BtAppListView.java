@@ -1,5 +1,6 @@
 package com.vuze.plugin.btapp;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
@@ -10,6 +11,7 @@ import org.eclipse.swt.browser.Browser;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.widgets.Composite;
 
+import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.core3.util.FileUtil;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.ui.tables.*;
@@ -17,13 +19,13 @@ import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloader;
 import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloaderException;
 import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloaderListener;
 import org.gudy.azureus2.ui.swt.Utils;
-import org.gudy.azureus2.ui.swt.plugins.UISWTView;
-import org.gudy.azureus2.ui.swt.plugins.UISWTViewEvent;
-import org.gudy.azureus2.ui.swt.plugins.UISWTViewEventListener;
+import org.gudy.azureus2.ui.swt.plugins.*;
+import org.gudy.azureus2.ui.swt.pluginsimpl.UISWTViewCore;
 import org.gudy.azureus2.ui.swt.views.table.TableViewSWT;
 import org.gudy.azureus2.ui.swt.views.table.impl.TableViewSWTImpl;
 
 import com.aelitis.azureus.ui.common.table.TableColumnCore;
+import com.aelitis.azureus.ui.common.table.TableLifeCycleListener;
 import com.aelitis.azureus.ui.common.table.impl.TableColumnManager;
 import com.aelitis.azureus.util.JSONUtils;
 
@@ -42,6 +44,8 @@ public class BtAppListView
 	private Browser browser;
 
 	protected TableViewSWT<BtAppDataSource> tv;
+
+	private List listApps;
 
 	private static boolean alreadyCreatedStuff = false;
 	
@@ -131,6 +135,7 @@ public class BtAppListView
 
 	private void unloadView() {
 		Utils.disposeComposite(parent, false);
+		listApps.clear();
 	}
 
 	private void initView(Composite parent) {
@@ -140,6 +145,8 @@ public class BtAppListView
 		GridData gridData = new GridData();
 		gridData.exclude = true;
 		browser.setLayoutData(gridData);
+		
+		createTV();
 
 		try {
 			ResourceDownloader rd = pi.getUtilities().getResourceDownloaderFactory().create(
@@ -171,7 +178,8 @@ public class BtAppListView
 						if (map == null || !(map.get("value") instanceof List)) {
 							fail();
 						} else {
-							loadAppList((List) map.get("value"));
+							listApps = (List) map.get("value");
+							loadAppList();
 						}
 					} catch (IOException e) {
 					}
@@ -183,7 +191,26 @@ public class BtAppListView
 		}
 	}
 
-	protected void loadAppList(final List list) {
+	protected void loadAppList() {
+		Utils.execSWTThread(new AERunnable() {
+			public void runSupport() {
+				if (listApps == null) {
+					return;
+				}
+				for (Object appObject : listApps) {
+					if (appObject instanceof Map) {
+						BtAppDataSource appInfo = new BtAppDataSource((Map) appObject,
+								browser);
+						tv.addDataSource(appInfo);
+					} else if (appObject instanceof BtAppDataSource) {
+						tv.addDataSource((BtAppDataSource) appObject);
+					}
+				}
+			}
+		});
+	}
+
+	protected void createTV() {
 		Utils.execSWTThread(new Runnable() {
 			public void run() {
 
@@ -193,30 +220,35 @@ public class BtAppListView
 				tv.setHeaderVisible(true);
 
 				tv.initialize(parent);
-
-				for (Object appObject : list) {
-					if (appObject instanceof Map) {
-						BtAppDataSource appInfo = new BtAppDataSource((Map) appObject,
-								browser);
-						tv.addDataSource(appInfo);
+				
+				tv.addLifeCycleListener(new TableLifeCycleListener() {
+					
+					public void tableViewInitialized() {
+						loadAppList();
 					}
-				}
+					
+					public void tableViewDestroyed() {
+					}
+				});
+
 				parent.layout();
 			}
 		});
 	}
 
 	protected void fail() {
-		Utils.execSWTThread(new Runnable() {
-			public void run() {
-				browser.setLayoutData(Utils.getFilledFormData());
+		if (listApps == null) {
+			listApps = new ArrayList();
+		} else {
+			listApps.clear();
+		}
 
-				browser.setUrl("http://www.utorrent.com/get-started/apps");
-				browser.setLayoutData(new GridData(GridData.FILL_BOTH));
+		File[] appDirs = Plugin.getAppDirs();
+		for (File dir : appDirs) {
+			listApps.add(new BtAppDataSource(dir));
+		}
 
-				parent.layout();
-			}
-		});
+		loadAppList();
 	}
 
 }

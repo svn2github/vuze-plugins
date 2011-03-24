@@ -22,7 +22,7 @@ import org.gudy.azureus2.ui.swt.plugins.UISWTView;
 public class Plugin
 	implements UnloadablePlugin
 {
-	private static UISWTInstance swtUI;
+	public static UISWTInstance swtUI;
 
 	private static File pluginUserDir;
 
@@ -46,22 +46,24 @@ public class Plugin
 				if (instance instanceof UISWTInstance) {
 					swtUI = (UISWTInstance) instance;
 
+					// tux test window
+					File testDir = new File(
+							"/Volumes/Workspace/workspace/plugins-public/btapp/test");
+					if (testDir.exists()) {
+						swtUI.addView(UISWTInstance.VIEW_MAIN, "btapp.test",
+								BtAppView.class, testDir);
+					}
+
+					String[] appIDs = getAppIDs();
+					for (String id : appIDs) {
+						File btAppDir = new File(pluginUserDir, id);
+						swtUI.addView(UISWTInstance.VIEW_MAIN, "btapp." + id,
+								BtAppView.class, btAppDir);
+					}
+
 					swtUI.addView(UISWTInstance.VIEW_MAIN, "btapplist",
 							BtAppListView.class, null);
 					swtUI.openView(UISWTInstance.VIEW_MAIN, "btapplist", null, false);
-
-					// tux test window
-					File testDir = new File("/Volumes/Workspace/workspace/plugins-public/btapp/test");
-					if (testDir.exists()) {
-  					swtUI.addView(UISWTInstance.VIEW_MAIN, "btapp.test",
-  							BtAppView.class, testDir);
-					}
-					
-					String[] appIDs = getAppIDs();
-					for (String id : appIDs) {
-						swtUI.addView(UISWTInstance.VIEW_MAIN, "btapp." + id,
-								BtAppView.class, new File(pluginUserDir, id));
-					}
 
 				}
 			}
@@ -85,17 +87,21 @@ public class Plugin
 		}
 	}
 
-	private String[] getAppIDs() {
-		File[] listFiles = pluginUserDir.listFiles(new FileFilter() {
-			public boolean accept(File pathname) {
-				return pathname.isDirectory() && new File(pathname, "btapp").isFile();
-			}
-		});
+	public static String[] getAppIDs() {
+		File[] listFiles = getAppDirs();
 		String[] s = new String[listFiles.length];
 		for (int i = 0; i < listFiles.length; i++) {
 			s[i] = listFiles[i].getName();
 		}
 		return s;
+	}
+
+	public static File[] getAppDirs() {
+		return pluginUserDir.listFiles(new FileFilter() {
+			public boolean accept(File pathname) {
+				return pathname.isDirectory() && new File(pathname, "btapp").isFile();
+			}
+		});
 	}
 
 	public static String jsTextify(String s) {
@@ -156,14 +162,15 @@ public class Plugin
 								// ensure creation before writing any files
 								//destFile.mkdirs();
 							} else {
-  							destFile.getParentFile().mkdirs();
-  							FileOutputStream fos = new FileOutputStream(destFile);
-  							BufferedOutputStream dest = new BufferedOutputStream(fos, BUFFER);
-  							while ((count = zis.read(data, 0, BUFFER)) != -1) {
-  								dest.write(data, 0, count);
-  							}
-  							dest.flush();
-  							dest.close();
+								destFile.getParentFile().mkdirs();
+								FileOutputStream fos = new FileOutputStream(destFile);
+								BufferedOutputStream dest = new BufferedOutputStream(fos,
+										BUFFER);
+								while ((count = zis.read(data, 0, BUFFER)) != -1) {
+									dest.write(data, 0, count);
+								}
+								dest.flush();
+								dest.close();
 							}
 						}
 						zis.close();
@@ -192,6 +199,12 @@ public class Plugin
 		}
 		File dir = new File(pluginUserDir, ourAppId);
 		FileUtil.recursiveDeleteNoCheck(dir);
+
+		File stashFile = pi.getPluginconfig().getPluginUserFile(
+				ourAppId + ".stash");
+		if (stashFile.exists()) {
+			stashFile.delete();
+		}
 	}
 
 	public static void openApp(String ourAppId) {
