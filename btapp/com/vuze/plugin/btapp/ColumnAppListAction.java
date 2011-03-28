@@ -6,6 +6,7 @@ import org.eclipse.swt.widgets.Display;
 
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.ui.tables.*;
+import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.gudy.azureus2.ui.swt.Utils;
 import org.gudy.azureus2.ui.swt.shells.GCStringPrinter;
 import org.gudy.azureus2.ui.swt.shells.GCStringPrinter.URLInfo;
@@ -101,18 +102,36 @@ public class ColumnAppListAction
 		}
 		BtAppDataSource appInfo = (BtAppDataSource) ds;
 
-		boolean isInstalled = Plugin.isAppInstalled(appInfo.getOurAppId());
+		String ourAppId = appInfo.getOurAppId();
+		boolean isInstalled = Plugin.isAppInstalled(ourAppId);
+		boolean isInstalling = Plugin.isAppInstalling(ourAppId);
+		
+		int sortVal = (isInstalled ? 1 : 0) + (isInstalling ? 2 : 0);
 
-		if (!cell.setSortValue(isInstalled) && cell.isValid()) {
+		if (!cell.setSortValue(sortVal) && cell.isValid()) {
 			return;
 		}
 
-		if (isInstalled) {
-			cell.getTableRow().setData("text",
-					"<A HREF=\"open\">Open</A> | <A HREF=\"uninstall\">Uninstall</A>");
+		StringBuffer text = new StringBuffer();
+		
+		LocaleUtilities localeUtilities = Plugin.pi.getUtilities().getLocaleUtilities();
+		if (isInstalling) {
+			text.append(localeUtilities.getLocalisedMessageText("BtAppList.action.installing"));
+		} else if (isInstalled) {
+			text.append("<A HREF=\"open\">");
+			text.append(localeUtilities.getLocalisedMessageText("BtAppList.action.open"));
+			text.append("</A>");
+			text.append(" | ");
+			text.append("<A HREF=\"uninstall\">");
+			text.append(localeUtilities.getLocalisedMessageText("BtAppList.action.uninstall"));
+			text.append("</A>");
 		} else {
-			cell.getTableRow().setData("text", "<A HREF=\"install\">Install</A>");
+			text.append("<A HREF=\"install\">");
+			text.append(localeUtilities.getLocalisedMessageText("BtAppList.action.install"));
+			text.append("</A>");
 		}
+		
+		cell.getTableRow().setData("text", text.toString());
 	}
 
 	// @see org.gudy.azureus2.plugins.ui.tables.TableCellMouseListener#cellMouseTrigger(org.gudy.azureus2.plugins.ui.tables.TableCellMouseEvent)

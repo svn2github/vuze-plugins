@@ -19,8 +19,9 @@ import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloader;
 import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloaderException;
 import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloaderListener;
 import org.gudy.azureus2.ui.swt.Utils;
-import org.gudy.azureus2.ui.swt.plugins.*;
-import org.gudy.azureus2.ui.swt.pluginsimpl.UISWTViewCore;
+import org.gudy.azureus2.ui.swt.plugins.UISWTView;
+import org.gudy.azureus2.ui.swt.plugins.UISWTViewEvent;
+import org.gudy.azureus2.ui.swt.plugins.UISWTViewEventListener;
 import org.gudy.azureus2.ui.swt.views.table.TableViewSWT;
 import org.gudy.azureus2.ui.swt.views.table.impl.TableViewSWTImpl;
 
@@ -48,7 +49,7 @@ public class BtAppListView
 	private List listApps;
 
 	private static boolean alreadyCreatedStuff = false;
-	
+
 	public BtAppListView() {
 	}
 
@@ -58,7 +59,7 @@ public class BtAppListView
 			case UISWTViewEvent.TYPE_CREATE:
 				swtView = (UISWTView) event.getData();
 				pi = swtView.getPluginInterface();
-				
+
 				createStuff();
 				// not sure if adding a 'torrent' event to an app with PRIV_READALL
 				// should send events for all new torrents.
@@ -83,6 +84,10 @@ public class BtAppListView
 				unloadView();
 				break;
 
+			case UISWTViewEvent.TYPE_REFRESH:
+				if (tv != null) {
+					tv.refreshTable(false);
+				}
 		}
 		return true;
 	}
@@ -91,12 +96,13 @@ public class BtAppListView
 		if (alreadyCreatedStuff) {
 			return;
 		}
-		
+
 		alreadyCreatedStuff = true;
 		TableManager tableManager = pi.getUIManager().getTableManager();
 
-		TableColumnCreationListener colCreateListener = new TableColumnCreationListener() {
+		TableColumnCreationListener colListener = new TableColumnCreationListener() {
 			public void tableColumnCreated(TableColumn column) {
+				column.setVisible(true);
 				column.setWidth(BtAppDataSource.getDisplayWidth(column.getName()));
 				column.addCellAddedListener(new TableCellAddedListener() {
 					public void cellAdded(TableCell cell) {
@@ -105,29 +111,35 @@ public class BtAppListView
 							BtAppDataSource appInfo = (BtAppDataSource) ds;
 							cell.setText(appInfo.getProperty(cell.getTableColumn().getName()));
 						}
+						cell.setMarginHeight(10);
 					}
 				});
 			}
 		};
 
-		String[] keys = BtAppDataSource.getKeys();
+		String[] keys = BtAppDataSource.getDisplaykeys();
 		for (String key : keys) {
-			tableManager.registerColumn(BtAppDataSource.class, key,
-					colCreateListener);
+			if (key.equals("action")) {
+				TableColumnCreationListener colActionListener = new TableColumnCreationListener() {
+					public void tableColumnCreated(TableColumn column) {
+						ColumnAppListAction columnAppListAction = new ColumnAppListAction();
+						column.addListeners(columnAppListAction);
+						((TableColumnCore) column).addCellOtherListener("SWTPaint",
+								columnAppListAction);
+						column.setRefreshInterval(TableColumn.INTERVAL_LIVE);
+						column.setVisible(true);
+						column.setWidth(BtAppDataSource.getDisplayWidth(column.getName()));
+					}
+				};
+				tableManager.registerColumn(BtAppDataSource.class, "action",
+						colActionListener);
+			} else {
+				tableManager.registerColumn(BtAppDataSource.class, key, colListener);
+			}
 		}
 
-		TableColumnCreationListener colActionCreateListener = new TableColumnCreationListener() {
-			public void tableColumnCreated(TableColumn column) {
-				ColumnAppListAction columnAppListAction = new ColumnAppListAction();
-				column.addListeners(columnAppListAction);
-				((TableColumnCore) column).addCellOtherListener("SWTPaint", columnAppListAction);
-				column.setWidth(250);
-			}
-		};
-		tableManager.registerColumn(BtAppDataSource.class, "action", colActionCreateListener);
-
-		List<String> displayKeys = new ArrayList<String>(Arrays.asList(BtAppDataSource.getDisplaykeys()));
-		displayKeys.add("action");
+		List<String> displayKeys = new ArrayList<String>(
+				Arrays.asList(BtAppDataSource.getDisplaykeys()));
 
 		TableColumnManager tcm = TableColumnManager.getInstance();
 		tcm.setDefaultColumnNames(TABLE_ID, displayKeys.toArray(new String[0]));
@@ -145,7 +157,7 @@ public class BtAppListView
 		GridData gridData = new GridData();
 		gridData.exclude = true;
 		browser.setLayoutData(gridData);
-		
+
 		createTV();
 
 		try {
@@ -216,17 +228,17 @@ public class BtAppListView
 
 				tv = new TableViewSWTImpl<BtAppDataSource>(BtAppDataSource.class,
 						TABLE_ID, TABLE_ID, "name");
-				tv.setRowDefaultHeight(25);
+				tv.setRowDefaultHeight(80);
 				tv.setHeaderVisible(true);
 
 				tv.initialize(parent);
-				
+
 				tv.addLifeCycleListener(new TableLifeCycleListener() {
-					
+
 					public void tableViewInitialized() {
 						loadAppList();
 					}
-					
+
 					public void tableViewDestroyed() {
 					}
 				});
@@ -245,7 +257,11 @@ public class BtAppListView
 
 		File[] appDirs = Plugin.getAppDirs();
 		for (File dir : appDirs) {
-			listApps.add(new BtAppDataSource(dir));
+			BtAppDataSource ds = new BtAppDataSource(dir);
+			if (ds.getProperty("category").length() == 0) {
+				ds.setProperty("category", "Installed");
+			}
+			listApps.add(ds);
 		}
 
 		loadAppList();

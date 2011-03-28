@@ -3,6 +3,8 @@ package com.vuze.plugin.btapp;
 import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -13,6 +15,7 @@ import org.gudy.azureus2.plugins.UnloadablePlugin;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
+import org.gudy.azureus2.plugins.ui.UIMessage;
 import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloader;
 import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloaderException;
 import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloaderListener;
@@ -28,7 +31,9 @@ public class Plugin
 
 	private static LoggerChannel logger;
 
-	private static PluginInterface pi;
+	public static PluginInterface pi;
+
+	private static List<String> listInstallingApps = new ArrayList<String>();
 
 	public void initialize(final PluginInterface pi)
 			throws PluginException {
@@ -123,8 +128,13 @@ public class Plugin
 		return appDir.isDirectory() && new File(appDir, "btapp").isFile();
 	}
 
+	public static boolean isAppInstalling(String ourAppId) {
+		return listInstallingApps.contains(ourAppId);
+	}
+
 	public static void installApp(final String ourAppId, String url) {
 		try {
+			listInstallingApps.add(ourAppId);
 			ResourceDownloader rd = pi.getUtilities().getResourceDownloaderFactory().create(
 					new URL(url));
 
@@ -174,12 +184,45 @@ public class Plugin
 							}
 						}
 						zis.close();
+						
+						File file = new File(destDir, "btapp");
+						if (!file.exists()) {
+							uninstallApp(ourAppId);
+							UIMessage message = swtUI.createMessage();
+							message.setMessage("BtApp.dlg.notanapp.text");
+							message.setTitle("BtApp.dlg.notanapp.title");
+							message.setInputType(UIMessage.INPUT_OK);
+							message.ask();
+							return true;
+						}
+						
+						BtAppDataSource app = new BtAppDataSource(destDir);
+						long accessMode = app.getAccessMode();
+						if (accessMode != BtAppView.PRIV_LOCAL) {
+							String prefix = "BtApp.dlg.access";
+							String id = prefix;
+							if ((accessMode & BtAppView.PRIV_READALL) > 0) {
+								id += ".read";
+							}
+							if ((accessMode & BtAppView.PRIV_WRITEALL) > 0) {
+								id += ".write";
+							}
+							UIMessage message = swtUI.createMessage();
+							message.setMessage(id);
+							message.setTitle(prefix + ".title");
+							message.setInputType(UIMessage.INPUT_YES_NO);
+							int ask = message.ask();
+							if (ask != UIMessage.ANSWER_YES) {
+								uninstallApp(ourAppId);
+								return true;
+							}
+						}
 
-						String viewID = "btapp."
-								+ Integer.toHexString(destDir.getName().hashCode());
+						String viewID = "btapp." + destDir.getName();
 						swtUI.addView(UISWTInstance.VIEW_MAIN, viewID, BtAppView.class,
 								destDir);
 						swtUI.openView(UISWTInstance.VIEW_MAIN, viewID, null, true);
+						listInstallingApps.remove(ourAppId);
 
 					} catch (Exception e) {
 						log(e.toString());
@@ -194,14 +237,14 @@ public class Plugin
 	}
 
 	public static void uninstallApp(String ourAppId) {
+		listInstallingApps.remove(ourAppId);
 		if (swtUI != null) {
 			swtUI.removeViews(UISWTInstance.VIEW_MAIN, "btapp." + ourAppId);
 		}
 		File dir = new File(pluginUserDir, ourAppId);
 		FileUtil.recursiveDeleteNoCheck(dir);
 
-		File stashFile = pi.getPluginconfig().getPluginUserFile(
-				ourAppId + ".stash");
+		File stashFile = pi.getPluginconfig().getPluginUserFile(ourAppId + ".stash");
 		if (stashFile.exists()) {
 			stashFile.delete();
 		}

@@ -43,7 +43,20 @@ public class BtAppView
 	implements UISWTViewEventListener, BtApp
 {
 
-	private static final int RATE_LIMITER_MAX = 300;
+	// Rate limiter will count the # of api calls within RATE_LIMITER_SPAN ms,
+	// and only after RATE_LIMITER_SPAN ms of API activity.
+	// If the api call rate is over RATE_LIMITER_MAX each new API call will
+	// sleep for least RATE_LIMITER_SLEEPFOR, until the count goes down to near 0
+	
+	// Essentially it means the plugin can suck your CPU for up to 
+	// RATE_LIMITER_SPAN before it gets rate limited
+	private static final int RATE_LIMITER_MAX = 1000;
+	
+	private static final int RATE_LIMITER_SPAN = 10000;
+	
+	private static final int RATE_LIMITER_SLEEPFOR = 10;
+	
+	private boolean rateLimiterFullSpan = false;
 
 	private LinkedList<Long> rateLimiterList = new LinkedList<Long>();
 
@@ -85,6 +98,8 @@ public class BtAppView
 	private Composite cOptionsArea;
 
 	private Label lblTitle;
+
+	private Label lblRateLimiter;
 
 	private boolean disposeOnFocusOut = true;
 
@@ -564,14 +579,13 @@ public class BtAppView
 		try {
 			Download download = pi.getDownloadManager().getDownload(hashBytes);
 			if (download != null) {
-				Torrent torrent = download.getTorrent();
-				if (torrent != null) {
-					DiskManagerFileInfo[] fileInfos = download.getDiskManagerFileInfo();
-					TorrentFile[] files = torrent.getFiles();
+				DiskManagerFileInfo fileInfo = download.getDiskManagerFileInfo(index);
+				//Incredibly Slow
+				//TorrentFile[] files = torrent.getFiles();
+				//if (index < fileInfos.length && index < files.length) {
 
-					if (index < fileInfos.length && index < files.length) {
-						return getFileProperty(key, fileInfos[index], files[index]);
-					}
+				if (fileInfo != null) {
+					return getFileProperty(key, fileInfo);
 				}
 			}
 		} catch (DownloadException e) {
@@ -784,9 +798,36 @@ public class BtAppView
 			case UISWTViewEvent.TYPE_DESTROY:
 				unloadApp();
 				break;
+				
+			case UISWTViewEvent.TYPE_REFRESH:
+				reduceRateLimiterList();
+
+				refreshRateLimiterDisplay();
+				break;
 
 		}
 		return true;
+	}
+
+	private void refreshRateLimiterDisplay() {
+		Utils.execSWTThread(new Runnable() {
+			public void run() {
+				if (lblRateLimiter == null || lblRateLimiter.isDisposed()) {
+					return;
+				}
+				String s;
+				if (rateLimiterList.size() > 1) {
+					long span = SystemTime.getCurrentTime() - rateLimiterList.getFirst();
+					
+					s = "api: " + (rateLimiterList.size() * 1000 / span) + "/s";
+				} else {
+					s = "";
+				}
+				
+				lblRateLimiter.setText(s);
+				//lblRateLimiter.getParent().layout();
+			}
+		});
 	}
 
 	public void executeJS(final String js) {
@@ -895,13 +936,13 @@ public class BtAppView
 		return mapPropertyVals;
 	}
 
-	private Object getFileProperty(String key, DiskManagerFileInfo info,
-			TorrentFile file) {
+	private Object getFileProperty(String key, DiskManagerFileInfo info) {
+		info.getLength();
 		if (key.equals("name")) {
-			return file.getName();
+			return info.getFile().getName();
 		}
 		if (key.equals("size")) {
-			return file.getSize();
+			return info.getLength();
 		}
 		if (key.equals("downloaded")) {
 			return info.getDownloaded();
@@ -999,17 +1040,30 @@ public class BtAppView
 				}
 			}
 		});
-
+		
 		Button btnDisposeOnLostSelection = new Button(cOptionsArea, SWT.CHECK);
 		btnDisposeOnLostSelection.setText("Dispose of browser when switching away from view");
-		fd = new FormData();
-		btnDisposeOnLostSelection.setLayoutData(fd);
+
+		lblRateLimiter = new Label(cOptionsArea, SWT.NONE);
 		btnDisposeOnLostSelection.setSelection(disposeOnFocusOut);
 		btnDisposeOnLostSelection.addListener(SWT.DefaultSelection, new Listener() {
 			public void handleEvent(Event event) {
 				disposeOnFocusOut = ((Button) event.widget).getSelection();
 			}
 		});
+
+		
+		fd = new FormData();
+		fd.left = new FormAttachment(0, 0);
+		fd.right = new FormAttachment(100, 0);
+		lblRateLimiter.setLayoutData(fd);
+
+		fd = new FormData();
+		fd.top = new FormAttachment(lblRateLimiter);
+		btnDisposeOnLostSelection.setLayoutData(fd);
+		
+		showOptionsArea();
+
 
 		browser = new Browser(parent, SWT.NONE);
 		browser.setLayoutData(new GridData(GridData.FILL_BOTH));
@@ -1223,12 +1277,11 @@ public class BtAppView
 	}
 
 	public void log(String string) {
-		reduceRateLimiterList();
 		StringBuffer sb = new StringBuffer();
 		sb.append(title);
 		sb.append(":");
 		sb.append(rateLimiterList.size());
-		if (isRateLimiting()) {
+		if (isRateLimitingAndFull()) {
 			sb.append("*");
 		}
 		sb.append("] ");
@@ -1241,26 +1294,26 @@ public class BtAppView
 			synchronized (rateLimiterList) {
 				reduceRateLimiterList();
 				int count = rateLimiterList.size();
+				long now = pi.getUtilities().getCurrentSystemTime();
 				if (count <= 1) {
-					if (isRateLimiting()) {
+					if (isRateLimitingAndFull()) {
 						setRateLimiting(false);
 						log("Rate Limiting OFF");
 					}
-				} else if (count >= RATE_LIMITER_MAX) {
-					if (!isRateLimiting()) {
+				} else if (count >= RATE_LIMITER_MAX && (now - rateLimiterList.getFirst()) > (RATE_LIMITER_SPAN * 0.95)) {
+					if (!isRateLimitingAndFull()) {
 						setRateLimiting(true);
 						log("Rate Limiting ON");
 					}
 				}
-				long now = pi.getUtilities().getCurrentSystemTime();
 				rateLimiterList.add(now);
 
-				if (isRateLimiting()) {
+				if (isRateLimitingAndFull()) {
 					Display display = Display.getDefault();
 					while (!display.isDisposed() && display.readAndDispatch()) {
 					}
 					long now2 = pi.getUtilities().getCurrentSystemTime();
-					long sleepFor = 10 - (now2 - now);
+					long sleepFor = RATE_LIMITER_SLEEPFOR - (now2 - now);
 					if (sleepFor > 0) {
 						Thread.sleep(sleepFor);
 					}
@@ -1385,14 +1438,20 @@ public class BtAppView
 			if (pi == null) {
 				return;
 			}
-			long gracePeriod = pi.getUtilities().getCurrentSystemTime() - 3000;
+			long gracePeriod = pi.getUtilities().getCurrentSystemTime() - RATE_LIMITER_SPAN;
 			if (rateLimiterList.size() > 0) {
 				Long first = rateLimiterList.getFirst();
-				while (first != null && first < gracePeriod) {
-					rateLimiterList.removeFirst();
-					first = rateLimiterList.size() == 0 ? null
-							: rateLimiterList.getFirst();
+				if (first != null && first < gracePeriod) {
+					setFullSpan(true);
+					
+  				while (first != null && first < gracePeriod) {
+  					rateLimiterList.removeFirst();
+  					first = rateLimiterList.size() == 0 ? null
+  							: rateLimiterList.getFirst();
+  				}
 				}
+			} else {
+				setFullSpan(false);
 			}
 		}
 	}
@@ -1476,14 +1535,21 @@ public class BtAppView
 		if (this.isRateLimiting == isRateLimiting) {
 			return;
 		}
+		if (!isRateLimiting) {
+			setFullSpan(false);
+		}
 		this.isRateLimiting = isRateLimiting;
+		updateTitle();
+	}
+	
+	public void updateTitle() {
 		Utils.execSWTThread(new Runnable() {
 			public void run() {
 				if (lblTitle == null || lblTitle.isDisposed()) {
 					return;
 				}
 				String s = title;
-				if (isRateLimiting()) {
+				if (isRateLimitingAndFull()) {
 					s += " (Rate Limiting to prevent CPU suckage)";
 				}
 				lblTitle.setText(s);
@@ -1492,7 +1558,19 @@ public class BtAppView
 		});
 	}
 
-	public boolean isRateLimiting() {
-		return isRateLimiting;
+	public boolean isRateLimitingAndFull() {
+		return isRateLimiting && isFullSpan();
+	}
+
+	public void setFullSpan(boolean fullSpan) {
+		if (this.rateLimiterFullSpan == fullSpan) {
+			return;
+		}
+		this.rateLimiterFullSpan = fullSpan;
+		updateTitle();
+	}
+
+	public boolean isFullSpan() {
+		return rateLimiterFullSpan;
 	}
 }

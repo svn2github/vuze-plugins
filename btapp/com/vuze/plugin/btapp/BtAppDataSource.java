@@ -20,8 +20,8 @@ public class BtAppDataSource
 	private String btappid = "?";
 	
 	private static final String keys[] = { "category", "name", "btapp_url", "publisher", "version", "descr" };
-	private static final String displayKeys[] = { "category", "name", "version", "publisher" };
-	private static final int displayWidths[] = { 100, 200, 100, 150 };
+	private static final String displayKeys[] = { "category", "name", "version", "publisher", "action", "descr" };
+	private static final int displayWidths[] = { 100, 180, 60, 90, 120, 350 };
 	
 	private long accessMode = BtAppView.PRIV_LOCAL;
 
@@ -119,5 +119,9 @@ public class BtAppDataSource
 
 	public long getAccessMode() {
 		return accessMode;
+	}
+	
+	public void setProperty(String key, String Value) {
+		properties.put(key, Value);
 	}
 }
