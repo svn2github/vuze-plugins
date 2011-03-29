@@ -11,7 +11,7 @@ if (true) {
 	
 	var btapp =  
 	{
-		peer_id : vzWrapAndEval(bt2vuze('peer_id')),
+		peer_id : bt2vuze('peer_id'),
 		settings : {
 			all : function() { return vzWrapAndEval(bt2vuze('settings.all')) }, 
 		  keys : function() { return bt2vuze('settings.keys') }, 
