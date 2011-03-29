@@ -9,3 +9,34 @@ TODOS
 
 - most set methods not implemented (only stash.set and events.set implemented)
 
+
+Differences from BT spec at http://btapps-sdk.bittorrent.com/doc/api.html
+====
+
+- All Peer properties are missing explanations in the official spec, so I guessed
+
+- btapp.peer_id returns "VuzeConstantPeerID".  In Vuze, our peer id is unique to the torrent.
+
+- torrent property "progress" has inconsistent definitions in spec. 
+  One spec example shows progress from 0 - 1000
+  Another spec example shows progress as a percentage float (0.5)
+  The intent seems to be 0 - 1000, so we use that
+  
+- APIs not implemented:
+    Torrent.properties.set
+    File.get_data
+    File.properties.set
+    Peer.properties.set
+    btapp.add.rss_feed
+    btapp.add.rss_filter
+    btapp.sendmsg
+
+- Torrent properties not implemented:
+   * seed_ratio (no idea what it is)
+   * trackers
+   * superseed
+   * dht
+   * pex
+   * seed_override (no idea)
+   * ulslots
+   * rss_feed_url

@@ -49,6 +49,12 @@ public class BtAppListView
 	private List listApps;
 
 	private static boolean alreadyCreatedStuff = false;
+	
+	private String[] listExcludeAppIDs = { 
+		"14c4d", // VLC, since it requires an VLC installer component
+		"686ca96", // Skins, since we don't support uTorrent style skins
+		"874a21f0", // Virus Guard, which required an installer component
+	};
 
 	public BtAppListView() {
 	}
@@ -213,7 +219,16 @@ public class BtAppListView
 					if (appObject instanceof Map) {
 						BtAppDataSource appInfo = new BtAppDataSource((Map) appObject,
 								browser);
-						tv.addDataSource(appInfo);
+						boolean skip = false;
+						for (String badAppId : listExcludeAppIDs) {
+							if (badAppId.equals(appInfo.getOurAppId())) {
+								skip = true;
+								break;
+							}
+						}
+						if (!skip) {
+							tv.addDataSource(appInfo);
+						}
 					} else if (appObject instanceof BtAppDataSource) {
 						tv.addDataSource((BtAppDataSource) appObject);
 					}

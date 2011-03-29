@@ -71,7 +71,6 @@ if (true) {
 	}
 	vzTorrentVarFile.prototype.get = function(key) { return new vzTorrentFile(this, this.hash, key) },
 	vzTorrentVarFile.prototype.keys = function() { return bt2vuze('torrent.file.keys', this.hash) },
-	vzTorrentVarFile.prototype.set = function(key, value) { bt2vuze('torrent.file.set', this.hash, key, value) },
 	vzTorrentVarFile.prototype.all = function() { return vzWrapAndEval(bt2vuze('torrent.file.all', this.hash)) } 
 	
 	// the 'properties' variable in vzTorrent

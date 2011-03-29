@@ -864,7 +864,10 @@ public class BtAppView
 
 				map.put("downloaded", stats.getDownloaded());
 				map.put("uploaded", stats.getUploaded());
-				map.put("progress", stats.getDownloadCompleted(true) / 1.0);
+				// One spec example shows progress from 0 - 1000
+				// Another spec example shows progress as a percentage float (0.5)
+				// Seems most assume 0 - 1000
+				map.put("progress", stats.getDownloadCompleted(true));
 				long etaSecs = stats.getETASecs();
 				map.put("eta", etaSecs > 0 ? etaSecs : 0);
 				map.put("ratio", stats.getShareRatio() / 1000.0);
@@ -953,7 +956,7 @@ public class BtAppView
 		// rest aren't in the spec, just guessing at this point..
 		mapPropertyVals.put("port", peer.getPort());
 		mapPropertyVals.put("progress",
-				peer.getPercentDoneInThousandNotation() / 1000.0);
+				peer.getPercentDoneInThousandNotation());
 
 		return mapPropertyVals;
 	}
@@ -1047,24 +1050,36 @@ public class BtAppView
 		fd.top = new FormAttachment(lblRateLimiter);
 		btnDisposeOnLostSelection.setLayoutData(fd);
 
-		showOptionsArea();
-
 		browser = new Browser(parent, SWT.NONE);
 		browser.setLayoutData(new GridData(GridData.FILL_BOTH));
 
+		// load first from class dir, 2nd from plugin app dir
+		File dirJS = new File(pi.getPluginDirectoryName(), "js");
 		try {
-			InputStream is = BtAppView.class.getResourceAsStream("btapp.js");
+			InputStream is = BtAppView.class.getResourceAsStream("/js/btapp.js");
 			jsBtApp = FileUtil.readInputStreamAsString(is, -1);
 			is.close();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		if (jsBtApp == null) {
+			try {
+				jsBtApp = FileUtil.readFileAsString(new File(dirJS, "btapp.js"), -1);
+			} catch (IOException e) {
+			}
+		}
 		try {
-			InputStream is = BtAppView.class.getResourceAsStream("jquery.ajaxproxy.js");
+			InputStream is = BtAppView.class.getResourceAsStream("/js/jquery.ajaxproxy.js");
 			jsAjax = FileUtil.readInputStreamAsString(is, -1);
 			is.close();
 		} catch (Exception e) {
 			e.printStackTrace();
+		}
+		if (jsAjax == null) {
+			try {
+				jsAjax = FileUtil.readFileAsString(new File(dirJS, "jquery.ajaxproxy.js"), -1);
+			} catch (IOException e) {
+			}
 		}
 
 		browserFunction = new BrowserFunction(browser, "bt2vuze") {
@@ -1319,7 +1334,7 @@ public class BtAppView
 		if (lfunc.equals("peer_id")) {
 			// We generate peer_id per torrent.. so just fudge this
 			// Maybe the specs mean this should be an unique user/app id?
-			result = "'VuzeConstantPeerID'";
+			result = "VuzeConstantPeerID";
 
 		} else if (lfunc.equals("settings.all")) {
 			result = api_settings_all(args);
@@ -1374,9 +1389,6 @@ public class BtAppView
 
 		} else if (lfunc.equals("torrent.file.all")) {
 			result = api_torrent_file_all(args);
-
-		} else if (lfunc.equals("torrent.file.set")) {
-			result = api_not_implemented();
 
 		} else if (lfunc.equals("torrent.file.keys")) {
 			result = api_torrent_file_keys(args);
