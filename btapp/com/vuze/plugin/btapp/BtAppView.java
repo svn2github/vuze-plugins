@@ -47,15 +47,15 @@ public class BtAppView
 	// and only after RATE_LIMITER_SPAN ms of API activity.
 	// If the api call rate is over RATE_LIMITER_MAX each new API call will
 	// sleep for least RATE_LIMITER_SLEEPFOR, until the count goes down to near 0
-	
+
 	// Essentially it means the plugin can suck your CPU for up to 
 	// RATE_LIMITER_SPAN before it gets rate limited
 	private static final int RATE_LIMITER_MAX = 1000;
-	
+
 	private static final int RATE_LIMITER_SPAN = 10000;
-	
+
 	private static final int RATE_LIMITER_SLEEPFOR = 10;
-	
+
 	private boolean rateLimiterFullSpan = false;
 
 	private LinkedList<Long> rateLimiterList = new LinkedList<Long>();
@@ -84,6 +84,8 @@ public class BtAppView
 	private Map<String, String> mapEventToJsFunc = new HashMap<String, String>(0);
 
 	private Map<String, String> mapStash = new HashMap<String, String>();
+
+	private List<String> listOwnedTorrents = new ArrayList<String>();
 
 	private Composite parent;
 
@@ -199,7 +201,7 @@ public class BtAppView
 	public BtAppView() {
 	}
 
-	protected String api_add_torrent(Object[] args) {
+	protected Object api_add_torrent(Object[] args) {
 		if (args.length > 1) {
 			String arg = (String) args[1];
 			File file = new File(arg);
@@ -207,7 +209,8 @@ public class BtAppView
 				try {
 					Torrent torrent = pi.getTorrentManager().createFromBEncodedFile(file);
 					if (torrent != null) {
-						// TODO store hash
+						listOwnedTorrents.add(ByteFormatter.encodeString(torrent.getHash()));
+
 						pi.getDownloadManager().addDownload(torrent);
 
 						Map<String, Object> map = new HashMap<String, Object>();
@@ -216,7 +219,7 @@ public class BtAppView
 						map.put("hash", ByteFormatter.encodeString(torrent.getHash()));
 						triggerEvent("torrent", JSONUtils.encodeToJSON(map));
 					}
-					return "true";
+					return true;
 				} catch (Exception e) {
 					// todo: triggerEvent
 				}
@@ -228,12 +231,12 @@ public class BtAppView
 					asyncDownloadURL(url);
 				} catch (Exception e) {
 					// todo: triggerEvent
-					return "false";
+					return false;
 				}
-				return "true";
+				return false;
 			}
 		}
-		return "false";
+		return false;
 	}
 
 	protected String api_events_set(Object[] args) {
@@ -256,23 +259,19 @@ public class BtAppView
 		String hash40 = (String) args[1];
 		String peerid = (String) args[2];
 
-		byte[] hashBytes = ByteFormatter.decodeString(hash40);
-		try {
-			Download download = pi.getDownloadManager().getDownload(hashBytes);
-			if (download != null) {
-				PeerManager pm = download.getPeerManager();
-				if (pm != null) {
-					Peer[] peers = pm.getPeers();
-					for (Peer peer : peers) {
-						if (peer.getState() == Peer.TRANSFERING) {
-							if (peerid.equals(ByteFormatter.encodeString(peer.getId()))) {
-								return encodeToJavascript(getAllPeerProperties(peer));
-							}
+		Download download = getDownload(hash40);
+		if (download != null) {
+			PeerManager pm = download.getPeerManager();
+			if (pm != null) {
+				Peer[] peers = pm.getPeers();
+				for (Peer peer : peers) {
+					if (peer.getState() == Peer.TRANSFERING) {
+						if (peerid.equals(ByteFormatter.encodeString(peer.getId()))) {
+							return encodeToJavascript(getAllPeerProperties(peer));
 						}
 					}
 				}
 			}
-		} catch (DownloadException e) {
 		}
 
 		return "{ }";
@@ -286,23 +285,19 @@ public class BtAppView
 		String peerid = (String) args[2];
 		String key = (String) args[3];
 
-		byte[] hashBytes = ByteFormatter.decodeString(hash40);
-		try {
-			Download download = pi.getDownloadManager().getDownload(hashBytes);
-			if (download != null) {
-				PeerManager pm = download.getPeerManager();
-				if (pm != null) {
-					Peer[] peers = pm.getPeers();
-					for (Peer peer : peers) {
-						if (peer.getState() == Peer.TRANSFERING) {
-							if (peerid.equals(ByteFormatter.encodeString(peer.getId()))) {
-								return getAllPeerProperties(peer).get(key);
-							}
+		Download download = getDownload(hash40);
+		if (download != null) {
+			PeerManager pm = download.getPeerManager();
+			if (pm != null) {
+				Peer[] peers = pm.getPeers();
+				for (Peer peer : peers) {
+					if (peer.getState() == Peer.TRANSFERING) {
+						if (peerid.equals(ByteFormatter.encodeString(peer.getId()))) {
+							return getAllPeerProperties(peer).get(key);
 						}
 					}
 				}
 			}
-		} catch (DownloadException e) {
 		}
 
 		return null;
@@ -315,23 +310,19 @@ public class BtAppView
 		String hash40 = (String) args[1];
 		String peerid = (String) args[2];
 
-		byte[] hashBytes = ByteFormatter.decodeString(hash40);
-		try {
-			Download download = pi.getDownloadManager().getDownload(hashBytes);
-			if (download != null) {
-				PeerManager pm = download.getPeerManager();
-				if (pm != null) {
-					Peer[] peers = pm.getPeers();
-					for (Peer peer : peers) {
-						if (peer.getState() == Peer.TRANSFERING) {
-							if (peerid.equals(ByteFormatter.encodeString(peer.getId()))) {
-								return getAllPeerProperties(peer).keySet().toArray();
-							}
+		Download download = getDownload(hash40);
+		if (download != null) {
+			PeerManager pm = download.getPeerManager();
+			if (pm != null) {
+				Peer[] peers = pm.getPeers();
+				for (Peer peer : peers) {
+					if (peer.getState() == Peer.TRANSFERING) {
+						if (peerid.equals(ByteFormatter.encodeString(peer.getId()))) {
+							return getAllPeerProperties(peer).keySet().toArray();
 						}
 					}
 				}
 			}
-		} catch (DownloadException e) {
 		}
 
 		return new Object[0];
@@ -431,9 +422,21 @@ public class BtAppView
 				Torrent torrent = download.getTorrent();
 				if (torrent != null) {
 					byte[] hash = torrent.getHash();
-					String hashID = ByteFormatter.encodeString(hash);
+					String hash40 = ByteFormatter.encodeString(hash);
 
-					mapMain.put(hashID, buildTorrentJS(download, hashID));
+					mapMain.put(hash40, buildTorrentJS(download, hash40));
+				}
+			}
+		} else {
+			DownloadManager manager = pi.getDownloadManager();
+			for (String hash40 : listOwnedTorrents) {
+				try {
+					Download download = manager.getDownload(ByteFormatter.decodeString(hash40));
+					if (download != null) {
+						mapMain.put(hash40, buildTorrentJS(download, hash40));
+					}
+				} catch (Exception e) {
+					// ignore
 				}
 			}
 		}
@@ -447,23 +450,19 @@ public class BtAppView
 		String hash40 = (String) args[1];
 		Map<String, Object> map = new HashMap<String, Object>();
 
-		byte[] hashBytes = ByteFormatter.decodeString(hash40);
-		try {
-			Download download = pi.getDownloadManager().getDownload(hashBytes);
-			if (download != null) {
-				Torrent torrent = download.getTorrent();
-				if (torrent != null) {
-					DiskManagerFileInfo[] fileInfos = download.getDiskManagerFileInfo();
-					TorrentFile[] files = torrent.getFiles();
+		Download download = getDownload(hash40);
+		if (download != null) {
+			Torrent torrent = download.getTorrent();
+			if (torrent != null) {
+				DiskManagerFileInfo[] fileInfos = download.getDiskManagerFileInfo();
+				TorrentFile[] files = torrent.getFiles();
 
-					for (DiskManagerFileInfo info : fileInfos) {
-						int index = info.getIndex();
-						map.put("" + index,
-								buildTorrentFileJS(hash40, info, files[info.getIndex()]));
-					}
+				for (DiskManagerFileInfo info : fileInfos) {
+					int index = info.getIndex();
+					map.put("" + index,
+							buildTorrentFileJS(hash40, info, files[info.getIndex()]));
 				}
 			}
-		} catch (DownloadException e) {
 		}
 
 		return encodeToJavascript(map);
@@ -476,17 +475,13 @@ public class BtAppView
 		List<String> list = new ArrayList<String>();
 		String hash40 = (String) args[1];
 
-		byte[] hashBytes = ByteFormatter.decodeString(hash40);
-		try {
-			Download download = pi.getDownloadManager().getDownload(hashBytes);
-			if (download != null) {
-				DiskManagerFileInfo[] fileInfos = download.getDiskManagerFileInfo();
+		Download download = getDownload(hash40);
+		if (download != null) {
+			DiskManagerFileInfo[] fileInfos = download.getDiskManagerFileInfo();
 
-				for (DiskManagerFileInfo info : fileInfos) {
-					list.add("" + info.getIndex());
-				}
+			for (DiskManagerFileInfo info : fileInfos) {
+				list.add("" + info.getIndex());
 			}
-		} catch (DownloadException e) {
 		}
 
 		return list.toArray();
@@ -506,19 +501,15 @@ public class BtAppView
 			return "{ }";
 		}
 
-		byte[] hashBytes = ByteFormatter.decodeString(hash40);
-		try {
-			Download download = pi.getDownloadManager().getDownload(hashBytes);
-			if (download != null) {
-				DiskManagerFileInfo[] fileInfos = download.getDiskManagerFileInfo();
+		Download download = getDownload(hash40);
+		if (download != null) {
+			DiskManagerFileInfo[] fileInfos = download.getDiskManagerFileInfo();
 
-				if (index < fileInfos.length) {
-					TorrentUtil.runDataSources(new Object[] {
-						fileInfos[index]
-					});
-				}
+			if (index < fileInfos.length) {
+				TorrentUtil.runDataSources(new Object[] {
+					fileInfos[index]
+				});
 			}
-		} catch (DownloadException e) {
 		}
 
 		return null;
@@ -538,22 +529,18 @@ public class BtAppView
 			return "{ }";
 		}
 
-		byte[] hashBytes = ByteFormatter.decodeString(hash40);
-		try {
-			Download download = pi.getDownloadManager().getDownload(hashBytes);
-			if (download != null) {
-				Torrent torrent = download.getTorrent();
-				if (torrent != null) {
-					DiskManagerFileInfo[] fileInfos = download.getDiskManagerFileInfo();
-					TorrentFile[] files = torrent.getFiles();
+		Download download = getDownload(hash40);
+		if (download != null) {
+			Torrent torrent = download.getTorrent();
+			if (torrent != null) {
+				DiskManagerFileInfo[] fileInfos = download.getDiskManagerFileInfo();
+				TorrentFile[] files = torrent.getFiles();
 
-					if (index < fileInfos.length && index < files.length) {
-						return encodeToJavascript(getAllFileProperties(fileInfos[index],
-								files[index]));
-					}
+				if (index < fileInfos.length && index < files.length) {
+					return encodeToJavascript(getAllFileProperties(fileInfos[index],
+							files[index]));
 				}
 			}
-		} catch (DownloadException e) {
 		}
 
 		return "{ }";
@@ -575,20 +562,16 @@ public class BtAppView
 
 		String key = (String) args[3];
 
-		byte[] hashBytes = ByteFormatter.decodeString(hash40);
-		try {
-			Download download = pi.getDownloadManager().getDownload(hashBytes);
-			if (download != null) {
-				DiskManagerFileInfo fileInfo = download.getDiskManagerFileInfo(index);
-				//Incredibly Slow
-				//TorrentFile[] files = torrent.getFiles();
-				//if (index < fileInfos.length && index < files.length) {
+		Download download = getDownload(hash40);
+		if (download != null) {
+			DiskManagerFileInfo fileInfo = download.getDiskManagerFileInfo(index);
+			//Incredibly Slow
+			//TorrentFile[] files = torrent.getFiles();
+			//if (index < fileInfos.length && index < files.length) {
 
-				if (fileInfo != null) {
-					return getFileProperty(key, fileInfo);
-				}
+			if (fileInfo != null) {
+				return getFileProperty(key, fileInfo);
 			}
-		} catch (DownloadException e) {
 		}
 
 		return null;
@@ -608,21 +591,17 @@ public class BtAppView
 			return new Object[0];
 		}
 
-		byte[] hashBytes = ByteFormatter.decodeString(hash40);
-		try {
-			Download download = pi.getDownloadManager().getDownload(hashBytes);
-			if (download != null) {
-				Torrent torrent = download.getTorrent();
-				if (torrent != null) {
-					DiskManagerFileInfo[] fileInfos = download.getDiskManagerFileInfo();
-					TorrentFile[] files = torrent.getFiles();
+		Download download = getDownload(hash40);
+		if (download != null) {
+			Torrent torrent = download.getTorrent();
+			if (torrent != null) {
+				DiskManagerFileInfo[] fileInfos = download.getDiskManagerFileInfo();
+				TorrentFile[] files = torrent.getFiles();
 
-					if (index < fileInfos.length && index < files.length) {
-						return getAllFileProperties(fileInfos[index], files[index]).keySet().toArray();
-					}
+				if (index < fileInfos.length && index < files.length) {
+					return getAllFileProperties(fileInfos[index], files[index]).keySet().toArray();
 				}
 			}
-		} catch (DownloadException e) {
 		}
 
 		return new Object[0];
@@ -641,6 +620,18 @@ public class BtAppView
 					list.add(hashID);
 				}
 			}
+		} else {
+			DownloadManager manager = pi.getDownloadManager();
+			for (String hash40 : listOwnedTorrents) {
+				try {
+					Download download = manager.getDownload(ByteFormatter.decodeString(hash40));
+					if (download != null) {
+						list.add(hash40);
+					}
+				} catch (Exception e) {
+					// ignore
+				}
+			}
 		}
 		return list.toArray();
 	}
@@ -651,22 +642,18 @@ public class BtAppView
 		}
 		Map<String, String> map = new HashMap<String, String>();
 		String hash40 = (String) args[1];
-		byte[] hashBytes = ByteFormatter.decodeString(hash40);
-		try {
-			Download download = pi.getDownloadManager().getDownload(hashBytes);
-			if (download != null) {
-				PeerManager pm = download.getPeerManager();
-				if (pm != null) {
-					Peer[] peers = pm.getPeers();
-					for (Peer peer : peers) {
-						if (peer.getState() == Peer.TRANSFERING) {
-							String key = ByteFormatter.encodeString(peer.getId());
-							map.put(key, buildPeerJS(hash40, peer));
-						}
+		Download download = getDownload(hash40);
+		if (download != null) {
+			PeerManager pm = download.getPeerManager();
+			if (pm != null) {
+				Peer[] peers = pm.getPeers();
+				for (Peer peer : peers) {
+					if (peer.getState() == Peer.TRANSFERING) {
+						String key = ByteFormatter.encodeString(peer.getId());
+						map.put(key, buildPeerJS(hash40, peer));
 					}
 				}
 			}
-		} catch (DownloadException e) {
 		}
 
 		return encodeToJavascript(map);
@@ -678,21 +665,17 @@ public class BtAppView
 		}
 		List<String> list = new ArrayList<String>();
 		String hash40 = (String) args[1];
-		byte[] hashBytes = ByteFormatter.decodeString(hash40);
-		try {
-			Download download = pi.getDownloadManager().getDownload(hashBytes);
-			if (download != null) {
-				PeerManager pm = download.getPeerManager();
-				if (pm != null) {
-					Peer[] peers = pm.getPeers();
-					for (Peer peer : peers) {
-						if (peer.getState() == Peer.TRANSFERING) {
-							list.add(ByteFormatter.encodeString(peer.getId()));
-						}
+		Download download = getDownload(hash40);
+		if (download != null) {
+			PeerManager pm = download.getPeerManager();
+			if (pm != null) {
+				Peer[] peers = pm.getPeers();
+				for (Peer peer : peers) {
+					if (peer.getState() == Peer.TRANSFERING) {
+						list.add(ByteFormatter.encodeString(peer.getId()));
 					}
 				}
 			}
-		} catch (DownloadException e) {
 		}
 
 		return list.toArray();
@@ -704,7 +687,7 @@ public class BtAppView
 		}
 		String hash40 = (String) args[1];
 
-		Map<String, Object> properties = getAllDownloadProperties(ByteFormatter.decodeString(hash40));
+		Map<String, Object> properties = getAllDownloadProperties(hash40);
 
 		return JSONUtils.encodeToJSON(properties);
 	}
@@ -715,7 +698,7 @@ public class BtAppView
 		}
 		String hash40 = (String) args[1];
 		String key = (String) args[2];
-		Map<String, Object> properties = getAllDownloadProperties(ByteFormatter.decodeString(hash40));
+		Map<String, Object> properties = getAllDownloadProperties(hash40);
 		Object val = properties.get(key);
 		return val;
 	}
@@ -726,7 +709,7 @@ public class BtAppView
 		}
 		String hash40 = (String) args[1];
 
-		Map<String, Object> properties = getAllDownloadProperties(ByteFormatter.decodeString(hash40));
+		Map<String, Object> properties = getAllDownloadProperties(hash40);
 
 		return properties.keySet().toArray();
 	}
@@ -798,7 +781,7 @@ public class BtAppView
 			case UISWTViewEvent.TYPE_DESTROY:
 				unloadApp();
 				break;
-				
+
 			case UISWTViewEvent.TYPE_REFRESH:
 				reduceRateLimiterList();
 
@@ -816,16 +799,19 @@ public class BtAppView
 					return;
 				}
 				String s;
-				if (rateLimiterList.size() > 1) {
-					long span = SystemTime.getCurrentTime() - rateLimiterList.getFirst();
-					
-					s = "api: " + (rateLimiterList.size() * 1000 / span) + "/s";
-				} else {
-					s = "";
+				synchronized (rateLimiterList) {
+
+					if (rateLimiterList.size() > 1) {
+						long span = SystemTime.getCurrentTime()
+								- rateLimiterList.getFirst();
+
+						s = "api: " + (rateLimiterList.size() * 1000 / span) + "/s";
+					} else {
+						s = "";
+					}
 				}
-				
+
 				lblRateLimiter.setText(s);
-				//lblRateLimiter.getParent().layout();
 			}
 		});
 	}
@@ -845,11 +831,11 @@ public class BtAppView
 		});
 	}
 
-	private Map<String, Object> getAllDownloadProperties(byte[] hash) {
+	private Map<String, Object> getAllDownloadProperties(String hash40) {
 		Map<String, Object> map = new HashMap<String, Object>();
 
 		try {
-			Download download = pi.getDownloadManager().getDownload(hash);
+			Download download = getDownload(hash40);
 			if (download != null) {
 
 				map.put("name", Plugin.jsTextify(download.getName()));
@@ -878,7 +864,7 @@ public class BtAppView
 
 				map.put("downloaded", stats.getDownloaded());
 				map.put("uploaded", stats.getUploaded());
-				map.put("progress", stats.getDownloadCompleted(true) / 1000.0);
+				map.put("progress", stats.getDownloadCompleted(true) / 1.0);
 				long etaSecs = stats.getETASecs();
 				map.put("eta", etaSecs > 0 ? etaSecs : 0);
 				map.put("ratio", stats.getShareRatio() / 1000.0);
@@ -1040,7 +1026,7 @@ public class BtAppView
 				}
 			}
 		});
-		
+
 		Button btnDisposeOnLostSelection = new Button(cOptionsArea, SWT.CHECK);
 		btnDisposeOnLostSelection.setText("Dispose of browser when switching away from view");
 
@@ -1052,7 +1038,6 @@ public class BtAppView
 			}
 		});
 
-		
 		fd = new FormData();
 		fd.left = new FormAttachment(0, 0);
 		fd.right = new FormAttachment(100, 0);
@@ -1061,9 +1046,8 @@ public class BtAppView
 		fd = new FormData();
 		fd.top = new FormAttachment(lblRateLimiter);
 		btnDisposeOnLostSelection.setLayoutData(fd);
-		
-		showOptionsArea();
 
+		showOptionsArea();
 
 		browser = new Browser(parent, SWT.NONE);
 		browser.setLayoutData(new GridData(GridData.FILL_BOTH));
@@ -1241,7 +1225,14 @@ public class BtAppView
 					"utf-8");
 			Object object = JSONValue.parse(reader);
 			if (object instanceof Map) {
-				mapStash.putAll((Map) object);
+				Map savedStash = (Map) object;
+				if (savedStash.containsKey("torrents")
+						&& savedStash.containsKey("stash")) {
+					listOwnedTorrents.addAll((Collection) savedStash.get("torrents"));
+					mapStash.putAll((Map) savedStash.get("stash"));
+				} else {
+					mapStash.putAll(savedStash);
+				}
 			}
 		} catch (Exception e) {
 			log("StashLoad: " + e.getMessage());
@@ -1300,7 +1291,8 @@ public class BtAppView
 						setRateLimiting(false);
 						log("Rate Limiting OFF");
 					}
-				} else if (count >= RATE_LIMITER_MAX && (now - rateLimiterList.getFirst()) > (RATE_LIMITER_SPAN * 0.95)) {
+				} else if (count >= RATE_LIMITER_MAX
+						&& (now - rateLimiterList.getFirst()) > (RATE_LIMITER_SPAN * 0.95)) {
 					if (!isRateLimitingAndFull()) {
 						setRateLimiting(true);
 						log("Rate Limiting ON");
@@ -1438,17 +1430,18 @@ public class BtAppView
 			if (pi == null) {
 				return;
 			}
-			long gracePeriod = pi.getUtilities().getCurrentSystemTime() - RATE_LIMITER_SPAN;
+			long gracePeriod = pi.getUtilities().getCurrentSystemTime()
+					- RATE_LIMITER_SPAN;
 			if (rateLimiterList.size() > 0) {
 				Long first = rateLimiterList.getFirst();
 				if (first != null && first < gracePeriod) {
 					setFullSpan(true);
-					
-  				while (first != null && first < gracePeriod) {
-  					rateLimiterList.removeFirst();
-  					first = rateLimiterList.size() == 0 ? null
-  							: rateLimiterList.getFirst();
-  				}
+
+					while (first != null && first < gracePeriod) {
+						rateLimiterList.removeFirst();
+						first = rateLimiterList.size() == 0 ? null
+								: rateLimiterList.getFirst();
+					}
 				}
 			} else {
 				setFullSpan(false);
@@ -1471,6 +1464,8 @@ public class BtAppView
 			Torrent torrent = urlDownloader.download();
 			pi.getDownloadManager().addDownload(torrent);
 
+			listOwnedTorrents.add(ByteFormatter.encodeString(torrent.getHash()));
+
 			map.put("status", 200);
 			map.put("message", "success");
 			map.put("url", url.toExternalForm());
@@ -1487,9 +1482,12 @@ public class BtAppView
 
 	public void triggerEvent(final String event, final String result) {
 		synchronized (mapEventToJsFunc) {
+			log("Trigger event " + event + " with " + result);
 			String jsFunc = mapEventToJsFunc.get(event);
 			if (jsFunc != null) {
 				executeJS("(" + jsFunc + ").call(this, " + result + ")");
+			} else {
+				log("  failed.. no Function to call");
 			}
 		}
 	}
@@ -1503,17 +1501,20 @@ public class BtAppView
 		if (btAppWebServ != null) {
 			btAppWebServ.delete();
 			btAppWebServ = null;
-		}
 
-		if (mapStash.size() > 0) {
 			// We don't use pi.getUtilities().writeResilientBEncodedFile(..) because
 			// it has a history of not working with certain non-ASCII map keys
 			File stashFile = pi.getPluginconfig().getPluginUserFile(
 					getAppId() + ".stash");
-			FileUtil.writeStringAsFile(stashFile, JSONUtils.encodeToJSON(mapStash));
-
-			mapStash.clear();
+			Map map = new HashMap();
+			map.put("stash", mapStash);
+			map.put("torrents", listOwnedTorrents);
+			String json = JSONUtils.encodeToJSON(map);
+			FileUtil.writeStringAsFile(stashFile, json);
 		}
+
+		listOwnedTorrents.clear();
+		mapStash.clear();
 		mapEventToJsFunc.clear();
 
 		Utils.execSWTThread(new Runnable() {
@@ -1541,7 +1542,7 @@ public class BtAppView
 		this.isRateLimiting = isRateLimiting;
 		updateTitle();
 	}
-	
+
 	public void updateTitle() {
 		Utils.execSWTThread(new Runnable() {
 			public void run() {
@@ -1572,5 +1573,21 @@ public class BtAppView
 
 	public boolean isFullSpan() {
 		return rateLimiterFullSpan;
+	}
+
+	private Download getDownload(String hash40) {
+		try {
+			if ((accessMode & PRIV_READALL) > 0) {
+				byte[] hashBytes = ByteFormatter.decodeString(hash40);
+				return pi.getDownloadManager().getDownload(hashBytes);
+			} else {
+				if (listOwnedTorrents.contains(hash40)) {
+					byte[] hashBytes = ByteFormatter.decodeString(hash40);
+					return pi.getDownloadManager().getDownload(hashBytes);
+				}
+			}
+		} catch (Exception e) {
+		}
+		return null;
 	}
 }
