@@ -1043,7 +1043,11 @@ public class BtAppView
 		btnDisposeOnLostSelection.setLayoutData(fd);
 
 		browser = new Browser(parent, SWT.NONE);
-		browser.setUrl("about:blank");
+		if (browser.evaluate("return 0") == null) {
+			// Some browsers (IE) won't do javascript until about:blank is loaded
+			// Other browsers (Safari) mess up on BrowserFunction when set to about:blank
+			browser.setUrl("about:blank");
+		}
 		browser.setLayoutData(new GridData(GridData.FILL_BOTH));
 
 		// load first from class dir, 2nd from plugin app dir
