@@ -1,7 +1,6 @@
 try {
 // checking for btapp doesn't work.. the prototype stuff seems to get lost!
 //if (!btapp) { 
-if (true) {
 	function vzWrapAndEval(s) {
 		if (s == null) {
 			return null;
@@ -11,7 +10,7 @@ if (true) {
 	
 	var btapp =  
 	{
-		peer_id : bt2vuze('peer_id'),
+		peer_id : 'VuzeConstantPeerID',
 		settings : {
 			all : function() { return vzWrapAndEval(bt2vuze('settings.all')) }, 
 		  keys : function() { return bt2vuze('settings.keys') }, 
@@ -55,7 +54,12 @@ if (true) {
 		resource : function(key) { return vzWrapAndEval(bt2vuze('resource', key)) }, 
 		sendmsg : function(key, x, y, s) { alert("sendmsg(" + key + ", ..) not supported") }
 	};
-	
+
+} catch (err) {
+	alert("btapp registration error\n" + err.description);
+}
+
+try {
 	// The 'peer' variable in vzTorrent
 	function vzTorrentVarPeer(torrent, hash) {
 		this.hash = hash;
@@ -144,9 +148,6 @@ if (true) {
 	vzTorrentFile.prototype.get_data = function() { return vzWrapAndEval(bt2vuze('torrent.file.get_data', this.hash, this.index)) };
 	
 	btapp.log("btapp registered");
-} else {
-	alert("already registered " + vzTorrentFile.prototype.open)
-}
 } catch (err) {
-	alert(err);
+	alert("btapp object registration error\n" + err.description);
 }
