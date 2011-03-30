@@ -105,7 +105,7 @@ public class BtAppView
 
 	private boolean disposeOnFocusOut = true;
 
-	private static String encodeToJavascript(List list) {
+	private static String encodeToJavascript(List<?> list) {
 		StringBuffer sb = new StringBuffer();
 		boolean first = true;
 		sb.append("[ ");
@@ -172,14 +172,9 @@ public class BtAppView
 
 	private static String encodeToJavascript(String s) {
 		StringBuffer sb = new StringBuffer();
-		if (s.startsWith("function") || s.startsWith("{") || s.startsWith("[")
-				|| s.startsWith("new ") || s.startsWith("(new ")) {
-			sb.append(s);
-		} else {
-			sb.append('\"');
-			sb.append(Plugin.jsTextify(s));
-			sb.append('\"');
-		}
+		sb.append('\"');
+		sb.append(Plugin.jsTextify(s));
+		sb.append('\"');
 
 		return sb.toString();
 	}
@@ -248,13 +243,14 @@ public class BtAppView
 		return "undefined";
 	}
 
-	private String api_not_implemented() {
-		return "throw 'not implemented'";
+	private StringDirect api_not_implemented() {
+		// probably doesn't actually throw
+		return new StringDirect("throw 'not implemented'");
 	}
 
-	private String api_peer_properties_all(Object[] args) {
+	private Object api_peer_properties_all(Object[] args) {
 		if (args.length < 3) {
-			return "{ }";
+			return Collections.EMPTY_MAP;
 		}
 		String hash40 = (String) args[1];
 		String peerid = (String) args[2];
@@ -267,14 +263,14 @@ public class BtAppView
 				for (Peer peer : peers) {
 					if (peer.getState() == Peer.TRANSFERING) {
 						if (peerid.equals(ByteFormatter.encodeString(peer.getId()))) {
-							return encodeToJavascript(getAllPeerProperties(peer));
+							return getAllPeerProperties(peer);
 						}
 					}
 				}
 			}
 		}
 
-		return "{ }";
+		return Collections.EMPTY_MAP;
 	}
 
 	private Object api_peer_properties_get(Object[] args) {
@@ -335,6 +331,11 @@ public class BtAppView
 			if (file.exists()) {
 				try {
 					String fileText = Plugin.jsTextify(FileUtil.readFileAsString(file, -1));
+					// IE HACK.. stylesheet link placed into the body via javascript
+					// won't run unless there's a script or img tag before it..
+					if (fileText.contains("text/css") && fileText.contains("stylesheet")) {
+						fileText = Plugin.jsTextify("<script src=\"\"></script>") + fileText;
+					}
 					return "\"" + fileText + "\"";
 				} catch (IOException e) {
 				}
@@ -343,37 +344,15 @@ public class BtAppView
 		return "\"\"";
 	}
 
-	protected String api_settings_all(Object[] args) {
+	protected Object api_settings_all(Object[] args) {
 		StringBuffer sb = new StringBuffer();
 		Map<String, Object> allSettings = getAllSettings();
-		boolean first = true;
-		sb.append("{ ");
-		for (Iterator<String> iter = allSettings.keySet().iterator(); iter.hasNext();) {
-			String key = iter.next();
-			if (first) {
-				first = false;
-			} else {
-				sb.append(", ");
-			}
-			sb.append('\"');
-			sb.append(key);
-			sb.append("\" : \"");
-			sb.append(allSettings.get(key));
-			sb.append('\"');
-		}
-		sb.append(" }");
-		return sb.toString();
+		return allSettings;
 	}
 
-	protected String api_settings_get(Object[] args) {
+	protected Object api_settings_get(Object[] args) {
 		Map<String, Object> allSettings = getAllSettings();
-		Object object = allSettings.get(args[1]);
-
-		StringBuffer sb = new StringBuffer();
-		sb.append("\"");
-		sb.append(object);
-		sb.append("\"");
-		return sb.toString();
+		return allSettings.get(args[1]);
 	}
 
 	protected Object[] api_settings_keys(Object[] args) {
@@ -413,8 +392,18 @@ public class BtAppView
 		return null;
 	}
 
+	protected String api_stash_unset(Object[] args) {
+		if (args.length > 1) {
+			synchronized (mapStash) {
+				String key = (String) args[1];
+				mapStash.remove((String) args[1]);
+			}
+		}
+		return null;
+	}
+
 	protected String api_torrent_all(Object[] args) {
-		Map<String, String> mapMain = new HashMap<String, String>();
+		Map<String, Object> mapMain = new HashMap<String, Object>();
 		if ((accessMode & PRIV_READALL) > 0) {
 			Download[] downloads = pi.getDownloadManager().getDownloads();
 
@@ -487,7 +476,7 @@ public class BtAppView
 		return list.toArray();
 	}
 
-	protected String api_torrent_file_open(Object[] args) {
+	protected Object api_torrent_file_open(Object[] args) {
 		if (args.length < 3) {
 			return null;
 		}
@@ -498,7 +487,7 @@ public class BtAppView
 		} else if (args[2] instanceof String) {
 			index = Integer.valueOf((String) args[2]);
 		} else {
-			return "{ }";
+			return null;
 		}
 
 		Download download = getDownload(hash40);
@@ -515,9 +504,9 @@ public class BtAppView
 		return null;
 	}
 
-	private String api_torrent_file_properties_all(Object[] args) {
+	private Map<?, ?> api_torrent_file_properties_all(Object[] args) {
 		if (args.length < 2) {
-			return "{ }";
+			return Collections.EMPTY_MAP;
 		}
 		String hash40 = (String) args[1];
 		int index;
@@ -526,7 +515,7 @@ public class BtAppView
 		} else if (args[2] instanceof String) {
 			index = Integer.valueOf((String) args[2]);
 		} else {
-			return "{ }";
+			return Collections.EMPTY_MAP;
 		}
 
 		Download download = getDownload(hash40);
@@ -537,13 +526,12 @@ public class BtAppView
 				TorrentFile[] files = torrent.getFiles();
 
 				if (index < fileInfos.length && index < files.length) {
-					return encodeToJavascript(getAllFileProperties(fileInfos[index],
-							files[index]));
+					return getAllFileProperties(fileInfos[index], files[index]);
 				}
 			}
 		}
 
-		return "{ }";
+		return Collections.EMPTY_MAP;
 	}
 
 	private Object api_torrent_file_properties_get(Object[] args) {
@@ -636,11 +624,11 @@ public class BtAppView
 		return list.toArray();
 	}
 
-	private String api_torrent_peer_all(Object[] args) {
+	private Map<?, ?> api_torrent_peer_all(Object[] args) {
 		if (args.length < 2) {
-			return "{ }";
+			return Collections.EMPTY_MAP;
 		}
-		Map<String, String> map = new HashMap<String, String>();
+		Map<String, Object> map = new HashMap<String, Object>();
 		String hash40 = (String) args[1];
 		Download download = getDownload(hash40);
 		if (download != null) {
@@ -656,7 +644,7 @@ public class BtAppView
 			}
 		}
 
-		return encodeToJavascript(map);
+		return map;
 	}
 
 	private Object[] api_torrent_peer_keys(Object[] args) {
@@ -722,19 +710,19 @@ public class BtAppView
 		});
 	}
 
-	private String buildPeerJS(String hash40, Peer peer) {
-		return "(new vzPeer(this, '" + hash40 + "', '"
-				+ Plugin.jsTextify(ByteFormatter.encodeString(peer.getId())) + "'))";
+	private StringDirect buildPeerJS(String hash40, Peer peer) {
+		return new StringDirect("(new vzPeer(this, '" + hash40 + "', '"
+				+ Plugin.jsTextify(ByteFormatter.encodeString(peer.getId())) + "'))");
 	}
 
-	private String buildTorrentFileJS(String hash40, DiskManagerFileInfo info,
-			TorrentFile file) {
-		return "(new vzTorrentFile(this, '" + hash40 + "', " + info.getIndex()
-				+ ", " + encodeToJavascript(file.getName()) + "))";
+	private StringDirect buildTorrentFileJS(String hash40,
+			DiskManagerFileInfo info, TorrentFile file) {
+		return new StringDirect("(new vzTorrentFile(this, '" + hash40 + "', "
+				+ info.getIndex() + ", \"" + Plugin.jsTextify(file.getName()) + "\"))");
 	}
 
-	private String buildTorrentJS(Download download, String hash40) {
-		return "(new vzTorrent('" + hash40 + "'))";
+	private StringDirect buildTorrentJS(Download download, String hash40) {
+		return new StringDirect("(new vzTorrent('" + hash40 + "'))");
 	}
 
 	public boolean eventOccurred(UISWTViewEvent event) {
@@ -798,16 +786,16 @@ public class BtAppView
 				if (lblRateLimiter == null || lblRateLimiter.isDisposed()) {
 					return;
 				}
-				String s;
+				String s = "";
 				synchronized (rateLimiterList) {
 
 					if (rateLimiterList.size() > 1) {
 						long span = SystemTime.getCurrentTime()
 								- rateLimiterList.getFirst();
 
-						s = "api: " + (rateLimiterList.size() * 1000 / span) + "/s";
-					} else {
-						s = "";
+						if (span > 0) {
+							s = "api: " + (rateLimiterList.size() * 1000 / span) + "/s";
+						}
 					}
 				}
 
@@ -955,8 +943,7 @@ public class BtAppView
 
 		// rest aren't in the spec, just guessing at this point..
 		mapPropertyVals.put("port", peer.getPort());
-		mapPropertyVals.put("progress",
-				peer.getPercentDoneInThousandNotation());
+		mapPropertyVals.put("progress", peer.getPercentDoneInThousandNotation());
 
 		return mapPropertyVals;
 	}
@@ -968,6 +955,11 @@ public class BtAppView
 	public void insertAjaxProxy() {
 		log("Inserting AJAX proxy");
 		executeJS(jsAjax);
+	}
+
+	public void insertBtAppJS() {
+		log("Inserting btapp js");
+		executeJS(jsBtApp);
 	}
 
 	private void loadApp(Composite parent) {
@@ -1051,6 +1043,7 @@ public class BtAppView
 		btnDisposeOnLostSelection.setLayoutData(fd);
 
 		browser = new Browser(parent, SWT.NONE);
+		browser.setUrl("about:blank");
 		browser.setLayoutData(new GridData(GridData.FILL_BOTH));
 
 		// load first from class dir, 2nd from plugin app dir
@@ -1060,7 +1053,6 @@ public class BtAppView
 			jsBtApp = FileUtil.readInputStreamAsString(is, -1);
 			is.close();
 		} catch (Exception e) {
-			e.printStackTrace();
 		}
 		if (jsBtApp == null) {
 			try {
@@ -1073,11 +1065,11 @@ public class BtAppView
 			jsAjax = FileUtil.readInputStreamAsString(is, -1);
 			is.close();
 		} catch (Exception e) {
-			e.printStackTrace();
 		}
 		if (jsAjax == null) {
 			try {
-				jsAjax = FileUtil.readFileAsString(new File(dirJS, "jquery.ajaxproxy.js"), -1);
+				jsAjax = FileUtil.readFileAsString(new File(dirJS,
+						"jquery.ajaxproxy.js"), -1);
 			} catch (IOException e) {
 			}
 		}
@@ -1130,7 +1122,7 @@ public class BtAppView
 					setRateLimiting(false);
 					rateLimiterList.clear();
 				}
-				browser.execute(jsBtApp);
+				insertBtAppJS();
 			}
 
 			public void changing(LocationEvent event) {
@@ -1363,6 +1355,9 @@ public class BtAppView
 		} else if (lfunc.equals("stash.set")) {
 			result = api_stash_set(args);
 
+		} else if (lfunc.equals("stash.unset")) {
+			result = api_stash_unset(args);
+
 		} else if (lfunc.equals("stash.get")) {
 			result = api_stash_get(args);
 
@@ -1374,6 +1369,24 @@ public class BtAppView
 
 		} else if (lfunc.equals("torrent.keys")) {
 			result = api_torrent_keys(args);
+
+		} else if (lfunc.equals("torrent.recheck")) {
+			result = api_not_implemented();
+
+		} else if (lfunc.equals("torrent.remove")) {
+			result = api_not_implemented();
+
+		} else if (lfunc.equals("torrent.pause")) {
+			result = api_not_implemented();
+
+		} else if (lfunc.equals("torrent.stop")) {
+			result = api_not_implemented();
+
+		} else if (lfunc.equals("torrent.unpause")) {
+			result = api_not_implemented();
+
+		} else if (lfunc.equals("torrent.start")) {
+			result = api_not_implemented();
 
 		} else if (lfunc.equals("torrent.properties.all")) {
 			result = api_torrent_properties_all(args);
@@ -1518,7 +1531,7 @@ public class BtAppView
 			// it has a history of not working with certain non-ASCII map keys
 			File stashFile = pi.getPluginconfig().getPluginUserFile(
 					getAppId() + ".stash");
-			Map map = new HashMap();
+			Map<String, Object> map = new HashMap<String, Object>();
 			map.put("stash", mapStash);
 			map.put("torrents", listOwnedTorrents);
 			String json = JSONUtils.encodeToJSON(map);
@@ -1592,14 +1605,26 @@ public class BtAppView
 			if ((accessMode & PRIV_READALL) > 0) {
 				byte[] hashBytes = ByteFormatter.decodeString(hash40);
 				return pi.getDownloadManager().getDownload(hashBytes);
-			} else {
-				if (listOwnedTorrents.contains(hash40)) {
-					byte[] hashBytes = ByteFormatter.decodeString(hash40);
-					return pi.getDownloadManager().getDownload(hashBytes);
-				}
+			}
+			if (listOwnedTorrents.contains(hash40)) {
+				byte[] hashBytes = ByteFormatter.decodeString(hash40);
+				return pi.getDownloadManager().getDownload(hashBytes);
 			}
 		} catch (Exception e) {
 		}
 		return null;
+	}
+
+	public class StringDirect
+	{
+		public String s;
+
+		public StringDirect(String s) {
+			this.s = s;
+		}
+
+		public String toString() {
+			return s;
+		}
 	}
 }

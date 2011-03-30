@@ -54,6 +54,9 @@ public class Plugin
 					// tux test window
 					File testDir = new File(
 							"/Volumes/Workspace/workspace/plugins-public/btapp/test");
+					if (!testDir.exists()) {
+						testDir = new File("C:\\workspace\\pubPlugins\\btapp\\test");
+					}
 					if (testDir.exists()) {
 						swtUI.addView(UISWTInstance.VIEW_MAIN, "btapp.test",
 								BtAppView.class, testDir);

@@ -1,3 +1,4 @@
+<script src="json2.js" type="text/javascript"></script>
 <SCRIPT type="text/javascript">
 function foobar(status) { alert(JSON.stringify(status)); };
 btapp.events.set('torrent', foobar);
@@ -26,13 +27,14 @@ function testClassStuff() {
 	}
 }
 </script>
-<A HREF="" ONCLICK="alert(btapp.peer_id); return false;">peer_id</A><BR>
-<A HREF="" ONCLICK="alert(JSON.stringify(btapp.settings.all())); return false;">settings.all()</A><BR>
-<A HREF="" ONCLICK="alert(JSON.stringify(btapp.settings.keys())); return false;">settings.keys()</A><BR>
-<A HREF="" ONCLICK="alert(btapp.settings.get('max_downloads')); return false;">settings.get('max_downloads')</A><BR>
-<A HREF="" ONCLICK="testTorrentAdd(); return false;">add.torrent</A><BR>
-<A HREF="" ONCLICK="alert(JSON.stringify(btapp.stash.keys())); return false;">stash.keys</A><BR>
-<A HREF="" ONCLICK="alert(btapp.stash.set('hi', 'there')); return false;">stash.set</A><BR>
-<A HREF="" ONCLICK="alert(btapp.stash.get('hi')); return false;">stash.get</A><BR>
-<A HREF="" ONCLICK="testClassStuff(); return false;">testClassStuff</A><BR>
+<A HREF="#" ONCLICK="alert(btapp.peer_id); return false;">peer_id</A><BR>
+<A HREF="#" ONCLICK="alert(JSON.stringify(btapp.settings.all())); return false;">settings.all()</A><BR>
+<A HREF="#" ONCLICK="alert(JSON.stringify(btapp.settings.keys())); return false;">settings.keys()</A><BR>
+<A HREF="#" ONCLICK="alert(btapp.settings.get('max_downloads')); return false;">settings.get('max_downloads')</A><BR>
+<A HREF="#" ONCLICK="testTorrentAdd(); return false;">add.torrent</A><BR>
+<A HREF="#" ONCLICK="alert(JSON.stringify(btapp.stash.keys())); return false;">stash.keys</A><BR>
+<A HREF="#" ONCLICK="alert(btapp.stash.set('hi', 'there')); return false;">stash.set</A><BR>
+<A HREF="#" ONCLICK="alert(btapp.stash.get('hi')); return false;">stash.get</A><BR>
+<A HREF="#" ONCLICK="testClassStuff(); return false;">testClassStuff</A><BR>
+<A HREF="#" ONCLICK="alert(typeof JSON); return false;">JSON</A><BR>
 

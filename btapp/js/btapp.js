@@ -16,71 +16,72 @@ if (true) {
 			all : function() { return vzWrapAndEval(bt2vuze('settings.all')) }, 
 		  keys : function() { return bt2vuze('settings.keys') }, 
 		  get : function(key) { return vzWrapAndEval(bt2vuze('settings.get', key)) }, 
-		  set : function(key, val) { bt2vuze('settings.set', key, val) },
+		  set : function(key, val) { bt2vuze('settings.set', key, val) }
 		},
 	
 		add : {
 			torrent : function(tor) { return vzWrapAndEval(bt2vuze('add.torrent', tor)) }, 
 		  rss_feed : function() { return vzWrapAndEval(bt2vuze('add.rss_feed')) }, 
-		  rss_filter : function() { return vzWrapAndEval(bt2vuze('add.rss_filter')) }, 
+		  rss_filter : function() { return vzWrapAndEval(bt2vuze('add.rss_filter')) } 
 		},
 	
 		events : { 
-			set : function(key, func) { bt2vuze('events.set', key, func.toString()) }, 
+			set : function(key, func) { bt2vuze('events.set', key, func.toString()) } 
 		},
 	
 		torrent : {
 			all : function() { return vzWrapAndEval(bt2vuze('torrent.all')) }, 
 		  keys : function() { return bt2vuze('torrent.keys') }, 
-		  get : function(key) { return new vzTorrent(key, "btapp.torrent.get"); }, 
+		  get : function(key) { return new vzTorrent(key, "btapp.torrent.get"); } 
 		},
 	
 		language : {
-			all : function() { return vzWrapAndEval(bt2vuze('language.all')) }, 
+			all : function() { return vzWrapAndEval(bt2vuze('language.all')) } 
 		},
 		
 		stash: {
-			all : function() { return vzWrapAndEval(bt2vuze('stash.all')) }, 
-		  keys : function() { return bt2vuze('stash.keys') }, 
+			all : function() { return vzWrapAndEval(bt2vuze('stash.all')); }, 
+		  keys : function() { return bt2vuze('stash.keys'); }, 
 		  get : function(key) {
 		  	var o = bt2vuze('stash.get', key); 
 		  	if (o == null) throw "key '" + key + "' not in stash";
 		  	return o;
 		  }, 
 		  set : function(key, val) { bt2vuze('stash.set', key, val) },
+		  unset : function(key) { bt2vuze('stash.unset', key) }
 		},
 		
 		log : function(key) { return vzWrapAndEval(bt2vuze('log', key)) }, 
 		resource : function(key) { return vzWrapAndEval(bt2vuze('resource', key)) }, 
-		sendmsg : function(key, x, y, s) { alert("sendmsg(" + key + ", ..) not supported") },
+		sendmsg : function(key, x, y, s) { alert("sendmsg(" + key + ", ..) not supported") }
 	};
 	
 	// The 'peer' variable in vzTorrent
 	function vzTorrentVarPeer(torrent, hash) {
 		this.hash = hash;
 	}
-	vzTorrentVarPeer.prototype.get = function(key) { return new vzPeer(this, this.hash, key) },
-	vzTorrentVarPeer.prototype.keys = function() { return bt2vuze('torrent.peer.keys', this.hash) },
-	vzTorrentVarPeer.prototype.set = function(key, value) { return bt2vuze('torrent.peer.set', this.hash, key, value) },
-	vzTorrentVarPeer.prototype.all = function() { return vzWrapAndEval(bt2vuze('torrent.peer.all', this.hash)) } 
+	vzTorrentVarPeer.prototype.get = function(key) { return new vzPeer(this, this.hash, key) };
+	vzTorrentVarPeer.prototype.keys = function() { return bt2vuze('torrent.peer.keys', this.hash) };
+	vzTorrentVarPeer.prototype.set = function(key, value) { return bt2vuze('torrent.peer.set', this.hash, key, value) };
+	vzTorrentVarPeer.prototype.all = function() { return vzWrapAndEval(bt2vuze('torrent.peer.all', this.hash)) } ;
 	
 	// the 'file' variable in vzTorrent
 	function vzTorrentVarFile(torrent, hash, sr) {
 		this.hash = hash;
 		this.torrent = torrent;
 	}
-	vzTorrentVarFile.prototype.get = function(key) { return new vzTorrentFile(this, this.hash, key) },
-	vzTorrentVarFile.prototype.keys = function() { return bt2vuze('torrent.file.keys', this.hash) },
-	vzTorrentVarFile.prototype.all = function() { return vzWrapAndEval(bt2vuze('torrent.file.all', this.hash)) } 
+	vzTorrentVarFile.prototype.get = function(key) { return new vzTorrentFile(this, this.hash, key) };
+	vzTorrentVarFile.prototype.keys = function() { return bt2vuze('torrent.file.keys', this.hash) };
+	vzTorrentVarFile.prototype.all = function() { return vzWrapAndEval(bt2vuze('torrent.file.all', this.hash)) }; 
 	
 	// the 'properties' variable in vzTorrent
 	function vzTorrentVarProperties(hash, sr) {
 		this.hash = hash;
 	}
-	vzTorrentVarProperties.prototype.get = function(id) { return bt2vuze('torrent.properties.get', this.hash, id) },
-	vzTorrentVarProperties.prototype.keys = function() { return bt2vuze('torrent.properties.keys', this.hash) },
-	vzTorrentVarProperties.prototype.set = function(key, value) { bt2vuze('torrent.properties.set', this.hash, key, value) },
-	vzTorrentVarProperties.prototype.all = function() { return vzWrapAndEval(bt2vuze('torrent.properties.all', this.hash)) } 
+	vzTorrentVarProperties.prototype.get = function(id) { return bt2vuze('torrent.properties.get', this.hash, id) };
+	vzTorrentVarProperties.prototype.keys = function() { return bt2vuze('torrent.properties.keys', this.hash) };
+	vzTorrentVarProperties.prototype.set = function(key, value) { bt2vuze('torrent.properties.set', this.hash, key, value) };
+	vzTorrentVarProperties.prototype.all = function() { return vzWrapAndEval(bt2vuze('torrent.properties.all', this.hash)) };
 	
 	// vzTorrent object returned from btapp.torrent.get/all, vzFile.torrent, vzPeer.torrent
 	function vzTorrent(hash, sr) {

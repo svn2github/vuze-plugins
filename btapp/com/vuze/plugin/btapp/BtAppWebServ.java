@@ -34,6 +34,8 @@ public class BtAppWebServ
 
 	private int port;
 
+	private boolean added;
+
 	public BtAppWebServ(PluginInterface pi, File root, BtApp app)
 			throws Exception {
 		this.pi = pi;
@@ -120,16 +122,16 @@ public class BtAppWebServ
 
 				String line = br.readLine();
 
-//				if (DEBUG) {
-//					log(line + "] =====");
-//					//log("Traffic Class: " + sck.getTrafficClass());
-//					//log("OS: " + sck.getOutputStream());
-//					log(line + "] isBound? " + sck.isBound() + "; isClosed=" + sck.isClosed()
-//							+ "; isConn=" + sck.isConnected() + ";isIShutD "
-//							+ sck.isInputShutdown() + ";isOShutD " + sck.isOutputShutdown());
-//					log(line + "] - - - -");
-//					log(line);
-//				}
+				//if (DEBUG) {
+				//	log(line + "] =====");
+				//	//log("Traffic Class: " + sck.getTrafficClass());
+				//	//log("OS: " + sck.getOutputStream());
+				//	log(line + "] isBound? " + sck.isBound() + "; isClosed=" + sck.isClosed()
+				//			+ "; isConn=" + sck.isConnected() + ";isIShutD "
+				//			+ sck.isInputShutdown() + ";isOShutD " + sck.isOutputShutdown());
+				//	log(line + "] - - - -");
+				//	log(line);
+				//}
 
 				String xLocation = null;
 
@@ -139,9 +141,9 @@ public class BtAppWebServ
 						xLocation = extraline.substring(12);
 						log("Got x-location of " + xLocation);
 					}
-//					if (DEBUG) {
-//						log(line + "] " + extraline);
-//					}
+					//if (DEBUG) {
+					//	log(line + "] " + extraline);
+					//}
 				}
 
 //				if (DEBUG) {
@@ -200,7 +202,6 @@ public class BtAppWebServ
 	private boolean process(String line, String xLocation,
 			OutputStream outputStream) {
 		String filename = line.replaceAll("^[\\s./]+", "");
-		filename = filename.replaceAll("/", File.separator);
 
 		if (filename.startsWith(PREFIX_AJAXPROXY)) {
 			
@@ -235,7 +236,12 @@ public class BtAppWebServ
 			}
 		}
 
+		filename = filename.replaceAll("/", "\\" + File.separator);
 		filename = filename.replaceAll("[#?].*$", "");
+		
+		if (filename.length() == 0) {
+			return true;
+		}
 
 		File file = new File(root, filename);
 		try {
@@ -252,6 +258,12 @@ public class BtAppWebServ
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		
+		if (!added) {
+			added = true;
+			app.insertBtAppJS();
+		}
+
 
 		if (filename.toLowerCase().contains("jquery")) {
 			app.insertAjaxProxy();

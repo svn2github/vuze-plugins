@@ -15,4 +15,6 @@ public interface BtApp
 	void insertAjaxProxy();
 	
 	void log(String s);
+
+	void insertBtAppJS();
 }

@@ -159,6 +159,7 @@ public class BtAppListView
 	private void initView(Composite parent) {
 		//parent.setLayout(new FormLayout());
 		browser = new Browser(parent, SWT.BORDER);
+		browser.setUrl("about:blank"); // needed for IE for javascript to work
 		browser.setVisible(false);
 		GridData gridData = new GridData();
 		gridData.exclude = true;
