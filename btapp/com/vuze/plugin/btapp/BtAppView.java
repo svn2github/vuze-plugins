@@ -504,9 +504,9 @@ public class BtAppView
 		return null;
 	}
 
-	private Map<?, ?> api_torrent_file_properties_all(Object[] args) {
+	private String api_torrent_file_properties_all(Object[] args) {
 		if (args.length < 2) {
-			return Collections.EMPTY_MAP;
+			return "{ }";
 		}
 		String hash40 = (String) args[1];
 		int index;
@@ -515,7 +515,7 @@ public class BtAppView
 		} else if (args[2] instanceof String) {
 			index = Integer.valueOf((String) args[2]);
 		} else {
-			return Collections.EMPTY_MAP;
+			return "{ }";
 		}
 
 		Download download = getDownload(hash40);
@@ -526,12 +526,13 @@ public class BtAppView
 				TorrentFile[] files = torrent.getFiles();
 
 				if (index < fileInfos.length && index < files.length) {
-					return getAllFileProperties(fileInfos[index], files[index]);
+					return encodeToJavascript(getAllFileProperties(fileInfos[index],
+							files[index]));
 				}
 			}
 		}
 
-		return Collections.EMPTY_MAP;
+		return "{ }";
 	}
 
 	private Object api_torrent_file_properties_get(Object[] args) {
@@ -624,9 +625,9 @@ public class BtAppView
 		return list.toArray();
 	}
 
-	private Map<?, ?> api_torrent_peer_all(Object[] args) {
+	private String api_torrent_peer_all(Object[] args) {
 		if (args.length < 2) {
-			return Collections.EMPTY_MAP;
+			return "{ }";
 		}
 		Map<String, Object> map = new HashMap<String, Object>();
 		String hash40 = (String) args[1];
@@ -644,7 +645,7 @@ public class BtAppView
 			}
 		}
 
-		return map;
+		return encodeToJavascript(map);
 	}
 
 	private Object[] api_torrent_peer_keys(Object[] args) {
