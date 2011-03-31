@@ -8,7 +8,7 @@ try {
 		return eval('(' + s + ')');
 	}
 	
-	var btapp =  
+	window.btapp =  
 	{
 		peer_id : 'VuzeConstantPeerID',
 		settings : {
@@ -54,12 +54,13 @@ try {
 		resource : function(key) { return vzWrapAndEval(bt2vuze('resource', key)) }, 
 		sendmsg : function(key, x, y, s) { alert("sendmsg(" + key + ", ..) not supported") }
 	};
-
+	
 } catch (err) {
-	alert("btapp registration error\n" + err.description);
+	alert("btapp registration error!\n" + err);
 }
 
 try {
+if (typeof bt2vuze !== "undefined") {
 	// The 'peer' variable in vzTorrent
 	function vzTorrentVarPeer(torrent, hash) {
 		this.hash = hash;
@@ -148,6 +149,7 @@ try {
 	vzTorrentFile.prototype.get_data = function() { return vzWrapAndEval(bt2vuze('torrent.file.get_data', this.hash, this.index)) };
 	
 	btapp.log("btapp registered");
+}
 } catch (err) {
-	alert("btapp object registration error\n" + err.description);
+	alert("btapp object registration error..\n" + JSON.stringify(err));
 }
