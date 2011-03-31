@@ -50,7 +50,7 @@ try {
 		  unset : function(key) { bt2vuze('stash.unset', key) }
 		},
 		
-		log : function(key) { return vzWrapAndEval(bt2vuze('log', key)) }, 
+		log : function(key) { if (typeof bt2vuze !== "undefined") { bt2vuze('log', key); } }, 
 		resource : function(key) { return vzWrapAndEval(bt2vuze('resource', key)) }, 
 		sendmsg : function(key, x, y, s) { alert("sendmsg(" + key + ", ..) not supported") }
 	};
@@ -60,7 +60,6 @@ try {
 }
 
 try {
-if (typeof bt2vuze !== "undefined") {
 	// The 'peer' variable in vzTorrent
 	function vzTorrentVarPeer(torrent, hash) {
 		this.hash = hash;
@@ -149,7 +148,7 @@ if (typeof bt2vuze !== "undefined") {
 	vzTorrentFile.prototype.get_data = function() { return vzWrapAndEval(bt2vuze('torrent.file.get_data', this.hash, this.index)) };
 	
 	btapp.log("btapp registered");
-}
+
 } catch (err) {
 	alert("btapp object registration error..\n" + JSON.stringify(err));
 }
