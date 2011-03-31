@@ -230,6 +230,7 @@ public class BtAppWebServ
 					return true;
 				} catch (Exception e) {
 					log("AJAX PROXY] " + e.toString());
+					return true;
 				}
 			} else {
 				log("AJAX PROXY] Invalid " + ajax);
