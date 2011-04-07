@@ -28,7 +28,7 @@ function testClassStuff() {
 }
 </script>
 <A HREF="#" ONCLICK="alert(btapp.peer_id); return false;">peer_id</A><BR>
-<A HREF="#" ONCLICK="alert(JSON.stringify(btapp.settings.all())); return false;">settings.all()</A><BR>
+<A HREF="#" ONCLICK="try { alert(JSON.stringify(btapp.settings.all())); return false; } catch (err) { alert(err) }">settings.all()</A><BR>
 <A HREF="#" ONCLICK="alert(JSON.stringify(btapp.settings.keys())); return false;">settings.keys()</A><BR>
 <A HREF="#" ONCLICK="alert(btapp.settings.get('max_downloads')); return false;">settings.get('max_downloads')</A><BR>
 <A HREF="#" ONCLICK="testTorrentAdd(); return false;">add.torrent</A><BR>
@@ -38,4 +38,6 @@ function testClassStuff() {
 <A HREF="#" ONCLICK="testClassStuff(); return false;">testClassStuff</A><BR>
 <A HREF="#" ONCLICK="alert(typeof JSON); return false;">JSON</A><BR>
 <A HREF="#" ONCLICK="alert(JSON.stringify(btapp)); return false;">btapp</A><BR>
-
+<A HREF="#" ONCLICK="alert(JSON.stringify(window.bt2vuze)); return false;">bt2vuze</A><BR>
+<A HREF="#" ONCLICK="try { alert(JSON.stringify(window.external.callJava)); return false; } catch (err) { alert(err) }">window.external.callJava</A><BR>
+<A HREF="#" ONCLICK="alert(navigator.userAgent); return false;">userAgent</A><BR>
