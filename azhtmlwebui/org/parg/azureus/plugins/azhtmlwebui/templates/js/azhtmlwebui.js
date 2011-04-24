@@ -565,7 +565,7 @@ function removeCat(index) {
 }
 
 function createCatReq( cat, cmd , index){
-	debug2('createCatReq() :: cat: ' + cat + ' / cmd: ' + cmd)
+	debug2('createCatReq() :: cat: ' + escapeXML(cat) + ' / cmd: ' + cmd)
 	//alert("hash= " + index );
 	
 	var hash = ( hashes[index] ) ? hashes[index] : index; 
@@ -594,11 +594,11 @@ function createCatReq( cat, cmd , index){
 		}
 }
 function createElt( parent, type, value, inner ) {
-	debug2('createElt() :: type: ' + type + ' / value: ' + value + ' / inner: ' + inner)
+	debug2('createElt() :: type: ' + type + ' / value: ' + escapeXML(value) + ' / inner: ' + escapeXML(inner))
 	elt = document.createElement( type )
 	elt = $( elt )
-	elt.setAttribute('value', value.strip())
-	elt.innerHTML = inner.strip()
+	elt.setAttribute('value', escapeXML(value.strip()))
+	elt.innerHTML = escapeXML(inner.strip())
 	parent.appendChild( elt )
 }
 var categories = new Array();
@@ -634,7 +634,7 @@ function updateCatList() {
 		  		for(j = 0; j<nodes.length ; j++ ) {
 		  			if( (nodes[j].getElementsByTagName('value')).length == 0){
 		  				name = nodes[j].getElementsByTagName('name')[0].firstChild.nodeValue;
-		  				debug2(name)
+		  				debug2(escapeXML(name))
 		  				categories[j] = name
 		  				createElt(catSelect, 'option', name, name)
 		  			}
@@ -2082,3 +2082,14 @@ Event.observe(window,'load',function(e){
 
     if(!$("comp_tab").checked) $('tab_comp').hide()
 })
+
+function escapeXML( str ) {
+	if ( !str ){ return ""; }
+	str = str.replace( /&/g, "&amp;" );
+	str = str.replace( />/g, "&gt;" );
+	str = str.replace( /</g, "&lt;" );
+	str = str.replace( /\"/g, "&quot;" );
+	str = str.replace( /--/g, "&#45;&#45;" );
+	
+	return str ;
+}

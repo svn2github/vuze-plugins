@@ -841,7 +841,7 @@ HTMLWebUIPlugin
 							
 							responseText += ("	<cat>");
 							responseText += ("		<name>");
-							responseText += ("			" + x[j]);
+							responseText += ("			" + escapeXML(x[j]));
 							responseText += ("		</name>");
 							responseText += ("	</cat>");
 
@@ -1193,7 +1193,7 @@ HTMLWebUIPlugin
 					}
 
 					//t_row.put("category", URLEncoder.encode(c, DEFAULT_ENCODING));
-					t_row.put("category", c);
+					t_row.put("category", escapeXML(c));
 					
 					long torrent_peers = 0;
 					long torrent_seeds = 0;
@@ -3184,7 +3184,7 @@ HTMLWebUIPlugin
 				
 				Hashtable ht = new Hashtable();
 				
-				ht.put( "name", x[j] );
+				ht.put( "name", escapeXML(x[j]) );
 				
 				category_names.add(ht);
 			}
