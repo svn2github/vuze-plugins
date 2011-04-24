@@ -1735,7 +1735,7 @@ function urlUpload() {
 	
 	var form = $('myform_url')
 	var params = form.serialize()
-	alert("urlUpload! : index.ajax?" + params)
+	//alert("urlUpload! : index.ajax?" + params)
 	
 	new Ajax.Request( "index.ajax?" + params, {
 		method: 'GET',
