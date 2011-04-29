@@ -18,7 +18,7 @@ public class DefaultActivationImpl
 	public boolean toolBarItemActivated(ToolBarItem item, long activationType,
 			Object datasource) {
 		uiInstance.promptUser("PluginToolBarTest", "Item " + item.getID()
-				+ " activated!", null, 0);
+				+ " activated!\n\n" + (datasource == null ? "null" : datasource.getClass().getSimpleName()), null, 0);
 
 		// We handled the activation.. return true
 		return true;

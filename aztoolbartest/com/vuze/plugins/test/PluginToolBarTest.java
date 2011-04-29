@@ -28,19 +28,19 @@ public class PluginToolBarTest
 					UIToolBarItem item1 = tbm.createToolBarItem("plugintest");
 					item1.setTextID("PluginToolBarTest.toolbar.text");
 					item1.setDefaultActivationListener(new DefaultActivationImpl(instance));
-					item1.setEnabled(true);
+					item1.setState(UIToolBarItem.STATE_ENABLED);
 					tbm.addToolBarItem(item1);
 
 					UIToolBarItem item2 = tbm.createToolBarItem("plugintest2");
 					item2.setTextID("PluginToolBarTest.toolbar.text2");
 					item2.setDefaultActivationListener(new DefaultActivationImpl(instance));
-					item2.setEnabled(true);
+					item2.setState(UIToolBarItem.STATE_ENABLED);
 					tbm.addToolBarItem(item2);
 
 					UIToolBarItem item3 = tbm.createToolBarItem("plugintest3");
 					item3.setTextID("PluginToolBarTest.toolbar.text3");
 					item3.setDefaultActivationListener(new DefaultActivationImpl(instance));
-					item3.setEnabled(true);
+					item3.setState(UIToolBarItem.STATE_ENABLED);
 					tbm.addToolBarItem(item3);
 				}
 			}
@@ -52,6 +52,7 @@ public class PluginToolBarTest
 		// might not be needed
 		instance.getToolBarManager().removeToolBarItem("plugintest");
 		instance.getToolBarManager().removeToolBarItem("plugintest2");
+		instance.getToolBarManager().removeToolBarItem("plugintest3");
 	}
 
 }
