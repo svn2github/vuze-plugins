@@ -31,6 +31,8 @@ import javax.activation.*;
 
 import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.core3.util.DelayedEvent;
+import org.gudy.azureus2.core3.util.DisplayFormatters;
+import org.gudy.azureus2.core3.util.UrlUtils;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.torrent.Torrent;
 import org.gudy.azureus2.plugins.ui.UIManager;
@@ -40,6 +42,7 @@ import org.gudy.azureus2.plugins.utils.*;
 import org.gudy.azureus2.plugins.logging.*;
 import org.gudy.azureus2.plugins.config.ConfigParameter;
 import org.gudy.azureus2.plugins.config.ConfigParameterListener;
+import org.gudy.azureus2.plugins.disk.DiskManagerFileInfo;
 import org.gudy.azureus2.plugins.download.*;
 
 import com.sun.mail.smtp.SMTPTransport;
@@ -102,6 +105,14 @@ StatusMailerPlugin
 
 	public static final String	CONFIG_RATIOS						= "ratios";
 
+	
+	public static final String	CONFIG_ATTACH_TORRENT				= "attach_torrent";
+	public static final boolean	CONFIG_ATTACH_TORRENT_DEFAULT		= false;
+	
+	public static final String	CONFIG_INCLUDE_FILES				= "include_files";
+	public static final boolean	CONFIG_INCLUDE_FILES_DEFAULT		= false;
+
+	
 	public static final String 	CONFIG_DEBUG_ON				= "debug_on";
 	public static final boolean	CONFIG_DEBUG_ON_DEFAULT		= false;
 	
@@ -135,6 +146,9 @@ StatusMailerPlugin
 
 	protected BooleanParameter		download_added;
 	protected BooleanParameter		download_removed;
+
+	protected BooleanParameter		attach_torrent;
+	protected BooleanParameter		include_file_details;
 
 	protected StringParameter		msg_subject;
 	protected StringParameter		msg_content;
@@ -184,9 +198,15 @@ StatusMailerPlugin
 
 		msg_content_add_remove = config_model.addStringParameter2( CONFIG_MSG_CONTENT_ADD_REMOVE, "statusmailer.msg_content_add_remove", CONFIG_MSG_CONTENT_ADD_REMOVE_DEFAULT );
 
-
 		ratios = config_model.addStringParameter2( CONFIG_RATIOS, "statusmailer.ratios", "" );
 
+		attach_torrent 			= config_model.addBooleanParameter2( CONFIG_ATTACH_TORRENT, "statusmailer.attach_torrent",  CONFIG_ATTACH_TORRENT_DEFAULT );
+		include_file_details 	= config_model.addBooleanParameter2( CONFIG_INCLUDE_FILES, "statusmailer.include_files",  CONFIG_INCLUDE_FILES_DEFAULT );
+
+		
+		
+		
+		
 		to_address = config_model.addStringParameter2( CONFIG_TO_ADDRESS, "statusmailer.to_address", "" );
 
 		from_address = config_model.addStringParameter2( CONFIG_FROM_ADDRESS, "statusmailer.from_address", "" );
@@ -300,11 +320,25 @@ StatusMailerPlugin
 		enable.addEnabledOnSelection( msg_content );
 		enable.addEnabledOnSelection( msg_subject_add_remove );
 		enable.addEnabledOnSelection( msg_content_add_remove );
+		enable.addEnabledOnSelection( attach_torrent );
+		enable.addEnabledOnSelection( include_file_details );
 		enable.addEnabledOnSelection( from_address );
 		enable.addEnabledOnSelection( to_address );
 		enable.addEnabledOnSelection( smtp_auth );
 		
 		plugin_interface.getDownloadManager().addListener( this );
+		
+			// add handlers for main MIME types
+		
+		MailcapCommandMap mc = (MailcapCommandMap)CommandMap.getDefaultCommandMap();
+		
+		mc.addMailcap("text/html;; x-java-content-handler=com.sun.mail.handlers.text_html");
+		mc.addMailcap("text/xml;; x-java-content-handler=com.sun.mail.handlers.text_xml");
+		mc.addMailcap("text/plain;; x-java-content-handler=com.sun.mail.handlers.text_plain");
+		mc.addMailcap("multipart/*;; x-java-content-handler=com.sun.mail.handlers.multipart_mixed");
+		mc.addMailcap("message/rfc822;; x-java-content-handler=com.sun.mail.handlers.message_rfc822");
+		
+		CommandMap.setDefaultCommandMap(mc);
 	}
 	
 	public void
@@ -486,6 +520,7 @@ StatusMailerPlugin
 		params.put( "%r",	"<ratio>" );
 		params.put( "%a",	"<added/removed>" );
 		params.put( "%s",	"<size>" );
+		params.put( "%m",	"<magnet URI>" );
 	
 		return( params );
 	}
@@ -508,7 +543,8 @@ StatusMailerPlugin
 			params.put( "%n", 	"" + Download.ST_NAMES[new_state]);
 			params.put( "%r",	"" + (((float)download.getStats().getShareRatio())/1000));
 			params.put( "%s",	"" + (torrent==null?-1:torrent.getSize()));
-			
+			params.put( "%m",	(torrent==null?"":UrlUtils.getMagnetURI( torrent.getHash())));
+					
 			sendMail( download, params, delay );
 
 		}else{
@@ -534,6 +570,7 @@ StatusMailerPlugin
 			params.put( "%r",	Float.toString(download.getStats().getShareRatio()/1000));
 			params.put( "%a",	added ? "added" : "removed" );
 			params.put( "%s",	"" + (torrent==null?-1:torrent.getSize()));
+			params.put( "%m",	(torrent==null?"":UrlUtils.getMagnetURI( torrent.getHash())));
 
 			sendAddRemoveMail( download, params, MAIL_DELAY );
 
@@ -618,6 +655,52 @@ StatusMailerPlugin
 						params.put( "%c",	"Uncategorized" );
 					}
 			
+					File[]	files = null;
+					
+					if ( attach_torrent.getValue() && download != null ){
+						
+						files = new File[]{ new File( download.getTorrentFileName())};
+					}
+					
+					String	expanded_content =  expandMessage( content, params );
+					
+					String[] content_lines;
+					
+					if ( include_file_details.getValue() && download != null ){
+						
+						DiskManagerFileInfo[] d_files = download.getDiskManagerFileInfo();
+						
+						content_lines = new String[d_files.length+1];
+						
+						content_lines[0] = expanded_content;
+						
+						for ( int i=0; i<d_files.length;i++ ){
+							
+							DiskManagerFileInfo f = d_files[i];
+						
+							long	perthou;
+							
+							long	size 	= f.getLength();
+							long	done	= f.getDownloaded();
+							
+							if ( size == done || size == 0 ){
+								
+								perthou = 1000;
+								
+							}else{
+								
+								perthou = (1000 * done ) / size;
+							}
+							
+							String f_str = "    " + f.getFile().getName() + ", " + DisplayFormatters.formatByteCountToKiBEtc( f.getLength()) + ":  " + DisplayFormatters.formatPercentFromThousands((int) perthou );
+								
+							content_lines[i+1] = f_str;
+						}
+					}else{
+						
+						content_lines = new String[]{ expanded_content };
+					}
+					
 					sendMessage(	smtp_server.getValue(),
 									smtp_port.getValue(),
 									smtp_ssl.getValue(),
@@ -627,7 +710,8 @@ StatusMailerPlugin
 									expandMessage( subject, params ),
 									expandMessage( to_address.getValue(),params ),
 									from_address.getValue(),
-									new String[]{ expandMessage( content, params )});		
+									content_lines,
+									files );		
 				}
 			});
 	}
@@ -652,7 +736,8 @@ StatusMailerPlugin
 				subject,
 				to,
 				from_address.getValue(),
-				new String[]{ content });
+				new String[]{ content },
+				null );
 	}
 	
 	/**
@@ -693,23 +778,6 @@ StatusMailerPlugin
 				new String[]{ content },
 				attachments);		
 	}
-
-
-    public void
-    sendMessage(
-		final String		server,
-		final int			port,
-		final boolean		ssl,
-		final String		user_name,
-		final String		password,
-		final boolean		html_message,
-		final String		subject,
-		final String		to,
-		final String		from,
-		final String[]	    lines)
-    {
-    	sendMessage(server, port, ssl, user_name, password, html_message, subject, to, from, lines, null);
-    }
     
     public void
     sendMessage(
@@ -748,8 +816,11 @@ StatusMailerPlugin
 		String[]	lines,
 		File[]      attachments)
     {
-    	try{
-
+    	ClassLoader original = Thread.currentThread().getContextClassLoader();
+    	
+    	try{   		
+    		Thread.currentThread().setContextClassLoader( StatusMailerPlugin.class.getClassLoader());
+    		
     	    Properties props = System.getProperties();
     	     
     		props.put( "mail.smtp.host", server);
@@ -815,8 +886,8 @@ StatusMailerPlugin
 	
 	        	for (int i=0;i<lines.length;i++){
 	       
-	        	    sb.append(lines[i]);
-	        	    sb.append("\n");
+	        	    sb.append(lines[i].replaceAll( " ", "&nbsp;" ));
+	        	    sb.append("<P>");
 	        	}
 	
 	        	sb.append("</BODY>\n");
@@ -826,9 +897,9 @@ StatusMailerPlugin
         		
 	        	for (int i=0;i<lines.length;i++){
 	     	       
-	     	        	    sb.append(lines[i]);
-	     	        	    sb.append("\n");
-	     	       	}       	
+	     	        sb.append(lines[i]);
+	     	        sb.append("\n");
+	     	    }       	
 	       	}
         	
         	text_part.setDataHandler(
@@ -866,6 +937,9 @@ StatusMailerPlugin
     			
     			log.log(e);
     		}
+    	}finally{
+    		
+       		Thread.currentThread().setContextClassLoader( original );
     	}
     }
 
@@ -976,6 +1050,7 @@ StatusMailerPlugin
 				"hello", 
 				"parg@users.sourceforge.net", 
 				"parg@users.sourceforge.net",
-				new String[]{ "parp parp parp" });
+				new String[]{ "parp parp parp" },
+				null );
 	}
 }
