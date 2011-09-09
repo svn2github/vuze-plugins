@@ -40,12 +40,7 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.util.*;
 
-import org.gudy.azureus2.core3.util.AESemaphore;
-import org.gudy.azureus2.core3.util.Constants;
-import org.gudy.azureus2.core3.util.Debug;
-import org.gudy.azureus2.core3.util.DisplayFormatters;
-import org.gudy.azureus2.core3.util.SystemTime;
-import org.gudy.azureus2.core3.util.TimeFormatter;
+import org.gudy.azureus2.core3.util.*;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.disk.DiskManagerFileInfo;
 import org.gudy.azureus2.plugins.download.Download;
@@ -156,6 +151,8 @@ UPnPMediaServer
 		"http-get:*:video/mpeg:DLNA.ORG_PN=MPEG_PS_PAL;DLNA.ORG_OP=01;DLNA.ORG_FLAGS=01700000000000000000000000000000,"+
 		"http-get:*:video/mpeg:DLNA.ORG_PN=MPEG_PS_NTSC;DLNA.ORG_OP=01;DLNA.ORG_FLAGS=01700000000000000000000000000000,"+
 		"http-get:*:video/x-ms-wmv:DLNA.ORG_PN=WMVMED_BASE;DLNA.ORG_OP=11;DLNA.ORG_FLAGS=01700000000000000000000000000000,"+
+		"http-get:*:video/x-matroska:*,http-get:*:video/x-mkv:*,http-get:*:audio/x-matroska:*,"+
+		"http-get:*:video/avi:*,"+
 		"http-get:*:image/png:DLNA.ORG_PN=PNG_TN;DLNA.ORG_OP=01;DLNA.ORG_FLAGS=00f00000000000000000000000000000,"+
 		"http-get:*:image/png:DLNA.ORG_PN=PNG_LRG;DLNA.ORG_OP=01;DLNA.ORG_FLAGS=00f00000000000000000000000000000,"+
 		"http-get:*:audio/x-ms-wma:DLNA.ORG_PN=WMAPRO;DLNA.ORG_OP=11;DLNA.ORG_FLAGS=01700000000000000000000000000000,"+
@@ -307,7 +304,7 @@ UPnPMediaServer
 			
 			final UIManager	ui_manager = plugin_interface.getUIManager();
 			
-			view_model = ui_manager.createBasicPluginViewModel( "upnpmediaserver.name" );
+			view_model = ui_manager.createBasicPluginViewModel( loc_utils.getLocalisedMessageText("upnpmediaserver.name") );
 			
 			view_model.getActivity().setVisible( false );
 			view_model.getProgress().setVisible( false );
@@ -2133,7 +2130,8 @@ UPnPMediaServer
 												stream = new ByteArrayInputStream( content.getBytes( "UTF-8" ));
 											}
 											
-											response.useStream( "xml", stream );
+											String ext = FileUtil.getExtension(resource);
+											response.useStream( ext.length() <= 1 ? "xml" : ext.substring(1), stream );
 										
 											return( true );
 											
@@ -2639,7 +2637,7 @@ UPnPMediaServer
 			arg_str += (i==0?"":",") + arg.getName() + " -> " + arg.getValue();
 		}
 	
-		logger.log( "Action (client=" + client + "): " + url + ":" + command +", " + arg_str );
+		logger.log( "Action (client=" + client + "): " + url + ":" + command +", arg=" + arg_str );
 		
 		resultEntries	result = new resultEntries();
 		
@@ -2717,6 +2715,8 @@ UPnPMediaServer
 
 		response += "</s:Body>"+
 					"</s:Envelope>";
+		
+		//System.out.println(response.replaceAll(">", ">\n") + "\n\n\n");
 		
 		return( response );
 	}
@@ -2977,10 +2977,11 @@ UPnPMediaServer
 				"xmlns=\"urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/\">" +
 				
 				didle + 
-				
 				"</DIDL-Lite>";
 		//}
-		
+			
+			//System.out.println(didle.replaceAll("><", ">\n<") + "\n\n\n");
+
 		//	System.out.println( didle ); 
 		result.add( "Result", didle );
 		
