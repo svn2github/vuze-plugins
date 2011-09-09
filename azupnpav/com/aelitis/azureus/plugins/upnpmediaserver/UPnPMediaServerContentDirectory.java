@@ -213,11 +213,11 @@ UPnPMediaServerContentDirectory
 		
 		root_container = new contentContainer( null, "Vuze" );
 		
-		music_container 	= new contentContainer( root_container, "Music" );
+		music_container 	= new contentContainer( root_container, "Music", "M" );
 				
-		pictures_container 	= new contentContainer( root_container, "Pictures" );
+		pictures_container 	= new contentContainer( root_container, "Pictures", "P" );
 		
-		movies_container 	= new contentContainer( root_container, "Movies" );
+		movies_container 	= new contentContainer( root_container, "Movies", "V" );
 		
 		downloads_container 	= new contentContainer( root_container, "Downloads" );
 	}
@@ -1012,16 +1012,19 @@ UPnPMediaServerContentDirectory
 				}
 			}
 			
-			return(
+			
+			String didl = 
 				"<container id=\"" + child_container.getID() + "\" parentID=\"" + child_container.getParentID() + "\" childCount=\"" + child_count + "\" restricted=\"false\" searchable=\"true\">" +
 				
 					"<dc:title>" + escapeXML(child_container.getName()) + "</dc:title>" +
 					"<upnp:class>" + CONTENT_CONTAINER + "</upnp:class>" +
 					"<upnp:storageUsed>" + storage_used + "</upnp:storageUsed>" +
-					"<upnp:writeStatus>WRITABLE</upnp:writeStatus>" +
-	
-				"</container>" );
-			
+					"<upnp:writeStatus>WRITABLE</upnp:writeStatus>";
+			if (child_container.mediaClass != null) {
+				didl += "<av:mediaClass xmlns:av=\"urn:schemas-sony-com:av\">" + child_container.mediaClass + "</av:mediaClass>";
+			}
+			didl += "</container>";
+			return didl;
 		
 		}else{
 			contentItem	child_item = (contentItem)con;
@@ -1401,6 +1404,7 @@ UPnPMediaServerContentDirectory
 		private String					name;
 		private List<content>			children 	= new ArrayList<content>();
 		private int						update_id	= random.nextInt( Integer.MAX_VALUE );
+		private String mediaClass;
 		
 		protected
 		contentContainer(
@@ -1434,6 +1438,12 @@ UPnPMediaServerContentDirectory
 			}
 		}
 		
+		public contentContainer(contentContainer _parent, String _name,
+				String _mediaClass) {
+			this(_parent, _name);
+			mediaClass = _mediaClass;
+		}
+
 		protected AzureusContentDownload
 		getACD()
 		{
@@ -2020,9 +2030,15 @@ UPnPMediaServerContentDirectory
 					
 					if ( item_class.equals( CONTENT_VIDEO )){
 										
-						if ( lc_fn.endsWith( ".vob" )){
+						if ( lc_fn.endsWith( ".vob" ) || lc_fn.endsWith( ".mpeg" ) || lc_fn.endsWith( ".mpg" )){
 					
 							attr = "DLNA.ORG_PN=MPEG_PS_NTSC;DLNA.ORG_OP=01;DLNA.ORG_CI=1;DLNA.ORG_FLAGS=01700000000000000000000000000000";							
+						} else if (lc_fn.endsWith("mkv")) {
+							attr = "DLNA.ORG_PN=MATROSKA;DLNA.ORG_OP=01;DLNA.ORG_FLAGS=01500000000000000000000000000000";
+						} else if (lc_fn.endsWith("avi")) {
+							attr = "DLNA.ORG_PN=AVI;DLNA.ORG_OP=01;DLNA.ORG_FLAGS=01500000000000000000000000000000";
+						} else if (lc_fn.endsWith("wmv")) {
+							attr = "DLNA.ORG_PN=WMVHIGH_FULL;DLNA.ORG_OP=01;DLNA.ORG_FLAGS=01500000000000000000000000000000";
 						}
 					}else if ( item_class.equals( CONTENT_AUDIO )){
 												
@@ -2170,6 +2186,9 @@ UPnPMediaServerContentDirectory
 			String	didle = 
 				"<dc:title>" + escapeXML( getDisplayTitle()) + "</dc:title>" +
 				"<dc:creator>" +  escapeXML(getCreator()) + "</dc:creator>";
+			// These two work for thumbnail on SonyBluRay
+			//didle += "<res protocolInfo=\"http-get:*:image/jpeg:DLNA.ORG_PN=JPEG_TN;DLNA.ORG_OP=00;DLNA.ORG_CI=1;DLNA.ORG_FLAGS=00D00000000000000000000000000000\" >http://192.168.2.62:65246/Vuze120x120.jpg</res>";
+			//didle += "<upnp:albumArtURI xmlns:dlna=\"urn:schemas-dlna-org:metadata-1-0/\" dlna:profileID=\"JPEG_TN\"></upnp:albumArtURI>";
 			
 			String date = getDate();
 			
