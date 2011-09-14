@@ -307,7 +307,15 @@ UPnPMediaServerContentDirectory
 			try{
 				byte[]	hash = file.getDownloadHash();
 				
-				String title = getUniqueName( null, new HashWrapper( hash ), file.getFile().getName());
+				
+				String title;
+				
+				Object otitle = content_file.getProperty(AzureusContentFile.PT_TITLE);
+				if (otitle instanceof String) {
+					title = getUniqueName( null, null, (String) otitle);
+				} else {
+					title = getUniqueName( null, new HashWrapper( hash ), file.getFile().getName());
+				}
 					
 				contentItem	item = new contentItem( downloads_container, content_file, hash, title );
 						
@@ -600,7 +608,7 @@ UPnPMediaServerContentDirectory
 	{
 		synchronized( unique_names ){
 			
-			String result = (String)unique_name_map.get( hw );
+			String result = hw == null ? null : (String)unique_name_map.get( hw );
 	
 			if ( result != null ){
 				
@@ -631,7 +639,9 @@ UPnPMediaServerContentDirectory
 			
 			unique_names.add( result );
 			
-			unique_name_map.put( hw, result );
+			if (hw != null) {
+				unique_name_map.put( hw, result );
+			}
 			
 			return( result );
 		}
