@@ -11,8 +11,8 @@
         </sealing>
     </manifest>
     <selectedElements exportClassFiles="true" exportJavaFiles="true" exportOutputFolder="false">
-        <javaElement handleIdentifier="=azupnpav/&lt;com.aelitis.azureus.plugins.upnpmediaserver.resources"/>
         <javaElement handleIdentifier="=azupnpav/&lt;com.aelitis.azureus.plugins.upnpmediaserver.ui"/>
+        <javaElement handleIdentifier="=azupnpav/&lt;com.aelitis.azureus.plugins.upnpmediaserver.resources"/>
         <javaElement handleIdentifier="=azupnpav/&lt;com.aelitis.azureus.plugins.upnpmediaserver.ui.swt"/>
         <javaElement handleIdentifier="=azupnpav/&lt;com.aelitis.azureus.plugins.upnpmediaserver.resources.http"/>
         <javaElement handleIdentifier="=azupnpav/&lt;com.aelitis.azureus.plugins.upnpmediaserver.internat"/>
