@@ -340,6 +340,9 @@ UPnPMediaServer
 							view_model.getLogArea().appendText( sw.toString() + "\n" );
 						}
 					});		
+
+			logger.setDiagnostic();
+			logger.setForce( true );
 		
 			view_model.setConfigSectionID( "upnpmediaserver.name" );
 			
