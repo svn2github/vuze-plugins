@@ -1439,67 +1439,69 @@ UPnPMediaServerContentServer
 			writeb( "Cache-Control: no-cache" + NL );
 			writeb( "Expires: 0" + NL );
 			
-			if ( action_is_download ){
-				
-				writeb( "Content-Type: application/octet-stream" + NL );
-				writeb( "Content-Transfer-Encoding: binary" + NL );
-				writeb( "Content-Disposition: attachment; filename=\"" + item.getFile().getFile( true ).getName() + "\"" + NL );
-				
-				return;
-			}
+				// item can be null for error cases
 			
-			/* DLNA.ORG_CI: conversion indicator parameter (integer)
-			 *     0 not transcoded
-			 *     1 transcoded
-			 */
-			
-			/* DLNA.ORG_OP: operations parameter (string)
-			 *     "00" (or "0") neither time seek range nor range supported
-			 *     "01" range supported
-			 *     "10" time seek range supported
-			 *     "11" both time seek range and range supported
-			 */
-			
-			/* DLNA.ORG_FLAGS, padded with 24 trailing 0s
-			 *     80000000  31  senderPaced
-			 *     40000000  30  lsopTimeBasedSeekSupported
-			 *     20000000  29  lsopByteBasedSeekSupported
-			 *     10000000  28  playcontainerSupported
-			 *      8000000  27  s0IncreasingSupported
-			 *      4000000  26  sNIncreasingSupported
-			 *      2000000  25  rtspPauseSupported
-			 *      1000000  24  streamingTransferModeSupported
-			 *       800000  23  interactiveTransferModeSupported
-			 *       400000  22  backgroundTransferModeSupported
-			 *       200000  21  connectionStallingSupported
-			 *       100000  20  dlnaVersion15Supported
-			 *
-			 *     Example: (1 << 24) | (1 << 22) | (1 << 21) | (1 << 20)
-			 *       DLNA.ORG_FLAGS=01700000[000000000000000000000000] // [] show padding
-			 */
-			
-			String	PN;
-			
-				// don't have a mapping set yet so just random
-			
-			if ( item.getContentClass() == UPnPMediaServerContentDirectory.CONTENT_IMAGE ){
-				
-				PN = "JPEG";
-				
-			}else if ( item.getContentClass() == UPnPMediaServerContentDirectory.CONTENT_AUDIO ){
-				
-				PN = "MP3";
-				
-			}else{
-				
-				PN = "MPEG_PS_NTSC";
-			}
-			
-			writeb( "contentFeatures.dlna.org: DLNA.ORG_PN=" + PN + ";DLNA.ORG_OP=01;DLNA.ORG_CI=1;DLNA.ORG_FLAGS=01700000000000000000000000000000" + NL );
-			writeb( "transferMode.dlna.org: Streaming" + NL );
-
 			if ( item != null ){
-		
+
+				if ( action_is_download ){
+					
+					writeb( "Content-Type: application/octet-stream" + NL );
+					writeb( "Content-Transfer-Encoding: binary" + NL );
+					writeb( "Content-Disposition: attachment; filename=\"" + item.getFile().getFile( true ).getName() + "\"" + NL );
+					
+					return;
+				}
+				
+				/* DLNA.ORG_CI: conversion indicator parameter (integer)
+				 *     0 not transcoded
+				 *     1 transcoded
+				 */
+				
+				/* DLNA.ORG_OP: operations parameter (string)
+				 *     "00" (or "0") neither time seek range nor range supported
+				 *     "01" range supported
+				 *     "10" time seek range supported
+				 *     "11" both time seek range and range supported
+				 */
+				
+				/* DLNA.ORG_FLAGS, padded with 24 trailing 0s
+				 *     80000000  31  senderPaced
+				 *     40000000  30  lsopTimeBasedSeekSupported
+				 *     20000000  29  lsopByteBasedSeekSupported
+				 *     10000000  28  playcontainerSupported
+				 *      8000000  27  s0IncreasingSupported
+				 *      4000000  26  sNIncreasingSupported
+				 *      2000000  25  rtspPauseSupported
+				 *      1000000  24  streamingTransferModeSupported
+				 *       800000  23  interactiveTransferModeSupported
+				 *       400000  22  backgroundTransferModeSupported
+				 *       200000  21  connectionStallingSupported
+				 *       100000  20  dlnaVersion15Supported
+				 *
+				 *     Example: (1 << 24) | (1 << 22) | (1 << 21) | (1 << 20)
+				 *       DLNA.ORG_FLAGS=01700000[000000000000000000000000] // [] show padding
+				 */
+				
+				String	PN;
+				
+					// don't have a mapping set yet so just random
+				
+				if ( item.getContentClass() == UPnPMediaServerContentDirectory.CONTENT_IMAGE ){
+					
+					PN = "JPEG";
+					
+				}else if ( item.getContentClass() == UPnPMediaServerContentDirectory.CONTENT_AUDIO ){
+					
+					PN = "MP3";
+					
+				}else{
+					
+					PN = "MPEG_PS_NTSC";
+				}
+				
+				writeb( "contentFeatures.dlna.org: DLNA.ORG_PN=" + PN + ";DLNA.ORG_OP=01;DLNA.ORG_CI=1;DLNA.ORG_FLAGS=01700000000000000000000000000000" + NL );
+				writeb( "transferMode.dlna.org: Streaming" + NL );
+
 				writeb( "Content-Type: " + item.getContentType() + NL );
 
 				long date = item.getDateMillis();
