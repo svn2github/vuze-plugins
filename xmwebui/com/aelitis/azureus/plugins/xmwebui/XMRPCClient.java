@@ -25,6 +25,7 @@ import java.util.*;
 import java.net.*;
 import java.io.*;
 
+import org.gudy.azureus2.core3.util.UrlUtils;
 import org.json.simple.JSONObject;
 
 import com.aelitis.azureus.util.JSONUtils;
@@ -37,80 +38,96 @@ XMRPCClient
 		String[]		args )
 	{
 		try{
-			HttpURLConnection connection = (HttpURLConnection)new URL( "http://192.168.0.100:9091/transmission/rpc" ).openConnection();
+			HttpURLConnection connection;
 			
-			connection.setRequestMethod( "POST" );
-			
-			connection.setDoOutput( true );
-			
-			PrintWriter pw = new PrintWriter( new OutputStreamWriter( connection.getOutputStream(), "UTF-8" ));
-			
-			Map request = new JSONObject();
-			
-			/*
-			request.put( "method", "torrent-get" );
-			
-			Map	arg_map = new HashMap();
-			
-			request.put( "arguments", arg_map );
-			
-			List fields = new ArrayList();
-			
-			arg_map.put( "fields", fields );
-			
-			fields.add( "addedDate" );
-			fields.add( "announceURL" );
-			fields.add( "comment" );
-			fields.add( "creator" );
-			fields.add( "dateCreated" );
-			fields.add( "downloadedEver" );
-			fields.add( "error" );
-			fields.add( "errorString" );
-			fields.add( "eta" );
-			fields.add( "hashString" );
-			fields.add( "haveUnchecked" );
-			fields.add( "haveValid" );
-			fields.add( "id" );
-			fields.add( "isPrivate" );
-			fields.add( "leechers" );
-			fields.add( "leftUntilDone" );
-			fields.add( "name" );
-			fields.add( "peersConnected" );
-			fields.add( "peersGettingFromUs" );
-			fields.add( "peersSendingToUs" );
-			fields.add( "rateDownload" );
-			fields.add( "rateUpload" );
-			fields.add( "seeders" );
-			fields.add( "sizeWhenDone" );
-			fields.add( "status" );
-			fields.add( "swarmSpeed" );
-			fields.add( "totalSize" );
-			fields.add( "uploadedEver" );
+			if ( false ){
+				
+				connection = (HttpURLConnection)new URL( "http://127.0.0.1:9091/transmission/rpc" ).openConnection();
+				
+				connection.setRequestMethod( "POST" );
+				
+				connection.setDoOutput( true );
+				
+				PrintWriter pw = new PrintWriter( new OutputStreamWriter( connection.getOutputStream(), "UTF-8" ));
+				
+				Map request = new JSONObject();
+				
+				/*
+				request.put( "method", "torrent-get" );
+				
+				Map	arg_map = new HashMap();
+				
+				request.put( "arguments", arg_map );
+				
+				List fields = new ArrayList();
+				
+				arg_map.put( "fields", fields );
+				
+				fields.add( "addedDate" );
+				fields.add( "announceURL" );
+				fields.add( "comment" );
+				fields.add( "creator" );
+				fields.add( "dateCreated" );
+				fields.add( "downloadedEver" );
+				fields.add( "error" );
+				fields.add( "errorString" );
+				fields.add( "eta" );
+				fields.add( "hashString" );
+				fields.add( "haveUnchecked" );
+				fields.add( "haveValid" );
+				fields.add( "id" );
+				fields.add( "isPrivate" );
+				fields.add( "leechers" );
+				fields.add( "leftUntilDone" );
+				fields.add( "name" );
+				fields.add( "peersConnected" );
+				fields.add( "peersGettingFromUs" );
+				fields.add( "peersSendingToUs" );
+				fields.add( "rateDownload" );
+				fields.add( "rateUpload" );
+				fields.add( "seeders" );
+				fields.add( "sizeWhenDone" );
+				fields.add( "status" );
+				fields.add( "swarmSpeed" );
+				fields.add( "totalSize" );
+				fields.add( "uploadedEver" );
+	
+				
+				request.put( "tag", "1234" );
+				*/
+				
+				// {"method":"torrent-add","arguments":{"paused":"true","filename":"http://www.mininova.org/get/2963304"}}
+				
+				request.put( "method", "torrent-add" );
+				
+				Map	arg_map = new HashMap();
+				
+				request.put( "arguments", arg_map );
+	
+				File f = new File( "C:\\temp\\b.torrent" );
+				
+				String url = f.toURL().toExternalForm();
+				
+				System.out.println( "Adding " + url );
+				
+				arg_map.put( "paused", "true");
+				arg_map.put( "filename", url );
+				
+				pw.println( JSONUtils.encodeToJSON( request ));
+				
+				pw.flush();
+			}else{
+				Map request = new JSONObject();
 
-			
-			request.put( "tag", "1234" );
-			*/
-			
-			// {"method":"torrent-add","arguments":{"paused":"true","filename":"http://www.mininova.org/get/2963304"}}
-			
-			request.put( "method", "torrent-add" );
-			
-			Map	arg_map = new HashMap();
-			
-			request.put( "arguments", arg_map );
+				request.put( "method", "torrent-start-all" );
 
-			File f = new File( "C:\\temp\\b.torrent" );
-			
-			String url = f.toURL().toExternalForm();
-			
-			System.out.println( "Adding " + url );
-			
-			arg_map.put( "paused", "true");
-			arg_map.put( "filename", url );
-			
-			pw.println( JSONUtils.encodeToJSON( request ));
-			
-			pw.flush();
+				String url = "http://vuze:vuze@127.0.0.1:9091/vuze/rpc?json=" + UrlUtils.encode( JSONUtils.encodeToJSON( request ));
+				
+				System.out.println( url );
+				
+				connection = (HttpURLConnection)new URL( url).openConnection();
+
+			}
 			
 			LineNumberReader lnr = new LineNumberReader( new InputStreamReader( connection.getInputStream(), "UTF-8" ));
 			

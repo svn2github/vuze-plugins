@@ -44,6 +44,7 @@ import org.gudy.azureus2.core3.util.SimpleTimer;
 import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.gudy.azureus2.core3.util.TimerEventPeriodic;
+import org.gudy.azureus2.core3.util.UrlUtils;
 import org.gudy.azureus2.plugins.PluginConfig;
 import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
@@ -307,6 +308,41 @@ XMWebUIPlugin
 					
 					request_json_str.append( line );
 				}
+							
+				if ( logit ){
+				
+					log( "-> " + request_json_str );
+				}
+				
+				Map request_json = JSONUtils.decodeJSON( request_json_str.toString());
+				
+				Map response_json = processRequest( request_json );
+					
+				String response_json_str = JSONUtils.encodeToJSON( response_json );
+				
+				if ( logit ){
+				
+					log( "<- " + response_json_str );
+				}
+				
+				PrintWriter pw =new PrintWriter( new OutputStreamWriter( response.getOutputStream(), "UTF-8" ));
+			
+				pw.println( response_json_str );
+				
+				pw.flush();
+				
+				response.setContentType( "application/json; charset=UTF-8" );
+				
+				response.setGZIP( true );
+				
+				return( true );
+			
+			}else if ( 	url.startsWith( "/transmission/rpc?json=" ) ||
+						url.startsWith( "/vuze/rpc?json=" )){
+											
+				StringBuffer	request_json_str = new StringBuffer(2048);
+				
+				request_json_str.append( UrlUtils.decode( url.substring( url.indexOf('?') + 6 )));
 							
 				if ( logit ){
 				
@@ -795,6 +831,18 @@ XMWebUIPlugin
 			
 			result.put( "torrent-added", torrent_details );
 			
+		}else if ( method.equals( "torrent-start-all" )){
+
+			checkUpdatePermissions();
+			
+			plugin_interface.getDownloadManager().startAllDownloads();
+		
+		}else if ( method.equals( "torrent-stop-all" )){
+
+			checkUpdatePermissions();
+			
+			plugin_interface.getDownloadManager().stopAllDownloads();
+			 
 		}else if ( method.equals( "torrent-start" )){
 
 			checkUpdatePermissions();
