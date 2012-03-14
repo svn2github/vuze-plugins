@@ -102,12 +102,17 @@ public class KClosestNodesSearch {
 		}
 		
 		
-		if(includeOurself && owner.getRandomServer().getPublicAddress() != null && entries.size() < max_entries)
-		{
+		if(		includeOurself ){
+			
 			RPCServer srv = owner.getRandomServer();
 			
-			InetSocketAddress sockAddr = new InetSocketAddress(srv.getPublicAddress(), srv.getPort());
-			entries.add(new KBucketEntry(sockAddr, srv.getDerivedID()));
+			if ( 	srv != null &&
+					srv.getPublicAddress() != null && 
+					entries.size() < max_entries ){
+			
+				InetSocketAddress sockAddr = new InetSocketAddress(srv.getPublicAddress(), srv.getPort());
+				entries.add(new KBucketEntry(sockAddr, srv.getDerivedID()));
+			}
 		}
 	}
 
