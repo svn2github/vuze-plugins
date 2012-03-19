@@ -16,6 +16,7 @@
  */
 package lbms.plugins.mldht.azureus.gui;
 
+import java.net.URL;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,20 +28,30 @@ import lbms.plugins.mldht.kad.utils.PopulationListener;
 
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.widgets.Display;
+import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
+import org.gudy.azureus2.plugins.ui.menus.MenuContext;
+import org.gudy.azureus2.plugins.ui.menus.MenuItem;
+import org.gudy.azureus2.plugins.ui.menus.MenuItemListener;
+import org.gudy.azureus2.plugins.ui.menus.MenuManager;
 import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 import org.gudy.azureus2.ui.swt.plugins.UISWTStatusEntry;
+import org.gudy.azureus2.ui.swt.plugins.UISWTStatusEntryListener;
 
 /**
  * @author Leonard
  * 
  */
 public class SWTHelper implements UIManagerListener, PopulationListener, DHTStatusListener {
+	
+	private static final boolean	SHOW_STATUS_TEXT	= false;
+	
 	private UISWTStatusEntry	statusEntry;
 	private UISWTInstance		swtInstance;
 	private MlDHTPlugin			plugin;
 	private List<DHTView>		views = new ArrayList<DHTView>();
+	private List<MenuItem>		menu_items = new ArrayList<MenuItem>();
 
 	public Image				dhtStatusEntryIcon;
 	public Display				display;
@@ -64,6 +75,11 @@ public class SWTHelper implements UIManagerListener, PopulationListener, DHTStat
 			dhtStatusEntryIcon.dispose();
 			dhtStatusEntryIcon = null;
 		}
+		
+		for ( MenuItem mi: menu_items ){
+			
+			mi.remove();
+		}
 	}
 
 	/*
@@ -85,7 +101,42 @@ public class SWTHelper implements UIManagerListener, PopulationListener, DHTStat
 								.getResourceAsStream("/lbms/plugins/mldht/azureus/gui/dhtIcon.png"));
 				statusEntry.setImage(dhtStatusEntryIcon);
 				statusEntry.setImageEnabled(true);
-			} catch (RuntimeException e) {
+				
+				statusEntry.setListener(
+					new UISWTStatusEntryListener()
+					{
+							public void 
+							entryClicked(
+								UISWTStatusEntry entry )
+							{
+								plugin.showConfig();
+							}
+						});
+				
+				MenuContext menu_context = statusEntry.getMenuContext();
+				
+				MenuManager menu_manager = plugin.getPluginInterface().getUIManager().getMenuManager();
+				
+				for( final DHTtype type : DHTtype.values()){
+				
+					MenuItem item = menu_manager.addMenuItem( menu_context, "Views.plugins." + DHTView.VIEWID+"."+type.shortName + ".title");
+
+					menu_items.add( item );
+					
+					item.addListener(
+						new MenuItemListener()
+						{
+							public void 
+							selected(
+								MenuItem menu, Object target) 
+							{
+								swtInstance.openView(UISWTInstance.VIEW_MAIN, DHTView.VIEWID+"."+type.shortName,null );
+							}
+						});
+				}
+				
+				
+			} catch (Throwable e) {
 				e.printStackTrace();
 			}
 
@@ -103,6 +154,7 @@ public class SWTHelper implements UIManagerListener, PopulationListener, DHTStat
 
 			}
 
+			updateStatusEntry();
 		}
 	}
 
@@ -136,10 +188,10 @@ public class SWTHelper implements UIManagerListener, PopulationListener, DHTStat
 				tooltip.append(" "+type.shortName+": ");
 				if(status == DHTStatus.Running && dht.getEstimator().getEstimate() != 0)
 				{
-					text.append("\u2714");
+					text.append("\u2714");	// unicode not avail on some platforms
 					tooltip.append(format.format(dht.getEstimator().getEstimate()));
 				} else {
-					text.append("\u2718");
+					text.append("\u2718");	// unicode not avail on some platforms
 					tooltip.append(status);
 				}
 				
@@ -148,7 +200,11 @@ public class SWTHelper implements UIManagerListener, PopulationListener, DHTStat
 			if (display != null && !display.isDisposed()) {
 				display.asyncExec(new Runnable() {
 					public void run () {
-						statusEntry.setText(text.toString());
+						if ( SHOW_STATUS_TEXT ){
+							statusEntry.setText(text.toString());
+						}else{
+							statusEntry.setText( "mlDHT" );
+						}
 						statusEntry.setTooltipText(tooltip.toString());
 						statusEntry.setVisible(plugin.getPluginInterface().getPluginconfig().getPluginBooleanParameter("showStatusEntry"));
 					}

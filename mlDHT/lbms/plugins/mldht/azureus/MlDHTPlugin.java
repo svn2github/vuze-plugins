@@ -70,7 +70,6 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 	private LoggerChannelListener	logListener;
 	private UIManagerListener		uiListener;
 	private UISWTInstance			swtInstance	= null;
-	private Image					dhtStatusEntryIcon;
 
 	//private Display					display;
 
@@ -323,6 +322,12 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 		return logger;
 	}
 
+	public void
+	showConfig()
+	{
+		pluginInterface.getUIManager().showConfigSection( "plugin.mldht" );
+	}
+	
 	/**
 	 * Returns the user set status of whether or not the plugin should autoOpen
 	 * 
@@ -357,26 +362,37 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 		if (swtHelper != null) {
 			swtHelper.onPluginUnload();
 		}
-		if (dhtStatusEntryIcon != null) {
-			dhtStatusEntryIcon.dispose();
-			dhtStatusEntryIcon = null;
-		}
 		if (swtInstance != null) {
 			swtInstance.removeViews(UISWTInstance.VIEW_MAIN, DHTView.VIEWID);
 			swtInstance = null;
 		}
 		stopDHT();
 
-		try {
-			pluginInterface.getMainlineDHTManager().setProvider(null);
-		} catch (Throwable e) {
+		if ( pluginInterface != null ){
+			try {
+				pluginInterface.getMainlineDHTManager().setProvider(null);
+			} catch (Throwable e) {
+			}
+	
+			pluginInterface.getUIManager().removeUIListener(uiListener);
+			
+			pluginInterface.removeListener(this);
 		}
-
-		logChannel.removeListener(logListener);
-		pluginInterface.getUIManager().removeUIListener(uiListener);
-		view_model.destroy();
-		config_model.destroy();
-		pluginInterface.removeListener(this);
+		
+		if ( view_model != null ){
+		
+			view_model.destroy();
+		}
+		
+		if ( config_model != null ){
+		
+			config_model.destroy();
+		}
+		
+		if ( logChannel != null ){
+			
+			logChannel.removeListener(logListener);
+		}
 	}
 
 	/*
@@ -465,11 +481,16 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 	}
 
 	public void stopDHT () {
-		tracker.stop();
-		for (DHT dht : dhts.values()) {
-			dht.stop();
+		if ( tracker != null ){
+			tracker.stop();
 		}
-		view_model.getStatus().setText("Stopped");
+		if ( dhts != null ){
+			for (DHT dht : dhts.values()) {
+				dht.stop();
+			}
+		}
+		if ( view_model != null ){
+			view_model.getStatus().setText("Stopped");
+		}
 	}
-
 }
