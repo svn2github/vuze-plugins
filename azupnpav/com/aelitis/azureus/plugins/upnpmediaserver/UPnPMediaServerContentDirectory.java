@@ -37,6 +37,7 @@ import java.util.Set;
 
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.AERunnable;
+import org.gudy.azureus2.core3.util.Base32;
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.DelayedEvent;
@@ -1138,7 +1139,25 @@ UPnPMediaServerContentDirectory
 			
 			Map<String,Object> map = FileUtil.readResilientFile( file );
 			
-			config = (Map<String,Long>)map.get( "id_map" );
+			Map<String,Long> id_map2 = (Map<String,Long>)map.get( "id_map2" );
+			
+			if ( id_map2 != null ){
+				
+				config = new HashMap<String, Long>();
+				
+				try{					
+					for ( Map.Entry<String,Long>	entry: id_map2.entrySet()){
+						
+						config.put( new String( Base32.decode( entry.getKey()), "UTF-8" ), entry.getValue());
+					}
+				}catch( Throwable e ){
+					
+					Debug.out( e );
+				}
+			}else{
+				
+				config = (Map<String,Long>)map.get( "id_map" );
+			}
 			
 			if ( config == null ){
 				
@@ -1180,11 +1199,28 @@ UPnPMediaServerContentDirectory
 
 			Map<String,Object> map = new HashMap<String, Object>();
 			
-			Map<String,Long> new_config = new HashMap<String, Long>();
+			Map<String,Long> old_id_map = new HashMap<String, Long>();
 			
-			addPersistentContainerIDs( new_config, root_container );
+			addPersistentContainerIDs( old_id_map, root_container );
 			
-			map.put( "id_map", new_config );
+			map.put( "id_map", old_id_map );
+			
+				// issues with non-ascii keys here...
+			
+			try{
+				Map<String,Long> id_map2 = new HashMap<String, Long>();
+				
+				for ( Map.Entry<String,Long>	entry: old_id_map.entrySet()){
+					
+					id_map2.put( Base32.encode( entry.getKey().getBytes( "UTF-8" )), entry.getValue());
+				}
+				
+				map.put( "id_map2", id_map2 );
+				
+			}catch( Throwable e ){
+				
+				Debug.out( e );
+			}
 			
 			FileUtil.writeResilientFile( file, map );
 
