@@ -934,7 +934,7 @@ RemoteUIMainPanel
 	logMessage(
 		String	str )
 	{
-		String ts = new SimpleDateFormat("hh:mm:ss - ").format( new Date());
+		String ts = new SimpleDateFormat("HH:mm:ss - ").format( new Date());
 		
 		String	text = current_log_text + (current_log_text.length()==0?"":"\r\n") + ts + str;
 		

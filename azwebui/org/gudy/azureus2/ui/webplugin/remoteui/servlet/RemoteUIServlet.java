@@ -90,10 +90,10 @@ RemoteUIServlet
 		
 		"ui/swing/UISwingImageRepository.class",	
 		
-		"ui/swt/views/AbstractIView.class",
-		"ui/swt/views/IView.class",
-		"ui/swt/mainwindow/Refreshable.class",
-		"ui/swt/IconBarEnabler.class",
+		//"ui/swt/views/AbstractIView.class",
+		//"ui/swt/views/IView.class",
+		//"ui/swt/mainwindow/Refreshable.class",
+		//"ui/swt/IconBarEnabler.class",
 		
 		"ui/webplugin/remoteui/applet/RemoteUIApplet.class",
 		"ui/webplugin/remoteui/applet/RemoteUIMainPanelAdaptor.class",
@@ -188,7 +188,7 @@ RemoteUIServlet
 		
 		"plugins/PluginInterface.class",
 		"plugins/PluginListener.class",
-		"plugins/PluginView.class",
+		//"plugins/PluginView.class",
 		"plugins/PluginException.class",
 		"plugins/Plugin.class",
 		"plugins/PluginEvent.class",
@@ -241,6 +241,7 @@ RemoteUIServlet
 		"plugins/download/savelocation/SaveLocationChange.class",
 		// "plugins/download/session/SessionAuthenticator.class",
 		"plugins/network/ConnectionManager.class",
+		"plugins/network/RateLimiter.class",
 		"plugins/messaging/MessageManager.class",
 		"plugins/peers/PeerManager.class",
 		"plugins/platform/PlatformManager.class",
