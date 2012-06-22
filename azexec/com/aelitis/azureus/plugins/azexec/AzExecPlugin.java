@@ -41,6 +41,7 @@ import org.gudy.azureus2.plugins.ui.menus.*;
 
 import org.gudy.azureus2.plugins.ui.*;
 import org.gudy.azureus2.ui.swt.plugins.*;
+import org.gudy.azureus2.core3.util.ByteFormatter;
 
 public class AzExecPlugin implements Plugin, DownloadCompletionListener, MenuItemListener, MenuItemFillListener {
 	
@@ -49,6 +50,7 @@ public class AzExecPlugin implements Plugin, DownloadCompletionListener, MenuIte
 	private PluginInterface plugin_interface;
 	private PluginConfig cfg;
 	private TorrentAttribute attr;
+	private TorrentAttribute ta_cat;
 	private static int HISTORY_LIMIT = 15;
 	private BooleanParameter use_runtime_exec_param;
 	
@@ -139,6 +141,7 @@ public class AzExecPlugin implements Plugin, DownloadCompletionListener, MenuIte
 		this.model.getProgress().setVisible(false);
 		
 		this.attr = plugin_interface.getTorrentManager().getPluginAttribute("command");
+		this.ta_cat = plugin_interface.getTorrentManager().getAttribute(TorrentAttribute.TA_CATEGORY);
 		this.channel = plugin_interface.getLogger().getChannel("azexec");
 		this.model.attachLoggerChannel(channel);
 		
@@ -178,20 +181,31 @@ public class AzExecPlugin implements Plugin, DownloadCompletionListener, MenuIte
 		if (command_template == null) {return;}
 		
 		File save_path = new File(d.getSavePath());
-		String command_f, command_d, command_n = d.getName();
+		String command_f, command_d, command_k, 
+		command_n = d.getName(), 
+		command_l = d.getAttribute(ta_cat),
+		command_t = d.getTorrent().getAnnounceURL().getHost(), 
+		command_i = ByteFormatter.encodeString( d.getTorrent().getHash());
+		
 		if (d.getTorrent().isSimpleTorrent()) {
 			command_f = save_path.getName();
 			command_d = save_path.getParent();
+			command_k = "single";
 		}
 		else {
 			command_f = "";
 			command_d = save_path.getPath();
+			command_k = "multi";
 		}
 		
 		String command = command_template;
 		command = command.replace("%F", command_f);
 		command = command.replace("%D", command_d);
 		command = command.replace("%N", command_n);
+		command = command.replace("%L", command_l);
+		command = command.replace("%T", command_t);
+		command = command.replace("%I", command_i);
+		command = command.replace("%K", command_k);
 
 		final String command_to_run = command;
 		plugin_interface.getUtilities().createThread(d.getName() + " exec", new Runnable() {
@@ -267,6 +281,8 @@ public class AzExecPlugin implements Plugin, DownloadCompletionListener, MenuIte
 		String[] messages = new String[] {
 			"azexec.input.message",       "azexec.input.message.sub.d",
 			"azexec.input.message.sub.n", "azexec.input.message.sub.f",
+			"azexec.input.message.sub.l", "azexec.input.message.sub.t",
+			"azexec.input.message.sub.i", "azexec.input.message.sub.k"
 		};
 		
 		UIInputReceiver input = plugin_interface.getUIManager().getInputReceiver();
@@ -290,12 +306,12 @@ public class AzExecPlugin implements Plugin, DownloadCompletionListener, MenuIte
 		String[] history_array = cfg.getPluginStringListParameter(history_attrib);
 		
 		// Now take the command and re-arrange the history items.
-		List new_history = new ArrayList(Arrays.asList(history_array));
+		List<String> new_history = new ArrayList<String>(Arrays.asList(history_array));
 		new_history.remove(cmd_to_use);
 		new_history.add(0, cmd_to_use);
 		if (new_history.size() > HISTORY_LIMIT) {new_history = new_history.subList(0, HISTORY_LIMIT);}
 		
-		String[] new_history_array = (String[])new_history.toArray(new String[new_history.size()]);
+		String[] new_history_array = new_history.toArray(new String[new_history.size()]);
 		cfg.setPluginStringListParameter(history_attrib, new_history_array);
 	}
 	
