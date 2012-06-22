@@ -187,6 +187,8 @@ public class AzExecPlugin implements Plugin, DownloadCompletionListener, MenuIte
 		command_t = d.getTorrent().getAnnounceURL().getHost(), 
 		command_i = ByteFormatter.encodeString( d.getTorrent().getHash());
 		
+		if (command_l == null) {command_l = "Uncategorised";}
+		
 		if (d.getTorrent().isSimpleTorrent()) {
 			command_f = save_path.getName();
 			command_d = save_path.getParent();
