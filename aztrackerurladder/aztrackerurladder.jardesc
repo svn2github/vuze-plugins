@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="WINDOWS-1252" standalone="no"?>
+<jardesc>
+    <jar path="aztrackerurladder/aztrackerurladder.jar"/>
+    <options buildIfNeeded="true" compress="true" descriptionLocation="/aztrackerurladder/aztrackerurladder.jardesc" exportErrors="true" exportWarnings="true" includeDirectoryEntries="false" overwrite="false" saveDescription="true" storeRefactorings="false" useSourceFolders="false"/>
+    <storedRefactorings deprecationInfo="true" structuralOnly="false"/>
+    <selectedProjects/>
+    <manifest generateManifest="true" manifestLocation="" manifestVersion="1.0" reuseManifest="false" saveManifest="false" usesManifest="true">
+        <sealing sealJar="false">
+            <packagesToSeal/>
+            <packagesToUnSeal/>
+        </sealing>
+    </manifest>
+    <selectedElements exportClassFiles="true" exportJavaFiles="false" exportOutputFolder="false">
+        <file path="/aztrackerurladder/plugin.properties"/>
+        <javaElement handleIdentifier="=aztrackerurladder/&lt;com.azureus.plugins.trackerurladder.internat"/>
+        <javaElement handleIdentifier="=aztrackerurladder/&lt;com.azureus.plugins.trackerurladder"/>
+    </selectedElements>
+    <fatjar builder="org.eclipse.jdt.ui.plain_jar_builder" launchConfig=""/>
+</jardesc>
