@@ -406,51 +406,63 @@ UPnPMediaServer
 			
 			if ( default_name == null ){
 				
-				try{
-					Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+				PluginConfig plugin_config = plugin_interface.getPluginconfig();
+				
+				default_name = plugin_config.getPluginStringParameter( "upnpmediaserver.name.default", "" );
+				
+				if ( default_name.length() == 0 ){
 					
-					InetAddress	ipv4 = null;
-					InetAddress	ipv6 = null;
-					
-					while( interfaces.hasMoreElements()){
+					try{
+							// seen high CPU on some systems calling this (due to a mass of weird 6to4 interfaces maybe
+							// so just call the once
 						
-						Enumeration<InetAddress> addresses = interfaces.nextElement().getInetAddresses();
+						Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
 						
-						while( addresses.hasMoreElements()){
+						InetAddress	ipv4 = null;
+						InetAddress	ipv6 = null;
+						
+						while( interfaces.hasMoreElements()){
 							
-							InetAddress address = addresses.nextElement();
+							Enumeration<InetAddress> addresses = interfaces.nextElement().getInetAddresses();
 							
-							if ( address.isLoopbackAddress()){
+							while( addresses.hasMoreElements()){
 								
-								continue;
-							}
-							
-							if ( address instanceof Inet4Address ){
+								InetAddress address = addresses.nextElement();
 								
-								ipv4 = address;
+								if ( address.isLoopbackAddress()){
+									
+									continue;
+								}
 								
-							}else{
-								
-								ipv6 = address;
+								if ( address instanceof Inet4Address ){
+									
+									ipv4 = address;
+									
+								}else{
+									
+									ipv6 = address;
+								}
 							}
 						}
-					}
-					
-					if ( ipv4 != null ){
 						
-						default_name = "Vuze on " + ipv4.getHostAddress();
-						
-					}else if ( ipv6 != null ){
-						
-						default_name = "Vuze on " + ipv6.getHostAddress();
-
-					}else{
+						if ( ipv4 != null ){
+							
+							default_name = "Vuze on " + ipv4.getHostAddress();
+							
+						}else if ( ipv6 != null ){
+							
+							default_name = "Vuze on " + ipv6.getHostAddress();
+	
+						}else{
+							
+							default_name = "Vuze";
+						}
+					}catch( Throwable e ){
 						
 						default_name = "Vuze";
 					}
-				}catch( Throwable e ){
 					
-					default_name = "Vuze";
+					plugin_config.setPluginParameter( "upnpmediaserver.name.default", default_name );
 				}
 			}
 			
