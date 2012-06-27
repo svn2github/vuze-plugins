@@ -32,6 +32,9 @@ import org.gudy.azureus2.core3.disk.DiskManager;
 import org.gudy.azureus2.core3.disk.DiskManagerFileInfo;
 import org.gudy.azureus2.core3.download.DownloadManager;
 import org.gudy.azureus2.core3.download.DownloadManagerState;
+import org.gudy.azureus2.core3.internat.MessageText;
+import org.gudy.azureus2.core3.logging.LogAlert;
+import org.gudy.azureus2.core3.logging.Logger;
 import org.gudy.azureus2.core3.peer.PEPeer;
 import org.gudy.azureus2.core3.peer.PEPeerManager;
 import org.gudy.azureus2.core3.peer.PEPeerStats;
@@ -190,6 +193,8 @@ XMWebUIPlugin
 
 			view_mode = true;
 
+			checkViewMode();
+
 		}else{
 
 			mode_parameter.addConfigParameterListener(
@@ -205,7 +210,7 @@ XMWebUIPlugin
 
 			setViewMode();
 		}
-		
+				
 		plugin_interface.getDownloadManager().addListener( this );
 		
 		search_timer = SimpleTimer.addPeriodicEvent(
@@ -236,6 +241,49 @@ XMWebUIPlugin
 			});
 	}
 	
+	private void
+	checkViewMode()
+	{
+		if ( view_mode ){
+			
+			return;
+		}
+		
+		PluginConfig pc = plugin_interface.getPluginconfig();
+		
+		String 	data_dir 	= pc.getCoreStringParameter( PluginConfig.CORE_PARAM_STRING_DEFAULT_SAVE_PATH );
+
+		if ( data_dir == null || data_dir.length() == 0 || !new File( data_dir ).canWrite()){
+			
+			Logger.log(
+				new LogAlert(
+					true,
+					LogAlert.AT_ERROR,
+					MessageText.getString( "xmwebui.error.data_path" )));	
+		}
+		
+		if ( !pc.getUnsafeBooleanParameter( "Save Torrent Files" )){
+			
+			Logger.log(
+					new LogAlert(
+						true,
+						LogAlert.AT_ERROR,
+						MessageText.getString( "xmwebui.error.torrent_path" )));
+		}else{
+			
+			String 	torrent_dir 	= pc.getUnsafeStringParameter( "General_sDefaultTorrent_Directory" );
+
+			if ( torrent_dir == null || torrent_dir.length() == 0 || !new File( torrent_dir ).canWrite()){
+				
+				Logger.log(
+					new LogAlert(
+						true,
+						LogAlert.AT_ERROR,
+						MessageText.getString( "xmwebui.error.torrent_path" )));	
+			}
+		}
+	}
+	
 	public void 
 	unload() 
 		
@@ -259,6 +307,8 @@ XMWebUIPlugin
 		String mode_str = plugin_interface.getPluginconfig().getPluginStringParameter( WebPlugin.CONFIG_MODE, ((WebPlugin)plugin_interface.getPlugin()).CONFIG_MODE_DEFAULT );
 
 		view_mode = !mode_str.equalsIgnoreCase( WebPlugin.CONFIG_MODE_FULL );
+		
+		checkViewMode();
 	}
 	   
 	public void
