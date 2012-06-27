@@ -161,7 +161,23 @@ public class MessageDecoder {
 			byte[] nodes = (byte[]) args.get("nodes");
 			byte[] nodes6 = (byte[]) args.get("nodes6");
 			
-			List<byte[]> vals = (List<byte[]>) args.get("values");
+			Object _values = args.get("values");
+			
+			List<byte[]> vals = null;
+			
+			if ( _values instanceof List ){
+				
+				vals = (List<byte[]>)_values;
+				
+			}else if ( _values instanceof byte[] ){
+				
+					// seen this a few times...
+				
+				vals = new ArrayList<byte[]>();
+				
+				vals.add((byte[])_values);
+			}
+			
 			List<DBItem> dbl = null;
 			if (vals != null && vals.size() > 0)
 			{

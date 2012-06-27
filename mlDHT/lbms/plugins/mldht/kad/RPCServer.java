@@ -158,7 +158,15 @@ public class RPCServer implements Runnable, RPCServerBase {
 			{
 				if (running)
 				{
-					DHT.log(e, LogLevel.Error);
+						// see occasional socket closed errors here, no idea why...
+					
+					if ( 	delay != 1 || 
+							e.getMessage() == null ||
+							!e.getMessage().toLowerCase().contains( "socket closed" )){
+					
+						DHT.log(e, LogLevel.Error);
+					}
+					
 					sock.close();
 				}
 				continue;
