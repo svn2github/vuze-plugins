@@ -121,11 +121,14 @@ public class I2PPlugin
 		
 		if ( plugin_interface.getUtilities().isWindows()){
 			
-			String	win_def = "C:\\Program Files\\i2p";
+			String[]	win_defs = { "C:\\Program Files\\i2p", "C:\\Program Files (x86)\\i2p" };
 			
-			if ( new File(win_def).exists()){
+			for ( String win_def: win_defs ){
 				
-				CONFIG_I2P_LOCATION_DEFAULT	= win_def;
+				if ( new File( win_def ).exists()){
+					
+					CONFIG_I2P_LOCATION_DEFAULT	= win_def;
+				}
 			}
 		}
 		
@@ -253,6 +256,8 @@ public class I2PPlugin
 					throw( new Exception( "I2P install location not defined, plugin initialisation failed." ));				
 				}
 					
+				System.setProperty( "i2p.dir.base", new File( loc ).getAbsolutePath());
+				
 				File	lib = new File( loc, "lib" );
 				
 		   		URL[]	jars = new URL[I2P_JARS.length];

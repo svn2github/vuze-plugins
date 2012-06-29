@@ -474,7 +474,7 @@ I2PPluginConnection
 									
 									source_buffer.limit( source_buffer.capacity());
 									
-									// output_stream.flush();
+									output_stream.flush();
 									
 									con_man.trace( "I2PCon: " + getStateName() + " : write done -> I2P - " + len + ", elapsed = " + ( System.currentTimeMillis() - start ));
 									

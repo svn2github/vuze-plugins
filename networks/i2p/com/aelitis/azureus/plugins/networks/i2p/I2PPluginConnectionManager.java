@@ -27,9 +27,11 @@ import java.lang.reflect.*;
 import java.util.Properties;
 import java.util.StringTokenizer;
 
+import org.bouncycastle.util.encoders.Base64;
 import org.gudy.azureus2.core3.util.AEMonitor;
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.AEThread;
+import org.gudy.azureus2.core3.util.Base32;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.ui.config.BooleanParameter;
@@ -52,10 +54,15 @@ I2PPluginConnectionManager
 	
 	private LoggerChannel		log;
 	
+	private Object			naming_service;
+	
 	private volatile  Object			socket_manager;
 	
-	private Class				i2p_Destination;
+	private Method			i2p_NamingService_lookup;
+	
+	private Class			i2p_Destination;
 	private Method			i2p_Destination_fromBase64;
+	private Method			i2p_Destination_fromByteArray;
 	
 	private Class 			i2p_I2PSocketManagerFactory;
 	private Method			i2p_I2PSocketManager_getSession;
@@ -111,11 +118,21 @@ I2PPluginConnectionManager
 								
 			Class i2p_I2PContext = class_loader.loadClass( "net.i2p.I2PAppContext" );
 
-			i2p_I2PContext.newInstance();
+			Method i2p_I2PContext_getGlobalContext = i2p_I2PContext.getMethod( "getGlobalContext", new Class[0] );
+			
+			Object global_context = i2p_I2PContext_getGlobalContext.invoke( null, new Object[0] );
+			
+			Method i2p_I2PContext_namingService = i2p_I2PContext.getMethod( "namingService", new Class[0] );
+
+			naming_service = i2p_I2PContext_namingService.invoke( global_context, new Object[0] );
+			
+			Class i2p_NamingService = class_loader.loadClass( "net.i2p.client.naming.NamingService" );
+			
+			i2p_NamingService_lookup = i2p_NamingService.getMethod( "lookup", new Class[]{ String.class } );
 			
 			i2p_Destination = class_loader.loadClass( "net.i2p.data.Destination" );
 
-			i2p_Destination_fromBase64 = i2p_Destination.getMethod( "fromBase64", new Class[]{ String.class });
+			i2p_Destination_fromBase64 		= i2p_Destination.getMethod( "fromBase64", new Class[]{ String.class });
 			
 			Class i2p_I2PSession = class_loader.loadClass( "net.i2p.client.I2PSession" );
 			
@@ -370,6 +387,11 @@ I2PPluginConnectionManager
 	{
 		sem.reserve();
 		
+		if ( address.length() < 400 ){
+			
+			address += ".i2p";
+		}
+		
 		Object	current_socket_manager	= socket_manager;
 		
 		if ( current_socket_manager == null || i2p_Destination == null ){
@@ -378,9 +400,23 @@ I2PPluginConnectionManager
 		}
 		
 		try{
-			Object remote_dest = i2p_Destination.newInstance();
-	        
-			i2p_Destination_fromBase64.invoke( remote_dest, new Object[]{ address });
+			Object remote_dest;
+			
+			if ( naming_service != null ){
+			
+				remote_dest = i2p_NamingService_lookup.invoke( naming_service, new Object[]{ address });
+				
+			}else{
+				
+				remote_dest = i2p_Destination.newInstance();
+	       
+				i2p_Destination_fromBase64.invoke( remote_dest, new Object[]{ address });
+			}
+			
+			if ( remote_dest == null ){
+				
+				throw( new Exception( "Failed to resolve address '" + address + "'" ));
+			}
 			
 			Object res = i2p_I2PSocketManager_connect.invoke( current_socket_manager, new Object[]{ remote_dest });
 						
