@@ -442,7 +442,7 @@ I2PPluginConnection
 			
 			if ( len == -1 ){
 				
-				throw( new IOException( "read channel shutdown" ));
+				throw( new EOFException( "read channel shutdown" ));
 				
 			}else{
 				
