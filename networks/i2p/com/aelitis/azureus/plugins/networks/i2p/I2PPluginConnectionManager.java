@@ -434,7 +434,7 @@ I2PPluginConnectionManager
 				
 				logit = false;
 				
-			}else if ( msg.contains( "timeout" )){
+			}else if ( msg.contains( "timeout" ) || msg.contains( "timed out" )){
 				
 				logit = false;
 			}
