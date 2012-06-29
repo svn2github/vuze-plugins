@@ -426,12 +426,12 @@ public class I2PPlugin
 		
 		if ( enable.getValue()){
 			
-			if ( plugin_interface.getPluginconfig().getBooleanParameter(
+			if ( plugin_interface.getPluginconfig().getCoreBooleanParameter(
 					PluginConfig.CORE_PARAM_BOOLEAN_SOCKS_PROXY_NO_INWARD_CONNECTION )){
 				
 				log.logAlert( 
 						LoggerChannel.LT_ERROR,
-						"I2P Plugin requires that the 'inform tracker of limitation' setting for 'Connection' is deselected - please amend it" );
+						loc_utils.getLocalisedMessageText( "i2pnet.tracker.inform" ));
 				
 			}
 			
