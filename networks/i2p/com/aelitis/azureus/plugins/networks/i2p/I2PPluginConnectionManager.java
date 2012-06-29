@@ -424,12 +424,25 @@ I2PPluginConnectionManager
 			
 		}catch( Throwable e ){
 			
-			if ( Debug.getNestedExceptionMessage(e).toLowerCase().indexOf( "session is closed" ) != -1 ){
+			String msg = Debug.getNestedExceptionMessage(e).toLowerCase();
+			
+			boolean	logit = true;
+			
+			if ( msg.contains( "session is closed" )){
 				
 				routerFailure( current_socket_manager );
+				
+				logit = false;
+				
+			}else if ( msg.contains( "timeout" )){
+				
+				logit = false;
 			}
 			
-			log.log(e);
+			if ( logit ){
+				
+				log.log(e);
+			}
 			
 			throw( new IOException( e.getMessage()));
 		}
