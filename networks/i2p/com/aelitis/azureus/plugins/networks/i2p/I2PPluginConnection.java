@@ -25,6 +25,7 @@ package com.aelitis.azureus.plugins.networks.i2p;
 import java.io.*;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SocketChannel;
 
 import org.gudy.azureus2.core3.util.AEMonitor;
@@ -358,9 +359,14 @@ I2PPluginConnection
 								
 								if ( 	e instanceof IOException &&
 										e.getMessage() != null &&
-										e.getMessage().startsWith( "Already closed" )){
+										(	e.getMessage().startsWith( "Already closed" ) ||
+											e.getMessage().startsWith( "disconnected" ))){
 								
-										// ignore this one
+										// ignore these
+									
+								}else if ( e instanceof ClosedChannelException  ){
+									
+									// ignorify
 									
 								}else{
 										
