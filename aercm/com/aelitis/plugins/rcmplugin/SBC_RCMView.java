@@ -19,26 +19,29 @@
 package com.aelitis.plugins.rcmplugin;
 
 
+import java.lang.reflect.Field;
 import java.util.*;
 import java.util.regex.Pattern;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.*;
 import org.eclipse.swt.layout.*;
+import org.eclipse.swt.program.Program;
 import org.eclipse.swt.widgets.*;
 
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.*;
 import org.gudy.azureus2.plugins.ui.UIManager;
+import org.gudy.azureus2.plugins.ui.UIPluginViewToolBarListener;
 import org.gudy.azureus2.plugins.ui.tables.TableColumn;
 import org.gudy.azureus2.plugins.ui.tables.TableColumnCreationListener;
 import org.gudy.azureus2.plugins.ui.tables.TableManager;
+import org.gudy.azureus2.plugins.ui.toolbar.UIToolBarItem;
 import org.gudy.azureus2.pluginsimpl.local.PluginInitializer;
 import org.gudy.azureus2.ui.swt.Utils;
-import org.gudy.azureus2.ui.swt.views.table.TableViewFilterCheck;
 import org.gudy.azureus2.ui.swt.views.table.TableViewSWT;
 import org.gudy.azureus2.ui.swt.views.table.TableViewSWTMenuFillListener;
-import org.gudy.azureus2.ui.swt.views.table.impl.TableViewSWTImpl;
+import org.gudy.azureus2.ui.swt.views.table.impl.TableViewFactory;
 
 import com.aelitis.azureus.core.AzureusCore;
 import com.aelitis.azureus.core.AzureusCoreFactory;
@@ -48,8 +51,9 @@ import com.aelitis.azureus.core.content.RelatedContentManager;
 import com.aelitis.azureus.core.content.RelatedContentManagerListener;
 import com.aelitis.azureus.ui.UIFunctions;
 import com.aelitis.azureus.ui.UIFunctionsManager;
-import com.aelitis.azureus.ui.common.ToolBarEnabler;
+import com.aelitis.azureus.ui.common.ToolBarItem;
 import com.aelitis.azureus.ui.common.table.*;
+import com.aelitis.azureus.ui.common.table.impl.TableColumnManager;
 import com.aelitis.azureus.ui.common.updater.UIUpdatable;
 import com.aelitis.azureus.ui.mdi.MdiEntry;
 import com.aelitis.azureus.ui.selectedcontent.*;
@@ -59,7 +63,6 @@ import com.aelitis.azureus.ui.swt.skin.SWTSkinObject;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectContainer;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectTextbox;
 import com.aelitis.azureus.ui.swt.views.skin.SkinView;
-import com.aelitis.azureus.ui.swt.views.skin.sidebar.SideBar;
 import com.aelitis.plugins.rcmplugin.RelatedContentUI.RCMItemContent;
 import com.aelitis.plugins.rcmplugin.RelatedContentUI.RCMItemSubscriptions;
 import com.aelitis.plugins.rcmplugin.columns.*;
@@ -68,7 +71,7 @@ import com.aelitis.plugins.rcmplugin.columns.*;
 public class 
 SBC_RCMView
 	extends SkinView
-	implements UIUpdatable, ToolBarEnabler, TableViewFilterCheck<RelatedContent>
+	implements UIUpdatable, UIPluginViewToolBarListener, TableViewFilterCheck<RelatedContent>
 {
 	public static final String TABLE_RCM = "RCM";
 
@@ -198,9 +201,11 @@ SBC_RCMView
 			lblCreatedAgo.setText("Created Ago (days):");
 			Spinner spinCreatedAgo = new Spinner(cCreatedAgo, SWT.BORDER);
 			spinCreatedAgo.setMinimum(0);
+			spinCreatedAgo.setMaximum(999);
 			spinCreatedAgo.setSelection((int) (createdMsAgo / 86400000L));
 			spinCreatedAgo.addListener(SWT.Selection, new Listener() {
 				public void handleEvent(Event event) {
+					((Spinner) event.widget).setMaximum(999);
 					createdMsAgo = ((Spinner) event.widget).getSelection() * 86400L*1000L;
 					refilter();
 				}
@@ -393,6 +398,15 @@ SBC_RCMView
 							new ColumnRC_LastSeen(column);
 						}
 					});
+
+		tableManager.registerColumn(
+				RelatedContent.class, 
+				ColumnRC_RelatedTo.COLUMN_ID,
+					new TableColumnCreationListener() {
+						public void tableColumnCreated(TableColumn column) {
+							new ColumnRC_RelatedTo(column);
+						}
+					});
 	}
 
 	public Object 
@@ -481,7 +495,7 @@ SBC_RCMView
 	initTable(
 		Composite control ) 
 	{
-		tv_related_content = new TableViewSWTImpl<RelatedContent>(
+		tv_related_content = TableViewFactory.createTableViewSWT(
 				RelatedContent.class, 
 				TABLE_RCM,
 				TABLE_RCM, 
@@ -500,6 +514,16 @@ SBC_RCMView
 			}
 		}
 		
+		TableColumnManager.getInstance().setDefaultColumnNames(TABLE_RCM, new String[] {
+					ColumnRC_New.COLUMN_ID,
+					ColumnRC_Rank.COLUMN_ID,
+					ColumnRC_Title.COLUMN_ID,
+					ColumnRC_Actions.COLUMN_ID,
+					ColumnRC_Size.COLUMN_ID,
+					ColumnRC_Created.COLUMN_ID,
+					ColumnRC_Seeds.COLUMN_ID,
+					ColumnRC_Peers.COLUMN_ID,
+		});
 		table_parent = new Composite(control, SWT.NONE);
 		table_parent.setLayoutData(Utils.getFilledFormData());
 		GridLayout layout = new GridLayout();
@@ -842,8 +866,10 @@ SBC_RCMView
 						public void widgetSelected(SelectionEvent e) {
 							String s = related_content[0].getTitle();
 							s = s.replaceAll("[-_]", " ");
-							Utils.launch("http://images.google.com/images?q=" + UrlUtils.encode(s));
-						};
+							String URL = "http://images.google.com/search?q=" + UrlUtils.encode(s);
+							launchURL(URL);
+						}
+
 					});
 
 					item = new MenuItem(menu, SWT.PUSH);
@@ -852,7 +878,8 @@ SBC_RCMView
 						public void widgetSelected(SelectionEvent e) {
 							String s = related_content[0].getTitle();
 							s = s.replaceAll("[-_]", " ");
-							Utils.launch("http://google.com/search?q=" + UrlUtils.encode(s));
+							String URL = "https://google.com/search?q=" + UrlUtils.encode(s);
+							launchURL(URL);
 						};
 					});
 
@@ -927,31 +954,7 @@ SBC_RCMView
 		control.layout(true);
 	}
 	
-	public void refreshToolBar(Map<String, Boolean> list) {
-		if (tv_related_content == null) {
-			return;
-		}
-		list.put("remove", tv_related_content.getSelectedDataSources().size() > 0 );
-	}
 
-	public boolean toolBarItemActivated(String itemKey) {
-		if (itemKey.equals("remove")) {
-			Object[] _related_content = tv_related_content.getSelectedDataSources().toArray();
-			
-			if ( _related_content.length > 0 ){
-				
-				RelatedContent[] related_content = new RelatedContent[_related_content.length];
-				
-				System.arraycopy( _related_content, 0, related_content, 0, related_content.length );
-				
-				manager.delete( related_content );
-			}
-			return true;
-		}
-		return false;
-	}
-	
-	
 	public String 
 	getUpdateUIName() 
 	{
@@ -993,4 +996,51 @@ SBC_RCMView
 	// @see org.gudy.azureus2.ui.swt.views.table.TableViewFilterCheck#filterSet(java.lang.String)
 	public void filterSet(String filter) {
 	}
+
+	@Override
+	public boolean toolBarItemActivated(ToolBarItem item, long activationType,
+			Object datasource) {
+		if (item.getID().equals("remove")) {
+			Object[] _related_content = tv_related_content.getSelectedDataSources().toArray();
+			
+			if ( _related_content.length > 0 ){
+				
+				RelatedContent[] related_content = new RelatedContent[_related_content.length];
+				
+				System.arraycopy( _related_content, 0, related_content, 0, related_content.length );
+				
+				manager.delete( related_content );
+			}
+			return true;
+		}
+		return false;
+	}
+
+	@Override
+	public void refreshToolBarItems(Map<String, Long> list) {
+		if (tv_related_content == null) {
+			return;
+		}
+		list.put("remove", tv_related_content.getSelectedDataSources().size() > 0 ? UIToolBarItem.STATE_ENABLED : 0);
+	}
+
+	private void launchURL(String s) {
+		Program program = Program.findProgram(".html");
+		if (program != null && program.getName().contains("Chrome")) {
+			try {
+				Field field = Program.class.getDeclaredField("command");
+				field.setAccessible(true);
+				String command = (String) field.get(program);
+				command = command.replaceAll("%[1lL]", s);
+				command = command.replace(" --", "");
+				System.out.println(command + " -incognito");
+				PluginInitializer.getDefaultInterface().getUtilities().createProcess(command + " -incognito");
+			} catch (Exception e1) {
+				e1.printStackTrace();
+				Utils.launch(s);
+			}
+		} else {
+			Utils.launch(s);
+		}
+	};
 }
