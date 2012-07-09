@@ -997,7 +997,6 @@ SBC_RCMView
 	public void filterSet(String filter) {
 	}
 
-	@Override
 	public boolean toolBarItemActivated(ToolBarItem item, long activationType,
 			Object datasource) {
 		if (item.getID().equals("remove")) {
@@ -1016,7 +1015,6 @@ SBC_RCMView
 		return false;
 	}
 
-	@Override
 	public void refreshToolBarItems(Map<String, Long> list) {
 		if (tv_related_content == null) {
 			return;
