@@ -866,7 +866,7 @@ SBC_RCMView
 						public void widgetSelected(SelectionEvent e) {
 							String s = related_content[0].getTitle();
 							s = s.replaceAll("[-_]", " ");
-							String URL = "http://images.google.com/search?q=" + UrlUtils.encode(s);
+							String URL = "http://images.google.com/images?q=" + UrlUtils.encode(s);
 							launchURL(URL);
 						}
 
