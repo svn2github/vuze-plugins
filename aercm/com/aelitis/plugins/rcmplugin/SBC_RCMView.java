@@ -822,7 +822,7 @@ SBC_RCMView
 
 					final MenuItem assoc_item = new MenuItem(menu, SWT.PUSH);
 
-					assoc_item.setText(MessageText.getString("rcm.contextmenu.lookupassoc"));
+					assoc_item.setText(MessageText.getString("rcm.menu.discovermore"));
 
 					final ArrayList<RelatedContent> assoc_ok = new ArrayList<RelatedContent>();
 					
@@ -861,7 +861,7 @@ SBC_RCMView
 					}
 
 					MenuItem item = new MenuItem(menu, SWT.PUSH);
-					item.setText("gis");
+					item.setText(MessageText.getString("rcm.menu.gis"));
 					item.addSelectionListener(new SelectionAdapter() {
 						public void widgetSelected(SelectionEvent e) {
 							String s = related_content[0].getTitle();
@@ -873,7 +873,7 @@ SBC_RCMView
 					});
 
 					item = new MenuItem(menu, SWT.PUSH);
-					item.setText("g");
+					item.setText(MessageText.getString("rcm.menu.google"));
 					item.addSelectionListener(new SelectionAdapter() {
 						public void widgetSelected(SelectionEvent e) {
 							String s = related_content[0].getTitle();
