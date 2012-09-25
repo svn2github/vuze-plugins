@@ -60,7 +60,7 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
 
   public Composite filtParamComp, filtSpecificTVShow, filtSpecificOther, filtSpecificNone;
   public Table filtTable;
-  private ToolItem btnFiltUp, btnFiltAdd, btnFiltRemove, btnFiltDown;
+  private ToolItem btnFiltUp, btnFiltAdd, btnFiltCopy, btnFiltRemove, btnFiltDown;
   private Button btnFiltStoreDir, btnFiltAccept, btnFiltReset, btnFiltCancel;
 
   public Composite urlParamComp, urlOptCompCustReferer, urlOptCompCookie, urlOptCompNone;
@@ -303,6 +303,7 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
     ToolBar filtCompBar = new ToolBar(filtComp, SWT.FLAT | SWT.VERTICAL);
     btnFiltUp = setupToolItem(filtCompBar, "ItemMoveUp.gif");
     btnFiltAdd = setupToolItem(filtCompBar, "ItemAdd.gif");
+    btnFiltCopy = setupToolItem(filtCompBar, "Copy.gif");
     btnFiltRemove = setupToolItem(filtCompBar, "ItemRemove.gif");
     btnFiltDown = setupToolItem(filtCompBar, "ItemMoveDown.gif");
 
@@ -835,6 +836,58 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
     selFilterItem = newItem;
     rssfeedConfig.storeOptions();
     Utils.alternateTableBackground(filtTable);
+  }
+  
+  private void filtCopy() {
+	    int curPos = filtTable.getSelectionIndex();
+	    if(curPos < 0) {
+	    	return;
+	    }
+	    FilterBean item = (FilterBean)((FilterTableItem)filtTable.getItem(curPos)).getBean();
+
+	  
+	  filtTable.setRedraw(false);
+	  FilterTableItem newItem = new FilterTableItem(filtTable, rssfeedConfig);
+	  FilterBean tmpBean = new FilterBean();
+	  tmpBean.setName(item.getName() + " (copy)");
+	  tmpBean.setType(item.getType());
+	  tmpBean.setMode(item.getMode());
+	  tmpBean.setMatchLink(item.getMatchLink());
+	  tmpBean.setMatchTitle(item.getMatchTitle());
+	  tmpBean.setCategory(item.getCategory());
+	  tmpBean.setCleanFile(item.getCleanFile());
+	  tmpBean.setDisableAfter(item.getDisableAfter());
+	  tmpBean.setEnabled(item.getEnabled());
+	  tmpBean.setEndEpisode(item.getEndEpisode());
+	  tmpBean.setEndSeason(item.getEndSeason());
+	  tmpBean.setExpression(item.getExpression());
+	  tmpBean.setFeed(item.getFeed());
+	  tmpBean.setIsRegex(item.getIsRegex());
+	  tmpBean.setMoveTop(item.getMoveTop());
+	  tmpBean.setPriority(item.getPriority());
+	  tmpBean.setRateDownload(item.getRateDownload());
+	  tmpBean.setRateUseCustom(item.getRateUseCustom());
+	  tmpBean.setRenameFile(item.getRenameFile());
+	  tmpBean.setRenameIncEpisode(item.getRenameIncEpisode());
+	  tmpBean.setStartEpisode(item.getStartEpisode());
+	  tmpBean.setStartSeason(item.getStartSeason());
+	  tmpBean.setState(item.getState());
+	  tmpBean.setStoreDir(item.getStoreDir());
+	  tmpBean.setUseSmartHistory(item.getUseSmartHistory());
+	  
+	  newItem.setBean(tmpBean);
+	  newItem.setup(thisView);
+	  
+		  int topPos = filtTable.getTopIndex();
+		  int newPos = filtTable.indexOf(newItem);
+		  filtTable.setSelection(newPos);
+		  for(int iLoop = 1; iLoop <= newPos - curPos; ++iLoop) filtOrder(-1, false);
+		  filtTable.setTopIndex(topPos);
+
+	  filtTable.setRedraw(true);
+	  selFilterItem = newItem;
+	  rssfeedConfig.storeOptions();
+	  Utils.alternateTableBackground(filtTable);
   }
 
   private void filtRemove() {
@@ -1690,6 +1743,8 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
       filtOrder(-1);
     } else if(src == btnFiltAdd) {
       filtAdd();
+    } else if(src == btnFiltCopy) {
+    	filtCopy();
     } else if(src == btnFiltRemove) {
       if(selFilterItem == null) return;
       filtRemove();
