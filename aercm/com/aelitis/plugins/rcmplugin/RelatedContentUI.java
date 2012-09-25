@@ -209,7 +209,16 @@ RelatedContentUI
 	setRCMEnabled(
 		boolean	enabled )
 	{
-		COConfigurationManager.setParameter( "rcm.overall.enabled", enabled );
+		if ( isRCMEnabled() != enabled ){
+			
+			COConfigurationManager.setParameter( "rcm.overall.enabled", enabled );
+						
+			String plugin_info = enabled?"":"n";
+			
+			plugin_interface.getPluginconfig().setPluginParameter( "plugin.info", plugin_info );
+			
+			COConfigurationManager.save();
+		}
 	}
 	
 	protected void
@@ -229,11 +238,6 @@ RelatedContentUI
 		try{	
 			manager 	= RelatedContentManager.getSingleton();
 
-			if ( RelatedContentManager.DISABLE_ALL_UI ){
-				
-				return;
-			}
-			
 			BasicPluginConfigModel config_model = 
 				ui_manager.createBasicPluginConfigModel( "Associations" );
 			
