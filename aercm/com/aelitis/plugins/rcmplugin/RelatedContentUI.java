@@ -20,6 +20,9 @@
 
 package com.aelitis.plugins.rcmplugin;
 
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -27,6 +30,7 @@ import java.util.Map;
 
 
 import org.eclipse.swt.widgets.TreeItem;
+import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.core3.util.AESemaphore;
@@ -41,6 +45,7 @@ import org.gudy.azureus2.plugins.torrent.Torrent;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
+import org.gudy.azureus2.plugins.ui.config.BooleanParameter;
 import org.gudy.azureus2.plugins.ui.config.IntParameter;
 import org.gudy.azureus2.plugins.ui.config.Parameter;
 import org.gudy.azureus2.plugins.ui.config.ParameterListener;
@@ -51,6 +56,10 @@ import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.tables.TableContextMenuItem;
 import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.plugins.ui.tables.TableRow;
+import org.gudy.azureus2.plugins.utils.search.SearchException;
+import org.gudy.azureus2.plugins.utils.search.SearchInstance;
+import org.gudy.azureus2.plugins.utils.search.SearchObserver;
+import org.gudy.azureus2.plugins.utils.search.SearchProvider;
 import org.gudy.azureus2.pluginsimpl.local.PluginInitializer;
 import org.gudy.azureus2.ui.swt.Utils;
 import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
@@ -81,6 +90,7 @@ import com.aelitis.azureus.ui.swt.views.skin.SkinViewManager;
 import com.aelitis.azureus.ui.swt.views.skin.SkinViewManager.SkinViewManagerListener;
 import com.aelitis.azureus.ui.swt.views.skin.sidebar.SideBar;
 import com.aelitis.azureus.ui.swt.views.skin.sidebar.SideBarEntrySWT;
+import com.aelitis.net.magneturi.MagnetURIHandler;
 
 public class 
 RelatedContentUI 
@@ -189,6 +199,19 @@ RelatedContentUI
 			});
 	}
 	
+	private boolean
+	isRCMEnabled()
+	{
+		return( COConfigurationManager.getBooleanParameter( "rcm.overall.enabled", true ));
+	}
+	
+	private void
+	setRCMEnabled(
+		boolean	enabled )
+	{
+		COConfigurationManager.setParameter( "rcm.overall.enabled", enabled );
+	}
+	
 	protected void
 	setupUI(
 		MultipleDocumentInterface			mdi )	
@@ -214,6 +237,40 @@ RelatedContentUI
 			BasicPluginConfigModel config_model = 
 				ui_manager.createBasicPluginConfigModel( "Associations" );
 			
+			config_model.addLabelParameter2( "rcm.plugin.info" );
+			
+			config_model.addHyperlinkParameter2( "rcm.plugin.wiki", MessageText.getString( "rcm.plugin.wiki.url" ));
+			
+				// overall enable
+			
+			final BooleanParameter overall_enable = 
+				config_model.addBooleanParameter2( 
+					"rcm.overall.enable", "rcm.overall.enable",
+					isRCMEnabled());
+			
+			overall_enable.addListener(
+					new ParameterListener()
+					{
+						public void 
+						parameterChanged(
+							Parameter param) 
+						{
+							setRCMEnabled( overall_enable.getValue());
+						}
+					});
+			
+			final BooleanParameter enable_sidebar = 
+				config_model.addBooleanParameter2( 
+					"rcm.sidebar.enable", "rcm.sidebar.enable",
+					true );
+			
+			final BooleanParameter enable_search = 
+				config_model.addBooleanParameter2( 
+					"rcm.search.enable", "rcm.search.enable",
+					true );
+			
+				// max results
+			
 			final IntParameter max_results = 
 				config_model.addIntParameter2( 
 					"rcm.config.max_results", "rcm.config.max_results",
@@ -230,6 +287,8 @@ RelatedContentUI
 						}
 					});
 			
+				// max level
+			
 			final IntParameter max_level = 
 				config_model.addIntParameter2( 
 					"rcm.config.max_level", "rcm.config.max_level",
@@ -245,13 +304,38 @@ RelatedContentUI
 							manager.setMaxSearchLevel( max_level.getValue());
 						}
 					});
-						
-			main_view_info = new MainViewInfo();
 
+			overall_enable.addEnabledOnSelection( enable_sidebar  );
+			overall_enable.addEnabledOnSelection( enable_search  );
+			overall_enable.addEnabledOnSelection( max_results  );
+			overall_enable.addEnabledOnSelection( max_level  );
+			
+			hookSearch( isRCMEnabled() && enable_search.getValue());
+
+			buildSideBarEtc( isRCMEnabled() && enable_sidebar.getValue());
+			
+		}catch( Throwable e ){
+			
+			Debug.out( e );
+		}
+	}
+	
+	private void
+	buildSideBarEtc(
+		boolean	enable )
+	{		
+		if ( !enable ){
+			
+			return;
+		}
+		
+		try{
+			main_view_info = new MainViewInfo();
+	
 			hookMenus();
 						
 			buildSideBar();
-			
+						
 			manager.addListener(
 				new RelatedContentManagerListener()
 				{
@@ -263,7 +347,7 @@ RelatedContentUI
 					{
 						check();
 					}
-
+	
 					public void
 					contentChanged(
 						RelatedContent[]	content )
@@ -336,6 +420,133 @@ RelatedContentUI
 		}catch( Throwable e ){
 			
 			Debug.out( e );
+		}
+	}
+	
+	private void
+	hookSearch(
+		boolean	enable )
+	{
+		try{
+			SearchProvider search_provider = 
+				new SearchProvider()
+				{
+					private Map<Integer,Object>	properties = new HashMap<Integer, Object>();
+					
+					{
+						properties.put( PR_NAME, MessageText.getString( "rcm.search.provider" ));
+						
+						try{
+							URL url = 
+								MagnetURIHandler.getSingleton().registerResource(
+									new MagnetURIHandler.ResourceProvider()
+									{
+										public String
+										getUID()
+										{
+											return( RelatedContentManager.class.getName() + ".1" );
+										}
+										
+										public String
+										getFileType()
+										{
+											return( "png" );
+										}
+												
+										public byte[]
+										getData()
+										{
+											InputStream is = getClass().getClassLoader().getResourceAsStream( "org/gudy/azureus2/ui/icons/rcm.png" );
+											
+											if ( is == null ){
+												
+												return( null );
+											}
+											
+											try{
+												ByteArrayOutputStream	baos = new ByteArrayOutputStream();
+												
+												try{
+													byte[]	buffer = new byte[8192];
+													
+													while( true ){
+							
+														int	len = is.read( buffer );
+										
+														if ( len <= 0 ){
+															
+															break;
+														}
+								
+														baos.write( buffer, 0, len );
+													}
+												}finally{
+													
+													is.close();
+												}
+												
+												return( baos.toByteArray());
+												
+											}catch( Throwable e ){
+												
+												return( null );
+											}
+										}
+									});
+																	
+							properties.put( PR_ICON_URL, url.toExternalForm());
+							
+						}catch( Throwable e ){
+							
+							Debug.out( e );
+						}
+					}
+					
+					public SearchInstance
+					search(
+						Map<String,Object>	search_parameters,
+						SearchObserver		observer )
+					
+						throws SearchException
+					{		
+						try{
+							return( RelatedContentManager.getSingleton().searchRCM( search_parameters, observer ));
+							
+						}catch( Throwable e ){
+							
+							throw( new SearchException( "Search failed", e ));
+						}
+					}
+					
+					public Object
+					getProperty(
+						int			property )
+					{
+						return( properties.get( property ));
+					}
+					
+					public void
+					setProperty(
+						int			property,
+						Object		value )
+					{
+						properties.put( property, value );
+					}
+				};
+				
+			if ( enable ){
+			
+				plugin_interface.getUtilities().registerSearchProvider( search_provider );
+				
+			}else{
+				// not actually needed
+				//plugin_interface.getUtilities().unregisterSearchProvider( search_provider );
+
+			}
+
+		}catch( Throwable e ){
+			
+			Debug.out( "Failed to register search provider" );
 		}
 	}
 	
