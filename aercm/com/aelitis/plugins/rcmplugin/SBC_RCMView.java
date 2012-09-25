@@ -108,7 +108,7 @@ SBC_RCMView
 
 	private int minRank;
 
-	private boolean showPrivate = true;
+	private boolean showIndirect = true;
 
 	private Object ds;
 
@@ -237,11 +237,11 @@ SBC_RCMView
 			fd.right = null;
 			cChecks.setLayoutData(fd);
 			Button chkShowPrivate = new Button(cChecks, SWT.CHECK);
-			chkShowPrivate.setText("Show Private");
-			chkShowPrivate.setSelection(showPrivate );
+			chkShowPrivate.setText( MessageText.getString( "rcm.header.show_indirect" ));
+			chkShowPrivate.setSelection(showIndirect );
 			chkShowPrivate.addListener(SWT.Selection, new Listener() {
 				public void handleEvent(Event event) {
-					showPrivate = ((Button) event.widget).getSelection();
+					showIndirect = ((Button) event.widget).getSelection();
 					refilter();
 				}
 			});
@@ -263,7 +263,7 @@ SBC_RCMView
 		return ((c.getSeeds() >= minSeeds) || (showUnknownSeeds && c.getSeeds() < 0)) 
 			&& (createdMsAgo == 0 || (SystemTime.getCurrentTime() - c.getPublishDate() < createdMsAgo))
 			&& ((c.getRank() >= minRank))
-			&& (showPrivate || c.getHash() != null);
+			&& (showIndirect || c.getHash() != null);
 	}
 
 
