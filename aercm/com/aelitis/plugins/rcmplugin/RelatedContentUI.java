@@ -43,9 +43,7 @@ import org.gudy.azureus2.plugins.PluginConfig;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.torrent.Torrent;
-import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManager;
-import org.gudy.azureus2.plugins.ui.UIManagerListener;
 import org.gudy.azureus2.plugins.ui.config.ActionParameter;
 import org.gudy.azureus2.plugins.ui.config.BooleanParameter;
 import org.gudy.azureus2.plugins.ui.config.IntParameter;
@@ -62,9 +60,7 @@ import org.gudy.azureus2.plugins.utils.search.SearchException;
 import org.gudy.azureus2.plugins.utils.search.SearchInstance;
 import org.gudy.azureus2.plugins.utils.search.SearchObserver;
 import org.gudy.azureus2.plugins.utils.search.SearchProvider;
-import org.gudy.azureus2.pluginsimpl.local.PluginInitializer;
 import org.gudy.azureus2.ui.swt.Utils;
-import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 
 import com.aelitis.azureus.core.AzureusCore;
 import com.aelitis.azureus.core.AzureusCoreFactory;
@@ -119,11 +115,14 @@ RelatedContentUI
 	private BooleanParameter 		enable_sidebar;
 	private BooleanParameter 		enable_search;
 	
-	private RelatedContentManager	manager;
+	private RelatedContentManager			manager;
+	private RelatedContentManagerListener	rcm_listener;
 	
 	private boolean			ui_hooked;
 	private boolean			ui_setup;
 	private boolean			root_menus_added;
+	
+	private List<TableContextMenuItem>	menus = new ArrayList<TableContextMenuItem>();
 	
 	private SearchProvider 	search_provider;
 	
@@ -164,10 +163,37 @@ RelatedContentUI
 			{
 				public void 
 				runSupport() 
-				{
+				{					
 					if ( config_model != null ){
 						
 						config_model.destroy();
+					}
+					
+					try{
+						for ( TableContextMenuItem menu: menus ){
+							
+							menu.remove();
+						}
+					}catch( Throwable e ){
+						
+						Debug.out( e );
+					}
+					
+					try{
+						MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
+
+						if ( mdi != null ){
+							
+							MdiEntry mdi_entry = mdi.getEntry( SIDEBAR_SECTION_RELATED_CONTENT );
+							
+							if ( mdi_entry != null ){
+								
+								mdi_entry.close( true );
+							}
+						}
+					}catch( Throwable e ){
+						
+						Debug.out( e );
 					}
 					
 					if ( search_provider != null ){
@@ -182,6 +208,25 @@ RelatedContentUI
 							Debug.out( e );
 						}
 					}
+					
+					if ( manager != null ){
+						
+						try{
+							if ( rcm_listener != null ){
+								
+								manager.removeListener( rcm_listener );								
+							}
+						}catch( Throwable e ){
+							
+							Debug.out( e );
+						}
+						
+						manager 		= null;
+						rcm_listener 	= null;
+
+					}
+				
+					singleton	= null;
 				}
 			});
 	}
@@ -216,6 +261,13 @@ RelatedContentUI
 								skinViewAdded(
 									SkinView skinview ) 
 								{
+									if ( destroyed ){
+										
+										SkinViewManager.RemoveListener(this);
+										
+										return;
+									}
+									
 									if (skinview instanceof SideBar) {
 									
 										setupUI((SideBar) skinview);
@@ -452,7 +504,7 @@ RelatedContentUI
 						
 			buildSideBar( main_view_info );
 						
-			manager.addListener(
+			rcm_listener = 
 				new RelatedContentManagerListener()
 				{
 					private int last_unread;
@@ -531,7 +583,9 @@ RelatedContentUI
 						
 						ViewTitleInfoManager.refreshTitleInfo( main_view_info );
 					}
-				});
+				};
+				
+			manager.addListener( rcm_listener );
 			
 		}catch( Throwable e ){
 			
@@ -682,6 +736,8 @@ RelatedContentUI
 			
 			TableContextMenuItem menu_item = table_manager.addContextMenuItem( table_id, "rcm.contextmenu.lookupassoc");
 		
+			menus.add( menu_item );
+			
 			menu_item.setStyle( TableContextMenuItem.STYLE_PUSH );
 
 			MenuItemListener listener = 
@@ -755,7 +811,14 @@ RelatedContentUI
 										contentFound(
 											RelatedContent[]	content )
 										{
-											current_listener.contentFound( content );
+											if ( destroyed ){
+												
+												manager.removeListener( base_listener );
+												
+											}else{
+											
+												current_listener.contentFound( content );
+											}
 										}
 										
 										public void
