@@ -839,7 +839,7 @@ SBC_RCMView
 							
 							int	 i = 0;
 							
-							RelatedContentUI ui = RelatedContentUI.getSingleton();
+							RelatedContentUI ui = RelatedContentUI.getSingleton( null );
 							
 							for ( RelatedContent c: assoc_ok ){
 							

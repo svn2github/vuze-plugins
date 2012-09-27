@@ -39,12 +39,14 @@ import org.gudy.azureus2.core3.util.AsyncDispatcher;
 import org.gudy.azureus2.core3.util.ByteArrayHashMap;
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.plugins.PluginConfig;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.torrent.Torrent;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
+import org.gudy.azureus2.plugins.ui.config.ActionParameter;
 import org.gudy.azureus2.plugins.ui.config.BooleanParameter;
 import org.gudy.azureus2.plugins.ui.config.IntParameter;
 import org.gudy.azureus2.plugins.ui.config.Parameter;
@@ -96,15 +98,16 @@ public class
 RelatedContentUI 
 {		
 	public static final String SIDEBAR_SECTION_RELATED_CONTENT = "RelatedContent";
-
-	private static RelatedContentUI	singleton;
 	
-	public static synchronized RelatedContentUI
-	getSingleton()
+	private static RelatedContentUI		singleton;
+	
+	public synchronized static RelatedContentUI
+	getSingleton(
+		PluginInterface		pi )
 	{
 		if ( singleton == null ){
 			
-			singleton = new RelatedContentUI();
+			singleton = new RelatedContentUI( pi );
 		}
 		
 		return( singleton );
@@ -113,24 +116,30 @@ RelatedContentUI
 	private PluginInterface		plugin_interface;
 	private UIManager			ui_manager;
 	
+	private BooleanParameter 	enable_sidebar;
+	private BooleanParameter 	enable_search;
+	
 	private RelatedContentManager	manager;
 	
+	private boolean			ui_hooked;
 	private boolean			ui_setup;
 	private boolean			root_menus_added;
-	private MainViewInfo 	main_view_info;
 	
 	
 	private ByteArrayHashMap<RCMItem>	rcm_item_map = new ByteArrayHashMap<RCMItem>();
 	
 	private AsyncDispatcher	async_dispatcher = new AsyncDispatcher();
 	
-	public 
-	RelatedContentUI()
+	private 
+	RelatedContentUI(
+		PluginInterface	_plugin_interface )
 	{
-		plugin_interface = PluginInitializer.getDefaultInterface();
+		plugin_interface	= _plugin_interface;
 		
 		ui_manager = plugin_interface.getUIManager();
 
+		updatePluginInfo();
+		
 		ui_manager.addUIListener(
 				new UIManagerListener()
 				{
@@ -199,6 +208,34 @@ RelatedContentUI
 			});
 	}
 	
+	private void
+	updatePluginInfo()
+	{
+		String plugin_info;
+		
+		if ( !hasFTUXBeenShown()){
+			
+			plugin_info = "f";
+			
+		}else if ( isRCMEnabled()){
+		
+			plugin_info = "e";
+			
+		}else{
+			
+			plugin_info = "d";
+		}
+		
+		PluginConfig pc = plugin_interface.getPluginconfig();
+		
+		if ( !pc.getPluginStringParameter( "plugin.info", "" ).equals( plugin_info )){
+			
+			pc.setPluginParameter( "plugin.info", plugin_info );
+		
+			COConfigurationManager.save();
+		}
+	}
+	
 	private boolean
 	isRCMEnabled()
 	{
@@ -212,13 +249,9 @@ RelatedContentUI
 		if ( isRCMEnabled() != enabled ){
 			
 			COConfigurationManager.setParameter( "rcm.overall.enabled", enabled );
-						
-			String plugin_info = enabled?"":"n";
-			
-			plugin_interface.getPluginconfig().setPluginParameter( "plugin.info", plugin_info );
-			
-			COConfigurationManager.save();
 		}
+		
+		updatePluginInfo();
 	}
 	
 	protected void
@@ -245,6 +278,19 @@ RelatedContentUI
 			
 			config_model.addHyperlinkParameter2( "rcm.plugin.wiki", MessageText.getString( "rcm.plugin.wiki.url" ));
 			
+			ActionParameter action = config_model.addActionParameter2( "show.ftux", "show.ftux" );
+			
+			action.addListener(
+				new ParameterListener()
+				{
+					public void 
+					parameterChanged(
+						Parameter param ) 
+					{
+						setFTUXResult( true, true, true );
+					}		
+				});
+			
 				// overall enable
 			
 			final BooleanParameter overall_enable = 
@@ -263,12 +309,12 @@ RelatedContentUI
 						}
 					});
 			
-			final BooleanParameter enable_sidebar = 
+			enable_sidebar = 
 				config_model.addBooleanParameter2( 
 					"rcm.sidebar.enable", "rcm.sidebar.enable",
 					true );
 			
-			final BooleanParameter enable_search = 
+			enable_search = 
 				config_model.addBooleanParameter2( 
 					"rcm.search.enable", "rcm.search.enable",
 					true );
@@ -314,14 +360,57 @@ RelatedContentUI
 			overall_enable.addEnabledOnSelection( max_results  );
 			overall_enable.addEnabledOnSelection( max_level  );
 			
-			hookSearch( isRCMEnabled() && enable_search.getValue());
-
-			buildSideBarEtc( isRCMEnabled() && enable_sidebar.getValue());
-			
+			if ( hasFTUXBeenShown()){
+				
+				hookUI();
+			}
 		}catch( Throwable e ){
 			
 			Debug.out( e );
 		}
+	}
+	
+	public boolean
+	hasFTUXBeenShown()
+	{
+		return( plugin_interface.getPluginconfig().getPluginBooleanParameter( "rcm.ftux.shown", false ));
+	}
+	
+	public void
+	setFTUXResult(
+		boolean		_enable_rcm,
+		boolean		_enable_sidebar,
+		boolean		_enable_search )
+	{
+		plugin_interface.getPluginconfig().setPluginParameter( "rcm.ftux.shown", true );
+
+		setRCMEnabled( _enable_rcm );
+		
+		enable_sidebar.setValue( _enable_sidebar );
+		enable_search.setValue( _enable_search );
+				
+		if ( _enable_search || _enable_sidebar ){
+			
+			hookUI();
+		}
+	}
+	
+	private void
+	hookUI()
+	{
+		synchronized( this ){
+			
+			if ( ui_hooked ){
+				
+				return;
+			}
+			
+			ui_hooked = true;
+		}
+		
+		hookSearch( isRCMEnabled() && enable_search.getValue());
+
+		buildSideBarEtc( isRCMEnabled() && enable_sidebar.getValue());
 	}
 	
 	private void
@@ -334,11 +423,11 @@ RelatedContentUI
 		}
 		
 		try{
-			main_view_info = new MainViewInfo();
+			final MainViewInfo main_view_info = new MainViewInfo();
 	
 			hookMenus();
 						
-			buildSideBar();
+			buildSideBar( main_view_info );
 						
 			manager.addListener(
 				new RelatedContentManagerListener()
@@ -604,11 +693,13 @@ RelatedContentUI
 	}
 	
 	protected void
-	buildSideBar()
+	buildSideBar(
+		final MainViewInfo main_view_info )
 	{		
 		final String parent_id = "sidebar." + SIDEBAR_SECTION_RELATED_CONTENT;
 
 		final MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
+		
 		mdi.registerEntry(SIDEBAR_SECTION_RELATED_CONTENT, new MdiEntryCreationListener() {
 			public MdiEntry createMDiEntry(String id) {
 				

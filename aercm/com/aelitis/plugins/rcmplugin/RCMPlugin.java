@@ -47,7 +47,7 @@ RCMPlugin
 	
 	public void
 	initialize(
-		PluginInterface		plugin_interface )
+		final PluginInterface		plugin_interface )
 	
 		throws PluginException
 	{
@@ -83,7 +83,7 @@ RCMPlugin
 						Debug.out(mre);
 					}	
 					
-					new RelatedContentUI();
+					RelatedContentUI.getSingleton( plugin_interface );
 				}
 				
 				public void
