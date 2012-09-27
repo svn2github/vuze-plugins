@@ -27,9 +27,7 @@ import java.util.ResourceBundle;
 
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.util.Debug;
-import org.gudy.azureus2.plugins.Plugin;
-import org.gudy.azureus2.plugins.PluginException;
-import org.gudy.azureus2.plugins.PluginInterface;
+import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
@@ -39,11 +37,15 @@ import com.aelitis.azureus.ui.swt.skin.SWTSkinProperties;
 
 public class 
 RCMPlugin 
-	implements Plugin
+	implements UnloadablePlugin
 {
 	static{
 		COConfigurationManager.setParameter( "rcm.persist", true );
 	}
+	
+	private RelatedContentUI		ui;
+	
+	private boolean					destroyed;
 	
 	public void
 	initialize(
@@ -83,7 +85,15 @@ RCMPlugin
 						Debug.out(mre);
 					}	
 					
-					RelatedContentUI.getSingleton( plugin_interface );
+					synchronized( RCMPlugin.this ){
+						
+						if ( destroyed ){
+							
+							return;
+						}
+					
+						ui = RelatedContentUI.getSingleton( plugin_interface );
+					}
 				}
 				
 				public void
@@ -93,5 +103,28 @@ RCMPlugin
 					
 				}
 			});
+	}
+	
+	public void 
+	unload() 
+	
+		throws PluginException 
+	{
+		synchronized( this ){
+			
+			if ( destroyed ){
+				
+				return;
+			}
+			
+			destroyed = true;
+		}
+		
+		if ( ui != null ){
+			
+			ui.destroy();
+			
+			ui = null;
+		}
 	}
 }

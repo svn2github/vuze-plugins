@@ -114,10 +114,10 @@ RelatedContentUI
 	}
 	
 	private PluginInterface		plugin_interface;
-	private UIManager			ui_manager;
 	
-	private BooleanParameter 	enable_sidebar;
-	private BooleanParameter 	enable_search;
+	private BasicPluginConfigModel 	config_model;
+	private BooleanParameter 		enable_sidebar;
+	private BooleanParameter 		enable_search;
 	
 	private RelatedContentManager	manager;
 	
@@ -125,10 +125,14 @@ RelatedContentUI
 	private boolean			ui_setup;
 	private boolean			root_menus_added;
 	
+	private SearchProvider 	search_provider;
 	
 	private ByteArrayHashMap<RCMItem>	rcm_item_map = new ByteArrayHashMap<RCMItem>();
 	
 	private AsyncDispatcher	async_dispatcher = new AsyncDispatcher();
+	
+	
+	private volatile boolean	destroyed = false;
 	
 	private 
 	RelatedContentUI(
@@ -136,38 +140,50 @@ RelatedContentUI
 	{
 		plugin_interface	= _plugin_interface;
 		
-		ui_manager = plugin_interface.getUIManager();
-
 		updatePluginInfo();
 		
-		ui_manager.addUIListener(
-				new UIManagerListener()
+		AzureusCoreFactory.addCoreRunningListener(
+			new AzureusCoreRunningListener() 
+			{
+				public void 
+				azureusCoreRunning(
+					AzureusCore core ) 
 				{
-					public void
-					UIAttached(
-							UIInstance		instance )
-					{
-						if ( instance instanceof UISWTInstance ){
+					uiAttachedAndCoreRunning( core );
+				}
+			});
+	}
+	
+	protected void
+	destroy()
+	{
+		destroyed	= true;
+		
+		Utils.execSWTThread(
+			new AERunnable() 
+			{
+				public void 
+				runSupport() 
+				{
+					if ( config_model != null ){
+						
+						config_model.destroy();
+					}
+					
+					if ( search_provider != null ){
 
-							AzureusCoreFactory.addCoreRunningListener(
-								new AzureusCoreRunningListener() 
-								{
-									public void 
-									azureusCoreRunning(
-										AzureusCore core ) 
-									{
-										uiAttachedAndCoreRunning(core);
-									}
-								});
+						try{
+							plugin_interface.getUtilities().unregisterSearchProvider( search_provider );
+	
+							search_provider = null;
+							
+						}catch( Throwable e ){
+							
+							Debug.out( e );
 						}
 					}
-
-					public void
-					UIDetached(
-							UIInstance		instance )
-					{
-					}
-				});
+				}
+			});
 	}
 	
 	private void 
@@ -180,6 +196,11 @@ RelatedContentUI
 				public void 
 				runSupport() 
 				{
+					if ( destroyed ){
+						
+						return;
+					}
+					
 					MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
 					
 					if ( mdi != null ){
@@ -271,7 +292,9 @@ RelatedContentUI
 		try{	
 			manager 	= RelatedContentManager.getSingleton();
 
-			BasicPluginConfigModel config_model = 
+			UIManager			ui_manager = plugin_interface.getUIManager();
+
+			config_model = 
 				ui_manager.createBasicPluginConfigModel( "Associations" );
 			
 			config_model.addLabelParameter2( "rcm.plugin.info" );
@@ -521,7 +544,7 @@ RelatedContentUI
 		boolean	enable )
 	{
 		try{
-			SearchProvider search_provider = 
+			search_provider = 
 				new SearchProvider()
 				{
 					private Map<Integer,Object>	properties = new HashMap<Integer, Object>();
@@ -632,9 +655,8 @@ RelatedContentUI
 				plugin_interface.getUtilities().registerSearchProvider( search_provider );
 				
 			}else{
-				// not actually needed
-				//plugin_interface.getUtilities().unregisterSearchProvider( search_provider );
-
+			
+				plugin_interface.getUtilities().unregisterSearchProvider( search_provider );
 			}
 
 		}catch( Throwable e ){
@@ -778,6 +800,8 @@ RelatedContentUI
 			
 			root_menus_added = true;
 			
+			UIManager			ui_manager = plugin_interface.getUIManager();
+
 			MenuManager menu_manager = ui_manager.getMenuManager();
 
 			MenuItem menu_item = menu_manager.addMenuItem( parent_id, "rcm.menu.findsubs" );
