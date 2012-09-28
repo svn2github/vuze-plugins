@@ -366,24 +366,7 @@ RelatedContentUI
 					}		
 				});
 			
-				// overall enable
-			
-			final BooleanParameter overall_enable = 
-				config_model.addBooleanParameter2( 
-					"rcm.overall.enable", "rcm.overall.enable",
-					isRCMEnabled());
-			
-			overall_enable.addListener(
-					new ParameterListener()
-					{
-						public void 
-						parameterChanged(
-							Parameter param) 
-						{
-							setRCMEnabled( overall_enable.getValue());
-						}
-					});
-			
+				
 			enable_sidebar = 
 				config_model.addBooleanParameter2( 
 					"rcm.sidebar.enable", "rcm.sidebar.enable",
@@ -430,10 +413,32 @@ RelatedContentUI
 						}
 					});
 
-			overall_enable.addEnabledOnSelection( enable_sidebar  );
-			overall_enable.addEnabledOnSelection( enable_search  );
-			overall_enable.addEnabledOnSelection( max_results  );
-			overall_enable.addEnabledOnSelection( max_level  );
+				// overall enable
+			
+			final BooleanParameter overall_disable = 
+				config_model.addBooleanParameter2( 
+					"rcm.overall.disable", "rcm.overall.disable",
+					!isRCMEnabled());
+			
+			overall_disable.setMinimumRequiredUserMode( 
+					overall_disable.getValue()?Parameter.MODE_BEGINNER:Parameter.MODE_INTERMEDIATE );
+			
+			overall_disable.addListener(
+					new ParameterListener()
+					{
+						public void 
+						parameterChanged(
+							Parameter param) 
+						{
+							setRCMEnabled( !overall_disable.getValue());
+						}
+					});
+
+			
+			overall_disable.addDisabledOnSelection( enable_sidebar  );
+			overall_disable.addDisabledOnSelection( enable_search  );
+			overall_disable.addDisabledOnSelection( max_results  );
+			overall_disable.addDisabledOnSelection( max_level  );
 			
 			if ( hasFTUXBeenShown()){
 				
