@@ -12,9 +12,10 @@
     </manifest>
     <selectedElements exportClassFiles="true" exportJavaFiles="true" exportOutputFolder="false">
         <javaElement handleIdentifier="=rcmplugin/&lt;com.aelitis.plugins.rcmplugin.skins"/>
+        <javaElement handleIdentifier="=rcmplugin/&lt;com.aelitis.plugins.rcmplugin.internat"/>
+        <file path="/rcmplugin/plugin.properties"/>
         <javaElement handleIdentifier="=rcmplugin/&lt;com.aelitis.plugins.rcmplugin.columns"/>
         <javaElement handleIdentifier="=rcmplugin/&lt;com.aelitis.plugins.rcmplugin"/>
-        <file path="/rcmplugin/plugin.properties"/>
     </selectedElements>
     <fatjar builder="org.eclipse.jdt.ui.plain_jar_builder" launchConfig=""/>
 </jardesc>
