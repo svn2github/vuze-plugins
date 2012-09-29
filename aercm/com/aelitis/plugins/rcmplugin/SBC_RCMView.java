@@ -416,6 +416,18 @@ SBC_RCMView
 	{
 		super.skinObjectShown(skinObject, params);
 
+		RelatedContentUI ui = RelatedContentUI.getSingleton( null );
+		if (ui != null && !ui.hasFTUXBeenShown()) {
+			 RelatedContentUI.showFTUX(getSkinObject("rcm-list"));
+		} else {
+			SWTSkinObject so_list = getSkinObject("rcm-list");
+
+			if ( so_list != null ){
+				so_list.setVisible(true);
+			}
+		}
+
+
 		SWTSkinObject so_list = getSkinObject("rcm-list");
 		
 		if ( so_list != null ){
@@ -1041,4 +1053,6 @@ SBC_RCMView
 			Utils.launch(s);
 		}
 	};
+
+
 }

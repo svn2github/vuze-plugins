@@ -20,35 +20,21 @@
 
 package com.aelitis.plugins.rcmplugin;
 
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
-
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.TreeItem;
+
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.internat.MessageText;
-import org.gudy.azureus2.core3.util.AERunnable;
-import org.gudy.azureus2.core3.util.AESemaphore;
-import org.gudy.azureus2.core3.util.AEThread2;
-import org.gudy.azureus2.core3.util.AsyncDispatcher;
-import org.gudy.azureus2.core3.util.ByteArrayHashMap;
-import org.gudy.azureus2.core3.util.ByteFormatter;
-import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.*;
 import org.gudy.azureus2.plugins.PluginConfig;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.torrent.Torrent;
 import org.gudy.azureus2.plugins.ui.UIManager;
-import org.gudy.azureus2.plugins.ui.config.ActionParameter;
-import org.gudy.azureus2.plugins.ui.config.BooleanParameter;
-import org.gudy.azureus2.plugins.ui.config.IntParameter;
-import org.gudy.azureus2.plugins.ui.config.Parameter;
-import org.gudy.azureus2.plugins.ui.config.ParameterListener;
+import org.gudy.azureus2.plugins.ui.config.*;
 import org.gudy.azureus2.plugins.ui.menus.MenuItem;
 import org.gudy.azureus2.plugins.ui.menus.MenuItemListener;
 import org.gudy.azureus2.plugins.ui.menus.MenuManager;
@@ -56,39 +42,28 @@ import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.tables.TableContextMenuItem;
 import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.plugins.ui.tables.TableRow;
-import org.gudy.azureus2.plugins.utils.search.SearchException;
-import org.gudy.azureus2.plugins.utils.search.SearchInstance;
-import org.gudy.azureus2.plugins.utils.search.SearchObserver;
 import org.gudy.azureus2.plugins.utils.search.SearchProvider;
 import org.gudy.azureus2.ui.swt.Utils;
+import org.gudy.azureus2.ui.swt.shells.CoreWaiterSWT;
+import org.gudy.azureus2.ui.swt.shells.MessageBoxShell;
 
 import com.aelitis.azureus.core.AzureusCore;
-import com.aelitis.azureus.core.AzureusCoreFactory;
 import com.aelitis.azureus.core.AzureusCoreRunningListener;
 import com.aelitis.azureus.core.cnetwork.ContentNetwork;
-import com.aelitis.azureus.core.content.ContentException;
-import com.aelitis.azureus.core.content.RelatedContent;
-import com.aelitis.azureus.core.content.RelatedContentLookupListener;
-import com.aelitis.azureus.core.content.RelatedContentManager;
-import com.aelitis.azureus.core.content.RelatedContentManagerListener;
-import com.aelitis.azureus.core.subs.Subscription;
-import com.aelitis.azureus.core.subs.SubscriptionException;
-import com.aelitis.azureus.core.subs.SubscriptionLookupListener;
-import com.aelitis.azureus.core.subs.SubscriptionManager;
-import com.aelitis.azureus.core.subs.SubscriptionManagerFactory;
+import com.aelitis.azureus.core.content.*;
+import com.aelitis.azureus.core.subs.*;
 import com.aelitis.azureus.core.util.CopyOnWriteList;
-
 import com.aelitis.azureus.ui.UIFunctions;
 import com.aelitis.azureus.ui.UIFunctionsManager;
+import com.aelitis.azureus.ui.UserPrompterResultListener;
 import com.aelitis.azureus.ui.common.viewtitleinfo.ViewTitleInfo;
 import com.aelitis.azureus.ui.common.viewtitleinfo.ViewTitleInfoManager;
 import com.aelitis.azureus.ui.mdi.*;
-import com.aelitis.azureus.ui.swt.views.skin.SkinView;
-import com.aelitis.azureus.ui.swt.views.skin.SkinViewManager;
+import com.aelitis.azureus.ui.swt.skin.*;
+import com.aelitis.azureus.ui.swt.views.skin.*;
 import com.aelitis.azureus.ui.swt.views.skin.SkinViewManager.SkinViewManagerListener;
 import com.aelitis.azureus.ui.swt.views.skin.sidebar.SideBar;
 import com.aelitis.azureus.ui.swt.views.skin.sidebar.SideBarEntrySWT;
-import com.aelitis.net.magneturi.MagnetURIHandler;
 
 public class 
 RelatedContentUI 
@@ -112,13 +87,12 @@ RelatedContentUI
 	private PluginInterface		plugin_interface;
 	
 	private BasicPluginConfigModel 	config_model;
-	private BooleanParameter 		enable_sidebar;
+	private BooleanParameter 		enable_ui;
 	private BooleanParameter 		enable_search;
 	
 	private RelatedContentManager			manager;
 	private RelatedContentManagerListener	rcm_listener;
 	
-	private boolean			ui_hooked;
 	private boolean			ui_setup;
 	private boolean			root_menus_added;
 	
@@ -132,7 +106,9 @@ RelatedContentUI
 	
 	
 	private volatile boolean	destroyed = false;
-	
+
+	private TableContextMenuItem[] menu_items;
+
 	private 
 	RelatedContentUI(
 		PluginInterface	_plugin_interface )
@@ -141,7 +117,7 @@ RelatedContentUI
 		
 		updatePluginInfo();
 		
-		AzureusCoreFactory.addCoreRunningListener(
+		CoreWaiterSWT.waitForCoreRunning(
 			new AzureusCoreRunningListener() 
 			{
 				public void 
@@ -235,50 +211,44 @@ RelatedContentUI
 	uiAttachedAndCoreRunning(
 		AzureusCore core ) 
 	{
-		Utils.execSWTThread(
-			new AERunnable() 
-			{
-				public void 
-				runSupport() 
+		if ( destroyed ){
+			
+			return;
+		}
+		
+		
+		
+		MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
+		
+		if ( mdi != null ){
+			
+			setupUI(mdi);
+			
+		} else {
+			
+			SkinViewManager.addListener(
+				new SkinViewManagerListener() 
 				{
-					if ( destroyed ){
+					public void 
+					skinViewAdded(
+						SkinView skinview ) 
+					{
+						if ( destroyed ){
+							
+							SkinViewManager.RemoveListener(this);
+							
+							return;
+						}
 						
-						return;
+						if (skinview instanceof SideBar) {
+						
+							setupUI((SideBar) skinview);
+							
+							SkinViewManager.RemoveListener(this);
+						}
 					}
-					
-					MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
-					
-					if ( mdi != null ){
-						
-						setupUI(mdi);
-						
-					} else {
-						
-						SkinViewManager.addListener(
-							new SkinViewManagerListener() 
-							{
-								public void 
-								skinViewAdded(
-									SkinView skinview ) 
-								{
-									if ( destroyed ){
-										
-										SkinViewManager.RemoveListener(this);
-										
-										return;
-									}
-									
-									if (skinview instanceof SideBar) {
-									
-										setupUI((SideBar) skinview);
-										
-										SkinViewManager.RemoveListener(this);
-									}
-								}
-							});
-					}
-				}
-			});
+				});
+		}
 	}
 	
 	private void
@@ -315,16 +285,17 @@ RelatedContentUI
 		return( COConfigurationManager.getBooleanParameter( "rcm.overall.enabled", true ));
 	}
 	
-	private void
+	private boolean
 	setRCMEnabled(
 		boolean	enabled )
 	{
 		if ( isRCMEnabled() != enabled ){
 			
 			COConfigurationManager.setParameter( "rcm.overall.enabled", enabled );
+			return true;
 		}
 		
-		updatePluginInfo();
+		return false;
 	}
 	
 	protected void
@@ -349,11 +320,9 @@ RelatedContentUI
 			config_model = 
 				ui_manager.createBasicPluginConfigModel( "Associations" );
 			
-			config_model.addLabelParameter2( "rcm.plugin.info" );
-			
 			config_model.addHyperlinkParameter2( "rcm.plugin.wiki", MessageText.getString( "rcm.plugin.wiki.url" ));
-			
-			ActionParameter action = config_model.addActionParameter2( "show.ftux", "show.ftux" );
+
+			ActionParameter action = config_model.addActionParameter2( null, "rcm.show.ftux" );
 			
 			action.addListener(
 				new ParameterListener()
@@ -362,21 +331,33 @@ RelatedContentUI
 					parameterChanged(
 						Parameter param ) 
 					{
-						setFTUXResult( true, true, true );
+						showFTUX(null);
 					}		
 				});
-			
-				
-			enable_sidebar = 
+
+			enable_ui = 
 				config_model.addBooleanParameter2( 
-					"rcm.sidebar.enable", "rcm.sidebar.enable",
+					"rcm.ui.enable", "rcm.ui.enable",
 					true );
+			
+			enable_ui.addListener(new ParameterListener() {
+				public void parameterChanged(Parameter param) {
+					hookUI();
+				}
+			});
 			
 			enable_search = 
 				config_model.addBooleanParameter2( 
 					"rcm.search.enable", "rcm.search.enable",
-					true );
-			
+					false );
+
+			enable_search.addListener(new ParameterListener() {
+				public void parameterChanged(Parameter param) {
+					hookSearch(enable_search.getValue());
+					updatePluginInfo();
+				}
+			});
+
 				// max results
 			
 			final IntParameter max_results = 
@@ -430,20 +411,52 @@ RelatedContentUI
 						parameterChanged(
 							Parameter param) 
 						{
-							setRCMEnabled( !overall_disable.getValue());
+							if (setRCMEnabled( !overall_disable.getValue())) {
+  							MessageBoxShell mb = new MessageBoxShell(
+  									MessageText.getString("rcm.restart.title"),
+  									MessageText.getString("rcm.restart.text"),
+  									new String[] {
+  										MessageText.getString("UpdateWindow.restart"),
+  										MessageText.getString("UpdateWindow.restartLater"),
+  									}, 0);
+  							mb.open(new UserPrompterResultListener() {
+  								public void prompterClosed(int result) {
+  									if (result != 0) {
+  										return;
+  									}
+  									UIFunctions uif = UIFunctionsManager.getUIFunctions();
+  									if (uif != null) {
+  										uif.dispose(true, false);
+  									}
+  								}
+  							});
+							}
+
 						}
 					});
 
 			
-			overall_disable.addDisabledOnSelection( enable_sidebar  );
+			overall_disable.addDisabledOnSelection( enable_ui  );
 			overall_disable.addDisabledOnSelection( enable_search  );
 			overall_disable.addDisabledOnSelection( max_results  );
 			overall_disable.addDisabledOnSelection( max_level  );
+
 			
-			if ( hasFTUXBeenShown()){
-				
-				hookUI();
+			if (Constants.IS_CVS_VERSION) {
+				config_model.addBooleanParameter2("rcm.ftux.shown", "!Debug:Was Welcome Shown!", false);
 			}
+
+			buildSideBar( new MainViewInfo() );
+
+			COConfigurationManager.addAndFireParameterListener("rcm.overall.enabled",
+					new org.gudy.azureus2.core3.config.ParameterListener() {
+						public void parameterChanged(String parameterName) {
+							overall_disable.setValue(!isRCMEnabled());
+							hookUI();
+							updatePluginInfo();
+						}
+					});
+
 		}catch( Throwable e ){
 			
 			Debug.out( e );
@@ -455,147 +468,27 @@ RelatedContentUI
 	{
 		return( plugin_interface.getPluginconfig().getPluginBooleanParameter( "rcm.ftux.shown", false ));
 	}
-	
-	public void
-	setFTUXResult(
-		boolean		_enable_rcm,
-		boolean		_enable_sidebar,
-		boolean		_enable_search )
-	{
-		plugin_interface.getPluginconfig().setPluginParameter( "rcm.ftux.shown", true );
 
-		setRCMEnabled( _enable_rcm );
-		
-		enable_sidebar.setValue( _enable_sidebar );
-		enable_search.setValue( _enable_search );
-				
-		if ( _enable_search || _enable_sidebar ){
-			
-			hookUI();
-		}
+	public void
+	setFTUXBeenShown(
+			boolean b )
+	{
+		plugin_interface.getPluginconfig().setPluginParameter( "rcm.ftux.shown", b );
 	}
-	
+
 	private void
 	hookUI()
 	{
-		synchronized( this ){
-			
-			if ( ui_hooked ){
-				
-				return;
-			}
-			
-			ui_hooked = true;
+		final MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
+		if (isRCMEnabled() && enable_ui.getValue()) {
+			mdi.loadEntryByID(SIDEBAR_SECTION_RELATED_CONTENT, false);
+			hookMyTorrentMenus(true);
+		} else {
+			mdi.closeEntry(SIDEBAR_SECTION_RELATED_CONTENT);
+			hookMyTorrentMenus(false);
 		}
-		
-		hookSearch( isRCMEnabled() && enable_search.getValue());
 
-		buildSideBarEtc( isRCMEnabled() && enable_sidebar.getValue());
-	}
-	
-	private void
-	buildSideBarEtc(
-		boolean	enable )
-	{		
-		if ( !enable ){
-			
-			return;
-		}
-		
-		try{
-			final MainViewInfo main_view_info = new MainViewInfo();
-	
-			hookMenus();
-						
-			buildSideBar( main_view_info );
-						
-			rcm_listener = 
-				new RelatedContentManagerListener()
-				{
-					private int last_unread;
-					
-					public void
-					contentFound(
-						RelatedContent[]	content )
-					{
-						check();
-					}
-	
-					public void
-					contentChanged(
-						RelatedContent[]	content )
-					{
-						contentChanged();
-					}
-					
-					public void 
-					contentChanged() 
-					{
-						check();
-						
-						List<RCMItem>	items;
-						
-						synchronized( RelatedContentUI.this ){
-							
-							items = new ArrayList<RCMItem>( rcm_item_map.values());
-						}
-						
-						for ( RCMItem item: items ){
-							
-							item.updateNumUnread();
-						}
-					}
-					
-					public void 
-					contentRemoved(
-						RelatedContent[] content ) 
-					{
-						check();
-						
-						List<RCMItem>	items;
-						
-						synchronized( RelatedContentUI.this ){
-							
-							items = new ArrayList<RCMItem>( rcm_item_map.values());
-						}
-						
-						for ( RCMItem item: items ){
-							
-							item.contentRemoved( content );
-						}
-					}
-					
-					public void
-					contentReset()
-					{
-						check();
-					}
-					
-					protected void
-					check()
-					{
-						int	unread = manager.getNumUnread();
-						
-						synchronized( this ){
-							
-							if ( unread == last_unread ){
-								
-								return;
-							}
-							
-							last_unread = unread;
-						}
-						
-						ViewTitleInfoManager.refreshTitleInfo( main_view_info );
-					}
-				};
-				
-			manager.addListener( rcm_listener );
-			
-		}catch( Throwable e ){
-			
-			Debug.out( e );
-		}
+		hookSearch( isRCMEnabled() && enable_search.getValue());
 	}
 	
 	private void
@@ -603,119 +496,18 @@ RelatedContentUI
 		boolean	enable )
 	{
 		try{
-			search_provider = 
-				new SearchProvider()
-				{
-					private Map<Integer,Object>	properties = new HashMap<Integer, Object>();
-					
-					{
-						properties.put( PR_NAME, MessageText.getString( "rcm.search.provider" ));
-						
-						try{
-							URL url = 
-								MagnetURIHandler.getSingleton().registerResource(
-									new MagnetURIHandler.ResourceProvider()
-									{
-										public String
-										getUID()
-										{
-											return( RelatedContentManager.class.getName() + ".1" );
-										}
-										
-										public String
-										getFileType()
-										{
-											return( "png" );
-										}
-												
-										public byte[]
-										getData()
-										{
-											InputStream is = getClass().getClassLoader().getResourceAsStream( "org/gudy/azureus2/ui/icons/rcm.png" );
-											
-											if ( is == null ){
-												
-												return( null );
-											}
-											
-											try{
-												ByteArrayOutputStream	baos = new ByteArrayOutputStream();
-												
-												try{
-													byte[]	buffer = new byte[8192];
-													
-													while( true ){
-							
-														int	len = is.read( buffer );
-										
-														if ( len <= 0 ){
-															
-															break;
-														}
-								
-														baos.write( buffer, 0, len );
-													}
-												}finally{
-													
-													is.close();
-												}
-												
-												return( baos.toByteArray());
-												
-											}catch( Throwable e ){
-												
-												return( null );
-											}
-										}
-									});
-																	
-							properties.put( PR_ICON_URL, url.toExternalForm());
-							
-						}catch( Throwable e ){
-							
-							Debug.out( e );
-						}
-					}
-					
-					public SearchInstance
-					search(
-						Map<String,Object>	search_parameters,
-						SearchObserver		observer )
-					
-						throws SearchException
-					{		
-						try{
-							return( RelatedContentManager.getSingleton().searchRCM( search_parameters, observer ));
-							
-						}catch( Throwable e ){
-							
-							throw( new SearchException( "Search failed", e ));
-						}
-					}
-					
-					public Object
-					getProperty(
-						int			property )
-					{
-						return( properties.get( property ));
-					}
-					
-					public void
-					setProperty(
-						int			property,
-						Object		value )
-					{
-						properties.put( property, value );
-					}
-				};
 				
 			if ( enable ){
+				if (search_provider == null) {
+					search_provider = new RCM_SearchProvider();
+				}
 			
 				plugin_interface.getUtilities().registerSearchProvider( search_provider );
 				
 			}else{
-			
-				plugin_interface.getUtilities().unregisterSearchProvider( search_provider );
+				if (search_provider != null) {
+					plugin_interface.getUtilities().unregisterSearchProvider( search_provider );
+				}
 			}
 
 		}catch( Throwable e ){
@@ -725,8 +517,22 @@ RelatedContentUI
 	}
 	
 	protected void
-	hookMenus()
+	hookMyTorrentMenus(boolean enable)
 	{
+		if (enable && menu_items != null) {
+			return;
+		}
+		
+		if (!enable) {
+			if (menu_items != null){ 
+				for (TableContextMenuItem menuitem : menu_items) {
+					menuitem.remove();
+				}
+				menu_items = null;
+			}
+			return;
+		}
+
 		TableManager	table_manager = plugin_interface.getUIManager().getTableManager();
 
 		String[]	table_ids = {
@@ -737,13 +543,16 @@ RelatedContentUI
 				TableManager.TABLE_MYTORRENTS_INCOMPLETE_BIG,
 		};
 		
-		for ( String table_id: table_ids ){
-			
-			TableContextMenuItem menu_item = table_manager.addContextMenuItem( table_id, "rcm.contextmenu.lookupassoc");
+		menu_items = new TableContextMenuItem[table_ids.length];
 		
-			menus.add( menu_item );
+		for (int i = 0; i < table_ids.length; i++) {
+			String table_id = table_ids[i];
 			
-			menu_item.setStyle( TableContextMenuItem.STYLE_PUSH );
+			menu_items[i] = table_manager.addContextMenuItem( table_id, "rcm.contextmenu.lookupassoc");
+		
+			menus.add( menu_items[i] );
+			
+			menu_items[i].setStyle( TableContextMenuItem.STYLE_PUSH );
 
 			MenuItemListener listener = 
 				new MenuItemListener()
@@ -764,8 +573,9 @@ RelatedContentUI
 					}
 				};
 				
-				menu_item.addMultiListener( listener );
+				menu_items[i].addMultiListener( listener );
 		}
+		
 	}
 	
 	protected void
@@ -786,11 +596,16 @@ RelatedContentUI
 		mdi.registerEntry(SIDEBAR_SECTION_RELATED_CONTENT, new MdiEntryCreationListener() {
 			public MdiEntry createMDiEntry(String id) {
 				
+				// might be called by auto-open
+				if (!isRCMEnabled() || !enable_ui.getValue()) {
+					return null;
+				}
+				
 				MdiEntry mdiEntry = mdi.createEntryFromSkinRef(
 						null,
 						SIDEBAR_SECTION_RELATED_CONTENT, "rcmview",
 						main_view_info.getTitle(),
-						main_view_info, null, false, null  );
+						main_view_info, null, true, null  );
 
 				mdiEntry.setImageLeftID( "image.sidebar.rcm" );
 				
@@ -862,8 +677,94 @@ RelatedContentUI
 			}
 		});
 		
-		mdi.loadEntryByID( SIDEBAR_SECTION_RELATED_CONTENT, false );
+		addMdiMenus(parent_id);
 		
+		rcm_listener = 
+			new RelatedContentManagerListener()
+			{
+				private int last_unread;
+				
+				public void
+				contentFound(
+					RelatedContent[]	content )
+				{
+					check();
+				}
+
+				public void
+				contentChanged(
+					RelatedContent[]	content )
+				{
+					contentChanged();
+				}
+				
+				public void 
+				contentChanged() 
+				{
+					check();
+					
+					List<RCMItem>	items;
+					
+					synchronized( RelatedContentUI.this ){
+						
+						items = new ArrayList<RCMItem>( rcm_item_map.values());
+					}
+					
+					for ( RCMItem item: items ){
+						
+						item.updateNumUnread();
+					}
+				}
+				
+				public void 
+				contentRemoved(
+					RelatedContent[] content ) 
+				{
+					check();
+					
+					List<RCMItem>	items;
+					
+					synchronized( RelatedContentUI.this ){
+						
+						items = new ArrayList<RCMItem>( rcm_item_map.values());
+					}
+					
+					for ( RCMItem item: items ){
+						
+						item.contentRemoved( content );
+					}
+				}
+				
+				public void
+				contentReset()
+				{
+					check();
+				}
+				
+				protected void
+				check()
+				{
+					int	unread = manager.getNumUnread();
+					
+					synchronized( this ){
+						
+						if ( unread == last_unread ){
+							
+							return;
+						}
+						
+						last_unread = unread;
+					}
+					
+					ViewTitleInfoManager.refreshTitleInfo( main_view_info );
+				}
+			};
+			
+		manager.addListener( rcm_listener );
+
+	}
+	
+	private void addMdiMenus(String parent_id) {
 		if ( !root_menus_added ){
 			
 			root_menus_added = true;
@@ -959,7 +860,7 @@ RelatedContentUI
 					});
 		}
 	}
-	
+
 	protected void
 	addSearch(
 		final Download		download )
@@ -1955,5 +1856,73 @@ RelatedContentUI
 		delete() 
 		{
 		}
+	}
+
+	public void setSearchEnabled(boolean b) {
+		enable_search.setValue(b);
+	}
+
+	public void setUIEnabled(boolean b) {
+		enable_ui.setValue(b);
+	}
+
+
+	private static void addResourceBundle(SWTSkin skin, String path, String name) {
+		String sFile = path + name;
+		ClassLoader loader = RCMPlugin.class.getClassLoader();
+		SWTSkinProperties skinProperties = skin.getSkinProperties();
+		try {
+			ResourceBundle subBundle = ResourceBundle.getBundle(sFile,
+					Locale.getDefault(), loader);
+			skinProperties.addResourceBundle(subBundle, path, loader);
+		} catch (MissingResourceException mre) {
+			Debug.out(mre);
+		}
+	}
+
+	public static void showFTUX(final SWTSkinObject so_list) {
+		VuzeMessageBox box = new VuzeMessageBox(MessageText.getString("rcm.ftux.title"), null, new String[] {
+			MessageText.getString("rcm.ftux.enable"),
+			MessageText.getString("rcm.ftux.disable"),
+		}, 0);
+		box.setSubTitle(MessageText.getString("rcm.ftux.heading"));
+		box.setListener(new VuzeMessageBoxListener() {
+			public void shellReady(Shell shell, SWTSkinObjectContainer soExtra) {
+				SWTSkin skin = soExtra.getSkin();
+				addResourceBundle(skin, "com/aelitis/plugins/rcmplugin/skins/",
+						"skin3_rcm_ftux");
+
+				String id = "rcm.ftux.shell";
+				skin.createSkinObject(id, id, soExtra);
+			}
+		});
+
+		box.open(new UserPrompterResultListener() {
+			public void prompterClosed(int result) {
+				if (result < 0) {
+					return;
+				}
+				boolean enabled = result == 0;				
+				
+				if ( so_list != null ){
+					so_list.setVisible(enabled);
+				}
+
+
+				RelatedContentUI ui = RelatedContentUI.getSingleton( null );
+
+				if (ui != null) {
+					if (enabled) {
+						ui.setRCMEnabled(enabled);
+					}
+					ui.setSearchEnabled(enabled);
+					ui.setUIEnabled(enabled);
+					ui.setFTUXBeenShown(true);
+				}
+
+			}
+		});
+		
+		box.waitUntilClosed();
 	}
 }
