@@ -1900,6 +1900,7 @@ RelatedContentUI
 		box.open(new UserPrompterResultListener() {
 			public void prompterClosed(int result) {
 				if (result < 0) {
+					UIFunctionsManager.getUIFunctions().openView(UIFunctions.VIEW_MYTORRENTS, null);
 					return;
 				}
 				boolean enabled = result == 0;				
