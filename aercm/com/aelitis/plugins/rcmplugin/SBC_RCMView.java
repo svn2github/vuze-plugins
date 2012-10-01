@@ -62,6 +62,7 @@ import com.aelitis.azureus.ui.swt.mdi.MultipleDocumentInterfaceSWT;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinObject;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectContainer;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectTextbox;
+import com.aelitis.azureus.ui.swt.views.skin.InfoBarUtil;
 import com.aelitis.azureus.ui.swt.views.skin.SkinView;
 import com.aelitis.plugins.rcmplugin.RelatedContentUI.RCMItemContent;
 import com.aelitis.plugins.rcmplugin.RelatedContentUI.RCMItemSubscriptions;
@@ -249,6 +250,13 @@ SBC_RCMView
 
 			parent.layout(true);
 		}
+
+		new InfoBarUtil(skinObject, "rcmview.infobar", false,
+				"rcm.infobar", "rcm.view.infobar") {
+			public boolean allowShow() {
+				return true;
+			}
+		};
 
 		return null;
 	}
