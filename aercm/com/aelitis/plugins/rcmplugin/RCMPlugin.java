@@ -31,6 +31,8 @@ import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
+import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
+
 import com.aelitis.azureus.ui.swt.skin.SWTSkinFactory;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinProperties;
 
@@ -69,30 +71,35 @@ RCMPlugin
 				UIAttached(
 					UIInstance instance) 
 				{
-					String path = "com/aelitis/plugins/rcmplugin/skins/";
-					
-					String sFile = path + "skin3_rcm";
-					
-					ClassLoader loader = RCMPlugin.class.getClassLoader();
-					
-					SWTSkinProperties skinProperties = SWTSkinFactory.getInstance().getSkinProperties();
-					
-					try {
-						ResourceBundle subBundle = ResourceBundle.getBundle(sFile,
-								Locale.getDefault(), loader);
-						skinProperties.addResourceBundle(subBundle, path, loader);
-					} catch (MissingResourceException mre) {
-						Debug.out(mre);
-					}	
-					
-					synchronized( RCMPlugin.this ){
+					if ( instance instanceof UISWTInstance ){
 						
-						if ( destroyed ){
-							
-							return;
-						}
-					
-						ui = RelatedContentUI.getSingleton( plugin_interface );
+						UISWTInstance	swt = (UISWTInstance)instance;
+
+  					String path = "com/aelitis/plugins/rcmplugin/skins/";
+  					
+  					String sFile = path + "skin3_rcm";
+  					
+  					ClassLoader loader = RCMPlugin.class.getClassLoader();
+  					
+  					SWTSkinProperties skinProperties = SWTSkinFactory.getInstance().getSkinProperties();
+  					
+  					try {
+  						ResourceBundle subBundle = ResourceBundle.getBundle(sFile,
+  								Locale.getDefault(), loader);
+  						skinProperties.addResourceBundle(subBundle, path, loader);
+  					} catch (MissingResourceException mre) {
+  						Debug.out(mre);
+  					}	
+  					
+  					synchronized( RCMPlugin.this ){
+  						
+  						if ( destroyed ){
+  							
+  							return;
+  						}
+  					
+  						ui = RelatedContentUI.getSingleton( plugin_interface, swt );
+  					}
 					}
 				}
 				

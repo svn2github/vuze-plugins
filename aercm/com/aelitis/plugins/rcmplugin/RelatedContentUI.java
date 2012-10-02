@@ -43,6 +43,9 @@ import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.plugins.ui.tables.TableRow;
 import org.gudy.azureus2.plugins.utils.search.SearchProvider;
 import org.gudy.azureus2.ui.swt.Utils;
+import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
+import org.gudy.azureus2.ui.swt.plugins.UISWTViewEvent;
+import org.gudy.azureus2.ui.swt.plugins.UISWTViewEventListener;
 import org.gudy.azureus2.ui.swt.shells.CoreWaiterSWT;
 import org.gudy.azureus2.ui.swt.shells.MessageBoxShell;
 
@@ -73,11 +76,11 @@ RelatedContentUI
 	
 	public synchronized static RelatedContentUI
 	getSingleton(
-		PluginInterface		pi )
+		PluginInterface		pi, UISWTInstance swtInstance )
 	{
 		if ( singleton == null ){
 			
-			singleton = new RelatedContentUI( pi );
+			singleton = new RelatedContentUI( pi, swtInstance );
 		}
 		
 		return( singleton );
@@ -108,11 +111,14 @@ RelatedContentUI
 
 	private TableContextMenuItem[] menu_items;
 
+	private UISWTInstance swtInstance;
+
 	private 
 	RelatedContentUI(
-		PluginInterface	_plugin_interface )
+		PluginInterface	_plugin_interface, UISWTInstance swtInstance )
 	{
 		plugin_interface	= _plugin_interface;
+		this.swtInstance = swtInstance;
 		
 		updatePluginInfo();
 		
@@ -772,7 +778,24 @@ RelatedContentUI
 
 			MenuManager menu_manager = ui_manager.getMenuManager();
 
-			MenuItem menu_item = menu_manager.addMenuItem( parent_id, "rcm.menu.findsubs" );
+			MenuItem menu_item;
+			
+			menu_item = menu_manager.addMenuItem( MenuManager.MENU_MENUBAR, "rcm.view.heading" );
+
+			menu_item.addListener( 
+					new MenuItemListener() 
+					{
+						public void 
+						selected(
+							MenuItem menu, Object target ) 
+						{
+							MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
+							mdi.showEntryByID(SIDEBAR_SECTION_RELATED_CONTENT);
+						}
+					});
+
+
+			menu_item = menu_manager.addMenuItem( parent_id, "rcm.menu.findsubs" );
 			
 			menu_item.addListener( 
 					new MenuItemListener() 
@@ -1909,7 +1932,7 @@ RelatedContentUI
 				}
 
 
-				RelatedContentUI ui = RelatedContentUI.getSingleton( null );
+				RelatedContentUI ui = RelatedContentUI.getSingleton( null, null );
 
 				if (ui != null) {
 					if (enabled) {

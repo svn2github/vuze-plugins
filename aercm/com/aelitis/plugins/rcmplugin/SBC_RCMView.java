@@ -59,9 +59,7 @@ import com.aelitis.azureus.ui.mdi.MdiEntry;
 import com.aelitis.azureus.ui.selectedcontent.*;
 import com.aelitis.azureus.ui.swt.UIFunctionsManagerSWT;
 import com.aelitis.azureus.ui.swt.mdi.MultipleDocumentInterfaceSWT;
-import com.aelitis.azureus.ui.swt.skin.SWTSkinObject;
-import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectContainer;
-import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectTextbox;
+import com.aelitis.azureus.ui.swt.skin.*;
 import com.aelitis.azureus.ui.swt.views.skin.InfoBarUtil;
 import com.aelitis.azureus.ui.swt.views.skin.SkinView;
 import com.aelitis.plugins.rcmplugin.RelatedContentUI.RCMItemContent;
@@ -157,19 +155,48 @@ SBC_RCMView
 			txtFilter = soFilterBox.getTextControl();
 		}
 
-		SWTSkinObject soFilterArea = getSkinObject("filterarea");
+		final SWTSkinObject soFilterArea = getSkinObject("filterarea");
 		if (soFilterArea != null) {
+			
+			SWTSkinObjectToggle soFilterButton = (SWTSkinObjectToggle) getSkinObject("filter-button");
+			if (soFilterButton != null) {
+				soFilterButton.addSelectionListener(new SWTSkinToggleListener() {
+					public void toggleChanged(SWTSkinObjectToggle so, boolean toggled) {
+						soFilterArea.setVisible(toggled);
+						Utils.relayout(soFilterArea.getControl().getParent());
+					}
+				});
+			}
+			
 			Composite parent = (Composite) soFilterArea.getControl();
 	
+			Label label;
 			FormData fd;
-			Composite cMinSeeds = new Composite(parent, SWT.BORDER);
-			cMinSeeds.setLayout(new GridLayout(2, false));
+			GridLayout layout;
+			int sepHeight = 20;
+			
+			Composite cRow = new Composite(parent, SWT.NONE);
 			fd = Utils.getFilledFormData();
-			fd.right = null;
-			cMinSeeds.setLayoutData(fd);
+			cRow.setLayoutData(fd);
+			RowLayout rowLayout = new RowLayout(SWT.HORIZONTAL);
+			rowLayout.spacing = 5;
+			rowLayout.marginBottom = rowLayout.marginTop = rowLayout.marginLeft = rowLayout.marginRight = 0; 
+			rowLayout.center = true;
+			cRow.setLayout(rowLayout);
+			
+			
+
+			/////
+			
+			
+			Composite cMinSeeds = new Composite(cRow, SWT.NONE);
+			layout = new GridLayout(2, false);
+			layout.marginWidth = 0;
+			layout.marginBottom = layout.marginTop = layout.marginLeft = layout.marginRight = 0;
+			cMinSeeds.setLayout(layout);
 			
 			Label lblMinSeeds = new Label(cMinSeeds, SWT.NONE);
-			lblMinSeeds.setText("Min Seeds:");
+			lblMinSeeds.setText(MessageText.getString("rcmview.filter.minSeeds"));
 			Spinner spinMinSeeds = new Spinner(cMinSeeds, SWT.BORDER);
 			spinMinSeeds.setMinimum(0);
 			spinMinSeeds.setSelection(minSeeds);
@@ -179,27 +206,18 @@ SBC_RCMView
 					refilter();
 				}
 			});
-			Button chkShowUnknownSeeds = new Button(cMinSeeds, SWT.CHECK);
-			chkShowUnknownSeeds.setText("Show unknown seeds");
-			chkShowUnknownSeeds.setSelection(showUnknownSeeds);
-			chkShowUnknownSeeds.addListener(SWT.Selection, new Listener() {
-				public void handleEvent(Event event) {
-					showUnknownSeeds = ((Button) event.widget).getSelection();
-					refilter();
-				}
-			});
-			GridData gridData = new GridData();
-			gridData.horizontalSpan = 2;
-			chkShowUnknownSeeds.setLayoutData(gridData);
+			
+			
+			label = new Label(cRow, SWT.VERTICAL | SWT.SEPARATOR);
+			label.setLayoutData(new RowData(-1, sepHeight));
 
-			Composite cCreatedAgo = new Composite(parent, SWT.BORDER);
-			cCreatedAgo.setLayout(new GridLayout(2, false));
-			fd = Utils.getFilledFormData();
-			fd.left = new FormAttachment(cMinSeeds, 2);
-			fd.right = null;
-			cCreatedAgo.setLayoutData(fd);
+			Composite cCreatedAgo = new Composite(cRow, SWT.NONE);
+			layout = new GridLayout(2, false);
+			layout.marginWidth = 0;
+			layout.marginBottom = layout.marginTop = layout.marginLeft = layout.marginRight = 0;
+			cCreatedAgo.setLayout(layout);
 			Label lblCreatedAgo = new Label(cCreatedAgo, SWT.NONE);
-			lblCreatedAgo.setText("Created Ago (days):");
+			lblCreatedAgo.setText(MessageText.getString("rcmview.filter.createdAgo"));
 			Spinner spinCreatedAgo = new Spinner(cCreatedAgo, SWT.BORDER);
 			spinCreatedAgo.setMinimum(0);
 			spinCreatedAgo.setMaximum(999);
@@ -212,14 +230,16 @@ SBC_RCMView
 				}
 			});
 			
-			Composite cMinRank = new Composite(parent, SWT.BORDER);
-			cMinRank.setLayout(new GridLayout(2, false));
-			fd = Utils.getFilledFormData();
-			fd.left = new FormAttachment(cCreatedAgo, 2);
-			fd.right = null;
-			cMinRank.setLayoutData(fd);
+			label = new Label(cRow, SWT.VERTICAL | SWT.SEPARATOR);
+			label.setLayoutData(new RowData(-1, sepHeight));
+
+			Composite cMinRank = new Composite(cRow, SWT.NONE);
+			layout = new GridLayout(2, false);
+			layout.marginWidth = 0;
+			layout.marginBottom = layout.marginTop = layout.marginLeft = layout.marginRight = 0;
+			cMinRank.setLayout(layout);
 			Label lblMinRank = new Label(cMinRank, SWT.NONE);
-			lblMinRank.setText("Min Rank:");
+			lblMinRank.setText(MessageText.getString("rcmview.filter.minRank"));;
 			Spinner spinMinRank = new Spinner(cMinRank, SWT.BORDER);
 			spinMinRank.setMinimum(0);
 			spinMinRank.setSelection(minRank);
@@ -229,20 +249,29 @@ SBC_RCMView
 					refilter();
 				}
 			});
-			
 
-			Composite cChecks = new Composite(parent, SWT.BORDER);
-			cChecks.setLayout(new GridLayout(1, false));
-			fd = Utils.getFilledFormData();
-			fd.left = new FormAttachment(cMinRank, 2);
-			fd.right = null;
-			cChecks.setLayoutData(fd);
-			Button chkShowPrivate = new Button(cChecks, SWT.CHECK);
+			label = new Label(cRow, SWT.VERTICAL | SWT.SEPARATOR);
+			label.setLayoutData(new RowData(-1, sepHeight));
+
+			Button chkShowPrivate = new Button(cRow, SWT.CHECK);
 			chkShowPrivate.setText( MessageText.getString( "rcm.header.show_indirect" ));
 			chkShowPrivate.setSelection(showIndirect );
 			chkShowPrivate.addListener(SWT.Selection, new Listener() {
 				public void handleEvent(Event event) {
 					showIndirect = ((Button) event.widget).getSelection();
+					refilter();
+				}
+			});
+			
+			label = new Label(cRow, SWT.VERTICAL | SWT.SEPARATOR);
+			label.setLayoutData(new RowData(-1, sepHeight));
+
+			Button chkShowUnknownSeeds = new Button(cRow, SWT.CHECK);
+			chkShowUnknownSeeds.setText(MessageText.getString("rcmview.filter.showUnknown"));
+			chkShowUnknownSeeds.setSelection(showUnknownSeeds);
+			chkShowUnknownSeeds.addListener(SWT.Selection, new Listener() {
+				public void handleEvent(Event event) {
+					showUnknownSeeds = ((Button) event.widget).getSelection();
 					refilter();
 				}
 			});
@@ -424,7 +453,7 @@ SBC_RCMView
 	{
 		super.skinObjectShown(skinObject, params);
 
-		RelatedContentUI ui = RelatedContentUI.getSingleton( null );
+		RelatedContentUI ui = RelatedContentUI.getSingleton( null, null );
 		if (ui != null && !ui.hasFTUXBeenShown()) {
 			 RelatedContentUI.showFTUX(getSkinObject("rcm-list"));
 		} else {
@@ -859,7 +888,7 @@ SBC_RCMView
 							
 							int	 i = 0;
 							
-							RelatedContentUI ui = RelatedContentUI.getSingleton( null );
+							RelatedContentUI ui = RelatedContentUI.getSingleton( null, null );
 							
 							for ( RelatedContent c: assoc_ok ){
 							
