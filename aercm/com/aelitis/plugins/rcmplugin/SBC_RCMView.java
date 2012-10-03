@@ -454,7 +454,7 @@ SBC_RCMView
 		super.skinObjectShown(skinObject, params);
 
 		RelatedContentUI ui = RelatedContentUI.getSingleton( null, null );
-		if (ui != null && !ui.hasFTUXBeenShown()) {
+		if (ui != null && !ui.getPlugin().hasFTUXBeenShown()) {
 			 RelatedContentUI.showFTUX(getSkinObject("rcm-list"));
 		} else {
 			SWTSkinObject so_list = getSkinObject("rcm-list");

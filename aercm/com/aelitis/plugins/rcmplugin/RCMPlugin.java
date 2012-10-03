@@ -31,6 +31,7 @@ import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
+import org.gudy.azureus2.plugins.utils.search.SearchProvider;
 import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 
 import com.aelitis.azureus.ui.swt.skin.SWTSkinFactory;
@@ -45,25 +46,29 @@ RCMPlugin
 		COConfigurationManager.setParameter( "rcm.persist", true );
 	}
 	
-	private RelatedContentUI		ui;
+	private PluginInterface			plugin_interface;
 	
+	private RelatedContentUI		ui;
+	private SearchProvider 			search_provider;
+
 	private boolean					destroyed;
 	
 	public void
 	initialize(
-		final PluginInterface		plugin_interface )
+		final PluginInterface		_plugin_interface )
 	
 		throws PluginException
 	{
-		if ( plugin_interface.getUtilities().compareVersions( plugin_interface.getAzureusVersion(), "4.4.0.5" ) < 0 ){
-			
-			throw( new PluginException( "Plugin requires Vuze version 4.4.0.5 or higher" ));
-		}
-		
+		plugin_interface = _plugin_interface;
+				
 		LocaleUtilities loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
 
 		loc_utils.integrateLocalisedMessageBundle( "com.aelitis.plugins.rcmplugin.internat.Messages" );
+
+		hookSearch();
 		
+		updatePluginInfo();
+
 		plugin_interface.getUIManager().addUIListener(
 			new UIManagerListener()
 			{
@@ -73,33 +78,31 @@ RCMPlugin
 				{
 					if ( instance instanceof UISWTInstance ){
 						
-						UISWTInstance	swt = (UISWTInstance)instance;
+						String path = "com/aelitis/plugins/rcmplugin/skins/";
 
-  					String path = "com/aelitis/plugins/rcmplugin/skins/";
-  					
-  					String sFile = path + "skin3_rcm";
-  					
-  					ClassLoader loader = RCMPlugin.class.getClassLoader();
-  					
-  					SWTSkinProperties skinProperties = SWTSkinFactory.getInstance().getSkinProperties();
-  					
-  					try {
-  						ResourceBundle subBundle = ResourceBundle.getBundle(sFile,
-  								Locale.getDefault(), loader);
-  						skinProperties.addResourceBundle(subBundle, path, loader);
-  					} catch (MissingResourceException mre) {
-  						Debug.out(mre);
-  					}	
-  					
-  					synchronized( RCMPlugin.this ){
-  						
-  						if ( destroyed ){
-  							
-  							return;
-  						}
-  					
-  						ui = RelatedContentUI.getSingleton( plugin_interface, swt );
-  					}
+						String sFile = path + "skin3_rcm";
+
+						ClassLoader loader = RCMPlugin.class.getClassLoader();
+
+						SWTSkinProperties skinProperties = SWTSkinFactory.getInstance().getSkinProperties();
+
+						try {
+							ResourceBundle subBundle = ResourceBundle.getBundle(sFile,
+									Locale.getDefault(), loader);
+							skinProperties.addResourceBundle(subBundle, path, loader);
+						} catch (MissingResourceException mre) {
+							Debug.out(mre);
+						}	
+
+						synchronized( RCMPlugin.this ){
+
+							if ( destroyed ){
+
+								return;
+							}
+
+							ui = RelatedContentUI.getSingleton( plugin_interface, RCMPlugin.this );
+						}
 					}
 				}
 				
@@ -111,6 +114,103 @@ RCMPlugin
 				}
 			});
 	}
+	
+	protected void
+	updatePluginInfo()
+	{
+		String plugin_info;
+		
+		if ( !hasFTUXBeenShown()){
+			
+			plugin_info = "f";
+			
+		}else if ( isRCMEnabled()){
+		
+			plugin_info = "e";
+			
+		}else{
+			
+			plugin_info = "d";
+		}
+		
+		PluginConfig pc = plugin_interface.getPluginconfig();
+		
+		if ( !pc.getPluginStringParameter( "plugin.info", "" ).equals( plugin_info )){
+			
+			pc.setPluginParameter( "plugin.info", plugin_info );
+		
+			COConfigurationManager.save();
+		}
+	}
+	
+	protected boolean
+	isRCMEnabled()
+	{
+		return( COConfigurationManager.getBooleanParameter( "rcm.overall.enabled", true ));
+	}
+	
+	protected boolean
+	setRCMEnabled(
+		boolean	enabled )
+	{
+		if ( isRCMEnabled() != enabled ){
+			
+			COConfigurationManager.setParameter( "rcm.overall.enabled", enabled );
+			return true;
+		}
+		
+		return false;
+	}
+	
+	protected boolean
+	hasFTUXBeenShown()
+	{
+		return( plugin_interface.getPluginconfig().getPluginBooleanParameter( "rcm.ftux.shown", false ));
+	}
+
+	protected void
+	setFTUXBeenShown(
+			boolean b )
+	{
+		plugin_interface.getPluginconfig().setPluginParameter( "rcm.ftux.shown", b );
+	}
+	
+	protected boolean
+	isSearchEnabled()
+	{
+		return( plugin_interface.getPluginconfig().getPluginBooleanParameter( "rcm.search.enable", false ));
+	}
+	
+	protected void
+	hookSearch()
+	{
+		boolean enable = isRCMEnabled() && isSearchEnabled() && hasFTUXBeenShown();
+		
+		try{
+				
+			if ( enable ){
+			
+				if ( search_provider == null ){
+					
+					search_provider = new RCM_SearchProvider();
+						
+					plugin_interface.getUtilities().registerSearchProvider( search_provider );
+				}
+			}else{
+				
+				if ( search_provider != null ) {
+					
+					plugin_interface.getUtilities().unregisterSearchProvider( search_provider );
+					
+					search_provider = null;
+				}
+			}
+		}catch( Throwable e ){
+			
+			Debug.out( "Failed to register/unregister search provider", e );
+		}
+	}
+	
 	
 	public void 
 	unload() 
@@ -132,6 +232,19 @@ RCMPlugin
 			ui.destroy();
 			
 			ui = null;
+		}
+		
+		if ( search_provider != null ){
+
+			try{
+				plugin_interface.getUtilities().unregisterSearchProvider( search_provider );
+
+				search_provider = null;
+				
+			}catch( Throwable e ){
+				
+				Debug.out( e );
+			}
 		}
 	}
 }

@@ -42,6 +42,8 @@ public class RCM_SearchProvider
 
 	private Map<Integer,Object>	properties = new HashMap<Integer, Object>();
 	
+	protected
+	RCM_SearchProvider()
 	{
 		properties.put( PR_NAME, MessageText.getString( "rcm.search.provider" ));
 		

@@ -76,17 +76,19 @@ RelatedContentUI
 	
 	public synchronized static RelatedContentUI
 	getSingleton(
-		PluginInterface		pi, UISWTInstance swtInstance )
+		PluginInterface		pi,
+		RCMPlugin			plugin )
 	{
 		if ( singleton == null ){
 			
-			singleton = new RelatedContentUI( pi, swtInstance );
+			singleton = new RelatedContentUI( pi, plugin );
 		}
 		
 		return( singleton );
 	}
 	
 	private PluginInterface		plugin_interface;
+	private RCMPlugin			plugin;
 	
 	private BasicPluginConfigModel 	config_model;
 	private BooleanParameter 		enable_ui;
@@ -99,9 +101,7 @@ RelatedContentUI
 	private boolean			root_menus_added;
 	
 	private List<TableContextMenuItem>	menus = new ArrayList<TableContextMenuItem>();
-	
-	private SearchProvider 	search_provider;
-	
+		
 	private ByteArrayHashMap<RCMItem>	rcm_item_map = new ByteArrayHashMap<RCMItem>();
 	
 	private AsyncDispatcher	async_dispatcher = new AsyncDispatcher();
@@ -111,16 +111,13 @@ RelatedContentUI
 
 	private TableContextMenuItem[] menu_items;
 
-	private UISWTInstance swtInstance;
-
 	private 
 	RelatedContentUI(
-		PluginInterface	_plugin_interface, UISWTInstance swtInstance )
+		PluginInterface	_plugin_interface, 
+		RCMPlugin		_plugin )
 	{
 		plugin_interface	= _plugin_interface;
-		this.swtInstance = swtInstance;
-		
-		updatePluginInfo();
+		plugin				= _plugin;
 		
 		CoreWaiterSWT.waitForCoreRunning(
 			new AzureusCoreRunningListener() 
@@ -132,6 +129,12 @@ RelatedContentUI
 					uiAttachedAndCoreRunning( core );
 				}
 			});
+	}
+	
+	protected RCMPlugin
+	getPlugin()
+	{
+		return( plugin );
 	}
 	
 	protected void
@@ -175,19 +178,6 @@ RelatedContentUI
 					}catch( Throwable e ){
 						
 						Debug.out( e );
-					}
-					
-					if ( search_provider != null ){
-
-						try{
-							plugin_interface.getUtilities().unregisterSearchProvider( search_provider );
-	
-							search_provider = null;
-							
-						}catch( Throwable e ){
-							
-							Debug.out( e );
-						}
 					}
 					
 					if ( manager != null ){
@@ -256,52 +246,7 @@ RelatedContentUI
 		}
 	}
 	
-	private void
-	updatePluginInfo()
-	{
-		String plugin_info;
-		
-		if ( !hasFTUXBeenShown()){
-			
-			plugin_info = "f";
-			
-		}else if ( isRCMEnabled()){
-		
-			plugin_info = "e";
-			
-		}else{
-			
-			plugin_info = "d";
-		}
-		
-		PluginConfig pc = plugin_interface.getPluginconfig();
-		
-		if ( !pc.getPluginStringParameter( "plugin.info", "" ).equals( plugin_info )){
-			
-			pc.setPluginParameter( "plugin.info", plugin_info );
-		
-			COConfigurationManager.save();
-		}
-	}
-	
-	private boolean
-	isRCMEnabled()
-	{
-		return( COConfigurationManager.getBooleanParameter( "rcm.overall.enabled", true ));
-	}
-	
-	private boolean
-	setRCMEnabled(
-		boolean	enabled )
-	{
-		if ( isRCMEnabled() != enabled ){
-			
-			COConfigurationManager.setParameter( "rcm.overall.enabled", enabled );
-			return true;
-		}
-		
-		return false;
-	}
+
 	
 	protected void
 	setupUI(
@@ -358,8 +303,8 @@ RelatedContentUI
 
 			enable_search.addListener(new ParameterListener() {
 				public void parameterChanged(Parameter param) {
-					hookSearch(enable_search.getValue());
-					updatePluginInfo();
+					plugin.hookSearch();
+					plugin.updatePluginInfo();
 				}
 			});
 
@@ -404,7 +349,7 @@ RelatedContentUI
 			final BooleanParameter overall_disable = 
 				config_model.addBooleanParameter2( 
 					"rcm.overall.disable", "rcm.overall.disable",
-					!isRCMEnabled());
+					!plugin.isRCMEnabled());
 			
 			overall_disable.setMinimumRequiredUserMode( 
 					overall_disable.getValue()?Parameter.MODE_BEGINNER:Parameter.MODE_INTERMEDIATE );
@@ -416,7 +361,7 @@ RelatedContentUI
 						parameterChanged(
 							Parameter param) 
 						{
-							if (setRCMEnabled( !overall_disable.getValue())) {
+							if (plugin.setRCMEnabled( !overall_disable.getValue())) {
   							MessageBoxShell mb = new MessageBoxShell(
   									MessageText.getString("rcm.restart.title"),
   									MessageText.getString("rcm.restart.text"),
@@ -456,9 +401,9 @@ RelatedContentUI
 			COConfigurationManager.addAndFireParameterListener("rcm.overall.enabled",
 					new org.gudy.azureus2.core3.config.ParameterListener() {
 						public void parameterChanged(String parameterName) {
-							overall_disable.setValue(!isRCMEnabled());
+							overall_disable.setValue(!plugin.isRCMEnabled());
 							hookUI();
-							updatePluginInfo();
+							plugin.updatePluginInfo();
 						}
 					});
 
@@ -467,25 +412,12 @@ RelatedContentUI
 			Debug.out( e );
 		}
 	}
-	
-	public boolean
-	hasFTUXBeenShown()
-	{
-		return( plugin_interface.getPluginconfig().getPluginBooleanParameter( "rcm.ftux.shown", false ));
-	}
-
-	public void
-	setFTUXBeenShown(
-			boolean b )
-	{
-		plugin_interface.getPluginconfig().setPluginParameter( "rcm.ftux.shown", b );
-	}
 
 	private void
 	hookUI()
 	{
 		final MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
-		if (isRCMEnabled() && enable_ui.getValue()) {
+		if (plugin.isRCMEnabled() && enable_ui.getValue()) {
 			mdi.loadEntryByID(SIDEBAR_SECTION_RELATED_CONTENT, false);
 			hookMyTorrentMenus(true);
 		} else {
@@ -493,32 +425,7 @@ RelatedContentUI
 			hookMyTorrentMenus(false);
 		}
 
-		hookSearch( isRCMEnabled() && enable_search.getValue());
-	}
-	
-	private void
-	hookSearch(
-		boolean	enable )
-	{
-		try{
-				
-			if ( enable ){
-				if (search_provider == null) {
-					search_provider = new RCM_SearchProvider();
-				}
-			
-				plugin_interface.getUtilities().registerSearchProvider( search_provider );
-				
-			}else{
-				if (search_provider != null) {
-					plugin_interface.getUtilities().unregisterSearchProvider( search_provider );
-				}
-			}
-
-		}catch( Throwable e ){
-			
-			Debug.out( "Failed to register search provider" );
-		}
+		plugin.hookSearch();
 	}
 	
 	protected void
@@ -604,7 +511,7 @@ RelatedContentUI
 			public MdiEntry createMDiEntry(String id) {
 				
 				// might be called by auto-open
-				if (!isRCMEnabled() || !enable_ui.getValue()) {
+				if (!plugin.isRCMEnabled() || !enable_ui.getValue()) {
 					return null;
 				}
 				
@@ -1939,11 +1846,11 @@ RelatedContentUI
 
 				if (ui != null) {
 					if (enabled) {
-						ui.setRCMEnabled(enabled);
+						ui.plugin.setRCMEnabled(enabled);
 					}
 					ui.setSearchEnabled(enabled);
 					ui.setUIEnabled(enabled);
-					ui.setFTUXBeenShown(true);
+					ui.plugin.setFTUXBeenShown(true);
 				}
 
 			}
