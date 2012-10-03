@@ -79,7 +79,12 @@ RelatedContentUI
 		PluginInterface		pi,
 		RCMPlugin			plugin )
 	{
-		if ( singleton == null ){
+		if ( singleton == null || singleton.isDestroyed()){
+			
+			if ( pi == null || plugin == null ){
+				
+				return( null );
+			}
 			
 			singleton = new RelatedContentUI( pi, plugin );
 		}
@@ -200,6 +205,12 @@ RelatedContentUI
 					singleton	= null;
 				}
 			});
+	}
+	
+	private boolean
+	isDestroyed()
+	{
+		return( destroyed );
 	}
 	
 	private void 
@@ -583,7 +594,7 @@ RelatedContentUI
 									f_manager.addListener( base_listener );
 							}
 							
-							RelatedContent[] current_content = manager.getRelatedContent();
+							RelatedContent[] current_content = f_manager.getRelatedContent();
 							
 							listener.contentFound( current_content );
 						}
@@ -903,7 +914,7 @@ RelatedContentUI
 				
 			}else if ( propertyID == TITLE_INDICATOR_TEXT ){
 				
-				int	 unread = manager.getNumUnread();
+				int	 unread = manager==null?0:manager.getNumUnread();
 				
 				if ( unread > 0 ){
 				
