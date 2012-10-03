@@ -598,6 +598,8 @@ RelatedContentUI
 
 		final MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
 		
+		final RelatedContentManager f_manager = manager;
+
 		mdi.registerEntry(SIDEBAR_SECTION_RELATED_CONTENT, new MdiEntryCreationListener() {
 			public MdiEntry createMDiEntry(String id) {
 				
@@ -628,7 +630,7 @@ RelatedContentUI
 							current_listener = listener;
 							
 							if ( base_listener == null ){
-								
+																
 								base_listener = 
 									new RelatedContentManagerListener()
 									{
@@ -638,7 +640,9 @@ RelatedContentUI
 										{
 											if ( destroyed ){
 												
-												manager.removeListener( base_listener );
+													// use final ref here as manager will be nulled
+												
+												f_manager.removeListener( base_listener );
 												
 											}else{
 											
@@ -669,7 +673,7 @@ RelatedContentUI
 										}
 									};
 									
-								manager.addListener( base_listener );
+									f_manager.addListener( base_listener );
 							}
 							
 							RelatedContent[] current_content = manager.getRelatedContent();
@@ -749,7 +753,7 @@ RelatedContentUI
 				protected void
 				check()
 				{
-					int	unread = manager.getNumUnread();
+					int	unread = f_manager.getNumUnread();
 					
 					synchronized( this ){
 						
@@ -765,8 +769,7 @@ RelatedContentUI
 				}
 			};
 			
-		manager.addListener( rcm_listener );
-
+			f_manager.addListener( rcm_listener );
 	}
 	
 	private void addMdiMenus(String parent_id) {
