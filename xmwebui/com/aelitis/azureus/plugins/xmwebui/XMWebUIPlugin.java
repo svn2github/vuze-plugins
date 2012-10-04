@@ -346,7 +346,7 @@ XMWebUIPlugin
 		try{
 			String	url = request.getURL();
 		
-			// System.out.println( request.getHeader() );
+			//System.out.println( request.getHeader() );
 			
 			if ( url.equals( "/transmission/rpc" )){
 							
@@ -372,7 +372,7 @@ XMWebUIPlugin
 				}
 				
 				Map request_json = JSONUtils.decodeJSON( request_json_str.toString());
-				
+								
 				Map response_json = processRequest( request_json );
 					
 				String response_json_str = JSONUtils.encodeToJSON( response_json );
@@ -682,8 +682,11 @@ XMWebUIPlugin
 				
 		JSONObject	result = new JSONObject();
 				
-			// http://trac.transmissionbt.com/browser/trunk/doc/rpc-spec.txt
-				
+			// https://trac.transmissionbt.com/browser/trunk/extras/rpc-spec.txt
+		
+			// to get 271 working with this backend change remote.js RPC _Root to be
+			// _Root                   : './transmission/rpc',
+		
 		if ( method.equals( "session-get" ) || method.equals( "session-set" )){
 							
 			PluginConfig pc = plugin_interface.getPluginconfig();
@@ -841,6 +844,29 @@ XMWebUIPlugin
 			result.put( "version", plugin_interface.getPluginVersion() );           // string     
 			result.put( "az-version", Constants.AZUREUS_VERSION );                  // string     
 			result.put( "az-mode", az_mode );										// string
+			
+		}else if ( method.equals( "session-stats" )){
+
+				// 2.71
+			
+			JSONObject	current_stats = new JSONObject();
+			
+			result.put( "current-stats", current_stats );
+			
+			current_stats.put( "uploadedBytes", 0 );
+			current_stats.put( "downloadedBytes", 0 );
+			current_stats.put( "ratio", 0 );
+			current_stats.put( "secondsActive", 0 );
+			
+			JSONObject	cumulative_stats = new JSONObject();
+			
+			result.put( "cumulative-stats", cumulative_stats );
+
+			cumulative_stats.put( "uploadedBytes", 0 );
+			cumulative_stats.put( "downloadedBytes", 0 );
+			cumulative_stats.put( "ratio", 0 );
+			cumulative_stats.put( "secondsActive", 0 );
+			cumulative_stats.put( "sessionCount", 0 );
 			
 		}else if ( method.equals( "torrent-add" )){
 			
@@ -1153,6 +1179,8 @@ XMWebUIPlugin
 				fields = new ArrayList();
 			}
 			
+			boolean	is_271 = fields.contains( "percentDone" );
+			
 			Object	ids = args.get( "ids" );
 			
 			if ( ids != null && ids instanceof String && ((String)ids).equals( "recently-active" )){
@@ -1349,7 +1377,8 @@ XMWebUIPlugin
 						}
 					}else if ( field.equals( "sizeWhenDone" )){	
 						value = new Long( t.getSize());	// TODO: excluded DND
-					}else if ( field.equals( "status" )){	
+					}else if ( field.equals( "status" )){
+						
 							// 1 - waiting to verify
 							// 2 - verifying
 							// 4 - downloading
@@ -1358,53 +1387,94 @@ XMWebUIPlugin
 							// 9 - queued (complete)
 							// 16 - paused
 						
-						int	status_int = 7;
+							// 2.71 - these changed!
+					
+						    //TR_STATUS_STOPPED        = 0, /* Torrent is stopped */
+						    //TR_STATUS_CHECK_WAIT     = 1, /* Queued to check files /*
+						    //TR_STATUS_CHECK          = 2, /* Checking files */
+						    //TR_STATUS_DOWNLOAD_WAIT  = 3, /* Queued to download */
+						    //TR_STATUS_DOWNLOAD       = 4, /* Downloading */
+						    //TR_STATUS_SEED_WAIT      = 5, /* Queued to seed */
+						    //TR_STATUS_SEED           = 6  /* Seeding */
+						   
+						final int CHECK_WAIT;
+						final int CHECKING;
+						final int DOWNLOADING;
+						final int QUEUED_INCOMPLETE;
+						final int QUEUED_COMPLETE;
+						final int STOPPED;
+						final int SEEDING;
+						final int ERROR;
+						
+						if ( is_271 ){
+							
+							CHECK_WAIT			= 1;
+							CHECKING			= 2;
+							DOWNLOADING			= 4;
+							QUEUED_INCOMPLETE	= 3;
+							QUEUED_COMPLETE		= 5;
+							STOPPED				= 0;
+							SEEDING				= 6;
+							ERROR				= STOPPED;
+						}else{
+							CHECK_WAIT			= 1;
+							CHECKING			= 2;
+							DOWNLOADING			= 4;
+							QUEUED_INCOMPLETE	= 5;
+							QUEUED_COMPLETE		= 9;
+							STOPPED				= 16;
+							SEEDING				= 8;
+							ERROR				= 0;
+						}
+						
+						int	status_int;
 						
 						if ( download.isPaused()){
 							
-							status_int = 16;
+							status_int = STOPPED;
 														
 						}else{
 							int state = download.getState();
 							
 							if ( state == Download.ST_DOWNLOADING ){
 								
-								status_int = 4;
+								status_int = DOWNLOADING;
 								
 							}else if ( state == Download.ST_SEEDING ){
 								
-								status_int = 8;
+								status_int = SEEDING;
 								
 							}else if ( state == Download.ST_QUEUED ){
 
 								if ( download.isComplete()){
 									
-									status_int = 9;
+									status_int = QUEUED_COMPLETE;
 									
 								}else{
 									
-									status_int = 5;
+									status_int = QUEUED_INCOMPLETE;
 								}
 							}else if ( state == Download.ST_STOPPED || state == Download.ST_STOPPING ){
 								
-								status_int = 16;
+								status_int = STOPPED;
 								
 							}else if ( state == Download.ST_ERROR ){
 								
-								status_int = 0;
+								status_int = ERROR;
 								
 							}else{
 								
 								if ( core_download.getState() == DownloadManager.STATE_CHECKING ){
 								
-									status_int = 2;
+									status_int = CHECKING;
 									
 								}else{
 									
-									status_int = 1;
+									status_int = CHECK_WAIT;
 								}
 							}
 						}
+						
 						value = new Long(status_int);
 					}else if ( field.equals( "swarmSpeed" )){	
 						value = new Long( core_download.getStats().getTotalAveragePerPeer());
@@ -1479,6 +1549,47 @@ XMWebUIPlugin
 						}
 						
 						value = stats_list;
+						
+					}else if ( field.equals( "isFinished" )){			// 2.71
+						value = FALSE;
+						
+					}else if ( field.equals( "isStalled" )){			// 2.71
+						value = FALSE;
+						
+					}else if ( field.equals( "percentDone" )){			// 2.71
+						value = 0;
+					}else if ( field.equals( "activityDate" )){			// 2.71
+						value = 0;
+					}else if ( field.equals( "corruptEver" )){			// 2.71
+						value = 0;
+					}else if ( field.equals( "desiredAvailable" )){		// 2.71
+						value = 0;
+					}else if ( field.equals( "webseedsSendingToUs" )){	// 2.71
+						value = 0;
+					}else if ( field.equals( "startDate" )){			// 2.71
+						value = 0;
+					}else if ( field.equals( "trackerStats" )){			// 2.71
+						
+						JSONArray	tracker_stats = new JSONArray();
+						
+						value = tracker_stats;
+						
+					}else if ( field.equals( "peers" )){				// 2.71
+						
+						JSONArray	peers = new JSONArray();
+						
+						value = peers;
+						
+					}else if ( field.equals( "queuePosition" )){		// 2.71
+						
+						value = core_download.getPosition();
+						
+					}else if ( field.equals( "trackers" )){				// 2.71
+						
+						JSONArray	trackers = new JSONArray();
+						
+						value = trackers;
+						
 					}else{
 						System.out.println( "Unhandled get-torrent field: " + field );
 					}
