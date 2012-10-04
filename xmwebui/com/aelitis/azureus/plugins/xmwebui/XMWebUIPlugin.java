@@ -112,6 +112,8 @@ XMWebUIPlugin
     private RemSearchPluginPageGenerator	search_handler;
     private TimerEventPeriodic				search_timer;
     
+    private boolean							check_ids_outstanding = true;
+    
     public
     XMWebUIPlugin()
     {
@@ -323,7 +325,12 @@ XMWebUIPlugin
 	{
 		synchronized( recently_removed ){
 			
-			recently_removed.add( getID( download ));
+			long id = getID( download, false );
+			
+			if ( id > 0 ){
+			
+				recently_removed.add( id );
+			}
 		}
 	}
 	
@@ -802,6 +809,8 @@ XMWebUIPlugin
 			
 			float stop_ratio = COConfigurationManager.getFloatParameter( "Stop Ratio" );
 			
+			String az_mode = plugin_interface.getUtilities().getFeatureManager().isFeatureInstalled( "core" )?"plus":"trial";
+			
 			result.put( "alt-speed-down", new Long( 0 ) );				// number     max global download speed (in K/s)
 			result.put( "alt-speed-enabled", FALSE );       			// boolean    true means use the alt speeds
 			result.put( "alt-speed-time-begin",  new Long( 0 ));     	// number     when to turn on alt speeds (units: minutes after midnight)
@@ -831,6 +840,7 @@ XMWebUIPlugin
 			result.put( "speed-limit-up-enabled", up_limit==0?FALSE:TRUE );   		// boolean    true means enabled
 			result.put( "version", plugin_interface.getPluginVersion() );           // string     
 			result.put( "az-version", Constants.AZUREUS_VERSION );                  // string     
+			result.put( "az-mode", az_mode );										// string
 			
 		}else if ( method.equals( "torrent-add" )){
 			
@@ -875,7 +885,7 @@ XMWebUIPlugin
 
 			JSONObject torrent_details = new JSONObject();
 			
-			torrent_details.put( "id", new Long( getID( download )));
+			torrent_details.put( "id", new Long( getID( download, true )));
 			torrent_details.put( "name", escapeXML( download.getName()));
 			torrent_details.put( "hashString", ByteFormatter.encodeString( torrent.getHash()));
 			
@@ -987,9 +997,16 @@ XMWebUIPlugin
 					
 					synchronized( recently_removed ){
 					
-						recently_removed.add( getID( download ));
+						long id = getID( download, false );
+						
+						if ( id > 0 ){
+						
+							recently_removed.add( id );
+						}
 					}
 				}catch( Throwable e ){
+					
+					Debug.out( "Failed to remove download '" + download.getName() + "'", e );
 				}
 			}
 		}else if ( method.equals( "torrent-set" )){
@@ -1287,7 +1304,7 @@ XMWebUIPlugin
 					}else if ( field.equals( "haveValid" )){
 						value = new Long( stats.getDownloaded());
 					}else if ( field.equals( "id" )){		
-						value = new Long( getID( download ));
+						value = new Long( getID( download, true ));
 					}else if ( field.equals( "trackerSeeds" )){
 						DownloadScrapeResult scrape = download.getLastScrapeResult();
 						value = new Long( scrape==null?0:scrape.getSeedCount());
@@ -1537,7 +1554,7 @@ XMWebUIPlugin
 				
 			}else{
 				
-				long	id = getID( download );
+				long	id = getID( download, true );
 				
 				if ( selected_ids.contains( id )){
 					
@@ -1557,6 +1574,27 @@ XMWebUIPlugin
 				}
 			}
 		}
+		
+		Collections.sort(
+			downloads,
+			new Comparator<Download>()
+			{
+				public int 
+				compare(
+					Download arg0, 
+					Download arg1 )
+				{
+					long res = getID( arg0, true ) - getID( arg1, true );
+					
+					if ( res < 0 ){
+						return( -1 );
+					}else if ( res > 0 ){
+						return( 1 );
+					}else{
+						return( 0 );
+					}
+				}		
+			});
 		
 		return( downloads );
 	}
@@ -1585,17 +1623,68 @@ XMWebUIPlugin
 	
 	protected long
 	getID(
-		Download		d )
+		Download		download,
+		boolean			allocate_if_new )
 	{
+		synchronized( this ){
+			
+			if ( check_ids_outstanding ){
+				
+				check_ids_outstanding = false;
+				
+				Download[] all_downloads = plugin_interface.getDownloadManager().getDownloads();
+
+				Set<Long>	all_ids = new HashSet<Long>();
+				
+				List<Download>	dups = new ArrayList<Download>();
+				
+				long	max_id = 0;
+				
+				for( Download d: all_downloads ){
+					
+					long	id = getID( d, false );
+					
+					if ( id <= 0 ){
+						
+						continue;
+					}
+					
+					max_id = Math.max( max_id, id );
+					
+					if ( all_ids.contains( id )){
+					
+						dups.add( d );
+						
+					}else{
+						
+						all_ids.add( id );
+					}
+				}
+				
+				PluginConfig config = plugin_interface.getPluginconfig();
+					
+				long	next_id = max_id + 1;
+				
+				for ( Download d: dups ){
+					
+					//System.out.println( "Fixed duplicate id " + getID( d, false ) + " for " + d.getName());
+					
+					d.setLongAttribute( t_id, next_id++ );
+				}
+				
+				config.setPluginParameter( "xmui.next.id", next_id );
+
+			}
+		}
 			
 			// I was trying to be clever and allocate unique ids for downloads. however,
 			// the webui assumes they are consecutive and give a queue index. ho hum
 			
 		// return( d.getIndex());
 		
-		long id = d.getLongAttribute( t_id );
+		long id = download.getLongAttribute( t_id );
 			
-		if ( id == 0 ){
+		if ( id == 0 && allocate_if_new ){
 		
 			synchronized( this ){
 				
@@ -1606,8 +1695,10 @@ XMWebUIPlugin
 				config.setPluginParameter( "xmui.next.id", id + 1 );
 			}
 			
-			d.setLongAttribute( t_id, id );
+			download.setLongAttribute( t_id, id );
 		}
+		
+		//System.out.println( download.getName() + " -> " + id );
 		
 		return( id );
 	}

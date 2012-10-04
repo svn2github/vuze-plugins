@@ -1,5 +1,16 @@
 var vz = window.vz || {}
 
+vz.mode = "trial"
+
+vz.updatePrefs = function( prefs ){
+	var az_mode = prefs["az-mode"];
+	if ( typeof az_mode == 'undefined' ){
+		vz.mode = "trial";
+	}else{
+		vz.mode = az_mode;
+	}
+}
+
 vz.searchQuery = null;
 
 vz.validateSearch = function(str){
@@ -12,7 +23,7 @@ vz.validateSearch = function(str){
 vz.executeSearch = function(){
     var search_input = $("#search_input").get(0).value
     if(! vz.validateSearch( search_input ) ) return;
-    var search_url = "http://search.vuze.com/xsearch/?q=" + search_input + "&search_source=" + escape(window.location.href)
+    var search_url = "http://search.vuze.com/xsearch/?q=" + search_input + "&mode=" + vz.mode + "&search_source=" + escape(window.location.href)
     //$("#remotesearch_container").html("<iframe id='remotesearch'></iframe>")
     //$("#remotesearch").attr({src: search_url})
     if( vz.searchQuery != search_url ) {

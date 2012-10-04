@@ -946,6 +946,9 @@ Transmission.prototype =
 
 		this[Prefs._TurtleState] = prefs[RPC._TurtleState];
 		this.updateTurtleButton();
+		
+		 /* VUZE */
+		 vz.updatePrefs( prefs );
 	},
 
 	setSearch: function( search ) {
