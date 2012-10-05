@@ -782,11 +782,17 @@ UPnPMediaServer
 			
 			if ( enabled ){
 				
-				log( "Creating UPnP mapping: port=" + port + ", name='" + name + "'"  );
-				
-				((UPnPPlugin)pi_upnp.getPlugin()).addMapping( name, true, port, true );
-				
-				config.setPluginParameter( key, port );
+				if ( port == 0 ){
+					
+					log( "Invalid port for UPnP mapping, ignoring" );
+					
+				}else{
+					log( "Creating UPnP mapping: port=" + port + ", name='" + name + "'"  );
+					
+					((UPnPPlugin)pi_upnp.getPlugin()).addMapping( name, true, port, true );
+					
+					config.setPluginParameter( key, port );
+				}
 			}
 		}
 	}
@@ -838,8 +844,31 @@ UPnPMediaServer
 		
 			info.setValue( String.valueOf( active_port));
 			
-			if ( !init ){
+			if ( init ){
 			
+				plugin_interface.addListener(
+					new PluginListener()
+					{
+						public void
+						initializationComplete()
+						{
+							plugin_interface.removeListener( this );
+							
+							doContentUPnP();
+						}
+						
+						public void
+						closedownInitiated()
+						{
+						}
+						
+						public void
+						closedownComplete()
+						{	
+						}
+					});
+			}else{
+				
 				doContentUPnP();
 			}
 		}catch( Throwable e ){
