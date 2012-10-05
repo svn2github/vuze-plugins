@@ -549,7 +549,7 @@ SBC_RCMView
 				TABLE_RCM,
 				TABLE_RCM, 
 				new TableColumnCore[0], 
-				ColumnRC_New.COLUMN_ID, 
+				ColumnRC_Rank.COLUMN_ID, 
 				SWT.MULTI | SWT.FULL_SELECTION | SWT.VIRTUAL );
 		if (txtFilter != null) {
 			tv_related_content.enableFilterCheck(txtFilter, this);

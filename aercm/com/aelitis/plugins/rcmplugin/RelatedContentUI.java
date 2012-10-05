@@ -41,11 +41,7 @@ import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.tables.TableContextMenuItem;
 import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.plugins.ui.tables.TableRow;
-import org.gudy.azureus2.plugins.utils.search.SearchProvider;
 import org.gudy.azureus2.ui.swt.Utils;
-import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
-import org.gudy.azureus2.ui.swt.plugins.UISWTViewEvent;
-import org.gudy.azureus2.ui.swt.plugins.UISWTViewEventListener;
 import org.gudy.azureus2.ui.swt.shells.CoreWaiterSWT;
 import org.gudy.azureus2.ui.swt.shells.MessageBoxShell;
 
@@ -533,6 +529,25 @@ RelatedContentUI
 						main_view_info, null, true, null  );
 
 				mdiEntry.setImageLeftID( "image.sidebar.rcm" );
+				
+				PluginConfig plugin_config = plugin_interface.getPluginconfig();
+				
+				if ( plugin_config.getPluginBooleanParameter( "rcm.sidebar.initial.show", true )){
+					
+					String parent_id = mdiEntry.getParentID();
+				
+					if ( parent_id != null ){
+					
+						MdiEntry parent = mdi.getEntry( parent_id );
+						
+						if ( parent != null ){
+							
+							parent.setExpanded( true );
+							
+							plugin_config.setPluginParameter( "rcm.sidebar.initial.show", false );
+						}
+					}
+				}
 				
 				mdiEntry.setDatasource(
 					new RelatedContentEnumerator()

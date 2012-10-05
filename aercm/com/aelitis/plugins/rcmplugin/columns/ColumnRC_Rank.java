@@ -44,7 +44,11 @@ public class ColumnRC_Rank
 		column.setType(TableColumn.TYPE_TEXT_ONLY);
 		
 		if ( column instanceof TableColumnCore ){
-			((TableColumnCore)column).setUseCoreDataSource( true );
+			TableColumnCore core_column = (TableColumnCore)column;
+			
+			core_column.setUseCoreDataSource( true );
+			
+			core_column.setDefaultSortAscending( false );
 		}
 	}
 
