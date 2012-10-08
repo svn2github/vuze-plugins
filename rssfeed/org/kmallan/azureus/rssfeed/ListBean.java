@@ -150,7 +150,14 @@ public class ListBean implements Serializable {
   }
 
   public void setState(int state) {
-    if(checkDone()) return;
+    if(checkDone()){
+    		// couple of cases where we want to pick up the new state as these can happen
+    		// after the download of the torrent is complete...
+    	if ( state != DOWNLOAD_FAIL && state != DOWNLOAD_EXCL ){
+    	
+    		return;
+    	}
+    }
     this.state = state;
   }
 

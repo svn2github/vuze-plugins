@@ -37,6 +37,9 @@ public class FilterBean implements Serializable {
   private String exprLower;
   private Pattern exprPat;
 
+  private long	minTorrentSize;
+  private long  maxTorrentSize;
+  
   public static Pattern epsnnenn_snnenn = Pattern.compile("(.*?)" + "s([0-9]+)e([0-9]+)[\\-\\+]s([0-9]+)e([0-9]+)" + ".*?");
   public static Pattern epsnnenn_enn = Pattern.compile("(.*?)" + "s([0-9]+)e([0-9]+)[\\-\\+]e([0-9]+)" + ".*?");
   public static Pattern epsnnenn_nn = Pattern.compile("(.*?)" + "s([0-9]+)e([0-9]+)[\\-\\+]([0-9]+)" + ".*?");
@@ -387,5 +390,31 @@ public class FilterBean implements Serializable {
 
   public void setUseSmartHistory(boolean smartHistory) {
     this.smartHistory = smartHistory;
+  }
+  
+  public long
+  getMinTorrentSize()
+  {
+	  return( minTorrentSize );
+  }
+  
+  public void
+  setMinTorrentSize(
+	long		l )
+  {
+	  minTorrentSize = l;
+  }
+  
+  public long
+  getMaxTorrentSize()
+  {
+	  return( maxTorrentSize );
+  }
+  
+  public void
+  setMaxTorrentSize(
+	long		l )
+  {
+	  maxTorrentSize = l;
   }
 }

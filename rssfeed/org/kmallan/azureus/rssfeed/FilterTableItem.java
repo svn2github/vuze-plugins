@@ -121,6 +121,8 @@ public class FilterTableItem extends TableItem {
         }
       }
 
+    view.setMinTorrentSize( data.getMinTorrentSize());
+    view.setMaxTorrentSize( data.getMaxTorrentSize());
     view.filtParamShow();
   }
 
@@ -175,6 +177,8 @@ public class FilterTableItem extends TableItem {
     }
     data.setEnabled(view.filtEnabled.getSelection());
     data.setMode(view.filtMode.getText());
+    data.setMinTorrentSize(view.getMinTorrentSize());
+    data.setMaxTorrentSize(view.getMaxTorrentSize());
     return data;
   }
 

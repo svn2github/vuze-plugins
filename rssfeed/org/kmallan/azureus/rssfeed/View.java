@@ -28,6 +28,7 @@ import org.eclipse.swt.widgets.*;
 import org.gudy.azureus2.core3.config.*;
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.Constants;
+import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.torrent.Torrent;
@@ -71,7 +72,7 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
   public Button btnUrlStoreDir, urlObeyTTL, urlLocRef, urlUseCookie;
 
   public Composite filtRatesCustom, filtRatesNone;
-  public Text filtName, filtStoreDir, filtExpression, filtRateUpload, filtRateDownload, filtCategory, filtStartSeason, filtStartEpisode, filtEndSeason, filtEndEpisode, filtTestMatch;
+  public Text filtName, filtStoreDir, filtExpression, filtRateUpload, filtRateDownload, filtCategory, filtStartSeason, filtStartEpisode, filtEndSeason, filtEndEpisode, filtTestMatch, filtMinTorrentSize, filtMaxTorrentSize;
   public Button filtIsRegex, filtMatchTitle, filtMatchLink, filtMoveTop, filtRateUseCustom, filtRename, filtRenameEppTitle, filtDisable, filtCleanup, filtEnabled, filtSmartHist;
   public Combo filtState, filtPriority, filtType, filtMode, filtFeed;
 
@@ -434,12 +435,34 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
     Messages.setLanguageText(filtMatchTitle, "RSSFeed.Options.Filter.Options.filtMatch.Title");
     filtMatchLink = new Button(options, SWT.CHECK);
     Messages.setLanguageText(filtMatchLink, "RSSFeed.Options.Filter.Options.filtMatch.Link");
+    
     filtMoveTop = new Button(options, SWT.CHECK);
     Messages.setLanguageText(filtMoveTop, "RSSFeed.Options.Filter.Options.MoveTop");
     layoutData = new GridData();
     layoutData.horizontalSpan = 2;
     filtMoveTop.setLayoutData(layoutData);
 
+   		// min/max file size
+    
+    setupLabel(filtParamComp, "RSSFeed.Options.Filter.MinTorrentSize", 75);
+    Composite minOpts = setupComposite(filtParamComp, setupGridLayout(2, 4, 0, 0, 0), -1);
+
+    filtMinTorrentSize = new Text(minOpts, SWT.BORDER);
+    layoutData = new GridData();
+    layoutData.widthHint = 100;
+    filtMinTorrentSize.setLayoutData(layoutData);
+    setupLabel(minOpts, "RSSFeed.Options.Filter.TorrentSizeInfo", 200);
+
+    setupLabel(filtParamComp, "RSSFeed.Options.Filter.MaxTorrentSize", 75);
+    Composite maxOpts = setupComposite(filtParamComp, setupGridLayout(2, 4, 0, 0, 0), -1);
+
+    filtMaxTorrentSize = new Text(maxOpts, SWT.BORDER);
+    layoutData = new GridData();
+    layoutData.widthHint = 100;
+    filtMaxTorrentSize.setLayoutData(layoutData);
+    setupLabel(maxOpts, "RSSFeed.Options.Filter.TorrentSizeInfo", 200);
+
+    
     setupLabel(filtParamComp, "RSSFeed.Options.Filter.State", 75);
     filtState = new Combo(filtParamComp, SWT.DROP_DOWN | SWT.READ_ONLY);
     layoutData = new GridData();
@@ -688,6 +711,131 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
     getComposite().dispose();
   }
 
+  public void
+  setMinTorrentSize(
+	long	l )
+  {
+	  filtMinTorrentSize.setText( getSize( l ));
+  }
+  
+  public long
+  getMinTorrentSize()
+  {
+	  return( getSize( filtMinTorrentSize.getText()));
+  }
+  
+  public void
+  setMaxTorrentSize(
+	long	l )
+  {
+	  filtMaxTorrentSize.setText( getSize( l ));
+  }
+  
+  public long
+  getMaxTorrentSize()
+  {
+	  return( getSize( filtMaxTorrentSize.getText()));
+  }
+  
+  private String
+  getSize(
+	long	l )
+  {
+	  if ( l == 0 ){
+		  return( "" );
+	  }
+	  
+	  if ( l % 1024 == 0 ){
+		  
+		  l = l/1024;
+		  
+		  if ( l % 1024 == 0 ){
+			  
+			  l = l/1024;
+			  
+			  if ( l % 1024 == 0 ){
+				  
+				  l = l/1024;
+				  
+				  
+				  return( l + " GB" );
+			  }else{
+				  
+				  return( l + " MB" );
+			  }
+		  }else{
+			  
+			  return( l + " KB" );
+		  }
+	  }else{
+		  
+		  return( l + " B" );
+	  }
+  }
+  
+  private long
+  getSize(
+	String	text )
+  {
+	  text = text.trim().toLowerCase();
+	  	  
+	  String num 	= "";
+	  String chars 	= "";
+	  
+	  for ( char c: text.toCharArray()){
+		  
+		  if ( Character.isDigit( c ) && chars.length() == 0 ){
+			  
+			  num += c;
+		  }else{
+			  
+			  chars += c;
+		  }
+	  }
+	  
+	  if ( num.length() == 0 ){
+		  
+		  return( 0 );
+	  }
+	  
+	  try{
+		  long size = Long.parseLong( num );
+	  
+		  chars = chars.trim();
+		  
+		  if ( chars.length() > 0 ){
+			  
+			  char c = chars.charAt(0);
+			  
+			  if ( c == 'b' ){
+				  
+			  }else if ( c == 'k' ){
+				  
+				  size *= 1024;
+				  
+			  }else if ( c == 'm' ){
+				  
+				  size *= 1024*1024;
+				  
+			  }else if ( c == 'g' ){
+				  
+				  size *= 1024*1024*1024L;
+				  
+			  }else{
+				  
+			  }
+		  }
+		  
+		  return( size );
+		  
+	  }catch( Throwable e ){
+		  
+		  Debug.out( "Invalid size: " + text );
+	  }
+	  
+	  return( 0 );
+  }
+  
   public void getConfig() {
     UrlTableItem urlItem;
     FilterTableItem filterItem;

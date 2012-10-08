@@ -85,68 +85,82 @@ public class TorrentDownloader {
         if(torrentLocation == null) return false;
         Torrent curTorrent = torrentManager.createFromBEncodedFile(torrentLocation);
 
-        String storeFile = null;
-        if((curTorrent.getFiles()).length == 1) storeFile = curTorrent.getName();
-
-        String defaultPath = "";
-        if(filterBean != null && filterBean.getStoreDir().length() > 0) {
-          defaultPath = filterBean.getStoreDir();
-        } else if(urlBean != null && urlBean.getStoreDir().length() > 0) {
-          defaultPath = urlBean.getStoreDir();
-        } else if(COConfigurationManager.getBooleanParameter("Use default data dir", true)) {
-          defaultPath = COConfigurationManager.getStringParameter("Default save path", "");
+        long	minSize = filterBean.getMinTorrentSize();
+        long	maxSize = filterBean.getMaxTorrentSize();
+        long	torrentSize = curTorrent.getSize();
+        
+        if ( minSize != 0 && minSize > torrentSize ){
+            listBean.setState(ListBean.DOWNLOAD_EXCL);
+            ret = false;
         }
-
-        if(defaultPath.length() > 0) {
-          File dataLocation = setFile(defaultPath, storeFile);
-
-          final Download download = addTorrent(curTorrent, torrentLocation, dataLocation);
-          ret = (download != null);
-          Plugin.debugOut("ret: " + ret + " download: " + download);
-
-          if(ret) {
-            if(filterBean != null) {
-              view.histAdd(listBean, download, dataLocation, filterBean);
-              try {
-								if (filterBean.getMoveTop()) {
-									for (int iLoop = 1; iLoop <= download.getIndex(); iLoop++) {
-										download.moveUp();
+        if ( maxSize != 0 && maxSize < torrentSize ){
+            listBean.setState(ListBean.DOWNLOAD_EXCL);
+            ret = false;
+        }
+        if ( ret ){
+	        String storeFile = null;
+	        if((curTorrent.getFiles()).length == 1) storeFile = curTorrent.getName();
+	
+	        String defaultPath = "";
+	        if(filterBean != null && filterBean.getStoreDir().length() > 0) {
+	          defaultPath = filterBean.getStoreDir();
+	        } else if(urlBean != null && urlBean.getStoreDir().length() > 0) {
+	          defaultPath = urlBean.getStoreDir();
+	        } else if(COConfigurationManager.getBooleanParameter("Use default data dir", true)) {
+	          defaultPath = COConfigurationManager.getStringParameter("Default save path", "");
+	        }
+	
+	        if(defaultPath.length() > 0) {
+	          File dataLocation = setFile(defaultPath, storeFile);
+	
+	          final Download download = addTorrent(curTorrent, torrentLocation, dataLocation);
+	          ret = (download != null);
+	          Plugin.debugOut("ret: " + ret + " download: " + download);
+	
+	          if(ret) {
+	            if(filterBean != null) {
+	              view.histAdd(listBean, download, dataLocation, filterBean);
+	              try {
+									if (filterBean.getMoveTop()) {
+										for (int iLoop = 1; iLoop <= download.getIndex(); iLoop++) {
+											download.moveUp();
+										}
 									}
-								}
-
-								if (Constants.compareVersions(Constants.getBaseVersion(),
-										"2.2.0.0") >= 0) {
-									if (filterBean.getRateUseCustom()) {
-										download.setUploadRateLimitBytesPerSecond(filterBean.getRateUpload() * 1024);
+	
+									if (Constants.compareVersions(Constants.getBaseVersion(),
+											"2.2.0.0") >= 0) {
+										if (filterBean.getRateUseCustom()) {
+											download.setUploadRateLimitBytesPerSecond(filterBean.getRateUpload() * 1024);
+										}
+									} else {
+										download.setPriority(filterBean.getPriority());
 									}
-								} else {
-									download.setPriority(filterBean.getPriority());
+	
+									switch (filterBean.getState()) {
+										case 1:
+											download.setForceStart(true);
+											break;
+										case 2:
+											download.stop();
+											break;
+									}
+									if (filterBean.getRateUseCustom())
+										download.setMaximumDownloadKBPerSecond(filterBean.getRateDownload());
+									if (filterBean.getCategory().length() > 0)
+										download.setCategory(filterBean.getCategory());
+								} catch (NoSuchMethodError e) {
+									/** < Azureus 2.1.0.5 **/
+								} catch (Exception e) {
 								}
-
-								switch (filterBean.getState()) {
-									case 1:
-										download.setForceStart(true);
-										break;
-									case 2:
-										download.stop();
-										break;
-								}
-								if (filterBean.getRateUseCustom())
-									download.setMaximumDownloadKBPerSecond(filterBean.getRateDownload());
-								if (filterBean.getCategory().length() > 0)
-									download.setCategory(filterBean.getCategory());
-							} catch (NoSuchMethodError e) {
-								/** < Azureus 2.1.0.5 **/
-							} catch (Exception e) {
-							}
-            } else {
-              if(!Plugin.getBooleanParameter("AutoStartManual")) download.stop();
-              view.histAdd(listBean, download, dataLocation);
-            }
-          }
-        } else {
-          ret = false;
-          err = "No Default Data Directory Set (Options > Files > Save to default data directory)";
+	            } else {
+	              if(!Plugin.getBooleanParameter("AutoStartManual")) download.stop();
+	              view.histAdd(listBean, download, dataLocation);
+	            }
+	          }
+	        } else {
+	          ret = false;
+	          err = "No Default Data Directory Set (Options > Files > Save to default data directory)";
+	        }
         }
       } else {
         ret = false;
@@ -159,7 +173,9 @@ public class TorrentDownloader {
       ret = false;
     }
     if(!ret) {
-      listBean.setState(ListBean.DOWNLOAD_FAIL);
+    	if ( listBean.getState() != ListBean.DOWNLOAD_EXCL ){
+    		listBean.setState(ListBean.DOWNLOAD_FAIL);
+    	}
       if(!"".equals(err)) listBean.setError(err);
     }
 
