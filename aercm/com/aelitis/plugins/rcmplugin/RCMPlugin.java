@@ -156,6 +156,11 @@ RCMPlugin
 		if ( isRCMEnabled() != enabled ){
 			
 			COConfigurationManager.setParameter( "rcm.overall.enabled", enabled );
+						
+			hookSearch();
+			
+			updatePluginInfo();
+
 			return true;
 		}
 		
@@ -170,9 +175,13 @@ RCMPlugin
 
 	protected void
 	setFTUXBeenShown(
-			boolean b )
+		boolean b )
 	{
 		plugin_interface.getPluginconfig().setPluginParameter( "rcm.ftux.shown", b );
+				
+		hookSearch();
+		
+		updatePluginInfo();
 	}
 	
 	protected boolean
@@ -183,7 +192,7 @@ RCMPlugin
 	
 	protected void
 	hookSearch()
-	{
+	{		
 		boolean enable = isRCMEnabled() && isSearchEnabled() && hasFTUXBeenShown();
 		
 		try{

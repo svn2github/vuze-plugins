@@ -311,7 +311,6 @@ RelatedContentUI
 			enable_search.addListener(new ParameterListener() {
 				public void parameterChanged(Parameter param) {
 					plugin.hookSearch();
-					plugin.updatePluginInfo();
 				}
 			});
 
