@@ -909,7 +909,18 @@ SBC_RCMView
 						assoc_item.setEnabled( false );
 					}
 
-					MenuItem item = new MenuItem(menu, SWT.PUSH);
+					MenuItem item;
+					item = new MenuItem(menu, SWT.PUSH);
+					item.setText(MessageText.getString("rcm.menu.google.hash"));
+					item.addSelectionListener(new SelectionAdapter() {
+						public void widgetSelected(SelectionEvent e) {
+							String s = ByteFormatter.encodeString(related_content[0].getHash());
+							String URL = "https://google.com/search?q=" + UrlUtils.encode(s);
+							launchURL(URL);
+						};
+					});
+
+					item = new MenuItem(menu, SWT.PUSH);
 					item.setText(MessageText.getString("rcm.menu.gis"));
 					item.addSelectionListener(new SelectionAdapter() {
 						public void widgetSelected(SelectionEvent e) {
