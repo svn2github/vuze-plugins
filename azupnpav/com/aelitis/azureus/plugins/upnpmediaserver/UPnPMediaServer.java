@@ -81,6 +81,7 @@ import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.plugins.ui.tables.TableRow;
 import org.gudy.azureus2.plugins.utils.DelayedTask;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
+import org.gudy.azureus2.plugins.utils.PowerManagementListener;
 import org.gudy.azureus2.plugins.utils.UTTimer;
 import org.gudy.azureus2.plugins.utils.UTTimerEvent;
 import org.gudy.azureus2.plugins.utils.UTTimerEventPerformer;
@@ -115,7 +116,7 @@ import com.aelitis.azureus.plugins.upnpmediaserver.UPnPMediaServerContentDirecto
 
 public class 
 UPnPMediaServer 
-	implements UnloadablePlugin, AzureusContentDirectoryListener
+	implements UnloadablePlugin, AzureusContentDirectoryListener, PowerManagementListener
 {
 	private static final int		HTTP_PORT_DEFAULT				= 6901;
 	
@@ -250,6 +251,8 @@ UPnPMediaServer
 	private boolean					use_categories;
 	private BooleanParameter		show_percent_done;
 	private BooleanParameter		show_eta;
+	
+	private BooleanParameter 		prevent_sleep_param;
 	
 	private UPnPMediaServerContentDirectory	content_directory;
 	
@@ -523,6 +526,17 @@ UPnPMediaServer
 			
 			speed_max_kb_sec = config_model.addIntParameter2( "upnpmediaserver.stream.speed_max_kbs", "upnpmediaserver.stream.speed_max_kbs", 0, 0, Integer.MAX_VALUE );
 
+			boolean supports_sleep = plugin_interface.getUtilities().supportsPowerStateControl( PowerManagementListener.ST_SLEEP );
+			
+			if ( supports_sleep ){
+				
+					// prevent sleep
+				
+				prevent_sleep_param = config_model.addBooleanParameter2("upnpmediaserver.prevent_sleep", "upnpmediaserver.prevent_sleep", true);
+			}
+			
+				// publish all media
+			
 			final BooleanParameter enable_publish_p = config_model.addBooleanParameter2( "upnpmediaserver.enable_publish", "upnpmediaserver.enable_publish", false );
 	
 			enable_lan_publish = enable_publish_p.getValue();
@@ -585,6 +599,7 @@ UPnPMediaServer
 							separate_by_category,
 							enable_publish_p,
 							speed_lab, speed_bit_rate_mult, speed_min_kb_sec, speed_max_kb_sec,
+							prevent_sleep_param,
 							main_auth, main_auth_ext_only, main_username, main_password,
 					});
 
@@ -637,7 +652,7 @@ UPnPMediaServer
 				
 				buildMenu();
 			}
-			
+						
 			ActionParameter print = config_model.addActionParameter2( "upnpmediaserver.printcd.label", "upnpmediaserver.printcd.button" );
 			
 			print.addListener(
@@ -679,7 +694,6 @@ UPnPMediaServer
 			createContentServer( active_port, true );
 			
 			content_directory = new UPnPMediaServerContentDirectory( this );
-	
 	
 			plugin_interface.addListener(
 				new PluginListener()
@@ -738,6 +752,11 @@ UPnPMediaServer
 					{
 					}
 				});
+			
+			if ( supports_sleep ){
+			
+				plugin_interface.getUtilities().addPowerManagementListener( this );
+			}
 		}finally{
 			
 			initialised	= true;
@@ -1479,6 +1498,12 @@ UPnPMediaServer
 				
 				azcd.removeListener( this );
 			}
+			
+			if ( plugin_interface != null ){
+			
+				plugin_interface.getUtilities().removePowerManagementListener( this );
+			}
+
 		}catch( Throwable e ){
 			
 			log( "Unload failed", e );
@@ -1582,6 +1607,40 @@ UPnPMediaServer
 		}
 		
 		return( filters );
+	}
+	
+	public String
+	getPowerName()
+	{
+		return( "MediaServer" );
+	}
+	
+	public boolean
+	requestPowerStateChange(
+		int		new_state,
+		Object	data )
+	{
+		if ( prevent_sleep_param != null && prevent_sleep_param.getValue()){
+			
+			UPnPMediaServerContentServer cs = content_server;
+
+			if ( cs != null ){
+				
+				if ( cs.getConnectionCount() > 0 ){
+					
+					return( false );
+				}
+			}
+		}
+		
+		return( true );
+	}
+
+	public void
+	informPowerStateChange(
+		int		new_state,
+		Object	data )
+	{
 	}
 	
 		// ***** plugin public interface starts
