@@ -708,7 +708,10 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
 
   public void delete() {
     isOpen = false;
-    getComposite().dispose();
+    Composite c = getComposite();
+    if ( c != null && !c.isDisposed()){
+    	c.dispose();
+    }
   }
 
   public void

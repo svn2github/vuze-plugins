@@ -85,17 +85,19 @@ public class TorrentDownloader {
         if(torrentLocation == null) return false;
         Torrent curTorrent = torrentManager.createFromBEncodedFile(torrentLocation);
 
-        long	minSize = filterBean.getMinTorrentSize();
-        long	maxSize = filterBean.getMaxTorrentSize();
-        long	torrentSize = curTorrent.getSize();
-        
-        if ( minSize != 0 && minSize > torrentSize ){
-            listBean.setState(ListBean.DOWNLOAD_EXCL);
-            ret = false;
-        }
-        if ( maxSize != 0 && maxSize < torrentSize ){
-            listBean.setState(ListBean.DOWNLOAD_EXCL);
-            ret = false;
+        if ( filterBean != null ){
+	        long	minSize = filterBean.getMinTorrentSize();
+	        long	maxSize = filterBean.getMaxTorrentSize();
+	        long	torrentSize = curTorrent.getSize();
+	        
+	        if ( minSize != 0 && minSize > torrentSize ){
+	            listBean.setState(ListBean.DOWNLOAD_EXCL);
+	            ret = false;
+	        }
+	        if ( maxSize != 0 && maxSize < torrentSize ){
+	            listBean.setState(ListBean.DOWNLOAD_EXCL);
+	            ret = false;
+	        }
         }
         if ( ret ){
 	        String storeFile = null;
