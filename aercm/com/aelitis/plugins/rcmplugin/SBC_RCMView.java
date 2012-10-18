@@ -25,6 +25,7 @@ import java.util.regex.Pattern;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.*;
+import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.layout.*;
 import org.eclipse.swt.program.Program;
 import org.eclipse.swt.widgets.*;
@@ -453,7 +454,7 @@ SBC_RCMView
 	{
 		super.skinObjectShown(skinObject, params);
 
-		RelatedContentUI ui = RelatedContentUI.getSingleton( null, null );
+		RelatedContentUI ui = RelatedContentUI.getSingleton();
 		if (ui != null && !ui.getPlugin().hasFTUXBeenShown()) {
 			 RelatedContentUI.showFTUX(getSkinObject("rcm-list"));
 		} else {
@@ -857,6 +858,10 @@ SBC_RCMView
 				}
 			});
 
+		RelatedContentUI ui = RelatedContentUI.getSingleton();
+		
+		final Image	swarm_image = ui==null?null:ui.getSwarmImage();
+		
 		tv_related_content.addMenuFillListener(
 			new TableViewSWTMenuFillListener() 
 			{
@@ -871,6 +876,11 @@ SBC_RCMView
 
 					final MenuItem assoc_item = new MenuItem(menu, SWT.PUSH);
 
+					if ( swarm_image != null && !swarm_image.isDisposed()){
+					
+						assoc_item.setImage( swarm_image );
+					}
+					
 					assoc_item.setText(MessageText.getString("rcm.menu.discovermore"));
 
 					final ArrayList<RelatedContent> assoc_ok = new ArrayList<RelatedContent>();
@@ -888,17 +898,20 @@ SBC_RCMView
 							
 							int	 i = 0;
 							
-							RelatedContentUI ui = RelatedContentUI.getSingleton( null, null );
+							RelatedContentUI ui = RelatedContentUI.getSingleton();
 							
-							for ( RelatedContent c: assoc_ok ){
-							
-								ui.addSearch( c.getHash(), c.getTitle());
+							if ( ui != null ){
 								
-								i++;
+								for ( RelatedContent c: assoc_ok ){
 								
-								if ( i > 8 ){
+									ui.addSearch( c.getHash(), c.getTitle());
 									
-									break;
+									i++;
+									
+									if ( i > 8 ){
+										
+										break;
+									}
 								}
 							}
 						};

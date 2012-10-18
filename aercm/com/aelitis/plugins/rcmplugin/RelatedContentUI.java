@@ -22,6 +22,7 @@ package com.aelitis.plugins.rcmplugin;
 
 import java.util.*;
 
+import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.TreeItem;
 
@@ -32,6 +33,7 @@ import org.gudy.azureus2.plugins.PluginConfig;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.torrent.Torrent;
+import org.gudy.azureus2.plugins.ui.Graphic;
 import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.config.*;
 import org.gudy.azureus2.plugins.ui.menus.MenuItem;
@@ -42,6 +44,7 @@ import org.gudy.azureus2.plugins.ui.tables.TableContextMenuItem;
 import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.plugins.ui.tables.TableRow;
 import org.gudy.azureus2.ui.swt.Utils;
+import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 import org.gudy.azureus2.ui.swt.shells.CoreWaiterSWT;
 import org.gudy.azureus2.ui.swt.shells.MessageBoxShell;
 
@@ -71,24 +74,32 @@ RelatedContentUI
 	private static RelatedContentUI		singleton;
 	
 	public synchronized static RelatedContentUI
+	getSingleton()
+	{
+		return( getSingleton( null, null, null ));
+	}
+	
+	public synchronized static RelatedContentUI
 	getSingleton(
 		PluginInterface		pi,
+		UISWTInstance		ui,
 		RCMPlugin			plugin )
 	{
 		if ( singleton == null || singleton.isDestroyed()){
 			
-			if ( pi == null || plugin == null ){
+			if ( pi == null || ui == null || plugin == null ){
 				
 				return( null );
 			}
 			
-			singleton = new RelatedContentUI( pi, plugin );
+			singleton = new RelatedContentUI( pi, ui, plugin );
 		}
 		
 		return( singleton );
 	}
 	
 	private PluginInterface		plugin_interface;
+	private UISWTInstance		swt_ui;
 	private RCMPlugin			plugin;
 	
 	private BasicPluginConfigModel 	config_model;
@@ -100,6 +111,8 @@ RelatedContentUI
 	
 	private boolean			ui_setup;
 	private boolean			root_menus_added;
+	
+	private Image			swarm_image;
 	
 	private List<TableContextMenuItem>	menus = new ArrayList<TableContextMenuItem>();
 		
@@ -115,9 +128,11 @@ RelatedContentUI
 	private 
 	RelatedContentUI(
 		PluginInterface	_plugin_interface, 
+		UISWTInstance	_ui,
 		RCMPlugin		_plugin )
 	{
 		plugin_interface	= _plugin_interface;
+		swt_ui				= _ui;
 		plugin				= _plugin;
 		
 		CoreWaiterSWT.waitForCoreRunning(
@@ -136,6 +151,12 @@ RelatedContentUI
 	getPlugin()
 	{
 		return( plugin );
+	}
+	
+	protected Image
+	getSwarmImage()
+	{
+		return( swarm_image );
 	}
 	
 	protected void
@@ -218,8 +239,8 @@ RelatedContentUI
 			return;
 		}
 		
-		
-		
+		swarm_image = swt_ui.loadImage( "org/gudy/azureus2/ui/icons/rcm.png" );
+	
 		MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
 		
 		if ( mdi != null ){
@@ -463,7 +484,8 @@ RelatedContentUI
 		
 		menu_items = new TableContextMenuItem[table_ids.length];
 		
-		for (int i = 0; i < table_ids.length; i++) {
+		for (int i = 0; i < table_ids.length; i++){ 
+			
 			String table_id = table_ids[i];
 			
 			menu_items[i] = table_manager.addContextMenuItem( table_id, "rcm.contextmenu.lookupassoc");
@@ -472,6 +494,13 @@ RelatedContentUI
 			
 			menu_items[i].setStyle( TableContextMenuItem.STYLE_PUSH );
 
+			if ( swarm_image != null && !swarm_image.isDisposed()){
+				
+				Graphic menu_icon = swt_ui.createGraphic( swarm_image );
+
+				menu_items[i].setGraphic( menu_icon );
+			}
+			
 			MenuItemListener listener = 
 				new MenuItemListener()
 				{
@@ -1867,7 +1896,7 @@ RelatedContentUI
 				}
 
 
-				RelatedContentUI ui = RelatedContentUI.getSingleton( null, null );
+				RelatedContentUI ui = RelatedContentUI.getSingleton();
 
 				if (ui != null) {
 					if (enabled) {

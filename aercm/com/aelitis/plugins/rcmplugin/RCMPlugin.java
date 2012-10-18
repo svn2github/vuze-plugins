@@ -101,7 +101,7 @@ RCMPlugin
 								return;
 							}
 
-							ui = RelatedContentUI.getSingleton( plugin_interface, RCMPlugin.this );
+							ui = RelatedContentUI.getSingleton( plugin_interface, (UISWTInstance)instance, RCMPlugin.this );
 						}
 					}
 				}
