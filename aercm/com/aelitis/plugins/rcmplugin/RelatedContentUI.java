@@ -480,6 +480,8 @@ RelatedContentUI
 				TableManager.TABLE_MYTORRENTS_ALL_BIG,
 				TableManager.TABLE_MYTORRENTS_COMPLETE_BIG,
 				TableManager.TABLE_MYTORRENTS_INCOMPLETE_BIG,
+				TableManager.TABLE_MYTORRENTS_UNOPENED,
+				TableManager.TABLE_MYTORRENTS_UNOPENED_BIG,
 		};
 		
 		menu_items = new TableContextMenuItem[table_ids.length];
