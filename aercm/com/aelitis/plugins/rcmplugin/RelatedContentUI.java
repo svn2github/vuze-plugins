@@ -22,7 +22,9 @@ package com.aelitis.plugins.rcmplugin;
 
 import java.util.*;
 
+import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Image;
+import org.eclipse.swt.widgets.MessageBox;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.TreeItem;
 
@@ -34,6 +36,8 @@ import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.torrent.Torrent;
 import org.gudy.azureus2.plugins.ui.Graphic;
+import org.gudy.azureus2.plugins.ui.UIInputReceiver;
+import org.gudy.azureus2.plugins.ui.UIInputReceiverListener;
 import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.config.*;
 import org.gudy.azureus2.plugins.ui.menus.MenuItem;
@@ -43,7 +47,9 @@ import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.tables.TableContextMenuItem;
 import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.plugins.ui.tables.TableRow;
+import org.gudy.azureus2.ui.swt.SimpleTextEntryWindow;
 import org.gudy.azureus2.ui.swt.Utils;
+import org.gudy.azureus2.ui.swt.components.shell.ShellManager;
 import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 import org.gudy.azureus2.ui.swt.shells.CoreWaiterSWT;
 import org.gudy.azureus2.ui.swt.shells.MessageBoxShell;
@@ -774,6 +780,57 @@ RelatedContentUI
 						}
 					});
 
+			menu_item = menu_manager.addMenuItem( parent_id, "rcm.menu.findbyhash" );
+			
+			menu_item.addListener( 
+					new MenuItemListener() 
+					{
+						public void 
+						selected(
+							MenuItem menu, Object target ) 
+						{
+							SimpleTextEntryWindow entryWindow = new SimpleTextEntryWindow(
+									"rcm.menu.findbyhash.title", "rcm.menu.findbyhash.msg" );
+							
+							entryWindow.prompt(new UIInputReceiverListener() {
+								public void UIInputReceiverClosed(UIInputReceiver entryWindow) {
+									if (!entryWindow.hasSubmittedInput()) {
+										return;
+									}
+									
+									String value = entryWindow.getSubmittedInput();
+									
+									boolean	ok = false;
+									
+									if ( value != null && value.length() > 0 ){
+										
+										byte[] hash = UrlUtils.decodeSHA1Hash( value.trim());
+										
+										if ( hash != null ){
+										
+											addSearch( hash, ByteFormatter.encodeString( hash ));
+											
+											ok = true;
+										}
+									}
+									
+									if ( !ok ){
+										MessageBox mb = new MessageBox( Utils.findAnyShell(), SWT.ICON_ERROR | SWT.OK);
+										
+										mb.setText( MessageText.getString( "rcm.menu.findbyhash.invalid.title" ));
+										
+										mb.setMessage(
+											MessageText.getString(
+												"rcm.menu.findbyhash.invalid.msg",
+												new String[]{ value }));
+
+										mb.open();
+									}
+								}
+							}); 	
+						}
+					});
+			
 			menu_item = menu_manager.addMenuItem( parent_id, "sep1" );
 
 			menu_item.setStyle( MenuItem.STYLE_SEPARATOR );
