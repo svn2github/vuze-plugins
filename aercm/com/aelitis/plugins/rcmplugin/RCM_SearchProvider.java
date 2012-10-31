@@ -25,9 +25,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.gudy.azureus2.core3.internat.MessageText;
+import org.gudy.azureus2.core3.util.ByteArrayHashMap;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.utils.search.*;
 
+import com.aelitis.azureus.core.content.RelatedContent;
 import com.aelitis.azureus.core.content.RelatedContentManager;
 import com.aelitis.net.magneturi.MagnetURIHandler;
 
@@ -39,12 +41,16 @@ import com.aelitis.net.magneturi.MagnetURIHandler;
 public class RCM_SearchProvider
 	implements SearchProvider
 {
-
+	private RCMPlugin	plugin;
+	
 	private Map<Integer,Object>	properties = new HashMap<Integer, Object>();
 	
 	protected
-	RCM_SearchProvider()
+	RCM_SearchProvider(
+		RCMPlugin	_plugin )
 	{
+		plugin	= _plugin;
+		
 		properties.put( PR_NAME, MessageText.getString( "rcm.search.provider" ));
 		
 		try{
@@ -121,7 +127,9 @@ public class RCM_SearchProvider
 		throws SearchException
 	{		
 		try{
-			return( RelatedContentManager.getSingleton().searchRCM( search_parameters, observer ));
+			RelatedContentManager manager = RelatedContentManager.getSingleton();
+			
+			return( manager.searchRCM( search_parameters, new SearchObserverFilter( manager, observer )));
 			
 		}catch( Throwable e ){
 			
@@ -142,5 +150,87 @@ public class RCM_SearchProvider
 		Object		value )
 	{
 		properties.put( property, value );
+	}
+	
+	private class
+	SearchObserverFilter
+		implements SearchObserver
+	{
+		private RelatedContentManager				manager;
+		private ByteArrayHashMap<RelatedContent>	hash_map;
+		
+		private SearchObserver				observer;
+		
+		private int	min_rank = plugin.getMinuumSearchRank();
+		
+		private
+		SearchObserverFilter(
+			RelatedContentManager	_manager,
+			SearchObserver			_observer )
+		{
+			manager		= _manager;
+			observer 	= _observer;
+			
+			if ( min_rank > 0 ){
+				
+				hash_map = new ByteArrayHashMap<RelatedContent>();
+				
+				RelatedContent[]	rc = manager.getRelatedContent();
+				
+				for ( RelatedContent r: rc ){
+					
+					byte[] hash = r.getHash();
+					
+					if ( hash != null ){
+						
+						hash_map.put( hash, r );
+					}
+				}
+			}
+		}
+		
+		public void
+		resultReceived(
+			SearchInstance		search,
+			SearchResult		result )
+		{
+			if ( hash_map == null){
+				
+				observer.resultReceived( search, result );
+				
+			}else{
+				
+				byte[] hash = (byte[])result.getProperty( SearchResult.PR_HASH );
+				
+				if ( hash != null ){
+					
+					RelatedContent rc = hash_map.get( hash );
+					
+					if ( rc.getRank() >= min_rank ){
+						
+						observer.resultReceived( search, result );
+					}
+				}
+			}
+		}
+		
+		public void
+		complete()
+		{
+			observer.complete();
+		}
+		
+		public void
+		cancelled()
+		{
+			observer.cancelled();
+		}
+		
+		public Object
+		getProperty(
+			int		property )
+		{
+			return( observer.getProperty(property));
+		}
 	}
 }

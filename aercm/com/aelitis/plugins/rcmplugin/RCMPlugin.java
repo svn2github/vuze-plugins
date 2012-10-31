@@ -42,6 +42,8 @@ public class
 RCMPlugin 
 	implements UnloadablePlugin
 {
+	protected static final int MIN_SEARCH_RANK_DEFAULT = 1;
+	
 	static{
 		COConfigurationManager.setParameter( "rcm.persist", true );
 	}
@@ -190,6 +192,12 @@ RCMPlugin
 		return( plugin_interface.getPluginconfig().getPluginBooleanParameter( "rcm.search.enable", false ));
 	}
 	
+	protected int
+	getMinuumSearchRank()
+	{
+		return( plugin_interface.getPluginconfig().getPluginIntParameter( "rcm.search.min_rank", MIN_SEARCH_RANK_DEFAULT ));
+	}
+	
 	protected void
 	hookSearch()
 	{		
@@ -201,7 +209,7 @@ RCMPlugin
 			
 				if ( search_provider == null ){
 					
-					search_provider = new RCM_SearchProvider();
+					search_provider = new RCM_SearchProvider( this );
 						
 					plugin_interface.getUtilities().registerSearchProvider( search_provider );
 				}

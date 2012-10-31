@@ -49,7 +49,6 @@ import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.plugins.ui.tables.TableRow;
 import org.gudy.azureus2.ui.swt.SimpleTextEntryWindow;
 import org.gudy.azureus2.ui.swt.Utils;
-import org.gudy.azureus2.ui.swt.components.shell.ShellManager;
 import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 import org.gudy.azureus2.ui.swt.shells.CoreWaiterSWT;
 import org.gudy.azureus2.ui.swt.shells.MessageBoxShell;
@@ -330,17 +329,6 @@ RelatedContentUI
 				}
 			});
 			
-			enable_search = 
-				config_model.addBooleanParameter2( 
-					"rcm.search.enable", "rcm.search.enable",
-					false );
-
-			enable_search.addListener(new ParameterListener() {
-				public void parameterChanged(Parameter param) {
-					plugin.hookSearch();
-				}
-			});
-
 				// max results
 			
 			final IntParameter max_results = 
@@ -377,6 +365,23 @@ RelatedContentUI
 						}
 					});
 
+			enable_search = 
+				config_model.addBooleanParameter2( 
+					"rcm.search.enable", "rcm.search.enable",
+					false );
+
+			enable_search.addListener(new ParameterListener() {
+				public void parameterChanged(Parameter param) {
+					plugin.hookSearch();
+				}
+			});
+
+			IntParameter sr_min_rank = 
+				config_model.addIntParameter2( 
+					"rcm.search.min_rank", "rcm.search.min_rank", RCMPlugin.MIN_SEARCH_RANK_DEFAULT );
+
+			enable_search.addEnabledOnSelection( sr_min_rank );
+			
 				// overall enable
 			
 			final BooleanParameter overall_disable = 
