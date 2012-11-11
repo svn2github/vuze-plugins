@@ -21,12 +21,15 @@
 
 package com.aelitis.plugins.rcmplugin;
 
+import java.io.File;
 import java.util.Locale;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 
 import org.gudy.azureus2.core3.config.COConfigurationManager;
+import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.SystemProperties;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
@@ -62,7 +65,31 @@ RCMPlugin
 		throws PluginException
 	{
 		plugin_interface = _plugin_interface;
+			
+			/*
+			 * Hack for 4800 OSX default save dir issue
+			 */
+		
+		if ( 	Constants.isOSX &&
+				( Constants.AZUREUS_VERSION.startsWith( "4.8.0.0" ) || Constants.AZUREUS_VERSION.startsWith( "4.8.0.1" ))){
+		
+			if ( !COConfigurationManager.doesParameterNonDefaultExist( "Default save path" )){
 				
+				String docPath =  SystemProperties.getDocPath();
+				
+				File f = new File( docPath, "Azureus Downloads" );
+				
+					// switch to Vuze Downloads for new installs
+				
+				if ( !f.exists()){
+					
+					f = new File( docPath, "Vuze Downloads" );
+				}
+				
+				COConfigurationManager.setParameter( "Default save path", f.getAbsolutePath());
+			}
+		}
+		
 		LocaleUtilities loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
 
 		loc_utils.integrateLocalisedMessageBundle( "com.aelitis.plugins.rcmplugin.internat.Messages" );
