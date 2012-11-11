@@ -73,7 +73,9 @@ RCMPlugin
 		if ( 	Constants.isOSX &&
 				( Constants.AZUREUS_VERSION.startsWith( "4.8.0.0" ) || Constants.AZUREUS_VERSION.startsWith( "4.8.0.1" ))){
 		
-			if ( !COConfigurationManager.doesParameterNonDefaultExist( "Default save path" )){
+			String	key = "Default save path";
+			
+			if ( !COConfigurationManager.doesParameterNonDefaultExist( key )){
 				
 				String docPath =  SystemProperties.getDocPath();
 				
@@ -86,7 +88,15 @@ RCMPlugin
 					f = new File( docPath, "Vuze Downloads" );
 				}
 				
-				COConfigurationManager.setParameter( "Default save path", f.getAbsolutePath());
+				Debug.out( "Hack: Updating default save path from '" + COConfigurationManager.getParameter( key ) + "' to '" + f.getAbsolutePath() + "'" );
+				
+				COConfigurationManager.setParameter( key, f.getAbsolutePath());
+				
+				COConfigurationManager.save();
+				
+			}else{
+				
+				// Debug.out( "Non def exists: " +  COConfigurationManager.getParameter( key ) + ",user-path='" + SystemProperties.getUserPath() + "'" );
 			}
 		}
 		
