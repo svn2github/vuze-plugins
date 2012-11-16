@@ -788,13 +788,16 @@ UPnPMediaServer
 			
 			int	existing_port = config.getPluginIntParameter( key, 0 );
 			
-			if ( !enabled || ( existing_port != 0 && existing_port != port )){
+			if ( !enabled || existing_port != port ){
 				
-				log( "Removing UPnP mapping: port=" + existing_port + ", name='" + name + "'"  );
-				
-				UPnPMapping m = ((UPnPPlugin)pi_upnp.getPlugin()).addMapping( name, true, existing_port, false );
-				
-				m.destroy();
+				if ( existing_port != 0 ){
+					
+					log( "Removing UPnP mapping: port=" + existing_port + ", name='" + name + "'"  );
+					
+					UPnPMapping m = ((UPnPPlugin)pi_upnp.getPlugin()).addMapping( name, true, existing_port, false );
+					
+					m.destroy();
+				}
 				
 				config.setPluginParameter( key, 0 );
 			}

@@ -137,15 +137,39 @@ UPnPMediaServerContentServer
 		
 		boolean	warned = false;
 		
+		InetAddress	selected_bind_ip = null;
+		
+outer:
 		for ( int i=0;i<1024;i++ ){
 			
 			try{
-				ssc = ServerSocketChannel.open();
-
-				bind( ssc, bind_ips[0], port );
-
-				break;
+				IOException fail = null;
 				
+				for ( int j=0;j<bind_ips.length;j++){
+				
+					ssc = ServerSocketChannel.open();
+
+					try{
+						bind( ssc, bind_ips[j], port );
+
+						selected_bind_ip = bind_ips[j];
+					
+						break outer;
+						
+					}catch( IOException e ){
+					
+						fail = e;
+						
+						ssc.close();
+						
+						ssc = null;
+					}
+				}
+				
+				if ( fail != null ){
+					
+					throw( fail );
+				}
 			}catch( Throwable e ){
 				
 				if ( ssc != null ){
@@ -177,14 +201,41 @@ UPnPMediaServerContentServer
 			
 		if ( ssc == null ){
 			
-			ssc = ServerSocketChannel.open();
+			IOException fail = null;
 			
-			bind( ssc, bind_ips[0], 0 );
+			for ( int i=0;i<bind_ips.length;i++){
+				
+				ssc = ServerSocketChannel.open();
+
+				try{
+			
+					bind( ssc, bind_ips[i], 0 );
 		
-			port = ssc.socket().getLocalPort();
+					selected_bind_ip = bind_ips[i];
+					
+					port = ssc.socket().getLocalPort();
+					
+					fail = null;
+					
+					break;
+					
+				}catch( IOException e ){
+					
+					fail = e;
+					
+					ssc.close();
+					
+					ssc = null;
+				}
+			}
+			
+			if ( fail != null ){
+				
+				throw( fail );
+			}
 		}
 		
-		first_bind_ip	= bind_ips[0];
+		first_bind_ip	= selected_bind_ip;
 		
 			// ok, we're bound to one - set up accepters and bind to any others as
 			// required
@@ -193,7 +244,7 @@ UPnPMediaServerContentServer
 			
 			ServerSocket ss;
 			
-			if ( i == 0 ){
+			if ( bind_ips[i] == selected_bind_ip ){
 				
 				ss = ssc.socket();
 				
