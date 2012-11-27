@@ -16,7 +16,6 @@
         <javaElement handleIdentifier="=advancedstatistics/&lt;org.darkman.plugins.advancedstatistics"/>
         <javaElement handleIdentifier="=advancedstatistics/&lt;org.darkman.plugins.advancedstatistics.dataprovider"/>
         <javaElement handleIdentifier="=advancedstatistics/&lt;org.darkman.plugins.advancedstatistics.graphic"/>
-        <file path="/advancedstatistics/plugin.properties"/>
     </selectedElements>
     <fatjar builder="org.eclipse.jdt.ui.plain_jar_builder" launchConfig=""/>
 </jardesc>
