@@ -33,6 +33,7 @@ import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.*;
 import org.gudy.azureus2.plugins.PluginConfig;
 import org.gudy.azureus2.plugins.PluginInterface;
+import org.gudy.azureus2.plugins.disk.DiskManagerFileInfo;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.torrent.Torrent;
 import org.gudy.azureus2.plugins.ui.Graphic;
@@ -41,6 +42,7 @@ import org.gudy.azureus2.plugins.ui.UIInputReceiverListener;
 import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.config.*;
 import org.gudy.azureus2.plugins.ui.menus.MenuItem;
+import org.gudy.azureus2.plugins.ui.menus.MenuItemFillListener;
 import org.gudy.azureus2.plugins.ui.menus.MenuItemListener;
 import org.gudy.azureus2.plugins.ui.menus.MenuManager;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
@@ -127,8 +129,6 @@ RelatedContentUI
 	
 	
 	private volatile boolean	destroyed = false;
-
-	private TableContextMenuItem[] menu_items;
 
 	private 
 	RelatedContentUI(
@@ -469,23 +469,23 @@ RelatedContentUI
 	protected void
 	hookMyTorrentMenus(boolean enable)
 	{
-		if (enable && menu_items != null) {
+		if (enable && menus.size() > 0) {
 			return;
 		}
 		
 		if (!enable) {
-			if (menu_items != null){ 
-				for (TableContextMenuItem menuitem : menu_items) {
+			if ( menus.size() > 0 ){ 
+				for (TableContextMenuItem menuitem : menus) {
 					menuitem.remove();
 				}
-				menu_items = null;
+				menus.clear();
 			}
 			return;
 		}
 
 		TableManager	table_manager = plugin_interface.getUIManager().getTableManager();
 
-		String[]	table_ids = {
+		String[]	download_table_ids = {
 				TableManager.TABLE_MYTORRENTS_INCOMPLETE,
 				TableManager.TABLE_MYTORRENTS_COMPLETE,
 				TableManager.TABLE_MYTORRENTS_ALL_BIG,
@@ -494,24 +494,22 @@ RelatedContentUI
 				TableManager.TABLE_MYTORRENTS_UNOPENED,
 				TableManager.TABLE_MYTORRENTS_UNOPENED_BIG,
 		};
-		
-		menu_items = new TableContextMenuItem[table_ids.length];
-		
-		for (int i = 0; i < table_ids.length; i++){ 
+				
+		for (int i = 0; i < download_table_ids.length; i++){ 
 			
-			String table_id = table_ids[i];
+			String table_id = download_table_ids[i];
 			
-			menu_items[i] = table_manager.addContextMenuItem( table_id, "rcm.contextmenu.lookupassoc");
+			TableContextMenuItem mi_rel = table_manager.addContextMenuItem( table_id, "rcm.contextmenu.lookupassoc");
 		
-			menus.add( menu_items[i] );
+			menus.add( mi_rel );
 			
-			menu_items[i].setStyle( TableContextMenuItem.STYLE_PUSH );
+			mi_rel.setStyle( TableContextMenuItem.STYLE_PUSH );
 
 			if ( swarm_image != null && !swarm_image.isDisposed()){
 				
 				Graphic menu_icon = swt_ui.createGraphic( swarm_image );
 
-				menu_items[i].setGraphic( menu_icon );
+				mi_rel.setGraphic( menu_icon );
 			}
 			
 			MenuItemListener listener = 
@@ -524,18 +522,156 @@ RelatedContentUI
 					{
 						TableRow[]	rows = (TableRow[])target;
 						
-						if ( rows.length > 0 ){
+						for ( TableRow row: rows ){
 							
-							Download download = (Download)rows[0].getDataSource();
+							Download download = (Download)row.getDataSource();
 							
 							explicitSearch( download );
 						}
 					}
 				};
 				
-				menu_items[i].addMultiListener( listener );
+			mi_rel.addMultiListener( listener );
+						
+			TableContextMenuItem mi_size = table_manager.addContextMenuItem( table_id, "rcm.contextmenu.lookupsize");
+			
+			menus.add( mi_size );
+			
+			mi_size.setStyle( TableContextMenuItem.STYLE_PUSH );
+
+			if ( swarm_image != null && !swarm_image.isDisposed()){
+				
+				Graphic menu_icon = swt_ui.createGraphic( swarm_image );
+
+				mi_size.setGraphic( menu_icon );
+			}
+				
+			mi_size.addFillListener(
+				new MenuItemFillListener()
+				{
+					public void 
+					menuWillBeShown(
+						MenuItem 	menu, 
+						Object 		data )
+					{
+						TableRow[]	rows = (TableRow[])data;
+						
+						int	num_ok = 0;
+						
+						for ( TableRow row: rows ){
+							
+							Download dl = (Download)row.getDataSource();
+							
+							if ( dl.getDiskManagerFileCount() == 1 ){
+							
+								if ( dl.getDiskManagerFileInfo(0).getLength() >= RelatedContentManager.FILE_ASSOC_MIN_SIZE ){
+								
+									num_ok++;
+								}
+							}
+						}
+						
+						menu.setEnabled( num_ok > 0 );
+					}
+				});
+			
+			mi_size.addMultiListener( 
+				new MenuItemListener()
+				{
+					public void 
+					selected(
+						MenuItem 	menu, 
+						Object 		target) 
+					{
+						TableRow[]	rows = (TableRow[])target;
+						
+						for ( TableRow row: rows ){
+							
+							Download dl = (Download)row.getDataSource();
+							
+							if ( dl.getDiskManagerFileCount() == 1 ){
+								
+								long len = dl.getDiskManagerFileInfo(0).getLength();
+								
+								if ( len >= RelatedContentManager.FILE_ASSOC_MIN_SIZE ){
+
+									explicitSearch( len );
+								}
+							}
+						}
+					}
+				});
 		}
 		
+		String[]	file_table_ids = {
+				TableManager.TABLE_TORRENT_FILES,
+		};
+				
+		for (int i = 0; i < file_table_ids.length; i++){ 
+			
+			String table_id = file_table_ids[i];
+			
+			TableContextMenuItem mi = table_manager.addContextMenuItem( table_id, "rcm.contextmenu.lookupsize");
+		
+			menus.add( mi );
+			
+			mi.setStyle( TableContextMenuItem.STYLE_PUSH );
+
+			if ( swarm_image != null && !swarm_image.isDisposed()){
+				
+				Graphic menu_icon = swt_ui.createGraphic( swarm_image );
+
+				mi.setGraphic( menu_icon );
+			}
+			
+			mi.addFillListener(
+				new MenuItemFillListener()
+				{
+					public void 
+					menuWillBeShown(
+						MenuItem 	menu, 
+						Object 		data )
+					{
+						TableRow[]	rows = (TableRow[])data;
+						
+						int	num_ok = 0;
+						
+						for ( TableRow row: rows ){
+							
+							DiskManagerFileInfo file = (DiskManagerFileInfo)row.getDataSource();
+							
+							if ( file.getLength() >= RelatedContentManager.FILE_ASSOC_MIN_SIZE ){
+								
+								num_ok++;
+							}
+						}
+						
+						menu.setEnabled( num_ok > 0 );
+					}
+				});
+			
+			mi.addMultiListener( 
+				new MenuItemListener()
+				{
+					public void 
+					selected(
+						MenuItem 	menu, 
+						Object 		target) 
+					{
+						TableRow[]	rows = (TableRow[])target;
+						
+						for ( TableRow row: rows ){
+							
+							DiskManagerFileInfo file = (DiskManagerFileInfo)row.getDataSource();
+							
+							if ( file.getLength() >= RelatedContentManager.FILE_ASSOC_MIN_SIZE ){
+							
+								explicitSearch( file.getLength());
+							}
+						}
+					}
+				});
+		}
 	}
 	
 	protected void
@@ -543,6 +679,13 @@ RelatedContentUI
 		Download		download )
 	{
 		addSearch( download );
+	}
+	
+	protected void
+	explicitSearch(
+		long			file_size )
+	{
+		addSearch( file_size );
 	}
 	
 	protected void
@@ -811,6 +954,33 @@ RelatedContentUI
 										
 										byte[] hash = UrlUtils.decodeSHA1Hash( value.trim());
 										
+										if ( hash == null ){
+											
+											try{
+												String url = UrlUtils.parseTextForURL( value, true );
+												
+												if ( url != null && url.startsWith( "magnet" )){
+													
+													int	pos = url.indexOf( "btih:" );
+													
+													if ( pos > 0 ){
+														
+														url = url.substring( pos+5 );
+														
+														pos = url.indexOf( '&' );
+														
+														if ( pos != -1 ){
+															
+															url = url.substring( 0, pos );
+														}
+														
+														hash = UrlUtils.decodeSHA1Hash( url );
+													}
+												}
+											}catch( Throwable e ){
+												
+											}
+										}
 										if ( hash != null ){
 										
 											addSearch( hash, ByteFormatter.encodeString( hash ));
@@ -828,6 +998,63 @@ RelatedContentUI
 											MessageText.getString(
 												"rcm.menu.findbyhash.invalid.msg",
 												new String[]{ value }));
+
+										mb.open();
+									}
+								}
+							}); 	
+						}
+					});
+			
+			menu_item = menu_manager.addMenuItem( parent_id, "rcm.menu.findbysize" );
+			
+			menu_item.addListener( 
+					new MenuItemListener() 
+					{
+						public void 
+						selected(
+							MenuItem menu, Object target ) 
+						{
+							SimpleTextEntryWindow entryWindow = new SimpleTextEntryWindow(
+									"rcm.menu.findbysize.title", "rcm.menu.findbysize.msg" );
+							
+							entryWindow.prompt(new UIInputReceiverListener() {
+								public void UIInputReceiverClosed(UIInputReceiver entryWindow) {
+									if (!entryWindow.hasSubmittedInput()) {
+										return;
+									}
+									
+									String value = entryWindow.getSubmittedInput();
+									
+									boolean	ok = false;
+									
+									if ( value != null && value.length() > 0 ){
+										
+										value = value.replaceAll( ",", "" ).trim();
+										
+										try{
+											long	file_size = Long.parseLong( value );
+										
+											if ( file_size >= RelatedContentManager.FILE_ASSOC_MIN_SIZE ){
+												
+												addSearch( file_size );
+											
+												ok = true;
+											}
+										}catch( Throwable e ){
+										}
+									}
+									
+									if ( !ok ){
+										
+										MessageBox mb = new MessageBox( Utils.findAnyShell(), SWT.ICON_ERROR | SWT.OK);
+										
+										mb.setText( MessageText.getString( "rcm.menu.findbysize.invalid.title" ));
+										
+										mb.setMessage(
+											MessageText.getString(
+												"rcm.menu.findbysize.invalid.msg",
+												new String[]{ value, DisplayFormatters.formatByteCountToKiBEtc( RelatedContentManager.FILE_ASSOC_MIN_SIZE ) }));
 
 										mb.open();
 									}
@@ -1001,6 +1228,92 @@ RelatedContentUI
 			}
 		}
 	}
+	
+	protected void
+	addSearch(
+		final long 			file_size )
+	{
+		final String name = MessageText.getString( "rcm.label.filesize" ) + ": " + file_size;
+		
+		try{
+			synchronized( this ){
+				
+				final byte[]	dummy_hash = String.valueOf( file_size ).getBytes( "UTF-8" );
+				
+				final RCMItem existing_si = rcm_item_map.get( dummy_hash );
+				
+				if (  existing_si == null ){
+		
+					final RCMItem new_si = new RCMItemContent( dummy_hash, file_size );
+					
+					rcm_item_map.put( dummy_hash, new_si );
+					
+					Utils.execSWTThread(
+						new Runnable()
+						{
+							public void
+							run()
+							{
+								synchronized( RelatedContentUI.this ){
+	
+									if ( new_si.isDestroyed()){
+										
+										return;
+									}
+									
+									RCMView view = new RCMView( SIDEBAR_SECTION_RELATED_CONTENT, name );
+									
+									new_si.setView( view );
+									
+									String key = "RCM_" + ByteFormatter.encodeString( dummy_hash );
+									
+									MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
+									
+									MdiEntry	entry = mdi.createEntryFromSkinRef(
+											SIDEBAR_SECTION_RELATED_CONTENT,
+											key, "rcmview",
+											view.getTitle(),
+											view, null, true, null );
+									
+									new_si.setMdiEntry(entry);
+									
+									if (entry instanceof SideBarEntrySWT) {
+										new_si.setTreeItem( ((SideBarEntrySWT)entry).getTreeItem() );
+									}
+									
+									new_si.activate();
+								}
+							}
+						});
+				}else{
+					
+					Utils.execSWTThread(
+							new Runnable()
+							{
+								public void
+								run()
+								{
+									ViewTitleInfoManager.refreshTitleInfo( existing_si.getView());
+									
+									MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
+									MdiEntry mainEntry = mdi.getEntry(SIDEBAR_SECTION_RELATED_CONTENT );
+									
+									if ( mainEntry != null ){
+										
+										ViewTitleInfoManager.refreshTitleInfo( mainEntry.getViewTitleInfo());
+									}
+									
+									existing_si.activate();
+								}
+							});
+				}
+			}
+		}catch( Throwable e ){
+			
+			Debug.out( e );
+		}
+	}
+	
 	
 	protected class
 	MainViewInfo
@@ -1244,6 +1557,7 @@ RelatedContentUI
 		implements RCMItem
 	{	
 		private byte[]				hash;
+		private long				file_size;
 		
 		private RCMView				view;
 		private MdiEntry			sb_entry;
@@ -1267,6 +1581,15 @@ RelatedContentUI
 			hash		= _hash;
 		}
 		
+		protected
+		RCMItemContent(
+			byte[]		_hash,
+			long		_file_size )
+		{
+			hash		= _hash;
+			file_size	= _file_size;
+		}
+		
 		public void
 		setMdiEntry(
 			MdiEntry _sb_entry )
@@ -1282,8 +1605,7 @@ RelatedContentUI
 			try{
 				showIcon( spinner, null );
 				
-				manager.lookupContent(
-					hash,
+				RelatedContentLookupListener listener =
 					new RelatedContentLookupListener()
 					{
 						public void
@@ -1340,7 +1662,16 @@ RelatedContentUI
 						{	
 							lookupComplete();
 						}
-					});
+					};
+					
+				if ( file_size == 0 ){
+				
+					manager.lookupContent( hash, listener );
+					
+				}else{
+					
+					manager.lookupContent( file_size, listener );
+				}
 			}catch( Throwable e ){
 				
 				lookup_complete = true;
