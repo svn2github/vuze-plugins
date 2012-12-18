@@ -33,29 +33,90 @@ import net.i2p.*;
 import net.i2p.client.*;
 import net.i2p.client.streaming.*;
 import net.i2p.data.*;
+import net.i2p.util.I2PThread;
 
 public class 
 Test 
 {
+	/*
 	public static void
 	main(
 		String[]	args )
 	{
 		
-		String tracker = "5HT3V86J7vEA33svEHXOidL-6TN5ZQ3FmCc3BOnjLottSZ6kEiunXXnBMETrBjq-jqq0~RwL-2pKWIGYQ8Pg4eVGq9ZsAuuXGvanxjh8PzpTZC7H-okHxUuqGTKkclBdF~wMzQhAGxI-6giv~f2NfkgSYHV-dnu7DHxFtcWWWQm7cTnb3Hp-jlX3m6Tl4TcSVBh3hnMTWAVnGajSKCnrCUdqcm7J0PxIwR6pMC0A8v1oqkEcxo~LM-xgP3mq3gk3sZkCSxRIZ8sZmRYvVDFoGz~gVnmhN9I5D5wSU3nk9jOHHj~arpSMhuSSr31OXcj5nG5HgN6qVM4ioKy-Km1TZj4eN2lV~r6tGhW04~h9GwZXjPXrKaDF-uY6NjP7bPlgELy3g9Yk6iGWSFetuxK3wmqnYC60MSLgzeYxxVMVSih1NK~SngOhpN2vUqDg3IsLxYTEP-nBU-79hTC27~ES1V1kQY8tvUDI9kqMe1ieH246cg0k4TlvHSBq-ImvsHZBAAAA";
+		//String tracker = "5HT3V86J7vEA33svEHXOidL-6TN5ZQ3FmCc3BOnjLottSZ6kEiunXXnBMETrBjq-jqq0~RwL-2pKWIGYQ8Pg4eVGq9ZsAuuXGvanxjh8PzpTZC7H-okHxUuqGTKkclBdF~wMzQhAGxI-6giv~f2NfkgSYHV-dnu7DHxFtcWWWQm7cTnb3Hp-jlX3m6Tl4TcSVBh3hnMTWAVnGajSKCnrCUdqcm7J0PxIwR6pMC0A8v1oqkEcxo~LM-xgP3mq3gk3sZkCSxRIZ8sZmRYvVDFoGz~gVnmhN9I5D5wSU3nk9jOHHj~arpSMhuSSr31OXcj5nG5HgN6qVM4ioKy-Km1TZj4eN2lV~r6tGhW04~h9GwZXjPXrKaDF-uY6NjP7bPlgELy3g9Yk6iGWSFetuxK3wmqnYC60MSLgzeYxxVMVSih1NK~SngOhpN2vUqDg3IsLxYTEP-nBU-79hTC27~ES1V1kQY8tvUDI9kqMe1ieH246cg0k4TlvHSBq-ImvsHZBAAAA";
+		String data    = "z0-oh9bivFmYlhFMVbdHmRtOV72ZH128JBxmB8gKdQ2A8yOVRRsxJJ-PAVG7QUO4wsqng9Pq0~lwsK5eUBVPnnc8LcHD-iZV8YlcZziylM-phbVKieaCTa4KbzefVc321XhcFVlTZEsNpt~D2INpU0V73HWe48w9Ff5~K82F0rh8s~8Vq-UOr6HGCYmVySPQA05gvcOHsXq7riZQTkEh~H1YInIec20puPmHtwWobQgq2oc8qA98bVR5hhXjgRSE7-ycGIFPMX6s4ghl8TqKn5j8Rd8MImIeRLaTJfU35gu2r5Izb2wfQXIo4NYP6DVOsZqbpVkA89WVAr9D63l8J1lXHqaHg~XYsA7I0N-ENI632LqnpXFq5Qq6D1yCnGdgpbqRzjh4fLUmsczV~T9BYZPQX0F38DpqQyEWYL~Kiz7A8LQ-yAN4KokoTLue07DMzAIObSQQnq2Vo6wM23iuXxH9nhXutQHUaLHRzAk7f-jyFitQIcdjybuDzBKyFsXLAAAA";
 		
 		try{
 	        I2PAppContext ctx = new I2PAppContext();
 	
+	        Destination tracker = ctx.namingService().lookup( "tracker2.postman.i2p" );
+	        
 	        Destination remote_dest = new Destination();
 	        
-	        remote_dest.fromBase64( tracker );
-	        	        
-	        I2PSocketManager	socket_manager = I2PSocketManagerFactory.createManager();//bais, "localhost", 7654, null);
+	        remote_dest.fromBase64( data );
+	        	       
+	        final I2PSocketManager	socket_manager = I2PSocketManagerFactory.createManager();
 
+	        System.out.println( "got socket manager" );
+	        
 	        I2PSession session = socket_manager.getSession();
 	        
-	        I2PSocket	socket = socket_manager.connect( remote_dest );
+	        final I2PServerSocket serverSocket = socket_manager.getServerSocket();
+	        
+	        new I2PThread()
+	        {
+	        	public void
+	        	run()
+	        	{
+	        		while( true ){
+	        			try{
+	        				I2PSocket sock = serverSocket.accept();
+	        			
+	        				System.out.println( "accepted" );
+	        				sock.close();
+	        				
+	        			}catch( Throwable e ){
+	        				e.printStackTrace();
+	        			}
+	        		}
+	        	}
+	        }.start();
+	        
+	        System.out.println( "got session" );
+	        
+	        final Destination my_dest = session.getMyDestination();
+	        
+	        System.out.println( "got my dest" );
+
+	        System.out.println( my_dest.toBase64());
+	        
+	        new I2PThread()
+	        {
+	        	public void
+	        	run()
+	        	{
+	        		while( true ){
+	        			try{
+	        			   boolean res = socket_manager.ping( my_dest, 10*1000 );
+	        		        
+	        		       System.out.println( "ping commplete: " + res);
+	        		        
+	        		       I2PSocket	socket = socket_manager.connect( my_dest );
+	        		        
+	        		        System.out.println( "got socket" );
+	        		        
+	        			}catch( Throwable e ){
+	        				e.printStackTrace();
+	        			}
+	        		}
+	        	}
+	        }.start();
+	       // boolean res = socket_manager.ping( my_dest, 60*1000 );
+	        
+	        //System.out.println( "ping commplete: " + res);
+	        
+	        I2PSocket	socket = socket_manager.connect( tracker );
 	        
 	        System.out.println( "got socket" );
 	        
@@ -86,6 +147,52 @@ Test
 	        	
 	        	System.out.println( new String( buffer, 0, len ));
 	        }
+		}catch( Throwable e ){
+			
+			e.printStackTrace();
+		}   
+	}
+	*/
+	
+	public static void
+	main(
+		String[]	args )
+	{
+		try{
+	        final I2PSocketManager	socket_manager = I2PSocketManagerFactory.createManager();
+
+	        System.out.println( "got socket manager" );
+	        
+	        I2PSession session = socket_manager.getSession();
+	        
+	        System.out.println( "got session" );
+	        
+	        final Destination my_dest = session.getMyDestination();
+	        
+	        System.out.println( "got my dest" );
+
+	        System.out.println( my_dest.toBase64());
+	        
+	        new I2PThread()
+	        {
+	        	public void
+	        	run()
+	        	{
+	        		while( true ){
+	        			try{
+	        				Thread.sleep( 1000 );
+	        				
+	        				boolean res = socket_manager.ping( my_dest, 10*1000 );
+	        		        
+	        				System.out.println( "ping commplete: " + res);
+		        		        
+	        			}catch( Throwable e ){
+	        				e.printStackTrace();
+	        			}
+	        		}
+	        	}
+	        }.start();
+
 		}catch( Throwable e ){
 			
 			e.printStackTrace();
