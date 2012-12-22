@@ -389,7 +389,10 @@ I2PPluginConnectionManager
 		
 		if ( address.length() < 400 ){
 			
-			address += ".i2p";
+			if ( !address.endsWith( ".i2p" )){
+			
+				address += ".i2p";
+			}
 		}
 		
 		Object	current_socket_manager	= socket_manager;
@@ -434,7 +437,7 @@ I2PPluginConnectionManager
 				
 				logit = false;
 				
-			}else if ( msg.contains( "timeout" ) || msg.contains( "timed out" )){
+			}else if ( msg.contains( "timeout" ) || msg.contains( "timed out" ) || msg.contains( "reset" ) || msg.contains( "resolve" )){
 				
 				logit = false;
 			}
@@ -444,7 +447,7 @@ I2PPluginConnectionManager
 				log.log(e);
 			}
 			
-			throw( new IOException( e.getMessage()));
+			throw( new IOException( Debug.getNestedExceptionMessage(e)));
 		}
 	}
 	

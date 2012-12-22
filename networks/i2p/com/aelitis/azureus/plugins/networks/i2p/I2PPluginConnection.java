@@ -27,6 +27,7 @@ import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SocketChannel;
+import java.util.Locale;
 
 import org.gudy.azureus2.core3.util.AEMonitor;
 import org.gudy.azureus2.core3.util.AERunnable;
@@ -197,7 +198,7 @@ I2PPluginConnection
 									f.printStackTrace();
 								}
 								
-								e.printStackTrace();
+								//e.printStackTrace();
 								
 								con_man.log( "I2PSocket creation fails: " + Debug.getNestedExceptionMessage(e) );
 							}
@@ -357,20 +358,33 @@ I2PPluginConnection
 								
 							}catch( Throwable e ){
 								
-								if ( 	e instanceof IOException &&
-										e.getMessage() != null &&
-										(	e.getMessage().startsWith( "Already closed" ) ||
-											e.getMessage().startsWith( "disconnected" ))){
+								boolean ignore = false;
 								
-										// ignore these
+								if ( e instanceof ClosedChannelException  ){
 									
-								}else if ( e instanceof ClosedChannelException  ){
+									ignore = true;
 									
-									// ignorify
+								}else if ( e instanceof IOException ){
 									
-								}else{
+									String message = e.getMessage();
+									
+									if ( message != null ){
 										
-									Debug.printStackTrace(e);
+										message = message.toLowerCase( Locale.US );
+									
+										if (	message.contains( "closed" ) ||
+												message.contains( "aborted" ) ||
+												message.contains( "disconnected" ) ||
+												message.contains( "reset" )){
+								
+											ignore = true;
+										}
+									}
+								}
+								
+								if ( !ignore ){
+									
+									Debug.out( e );
 								}
 								
 								break;
