@@ -10,7 +10,7 @@
       <dlna:X_DLNACAP xmlns:dlna="urn:schemas-dlna-org:device-1-0">av-upload,image-upload,audio-upload</dlna:X_DLNACAP>
       <deviceType>urn:schemas-upnp-org:device:MediaServer:1</deviceType>
       <friendlyName>%SERVICENAME%</friendlyName>
-      <manufacturer>Vuze, Inc.</manufacturer>
+      <manufacturer>Azureus Software, Inc.</manufacturer>
       <manufacturerURL>http://www.vuze.com</manufacturerURL>
       <modelDescription>Provides content through UPnP ContentDirectory service</modelDescription>
       <modelName>Vuze Media Server</modelName>

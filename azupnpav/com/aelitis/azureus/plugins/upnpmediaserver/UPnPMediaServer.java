@@ -3132,19 +3132,21 @@ UPnPMediaServer
 						}else if ( l1 > l2 ){
 							
 							result = 1;
+							
+						}else{
+						
+								// date same - fall through to alpha but always ascending alpha
+								// otherwise things look silly (especially for folders at top level)
+							
+							reverse_order = false;
 						}
-						
-							// date same - fall through to alpha but always ascending alpha
-							// otherwise things look silly (especially for folders at top level)
-						
-						reverse_order = false;
 					}
 					
 					if ( result == 0 ){
 					
 						result = alpha_comp.compare( o1.getName(), o2.getName());
 					}
-					
+										
 						// only handle ascending for non-default order
 					
 					if ( reverse_order ){
