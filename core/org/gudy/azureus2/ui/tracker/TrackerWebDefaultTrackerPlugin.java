@@ -956,17 +956,37 @@ TrackerWebDefaultTrackerPlugin
 				
 				URL	tracker_url	= defined_urls[0];
 
-					// unfortunately, historically the default tracker url includes an /announce, which it
-					// obviously shouldn't. However, we can't change this now as existing plugins might
-					// (well, do) rely on it. Never mind. remove path if found
+				String	http_host = (String)request.getHeaders().get( "host" );
 				
-				String	tracker_url_string = tracker_url.toString();
-				
-				String	path = tracker_url.getPath();
-				
-				if ( path.length() > 1 ){
+				if ( http_host == null ){
 					
-					tracker_url_string = tracker_url_string.substring(0,tracker_url_string.length()-(path.length()-1));
+					http_host = tracker_url.getHost();
+					
+				}else{
+					
+					http_host = http_host.toLowerCase( Locale.US );
+				}
+								
+				String	tracker_url_string;
+				
+				if ( http_host.endsWith( ".i2p") || http_host.endsWith( ".onion" )){
+				
+					tracker_url_string = "http://" + http_host + "/";
+					
+				}else{
+					
+						// unfortunately, historically the default tracker url includes an /announce, which it
+						// obviously shouldn't. However, we can't change this now as existing plugins might
+						// (well, do) rely on it. Never mind. remove path if found
+
+					tracker_url_string = tracker_url.toString();
+				
+					String	path = tracker_url.getPath();
+				
+					if ( path.length() > 1 ){
+					
+						tracker_url_string = tracker_url_string.substring(0,tracker_url_string.length()-(path.length()-1));
+					}
 				}
 				
 				pw.println( "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" ); 
@@ -975,7 +995,7 @@ TrackerWebDefaultTrackerPlugin
 				
 				pw.println( "<rss version=\"2.0\" xmlns:azureus=\"http://azureus.sourceforge.net/files/rss/\">");
 				pw.println(     "<channel>");
-				pw.println(         "<title>" + tracker_title + " on " + tracker_url.getHost() + "</title>"); 
+				pw.println(         "<title>" + tracker_title + " on " + http_host + "</title>"); 
 				pw.println(	 		"<description>RSS Feed for " + tracker_title+ "</description>");
 													
 				pw.println(			"<link>" + tracker_url_string + "</link>" );
