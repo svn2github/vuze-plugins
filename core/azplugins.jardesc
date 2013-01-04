@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="WINDOWS-1252" standalone="no"?>
+<jardesc>
+    <jar path="azcoreplugins/azplugins.jar"/>
+    <options buildIfNeeded="true" compress="true" descriptionLocation="/azcoreplugins/azplugins.jardesc" exportErrors="true" exportWarnings="true" includeDirectoryEntries="false" overwrite="false" saveDescription="true" storeRefactorings="false" useSourceFolders="false"/>
+    <storedRefactorings deprecationInfo="true" structuralOnly="false"/>
+    <selectedProjects/>
+    <manifest generateManifest="true" manifestLocation="" manifestVersion="1.0" reuseManifest="false" saveManifest="false" usesManifest="true">
+        <sealing sealJar="false">
+            <packagesToSeal/>
+            <packagesToUnSeal/>
+        </sealing>
+    </manifest>
+    <selectedElements exportClassFiles="true" exportJavaFiles="true" exportOutputFolder="false">
+        <javaElement handleIdentifier="=azcoreplugins/&lt;org.gudy.azureus2.ui.swt.views"/>
+        <javaElement handleIdentifier="=azcoreplugins/&lt;org.gudy.azureus2.ui.tracker.internat"/>
+        <javaElement handleIdentifier="=azcoreplugins/&lt;org.gudy.azureus2.ui.tracker"/>
+        <javaElement handleIdentifier="=azcoreplugins/&lt;org.gudy.azureus2.ui.tracker.templates"/>
+        <javaElement handleIdentifier="=azcoreplugins/&lt;HTML.Tmpl.Parsers"/>
+        <javaElement handleIdentifier="=azcoreplugins/&lt;HTML"/>
+        <javaElement handleIdentifier="=azcoreplugins/&lt;org.gudy.azureus2.ui.tracker.templates.js"/>
+        <javaElement handleIdentifier="=azcoreplugins/&lt;HTML.Tmpl.Element"/>
+        <javaElement handleIdentifier="=azcoreplugins/&lt;org.jibble.pircbot"/>
+        <javaElement handleIdentifier="=azcoreplugins/&lt;HTML.Tmpl"/>
+        <javaElement handleIdentifier="=azcoreplugins/&lt;org.gudy.azureus2.ui.tracker.templates.styles"/>
+        <file path="/azcoreplugins/plugin.properties"/>
+        <javaElement handleIdentifier="=azcoreplugins/&lt;org.gudy.azureus2.irc"/>
+        <javaElement handleIdentifier="=azcoreplugins/&lt;org.gudy.azureus2.ui.tracker.templates.images"/>
+    </selectedElements>
+    <fatjar builder="org.eclipse.jdt.ui.plain_jar_builder" launchConfig=""/>
+</jardesc>
