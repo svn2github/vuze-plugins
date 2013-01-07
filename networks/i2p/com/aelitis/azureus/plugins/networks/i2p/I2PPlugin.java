@@ -30,12 +30,15 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 
+import org.gudy.azureus2.core3.config.COConfigurationManager;
+import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
 
 import org.gudy.azureus2.plugins.ui.UIManager;
+import org.gudy.azureus2.plugins.ui.UIManagerEvent;
 import org.gudy.azureus2.plugins.ui.config.*;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
@@ -162,7 +165,9 @@ public class I2PPlugin
 		UIManager	ui_manager = plugin_interface.getUIManager();
 
 		BasicPluginConfigModel config_model = ui_manager.createBasicPluginConfigModel( "plugins", "i2pnet.name");
-						
+					
+		config_model.addHyperlinkParameter2( "i2pnet.wiki", MessageText.getString( "i2pnet.wiki.link" ));
+		
 		enable 		= config_model.addBooleanParameter2( CONFIG_ENABLE, "i2pnet.enable", CONFIG_ENABLE_DEFAULT );
 		
 		LabelParameter lab1 = config_model.addLabelParameter2( "i2pnet.proxy_port.info" );
@@ -425,22 +430,15 @@ public class I2PPlugin
 		
 		
 		if ( enable.getValue()){
-			
-			if ( plugin_interface.getPluginconfig().getCoreBooleanParameter(
-					PluginConfig.CORE_PARAM_BOOLEAN_SOCKS_PROXY_NO_INWARD_CONNECTION )){
-				
-				log.logAlert( 
-						LoggerChannel.LT_ERROR,
-						loc_utils.getLocalisedMessageText( "i2pnet.tracker.inform" ));
-				
-			}
-			
+									
 			plugin_interface.addListener(
 					new PluginListener()
 					{
 						public void
 						initializationComplete()
 						{
+							checkConfig();
+
 							PluginInterface pi_upnp = plugin_interface.getPluginManager().getPluginInterfaceByClass( UPnPPlugin.class );
 							
 							if ( pi_upnp == null ){
@@ -480,6 +478,47 @@ public class I2PPlugin
 						{	
 						}
 					});
+		}
+	}
+	
+	private void
+	checkConfig()
+	{
+		LocaleUtilities loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
+
+		if ( plugin_interface.getPluginconfig().getCoreBooleanParameter(
+				PluginConfig.CORE_PARAM_BOOLEAN_SOCKS_PROXY_NO_INWARD_CONNECTION )){
+			
+			log.logAlert( 
+					LoggerChannel.LT_ERROR,
+					loc_utils.getLocalisedMessageText( "i2pnet.tracker.inform" ));
+			
+		}
+		
+		String tracker_overrides = COConfigurationManager.getStringParameter( "Override Ip" ).toLowerCase().trim();
+		
+		String[] bits = tracker_overrides.split( ";");
+		
+		boolean ok = true;
+		
+		for ( String bit: bits ){
+			
+			bit = bit.trim();
+			
+				// this is from the .vuze-file installation default
+			
+			if ( bit.endsWith( ">.i2p" )){
+			
+				ok = false;
+			}
+		}
+		
+		if ( !ok ){
+			
+			plugin_interface.getUIManager().showMessageBox(
+					"i2pnet.tunnel.config.needed.title",
+					"i2pnet.tunnel.config.needed.details",
+					UIManagerEvent.MT_OK );
 		}
 	}
 }

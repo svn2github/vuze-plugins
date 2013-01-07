@@ -311,6 +311,9 @@ I2PPluginConnection
 			
 			source_buffer	= ByteBuffer.allocate( RELAY_BUFFER_SIZE );
 			
+			input_stream 	= con_man.i2pSocket_getInputStream( socket );
+			output_stream 	= con_man.i2pSocket_getOutputStream( socket );
+
 			connection.setReadState( this );
 			
 			connection.setWriteState( this );
@@ -319,9 +322,6 @@ I2PPluginConnection
 						
 			connection.setConnected();
 			
-			input_stream 	= con_man.i2pSocket_getInputStream( socket );
-			output_stream 	= con_man.i2pSocket_getOutputStream( socket );
-
 			async_pool.run(
 				new AERunnable()
 				{
