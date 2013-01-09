@@ -119,6 +119,8 @@ UPnPMediaServerContentDirectory
 		{ "flv",  "video/x-flv", 				CONTENT_VIDEO },
 		{ "ts",   "video/MP2T", 				CONTENT_VIDEO },
 		{ "m4v",  "video/m4v", 					CONTENT_VIDEO },
+		{ "mts",  "video/MP2T", 				CONTENT_VIDEO },
+		{ "m2ts", "video/MP2T", 				CONTENT_VIDEO },
 		
 			// audio
 		
