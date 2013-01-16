@@ -27,10 +27,12 @@ import java.text.NumberFormat;
 import java.text.ParseException;
 import java.util.*;
 
+import org.bouncycastle.util.encoders.Base64;
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.disk.DiskManager;
 import org.gudy.azureus2.core3.disk.DiskManagerFileInfo;
 import org.gudy.azureus2.core3.disk.DiskManagerFileInfoSet;
+import org.gudy.azureus2.core3.disk.DiskManagerPiece;
 import org.gudy.azureus2.core3.download.DownloadManager;
 import org.gudy.azureus2.core3.download.DownloadManagerState;
 import org.gudy.azureus2.core3.internat.MessageText;
@@ -40,7 +42,9 @@ import org.gudy.azureus2.core3.logging.LogAlert;
 import org.gudy.azureus2.core3.logging.Logger;
 import org.gudy.azureus2.core3.peer.PEPeer;
 import org.gudy.azureus2.core3.peer.PEPeerManager;
+import org.gudy.azureus2.core3.peer.PEPeerSource;
 import org.gudy.azureus2.core3.peer.PEPeerStats;
+import org.gudy.azureus2.core3.torrent.TOTorrent;
 import org.gudy.azureus2.core3.tracker.client.TRTrackerAnnouncer;
 import org.gudy.azureus2.core3.tracker.client.TRTrackerAnnouncerResponse;
 import org.gudy.azureus2.core3.tracker.client.TRTrackerScraper;
@@ -1650,44 +1654,6 @@ XMWebUIPlugin
 			
 			for ( String field: fields ){
 
-// metadataPercentComplete     | double                      | tr_stat
-// name                        | string                      | tr_info
-// peer-limit                  | number                      | tr_torrent
-// peers                       | array (see below)           | n/a
-// peersConnected              | number                      | tr_stat
-// peersFrom                   | object (see below)          | n/a
-// peersGettingFromUs          | number                      | tr_stat
-// peersSendingToUs            | number                      | tr_stat
-// percentDone                 | double                      | tr_stat
-// pieces                      | string (see below)          | tr_torrent
-// pieceCount                  | number                      | tr_info
-// pieceSize                   | number                      | tr_info
-// priorities                  | array (see below)           | n/a
-// queuePosition               | number                      | tr_stat
-// rateDownload (B/s)          | number                      | tr_stat
-// rateUpload (B/s)            | number                      | tr_stat
-// recheckProgress             | double                      | tr_stat
-// secondsDownloading          | number                      | tr_stat
-// secondsSeeding              | number                      | tr_stat
-// seedIdleLimit               | number                      | tr_torrent
-// seedIdleMode                | number                      | tr_inactvelimit
-// seedRatioLimit              | double                      | tr_torrent
-// seedRatioMode               | number                      | tr_ratiolimit
-// sizeWhenDone                | number                      | tr_stat
-// startDate                   | number                      | tr_stat
-// status                      | number                      | tr_stat
-// trackers                    | array (see below)           | n/a
-// trackerStats                | array (see below)           | n/a
-// totalSize                   | number                      | tr_info
-// torrentFile                 | string                      | tr_info
-// uploadedEver                | number                      | tr_stat
-// uploadLimit                 | number                      | tr_torrent
-// uploadLimited               | boolean                     | tr_torrent
-// uploadRatio                 | double                      | tr_stat
-// wanted                      | array (see below)           | n/a
-// webseeds                    | array (see below)           | n/a
-// webseedsSendingToUs         | number                      | tr_stat
-
 				Object	value = null;
 				
 				if ( field.equals( "activityDate" )){
@@ -1868,6 +1834,10 @@ XMWebUIPlugin
 
 					value = torrentGet_isStalled(download);
 					
+				}else if ( field.equals( "leechers" )){
+					// Removed in RPC v7
+					value = pm == null ? 0 : pm.getNbPeers();
+
 				}else if ( field.equals( "leftUntilDone" )){	
 					// RPC v0
 					// leftUntilDone               | number                      | tr_stat
@@ -1893,132 +1863,221 @@ XMWebUIPlugin
 				}else if ( field.equals( "maxConnectedPeers" )){ 
 					// maxConnectedPeers           | number                      | tr_torrent
 					// TODO: Some sort of Peer Limit (tr_torrentSetPeerLimit )
-					
 
-				}else if ( field.equals( "trackerSeeds" )){
-					DownloadScrapeResult scrape = download.getLastScrapeResult();
-					value = new Long( scrape==null?0:scrape.getSeedCount());
-				}else if ( field.equals( "trackerLeechers" )){
-					DownloadScrapeResult scrape = download.getLastScrapeResult();
-					value = new Long( scrape==null?0:scrape.getNonSeedCount());
-				}else if ( field.equals( "leechers" )){
-					// Removed in RPC v7
-					if ( pm == null ){
-						value = new Long(0);
-					}else{
-						value = new Long( pm.getNbPeers());
-					}
-				}else if ( field.equals( "name" )){	
-					value = download.getName();
-				}else if ( field.equals( "peersConnected" )){	
-					if ( pm == null ){
-						value = new Long(0);
-					}else{
-						value = new Long( pm.getNbPeers() + pm.getNbSeeds());
-					}
-				}else if ( field.equals( "peersGettingFromUs" )){	
-					value = new Long( peers_from_us );
-				}else if ( field.equals( "peersSendingToUs" )){
-					value = new Long( peers_to_us );
-				}else if ( field.equals( "rateDownload" )){	
-					value = new Long( stats.getDownloadAverage());
-				}else if ( field.equals( "rateUpload" )){
-					value = new Long( stats.getUploadAverage());
-				}else if ( field.equals( "speedLimitDownload" )){	
-					value = new Long( download.getDownloadRateLimitBytesPerSecond());
-				}else if ( field.equals( "speedLimitUpload" )){
-					value = new Long( download.getUploadRateLimitBytesPerSecond());
-				}else if ( field.equals( "seeders" )){
-					// Removed in RPC v7
-					if ( pm == null ){
-						value = new Long(-1);
-					}else{
-						value = new Long( pm.getNbSeeds());
-					}
-				}else if ( field.equals( "sizeWhenDone" )){	
-					value = new Long( t.getSize());	// TODO: excluded DND
-				}else if ( field.equals( "status" )){
-					
-					value = torrentGet_status(download);
-
-				}else if ( field.equals( "swarmSpeed" )){	
-					// Removed in RPC v7
-					value = new Long( core_download.getStats().getTotalAveragePerPeer());
-				}else if ( field.equals( "totalSize" )){
-					value = new Long( t.getSize());
-				}else if ( field.equals( "pieceCount" )){
-					value = new Long( t.getPieceCount());
-				}else if ( field.equals( "pieceSize" )){
-					value = new Long( t.getPieceSize());
-				}else if ( field.equals( "metadataPercentComplete" )){
+				}else if ( field.equals( "metadataPercentComplete" )){ 
+					// RPC v7: TODO
+					// metadataPercentComplete     | double                      | tr_stat
+			    /** 
+			     * How much of the metadata the torrent has.
+			     * For torrents added from a .torrent this will always be 1.
+			     * For magnet links, this number will from from 0 to 1 as the metadata is downloaded.
+			     * Range is [0..1] 
+			     */
 					// RPC v7
 					value = 1.0f;
-				}else if ( field.equals( "uploadedEver" )){	
-					value = new Long( stats.getUploaded());
-				}else if ( field.equals( "recheckProgress" )){
+
+				}else if ( field.equals( "name" )){	
+
+					value = download.getName();
+
+				}else if ( field.equals( "peer-limit" )){
+					// peer-limit                  | number                      | tr_torrent
+					// TODO
+					/** how many peers this torrent can connect to */
+					value = -1;
+
+				}else if ( field.equals( "peers" )){
+					// RPC v2
+
+					value = torrentGet_peers(core_download);
 					
-					double x = 0;
+				}else if ( field.equals( "peersConnected" )){	
+					// peersConnected              | number                      | tr_stat
 					
-					if ( core_download.getState() == DownloadManager.STATE_CHECKING ){
-						
-						DiskManager dm = core_download.getDiskManager();
-						
-						if ( dm != null ){
-							
-							x = ((double)stats.getCompleted())/1000;
-						}
-					}
+					/** Number of peers that we're connected to */
+					value = pm == null ? 0 : pm.getNbPeers() + pm.getNbSeeds();
+
+				}else if ( field.equals( "peersFrom" )){	
 					
-					value = new Double( x );
-				}else if ( field.equals( "uploadRatio" )){
-					value = new Double( ((double)stats.getShareRatio())/1000);
-				}else if ( field.equals( "seedRatioLimit" )){
+					value = torrentGet_peersFrom(pm);
+
+				}else if ( field.equals( "peersGettingFromUs" )){	
+					// peersGettingFromUs          | number                      | tr_stat
+
+					value = peers_from_us;
+
+				}else if ( field.equals( "peersSendingToUs" )){
+					// peersSendingToUs            | number                      | tr_stat
+
+					value = peers_to_us;
+
+				}else if ( field.equals( "percentDone" )){
 					// RPC v5
-
-					value = new Double( COConfigurationManager.getFloatParameter( "Stop Ratio" ));
-
-				}else if ( field.equals( "seedRatioMode" )){
-					// 0=global,1=local,2=unlimited
-					value = new Long(1);
-
-				}else if ( field.equals( "percentDone" )){			// 2.71
+					// percentDone                 | double                      | tr_stat
           /** 
            * How much has been downloaded of the files the user wants. This differs
            * from percentComplete if the user wants only some of the torrent's files.
            * Range is [0..1]
            */
-					// TODO
-  				value = 0;
+					// TODO: getRemaining only excludes DND when diskmanager exists..
+  				value = 1.0f - (stats.getRemaining() / t.getSize());
 
-				}else if ( field.equals( "webseedsSendingToUs" )){
-					// TODO: RPC v0
-					/** Number of webseeds that are sending data to us. */
-					value = 0;
+				} else if ( field.equals( "pieces")) {
+					// RPC v5
+					value = torrentGet_pieces(core_download);
+				}else if ( field.equals( "pieceCount" )){
+					// pieceCount                  | number                      | tr_info
+					value = t.getPieceCount();
+
+				}else if ( field.equals( "pieceSize" )){
+					// pieceSize                   | number                      | tr_info
+					value = t.getPieceSize();
+
+				}else if ( field.equals( "priorities" )){
+					
+					value = torrentGet_priorities(core_download);
+
+				}else if ( field.equals( "queuePosition" )){
+					// RPC v14
+					// "queuePosition"       | number     position of this torrent in its queue [0...n)
+					
+					value = core_download.getPosition();
+					
+				}else if ( field.equals( "rateDownload" )){	
+					// rateDownload (B/s)          | number                      | tr_stat
+					value = stats.getDownloadAverage();
+
+				}else if ( field.equals( "rateUpload" )){
+					// rateUpload (B/s)            | number                      | tr_stat
+					value = stats.getUploadAverage();
+
+				}else if ( field.equals( "recheckProgress" )){
+					// recheckProgress             | double                      | tr_stat
+					value = torrentGet_recheckProgress(core_download, stats);
+
+				}else if ( field.equals( "secondsDownloading")){
+					// secondsDownloading          | number                      | tr_stat
+					/** Cumulative seconds the torrent's ever spent downloading */
+					value = stats.getSecondsDownloading();
+
+				}else if ( field.equals( "secondsSeeding")){
+					// secondsSeeding              | number                      | tr_stat
+			    /** Cumulative seconds the torrent's ever spent seeding */
+					// TODO: Want "only seeding" time, or seeding time (including downloading time)? 
+					value = stats.getSecondsOnlySeeding();
+
+				}else if ( field.equals( "seedIdleLimit")){
+					// RPC v10
+					// "seedIdleLimit"       | number     torrent-level number of minutes of seeding inactivity
+					value = (int) stats.getSecondsSinceLastUpload() / 60;
+
+				}else if ( field.equals( "seedIdleMode")){
+					// RPC v10: Not used, always TransmissionVars.TR_IDLELIMIT_GLOBAL
+				  // "seedIdleMode"        | number     which seeding inactivity to use.  See tr_inactvelimit
+					value = TransmissionVars.TR_IDLELIMIT_GLOBAL;
+
+				}else if ( field.equals( "seedRatioLimit" )){
+					// RPC v5
+					// "seedRatioLimit"      | double     torrent-level seeding ratio
+
+					value = COConfigurationManager.getFloatParameter( "Stop Ratio" );
+
+				}else if ( field.equals( "seedRatioMode" )){
+					// RPC v5: Not used, always Global
+					// seedRatioMode               | number                      | tr_ratiolimit
+					value = TransmissionVars.TR_RATIOLIMIT_GLOBAL;
+
+				}else if ( field.equals( "sizeWhenDone" )){	
+					// sizeWhenDone                | number                      | tr_stat
+			    /** 
+			     * Byte count of all the piece data we'll have downloaded when we're done,
+	         * whether or not we have it yet. This may be less than tr_info.totalSize
+	         * if only some of the torrent's files are wanted.
+	         * [0...tr_info.totalSize] 
+	         **/
+					value = t.getSize();	// TODO: excluded DND
+
 				}else if ( field.equals( "startDate" )){
 					/** When the torrent was last started. */
-					value = 0;
+					value = stats.getTimeStarted() / 1000;
+
+				}else if ( field.equals( "status" )){
+					
+					value = torrentGet_status(download);
+
+				}else if ( field.equals( "trackers" )){
+
+					value = torrentGet_trackers(core_download);
+
 				}else if ( field.equals( "trackerStats" )){
 					// RPC v7
 					
 					value = torrentGet_trackerStats(core_download);
-					
-				}else if ( field.equals( "peers" )){				// 2.71
-					// RPC v2
 
-					List	peers = getPeerList(core_download);
-					
-					value = peers;
-					
-				}else if ( field.equals( "queuePosition" )){		// 2.71
-					
-					value = core_download.getPosition();
-					
-				}else if ( field.equals( "trackers" )){				// 2.71
-					
-					List	trackers = new ArrayList();
-					
-					value = trackers;
+				}else if ( field.equals( "totalSize" )){
 
+					value = t.getSize();
+
+
+				}else if ( field.equals( "torrentFile" )){
+					// torrentFile                 | string                      | tr_info
+					/** Path to torrent **/
+					value = core_download.getTorrentFileName();
+
+				}else if ( field.equals( "uploadedEver" )){	
+					// uploadedEver                | number                      | tr_stat
+					value = stats.getUploaded();
+
+				}else if ( field.equals( "uploadLimit" ) || field.equals("speed-limit-up")){
+					// RPC v5 (alternate is from 'set' prior to v5 -- added for rogue clients)
+
+					/** maximum upload speed (KBps) */
+					int bps = download.getUploadRateLimitBytesPerSecond();
+					value = bps <= 0 ? bps : (bps < 1024 ? 1 : bps / 1024);
+
+				}else if ( field.equals( "uploadLimited") || field.equals("speed-limit-up-enabled")){
+					// RPC v5 (alternate is from 'set' prior to v5 -- added for rogue clients)
+
+					/** true if "uploadLimit" is honored */
+					value = download.getUploadRateLimitBytesPerSecond() > 0;
+
+				}else if ( field.equals( "uploadRatio" )){
+					// uploadRatio                 | double                      | tr_stat
+					value = stats.getShareRatio() / 1000.0;
+
+				}else if ( field.equals( "wanted" )){
+					
+					value = torrentGet_wanted(core_download);
+
+				}else if ( field.equals( "webseeds" )){
+					value = torrentGet_webSeeds(t);
+
+				}else if ( field.equals( "webseedsSendingToUs" )){
+					value = torrentGet_webseedsSendingToUs(core_download);
+
+				}else if ( field.equals( "trackerSeeds" )){
+					// Vuze Specific?
+					DownloadScrapeResult scrape = download.getLastScrapeResult();
+					value = new Long( scrape==null?0:scrape.getSeedCount());
+
+				}else if ( field.equals( "trackerLeechers" )){
+					// Vuze Specific?
+					DownloadScrapeResult scrape = download.getLastScrapeResult();
+					value = new Long( scrape==null?0:scrape.getNonSeedCount());
+
+				}else if ( field.equals( "speedLimitDownload" )){	
+					// Vuze Specific?
+					value = new Long( download.getDownloadRateLimitBytesPerSecond());
+				}else if ( field.equals( "speedLimitUpload" )){
+					// Vuze Specific?
+					value = new Long( download.getUploadRateLimitBytesPerSecond());
+				}else if ( field.equals( "seeders" )){
+					// Removed in RPC v7
+					value = pm == null ? -1 : pm.getNbSeeds();
+
+				}else if ( field.equals( "swarmSpeed" )){	
+					// Removed in RPC v7
+					value = new Long( core_download.getStats().getTotalAveragePerPeer());
 				}else if ( field.equals( "announceResponse" )){
 					// Removed in RPC v7
 					
@@ -2028,10 +2087,6 @@ XMWebUIPlugin
 					} else {
 						value = "";
 					}
-
-				}else if ( field.equals( "peersKnown" )){ // TODO, Removed in v13
-					
-					value = 0;
 
 				}else if ( field.equals( "lastScrapeTime" )){
 					// Unsure of wanted format
@@ -2072,55 +2127,19 @@ XMWebUIPlugin
 						value = 0;
 					}
 
-				}else if ( field.equals( "webseeds" )){
-					// TODO
-					value = 0;
-
-				}else if ( field.equals( "priorities" )){
-					List list = new ArrayList();
-					value = list;
-					
-					DiskManagerFileInfoSet files = core_download.getDiskManagerFileInfoSet();
-					
-					DiskManagerFileInfo[] fileInfos = files.getFiles();
-					for (DiskManagerFileInfo fileInfo : fileInfos) {
-						int priority = fileInfo.getPriority();
-						long newPriority = TransmissionVars.convertVuzePriority(priority);
-						list.add(newPriority);
-					}
-
-				}else if ( field.equals( "uploadLimited") || field.equals("speed-limit-up-enabled")){
-					// RPC v5 (alternate is from 'set' prior to v5 -- added for rogue clients)
-					// TODO
-					value = false;
-
-				}else if ( field.equals( "uploadLimit" ) || field.equals("speed-limit-up")){
-					// RPC v5 (alternate is from 'set' prior to v5 -- added for rogue clients)
-					// TODO
-					value = -1;
-
-				}else if ( field.equals( "peer-limit" )){
-					// TODO
-					value = -1;
-
 				} else if (field.equals("downloadLimitMode") || field.equals("uploadLimitMode")) {
 					// RPC < v5 -- Not supported -- ignore
-/*
-We Support? | RPC v | Trns Ver| BW Compat | method         | comment
-					Y | 7     | 1.80    |        NO | torrent-get    | removed arg "announceResponse"
-					Y         |         |        NO | torrent-get    | removed arg "announceURL"
-					N         |         |        NO | torrent-get    | removed arg "downloaders"
-					N         |         |        NO | torrent-get    | removed arg "lastAnnounceTime"
-					N         |         |        NO | torrent-get    | removed arg "lastScrapeTime"
-					Y         |         |        NO | torrent-get    | removed arg "leechers"
-         	Y         |         |        NO | torrent-get    | removed arg "nextAnnounceTime"
-         	Y         |         |        NO | torrent-get    | removed arg "nextScrapeTime"
-         	N         |         |        NO | torrent-get    | removed arg "scrapeResponse"
-          Y         |         |        NO | torrent-get    | removed arg "scrapeURL"
-         	Y					|         |        NO | torrent-get    | removed arg "seeders"
-         	N         |         |        NO | torrent-get    | removed arg "timesCompleted"
-         	Y         |         |        NO | torrent-get    | removed arg "swarmSpeed"
- */
+
+				} else if (field.equals("downloaders") 
+						|| field.equals("lastAnnounceTime")
+						|| field.equals("lastScrapeTime")
+						|| field.equals("scrapeResponse")
+						|| field.equals("timesCompleted")
+						) {
+					// RPC < v7 -- Not Supported -- ignore
+
+				} else if (field.equals("peersKnown")) {
+					// RPC < v13 -- Not Supported -- ignore
 					
 				}else{
 					System.out.println( "Unhandled get-torrent field: " + field );
@@ -2140,7 +2159,176 @@ We Support? | RPC v | Trns Ver| BW Compat | method         | comment
 		return result;
 	}
 
-  /** 
+	/** Number of webseeds that are sending data to us. */
+  private Object torrentGet_webseedsSendingToUs(DownloadManager core_download) {
+  	PEPeerManager peerManager = core_download.getPeerManager();
+  	if (peerManager == null) {
+  		return 0;
+  	}
+		int numWebSeedsConnected = 0;
+		List<PEPeer> peers = peerManager.getPeers();
+		for (PEPeer peer : peers) {
+			if (peer.getProtocol().equals("HTTP")) {
+				numWebSeedsConnected++;
+			}
+		}
+		return numWebSeedsConnected;
+	}
+
+	private Object torrentGet_webSeeds(Torrent t) {
+    // webseeds           
+    // | an array of strings:                 |
+    // +-------------------------+------------+
+    // | webseed                 | string     | tr_info
+		List getright = BDecoder.decodeStrings(getURLList(t, "url-list"));
+		List webseeds = BDecoder.decodeStrings(getURLList(t, "httpseeds"));
+
+		List list = new ArrayList();
+		for (List l : new List[] {
+			getright,
+			webseeds
+		}) {
+
+			for (Object o : l) {
+				if (o instanceof String) {
+					list.add(o);
+				}
+			}
+		}
+		return list;
+	}
+
+	/** 
+   * When tr_stat.activity is TR_STATUS_CHECK or TR_STATUS_CHECK_WAIT,
+   * this is the percentage of how much of the files has been 
+   * verified. When it gets to 1, the verify process is done.
+   * Range is [0..1]
+   **/
+	private Object torrentGet_recheckProgress(DownloadManager core_download,
+			DownloadStats stats) {
+		double x = 1;
+		
+		if ( core_download.getState() == DownloadManager.STATE_CHECKING ){
+			
+			DiskManager dm = core_download.getDiskManager();
+			
+			if ( dm != null ){
+				
+				x = ((double)stats.getCompleted())/1000;
+			}
+		}
+		
+		return x;
+	}
+
+	private Object torrentGet_priorities(DownloadManager core_download) {
+    // | an array of tr_info.filecount        | tr_info
+    // | numbers. each is the tr_priority_t   |
+    // | mode for the corresponding file.     |
+		List list = new ArrayList();
+		
+		DiskManagerFileInfoSet files = core_download.getDiskManagerFileInfoSet();
+		
+		DiskManagerFileInfo[] fileInfos = files.getFiles();
+		for (DiskManagerFileInfo fileInfo : fileInfos) {
+			int priority = fileInfo.getPriority();
+			long newPriority = TransmissionVars.convertVuzePriority(priority);
+			list.add(newPriority);
+		}
+		
+		return list;
+	}
+
+	private Object torrentGet_pieces(DownloadManager core_download) {
+  	Object value = null;
+
+		// TODO: No idea if this works
+		// pieces | string             
+		// | A bitfield holding pieceCount flags  | tr_torrent
+		// | which are set to 'true' if we have   |
+		// | the piece matching that position.    |
+		// | JSON doesn't allow raw binary data,  |
+		// | so this is a base64-encoded string.  |
+
+		DiskManager dm = core_download.getDiskManager();
+		
+		if ( dm != null ){
+			DiskManagerPiece[] pieces = dm.getPieces();
+			byte[] bits = new byte[ (int) Math.ceil(pieces.length / 8.0f)];
+			int pieceNo = 0;
+			int bitPos = 0;
+			while (pieceNo < pieces.length) {
+				
+				bits[bitPos] = 0;
+				for (int i = 0; pieceNo < pieces.length && i < 8; i++) {
+					boolean done = pieces[pieceNo].isDone();
+					
+					if (done) {
+						bits[bitPos] |= (byte)(1 << i);
+					}
+					
+					pieceNo++;
+				}
+				
+				bitPos++;
+			}
+			try {
+				value = new String( Base64.encode(bits), "UTF8");
+			} catch (UnsupportedEncodingException e) {
+			}
+		}
+		return value;
+	}
+
+	private Object torrentGet_peersFrom(PEPeerManager pm) {
+    // peersFrom          | an object containing:                |
+    // +-------------------------+------------+
+    // | fromCache               | number     | tr_stat
+    // | fromDht                 | number     | tr_stat
+    // | fromIncoming            | number     | tr_stat
+    // | fromLpd                 | number     | tr_stat
+    // | fromLtep                | number     | tr_stat
+    // | fromPex                 | number     | tr_stat
+    // | fromTracker             | number     | tr_stat
+
+		Map<String, Long> mapPeersFrom = new HashMap<String, Long>();
+
+		if (pm == null) {
+			return mapPeersFrom;
+		}
+			
+		List<PEPeer> peers = pm.getPeers();
+		
+		for ( PEPeer peer: peers ){
+			
+			String peerSource = peer.getPeerSource();
+			if (peerSource != null) {
+				if (peerSource.equals(PEPeerSource.PS_BT_TRACKER)) {
+					peerSource = "fromTracker";
+				} else if (peerSource.equals(PEPeerSource.PS_DHT)) {
+					peerSource = "fromDht";
+				} else if (peerSource.equals(PEPeerSource.PS_INCOMING)) {
+					peerSource = "fromIncoming";
+				} else if (peerSource.equals(PEPeerSource.PS_OTHER_PEER)) {
+					peerSource = "fromPex";
+				} else if (peerSource.equals(PEPeerSource.PS_PLUGIN)) {
+					// TODO: better cat?
+					peerSource = "fromCache";
+				} else {
+					peerSource = "fromCache";
+				} // missing: from Ltep
+				if (!mapPeersFrom.containsKey(peerSource)) {
+					mapPeersFrom.put(peerSource, 1l);
+				} else {
+					mapPeersFrom.put(peerSource, mapPeersFrom.get(peerSource) + 1);
+				}
+			}
+		}
+
+		return mapPeersFrom;
+	}
+
+	/** 
    * time when one or more of the torrent's trackers will
    * allow you to manually ask for more peers,
    * or 0 if you can't 
@@ -2201,128 +2389,169 @@ We Support? | RPC v | Trns Ver| BW Compat | method         | comment
 		
 		return value;
 	}
+	
+	private Object torrentGet_trackers(DownloadManager core_download) {
+		List	trackers = new ArrayList();
+
+		List<TrackerPeerSource> trackerPeerSources = core_download.getTrackerPeerSources();
+		
+		if (trackerPeerSources == null) {
+			return trackers;
+		}
+
+		for (TrackerPeerSource tps : trackerPeerSources) {
+	    String statusString = tps.getStatusString();
+	    if (statusString == null) {
+	    	statusString = "";
+	    }
+
+	    Map<String, Object> map = new HashMap<String, Object>();
+      //trackers           | array of objects, each containing:   |
+      //+-------------------------+------------+
+      //| announce                | string     | tr_tracker_info
+      //| id                      | number     | tr_tracker_info
+      //| scrape                  | string     | tr_tracker_info
+      //| tier                    | number     | tr_tracker_info
+
+	    map.put("id", tps.hashCode());
+	    /* the full announce URL */
+	    map.put("announce", tps.getName()); // TODO
+	    /* the full scrape URL */
+	    map.put("scrape", tps.getName()); // TODO
+	    /* which tier this tracker is in */
+	    map.put("tier", 0); // TODO: int);
+
+
+	    
+	    trackers.add(map);
+		}
+
+		return trackers;
+	}
 
 	private Object torrentGet_trackerStats(DownloadManager core_download) {
 		List	tracker_stats = new ArrayList();
 
 		List<TrackerPeerSource> trackerPeerSources = core_download.getTrackerPeerSources();
 		
-		if (trackerPeerSources != null) {
-			for (TrackerPeerSource tps : trackerPeerSources) {
-		    String statusString = tps.getStatusString();
-		    if (statusString == null) {
-		    	statusString = "";
-		    }
+		if (trackerPeerSources == null) {
+			return tracker_stats;
+		}
 
-		    Map<String, Object> map = new HashMap<String, Object>();
-				
-		    /* how many downloads this tracker knows of (-1 means it does not know) */
-		    map.put("downloadCount", -1); // TODO
+		for (TrackerPeerSource tps : trackerPeerSources) {
+	    String statusString = tps.getStatusString();
+	    if (statusString == null) {
+	    	statusString = "";
+	    }
 
-		    /* whether or not we've ever sent this tracker an announcement */
-		    map.put("hasAnnounced", tps.getPeers() >= 0); // TODO
+	    Map<String, Object> map = new HashMap<String, Object>();
+			
+	    /* how many downloads this tracker knows of (-1 means it does not know) */
+	    map.put("downloadCount", -1); // TODO
 
-		    /* whether or not we've ever scraped to this tracker */
-		    map.put("hasScraped", false); // todo: bool);
+	    /* whether or not we've ever sent this tracker an announcement */
+	    map.put("hasAnnounced", tps.getPeers() >= 0); // TODO
 
-		    /* human-readable string identifying the tracker */
-		    map.put("host", tps.getName()); // TODO
+	    /* whether or not we've ever scraped to this tracker */
+	    map.put("hasScraped", false); // todo: bool);
 
-		    /* the full announce URL */
-		    map.put("announce", tps.getName()); // TODO
+	    /* human-readable string identifying the tracker */
+	    map.put("host", tps.getName()); // TODO
 
-		    /* the full scrape URL */
-		    map.put("scrape", tps.getName()); // TODO
+	    /* the full announce URL */
+	    map.put("announce", tps.getName()); // TODO
 
-		    /* Transmission uses one tracker per tier,
-		     * and the others are kept as backups */
-		    map.put("isBackup", false); // TODO
+	    /* the full scrape URL */
+	    map.put("scrape", tps.getName()); // TODO
 
-		    /* is the tracker announcing, waiting, queued, etc */
-		    int status = tps.getStatus();
-		    int state;
-		    if (status == tps.ST_AVAILABLE || status == tps.ST_ONLINE) {
-		    	state = TransmissionVars.TR_TRACKER_WAITING;
-		    } else if (status == tps.ST_UPDATING) {
-		    	state = TransmissionVars.TR_TRACKER_ACTIVE; 
-		    } else if (status == tps.ST_QUEUED) {
-		    	state = TransmissionVars.TR_TRACKER_QUEUED; 
-		    } else {
-		    	state = TransmissionVars.TR_TRACKER_INACTIVE;
-		    }
-		    map.put("announceState", state);
+	    /* Transmission uses one tracker per tier,
+	     * and the others are kept as backups */
+	    map.put("isBackup", false); // TODO
 
-		    /* is the tracker scraping, waiting, queued, etc */
-		    map.put("scrapeState", state);
+	    /* is the tracker announcing, waiting, queued, etc */
+	    int status = tps.getStatus();
+	    int state;
+	    if (status == tps.ST_AVAILABLE || status == tps.ST_ONLINE) {
+	    	state = TransmissionVars.TR_TRACKER_WAITING;
+	    } else if (status == tps.ST_UPDATING) {
+	    	state = TransmissionVars.TR_TRACKER_ACTIVE; 
+	    } else if (status == tps.ST_QUEUED) {
+	    	state = TransmissionVars.TR_TRACKER_QUEUED; 
+	    } else {
+	    	state = TransmissionVars.TR_TRACKER_INACTIVE;
+	    }
+	    map.put("announceState", state);
 
-		    /* number of peers the tracker told us about last time.
-		     * if "lastAnnounceSucceeded" is false, this field is undefined */
-		    map.put("lastAnnouncePeerCount", tps.getPeers());
+	    /* is the tracker scraping, waiting, queued, etc */
+	    map.put("scrapeState", state);
 
-		    /* human-readable string with the result of the last announce.
-		       if "hasAnnounced" is false, this field is undefined */
-		    if (statusString != null) {
-		    	map.put("lastAnnounceResult", statusString);
-		    }
+	    /* number of peers the tracker told us about last time.
+	     * if "lastAnnounceSucceeded" is false, this field is undefined */
+	    map.put("lastAnnouncePeerCount", tps.getPeers());
 
-		    /* when the last announce was sent to the tracker.
-		     * if "hasAnnounced" is false, this field is undefined */
-		    map.put("lastAnnounceStartTime", 0); // TODO: time_t);
+	    /* human-readable string with the result of the last announce.
+	       if "hasAnnounced" is false, this field is undefined */
+	    if (statusString != null) {
+	    	map.put("lastAnnounceResult", statusString);
+	    }
 
-		    /* whether or not the last announce was a success.
-		       if "hasAnnounced" is false, this field is undefined */
-		    map.put("lastAnnounceSucceeded", tps.getPeers() >= 0);
+	    /* when the last announce was sent to the tracker.
+	     * if "hasAnnounced" is false, this field is undefined */
+	    map.put("lastAnnounceStartTime", 0); // TODO: time_t);
 
-		    /* whether or not the last announce timed out. */
-		    map.put("lastAnnounceTimedOut", false); // TODO
+	    /* whether or not the last announce was a success.
+	       if "hasAnnounced" is false, this field is undefined */
+	    map.put("lastAnnounceSucceeded", tps.getPeers() >= 0);
 
-		    /* when the last announce was completed.
-		       if "hasAnnounced" is false, this field is undefined */
-		    map.put("lastAnnounceTime", 0); // TODO: time_t);
+	    /* whether or not the last announce timed out. */
+	    map.put("lastAnnounceTimedOut", false); // TODO
 
-		    /* human-readable string with the result of the last scrape.
-		     * if "hasScraped" is false, this field is undefined */
-		    if (statusString != null) {
-		    	map.put("lastScrapeResult", statusString);
-		    }
+	    /* when the last announce was completed.
+	       if "hasAnnounced" is false, this field is undefined */
+	    map.put("lastAnnounceTime", 0); // TODO: time_t);
 
-		    /* when the last scrape was sent to the tracker.
-		     * if "hasScraped" is false, this field is undefined */
-		    map.put("lastScrapeStartTime", 0); // TODO: time_t);
+	    /* human-readable string with the result of the last scrape.
+	     * if "hasScraped" is false, this field is undefined */
+	    if (statusString != null) {
+	    	map.put("lastScrapeResult", statusString);
+	    }
 
-		    /* whether or not the last scrape was a success.
-		       if "hasAnnounced" is false, this field is undefined */
-		    map.put("lastScrapeSucceeded", tps.getPeers() >= 0);
+	    /* when the last scrape was sent to the tracker.
+	     * if "hasScraped" is false, this field is undefined */
+	    map.put("lastScrapeStartTime", 0); // TODO: time_t);
 
-		    /* whether or not the last scrape timed out. */
-		    map.put("lastScrapeTimedOut", false); // TODO: bool);
+	    /* whether or not the last scrape was a success.
+	       if "hasAnnounced" is false, this field is undefined */
+	    map.put("lastScrapeSucceeded", tps.getPeers() >= 0);
 
-		    /* when the last scrape was completed.
-		       if "hasScraped" is false, this field is undefined */
-		    map.put("lastScrapeTime", 0); // TODO: time_t);
+	    /* whether or not the last scrape timed out. */
+	    map.put("lastScrapeTimedOut", false); // TODO: bool);
 
-		    /* number of leechers this tracker knows of (-1 means it does not know) */
-		    map.put("leecherCount", tps.getLeecherCount());
+	    /* when the last scrape was completed.
+	       if "hasScraped" is false, this field is undefined */
+	    map.put("lastScrapeTime", 0); // TODO: time_t);
 
-		    /* when the next periodic announce message will be sent out.
-		       if announceState isn't TR_TRACKER_WAITING, this field is undefined */
-		    map.put("nextAnnounceTime", 0); // TODO: time_t);
+	    /* number of leechers this tracker knows of (-1 means it does not know) */
+	    map.put("leecherCount", tps.getLeecherCount());
 
-		    /* when the next periodic scrape message will be sent out.
-		       if scrapeState isn't TR_TRACKER_WAITING, this field is undefined */
-		    map.put("nextScrapeTime", 0); // TODO: time_t);
+	    /* when the next periodic announce message will be sent out.
+	       if announceState isn't TR_TRACKER_WAITING, this field is undefined */
+	    map.put("nextAnnounceTime", 0); // TODO: time_t);
 
-		    /* number of seeders this tracker knows of (-1 means it does not know) */
-		    map.put("seederCount", tps.getSeedCount());
+	    /* when the next periodic scrape message will be sent out.
+	       if scrapeState isn't TR_TRACKER_WAITING, this field is undefined */
+	    map.put("nextScrapeTime", 0); // TODO: time_t);
 
-		    /* which tier this tracker is in */
-		    map.put("tier", 0); // TODO: int);
+	    /* number of seeders this tracker knows of (-1 means it does not know) */
+	    map.put("seederCount", tps.getSeedCount());
 
-		    /* used to match to a tr_tracker_info */
-		    map.put("id", tps.hashCode());
-		    
-		    tracker_stats.add(map);
-			}
+	    /* which tier this tracker is in */
+	    map.put("tier", 0); // TODO: int);
+
+	    /* used to match to a tr_tracker_info */
+	    map.put("id", tps.hashCode());
+	    
+	    tracker_stats.add(map);
 		}
 
 		return tracker_stats;
@@ -2429,6 +2658,22 @@ We Support? | RPC v | Trns Ver| BW Compat | method         | comment
   	}
   	
   	return status_int;
+	}
+
+	private Object torrentGet_wanted(DownloadManager core_download) {
+    // wanted             
+    // | an array of tr_info.fileCount        | tr_info
+    // | 'booleans' true if the corresponding |
+    // | file is to be downloaded.            |
+		List<Object> list = new ArrayList<Object>();
+		
+		DiskManagerFileInfo[] files = core_download.getDiskManagerFileInfoSet().getFiles();
+		
+		for ( DiskManagerFileInfo file: files ){
+			list.add( !file.isSkipped() );
+		}
+		
+		return list;
 	}
 
 	private Object torrentGet_fileStats(DownloadManager core_download) {
@@ -2581,7 +2826,26 @@ We Support? | RPC v | Trns Ver| BW Compat | method         | comment
 		return value;
 	}
 
-	private List getPeerList(DownloadManager core_download) {
+	private List torrentGet_peers(DownloadManager core_download) {
+  	// peers              | array of objects, each containing:   |
+  	// +-------------------------+------------+
+  	// | address                 | string     | tr_peer_stat
+  	// | clientName              | string     | tr_peer_stat
+  	// | clientIsChoked          | boolean    | tr_peer_stat
+  	// | clientIsInterested      | boolean    | tr_peer_stat
+  	// | flagStr                 | string     | tr_peer_stat
+  	// | isDownloadingFrom       | boolean    | tr_peer_stat
+  	// | isEncrypted             | boolean    | tr_peer_stat
+  	// | isIncoming              | boolean    | tr_peer_stat
+  	// | isUploadingTo           | boolean    | tr_peer_stat
+  	// | isUTP                   | boolean    | tr_peer_stat
+  	// | peerIsChoked            | boolean    | tr_peer_stat
+  	// | peerIsInterested        | boolean    | tr_peer_stat
+  	// | port                    | number     | tr_peer_stat
+  	// | progress                | double     | tr_peer_stat
+  	// | rateToClient (B/s)      | number     | tr_peer_stat
+  	// | rateToPeer (B/s)        | number     | tr_peer_stat
+
 		List peers = new ArrayList();
 		
 		if (core_download == null) {
@@ -2597,12 +2861,35 @@ We Support? | RPC v | Trns Ver| BW Compat | method         | comment
 			Map map = new HashMap();
 			peers.add(map);
 			
+			boolean isDownloadingFrom = peer.isDownloadPossible() && peer.getStats().getDataReceiveRate() > 0;
 			
 			map.put("address", peer.getIp());
 			map.put("clientName", peer.getClient());
 			map.put("clientIsChoked", peer.isChokedByMe());
 			map.put("clientIsInterested", peer.isInterested());
-			map.put("isDownloadingFrom", peer.isDownloadPossible() && peer.getStats().getDataReceiveRate() > 0);
+
+			// flagStr
+      // "O": "Optimistic unchoke"
+      // "D": "Downloading from this peer"
+      // "d": "We would download from this peer if they'd let us"
+      // "U": "Uploading to peer"
+      // "u": "We would upload to this peer if they'd ask"
+      // "K": "Peer has unchoked us, but we're not interested"
+      // "?": "We unchoked this peer, but they're not interested"
+      // "E": "Encrypted Connection"
+      // "H": "Peer was discovered through Distributed Hash Table (DHT)"
+      // "X": "Peer was discovered through Peer Exchange (PEX)"
+      // "I": "Peer is an incoming connection"
+      // "T": "Peer is connected via uTP"
+			//TODO
+			StringBuffer flagStr = new StringBuffer();
+			if (isDownloadingFrom) {
+				flagStr.append('D');
+			}
+			map.put("flagStr", flagStr);
+
+			
+			map.put("isDownloadingFrom", isDownloadingFrom);
 			// peer.connection.getTransport().isEncrypted
 			map.put("isEncrypted", !"None".equals(peer.getEncryption()));  // TODO FIX
 			map.put("isIncoming", peer.isIncoming());
@@ -2874,6 +3161,31 @@ We Support? | RPC v | Trns Ver| BW Compat | method         | comment
 	
 	private Number getTrackerID(TrackerPeerSource source) {
 		return Long.valueOf((source.getName().hashCode() << 4l) + source.getType());
+	}
+
+	protected List
+	getURLList(
+		Torrent	torrent,
+		String		key )
+	{
+		Object obj = torrent.getAdditionalProperty( key );
+		
+		if ( obj instanceof byte[] ){
+			
+              List l = new ArrayList();
+              
+	        l.add(obj);
+	        
+	        return( l );
+	        
+		}else if ( obj instanceof List ){
+			
+			return((List)obj);
+			
+		}else{
+			
+			return( new ArrayList());
+		}
 	}
 
 }

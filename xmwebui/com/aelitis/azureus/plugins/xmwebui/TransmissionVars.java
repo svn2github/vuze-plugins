@@ -226,6 +226,15 @@ public class TransmissionVars
 	/* override the global settings, seeding regardless of activity */
 	public static final long TR_IDLELIMIT_UNLIMITED = 2;
 	
+	//////////////////////////////////////////////////////////////////////////////
+	//tr_ratiolimit;
+  /* follow the global settings */
+	public static final long TR_RATIOLIMIT_GLOBAL    = 0;
+  /* override the global settings, seeding until a certain ratio */
+	public static final long TR_RATIOLIMIT_SINGLE    = 1;
+  /* override the global settings, seeding regardless of ratio */
+	public static final long TR_RATIOLIMIT_UNLIMITED = 2;
+
 	
 	public static final long TR_ETA_NOT_AVAIL = -1;
 	public static final long TR_ETA_UNKNOWN = -2;
