@@ -1006,7 +1006,7 @@ XMWebUIPlugin
 
 
 			result.put( "port", new Long( tcp_port ) );                	// number     port number
-			result.put( "rpc-version", new Long( 14 ));              	// number     the current RPC API version
+			result.put( "rpc-version", new Long( 15 ));              	// number     the current RPC API version
 			result.put( "rpc-version-minimum", new Long( 6 ));      	// number     the minimum RPC API version supported
 			result.put( "seedRatioLimit", new Double(stop_ratio) );          	// double     the default seed ratio for torrents to use
 			result.put( "seedRatioLimited", stop_ratio>0 );         			// boolean    true if seedRatioLimit is honored by default
@@ -1775,7 +1775,14 @@ XMWebUIPlugin
 					// eta                         | number                      | tr_stat
 
 					value = torrentGet_eta(download, stats);
-					
+
+				}else if ( field.equals( "etaIdle" )){
+					// RPC v15
+					/** If seeding, number of seconds left until the idle time limit is reached. */
+					// TODO: No idea what etaIdle description means! What happens at idle time?
+
+					value = TransmissionVars.TR_ETA_UNKNOWN;
+
 				}else if ( field.equals( "files" )){
 					// RPC v0
 
