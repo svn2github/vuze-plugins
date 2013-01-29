@@ -196,6 +196,23 @@ public class RCM_SearchProvider
 		{
 			if ( hash_map == null){
 				
+				long	cnet = (Long)result.getProperty( 50000 );
+				
+				if ( !plugin.isVisible( cnet )){
+					
+					byte[]	tracker_keys = (byte[])result.getProperty( 50001 );
+					
+					if ( !plugin.isVisible( tracker_keys )){
+						
+						byte[]	ws_keys = (byte[])result.getProperty( 50002 );
+	
+						if ( !plugin.isVisible( ws_keys )){
+							
+							return;
+						}
+					}
+				}
+				
 				observer.resultReceived( search, result );
 				
 			}else{

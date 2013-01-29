@@ -158,6 +158,12 @@ RelatedContentUI
 		return( plugin );
 	}
 	
+	protected PluginInterface
+	getPluginInterface()
+	{
+		return( plugin_interface );
+	}
+	
 	protected Image
 	getSwarmImage()
 	{

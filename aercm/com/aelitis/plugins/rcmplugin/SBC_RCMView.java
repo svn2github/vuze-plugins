@@ -21,6 +21,7 @@ package com.aelitis.plugins.rcmplugin;
 
 import java.lang.reflect.Field;
 import java.util.*;
+import java.util.List;
 import java.util.regex.Pattern;
 
 import org.eclipse.swt.SWT;
@@ -30,8 +31,14 @@ import org.eclipse.swt.layout.*;
 import org.eclipse.swt.program.Program;
 import org.eclipse.swt.widgets.*;
 
+import org.gudy.azureus2.core3.config.COConfigurationManager;
+import org.gudy.azureus2.core3.config.ParameterListener;
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.*;
+import org.gudy.azureus2.plugins.PluginConfig;
+import org.gudy.azureus2.plugins.PluginInterface;
+import org.gudy.azureus2.plugins.ui.UIInputReceiver;
+import org.gudy.azureus2.plugins.ui.UIInputReceiverListener;
 import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.UIPluginViewToolBarListener;
 import org.gudy.azureus2.plugins.ui.tables.TableColumn;
@@ -39,6 +46,7 @@ import org.gudy.azureus2.plugins.ui.tables.TableColumnCreationListener;
 import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.plugins.ui.toolbar.UIToolBarItem;
 import org.gudy.azureus2.pluginsimpl.local.PluginInitializer;
+import org.gudy.azureus2.ui.swt.SimpleTextEntryWindow;
 import org.gudy.azureus2.ui.swt.Utils;
 import org.gudy.azureus2.ui.swt.views.table.TableViewSWT;
 import org.gudy.azureus2.ui.swt.views.table.TableViewSWTMenuFillListener;
@@ -47,6 +55,7 @@ import org.gudy.azureus2.ui.swt.views.table.impl.TableViewFactory;
 import com.aelitis.azureus.core.AzureusCore;
 import com.aelitis.azureus.core.AzureusCoreFactory;
 import com.aelitis.azureus.core.AzureusCoreRunningListener;
+import com.aelitis.azureus.core.cnetwork.ContentNetwork;
 import com.aelitis.azureus.core.content.RelatedContent;
 import com.aelitis.azureus.core.content.RelatedContentManager;
 import com.aelitis.azureus.core.content.RelatedContentManagerListener;
@@ -111,7 +120,12 @@ SBC_RCMView
 	private boolean showIndirect = true;
 
 	private Object ds;
-
+	
+	public
+	SBC_RCMView()
+	{
+	}
+	
 	public Object 
 	skinObjectInitialShow(
 		SWTSkinObject skinObject, Object params ) 
@@ -169,6 +183,75 @@ SBC_RCMView
 				});
 			}
 			
+			SWTSkinObjectButton soSourcesButton = (SWTSkinObjectButton)getSkinObject("sources-button");
+			if (soSourcesButton != null) {
+				soSourcesButton.addSelectionListener(new SWTSkinButtonUtility.ButtonListenerAdapter() {
+				@Override
+				public void pressed(SWTSkinButtonUtility buttonUtility,
+						SWTSkinObject skinObject, int stateMask) 
+					{
+						final String param_name = "Plugin.aercm.sources.setlist";
+						
+						List<String> list = RelatedContentUI.getSingleton().getPlugin().getSourcesList();
+						
+						SimpleTextEntryWindow entryWindow = new SimpleTextEntryWindow(
+								"!Swarm Source Selection!", "!Enter the names of enabled swarm sources, or to enable all enter '*'!" );
+						
+						String 	text = "";
+						
+						for ( String s: list ){
+							
+							text += s + "\r\n";
+						}
+													
+						entryWindow.setPreenteredText( text, false );
+						
+						entryWindow.selectPreenteredText( false );
+						
+						entryWindow.setMultiLine( true );
+						
+						entryWindow.setLineHeight( list.size() + 3 );
+						
+						entryWindow.prompt(new UIInputReceiverListener() {
+							public void UIInputReceiverClosed(UIInputReceiver entryWindow) {
+								if (!entryWindow.hasSubmittedInput()) {
+									return;
+								}
+								
+								String input = entryWindow.getSubmittedInput();
+								
+								if ( input == null ){
+									
+									input = "";
+									
+								}else{
+									
+									input = input.trim();
+								}
+								
+								String[] lines = input.split( "\n" );
+								
+								List<String> list = new ArrayList<String>();
+								
+								for ( String line: lines ){
+									
+									line = line.trim();
+									
+									if ( line.length() > 0  ){
+										
+										list.add( line );
+									}
+								}
+								
+								COConfigurationManager.setParameter( param_name, list );
+								
+								refilter();
+							}
+						});
+
+					}
+				});
+			}
 			Composite parent = (Composite) soFilterArea.getControl();
 	
 			Label label;
@@ -298,10 +381,17 @@ SBC_RCMView
 	}
 	
 	private boolean isOurContent(RelatedContent c) {
-		return ((c.getSeeds() >= minSeeds) || (showUnknownSeeds && c.getSeeds() < 0)) 
+		boolean show = ((c.getSeeds() >= minSeeds) || (showUnknownSeeds && c.getSeeds() < 0)) 
 			&& (createdMsAgo == 0 || (SystemTime.getCurrentTime() - c.getPublishDate() < createdMsAgo))
 			&& ((c.getRank() >= minRank))
 			&& (showIndirect || c.getHash() != null);
+		
+		if ( show ){
+			
+			show = RelatedContentUI.getSingleton().getPlugin().isVisible( c );
+		}
+		
+		return( show );
 	}
 
 

@@ -22,11 +22,16 @@
 package com.aelitis.plugins.rcmplugin;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 
 import org.gudy.azureus2.core3.config.COConfigurationManager;
+import org.gudy.azureus2.core3.config.ParameterListener;
+import org.gudy.azureus2.core3.util.BDecoder;
+import org.gudy.azureus2.core3.util.ByteArrayHashMap;
 import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.SystemProperties;
@@ -37,6 +42,8 @@ import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.gudy.azureus2.plugins.utils.search.SearchProvider;
 import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 
+import com.aelitis.azureus.core.cnetwork.ContentNetwork;
+import com.aelitis.azureus.core.content.RelatedContent;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinFactory;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinProperties;
 
@@ -45,7 +52,7 @@ public class
 RCMPlugin 
 	implements UnloadablePlugin
 {
-	protected static final int MIN_SEARCH_RANK_DEFAULT = 1;
+	protected static final int MIN_SEARCH_RANK_DEFAULT = 0;
 	
 	static{
 		COConfigurationManager.setParameter( "rcm.persist", true );
@@ -58,6 +65,45 @@ RCMPlugin
 
 	private boolean					destroyed;
 	
+	List<String>	source_map_defaults = new ArrayList<String>();
+	{
+		source_map_defaults.add( "vhdn.vuze.com" );
+		source_map_defaults.add( "tracker.vodo.net" );
+		source_map_defaults.add( "bt.archive.org" );
+		source_map_defaults.add( "tracker.legaltorrents.com" );
+		source_map_defaults.add( "tracker.mininova.org" );
+	}
+	
+	private ByteArrayHashMap<Boolean>	source_map 	= new ByteArrayHashMap<Boolean>();
+	private boolean						source_map_wildcard;
+	private byte[]						source_vhdn = compressDomain( "vhdn.vuze.com" );
+	
+	
+	private byte[]
+	compressDomain(
+		String	host )
+	{
+		String[] bits = host.split( "\\." );
+		
+		int	len = bits.length;
+		
+		if ( len < 2 ){
+			
+			bits = new String[]{ bits[0], "com" };
+		}
+					
+		String	end = bits[len-1];
+							
+		String dom = bits[len-2] + "." + end;
+				
+		int hash = dom.hashCode();
+				
+		byte[]	bytes = { (byte)(hash>>24), (byte)(hash>>16),(byte)(hash>>8),(byte)hash };
+
+		return( bytes );
+	}
+
+	
 	public void
 	initialize(
 		final PluginInterface		_plugin_interface )
@@ -66,6 +112,19 @@ RCMPlugin
 	{
 		plugin_interface = _plugin_interface;
 			
+		COConfigurationManager.addAndFireParameterListener(
+			"Plugin.aercm.sources.setlist",
+			new ParameterListener()
+			{
+				public void 
+				parameterChanged(
+					String name) 
+				{
+					updateSourcesList();
+				}
+			});
+		
+		
 			/*
 			 * Hack for 4800 OSX default save dir issue
 			 */
@@ -265,6 +324,108 @@ RCMPlugin
 		}
 	}
 	
+	private void
+	updateSourcesList()
+	{
+		List<String>	list = getSourcesList();
+		
+		source_map.clear();
+		source_map_wildcard	= false;
+		
+		for( String host: list ){
+			
+			if ( host.equals( "*" )){
+				
+				source_map_wildcard = true;
+				
+			}else{
+				
+				source_map.put( compressDomain( host ), Boolean.TRUE );
+			}
+		}
+	}
+	
+	public List<String>
+	getSourcesList()
+	{
+		List<String>	list = 
+			BDecoder.decodeStrings( 
+				COConfigurationManager.getListParameter( "Plugin.aercm.sources.setlist", source_map_defaults ));
+
+		return( list );
+	}
+	
+	public boolean
+	isVisible(
+		long	cnet )
+	{
+		if ( cnet == ContentNetwork.CONTENT_NETWORK_VHDNL ){
+			
+			return( isVisible( source_vhdn ));
+		}
+		
+		return( false );
+	}
+	
+	public boolean
+	isVisible(
+		byte[]	key_list )
+	{
+		if ( source_map_wildcard ){
+			
+			return( true );
+		}
+		
+		if ( key_list != null ){
+			
+			for ( int i=0;i<key_list.length;i+=4 ){
+				
+				Boolean b = source_map.get( key_list, i, 4 );
+				
+				if ( b != null ){
+					
+					if ( b ){
+						
+						return( true );
+					}
+				}
+			}
+		}
+		
+		return( false );
+	}
+	
+	public boolean
+	isVisible(
+		RelatedContent	related_content )
+	{
+		if ( source_map_wildcard ){
+			
+			return( true );
+		}
+		
+		byte[] tracker_keys;
+		
+		long cnet = related_content.getContentNetwork();
+		
+		if ( cnet == ContentNetwork.CONTENT_NETWORK_VHDNL ){
+			
+			tracker_keys = source_vhdn;
+			
+		}else{
+		
+			tracker_keys = related_content.getTrackerKeys();
+		}
+		
+		if ( isVisible( tracker_keys )){
+			
+			return( true );
+		}
+		
+		byte[] ws_keys = related_content.getWebSeedKeys();
+		
+		return( isVisible( ws_keys ));
+	}
 	
 	public void 
 	unload() 
