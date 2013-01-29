@@ -1,6 +1,9 @@
 RSSFEED CHANGELOG - Changes by parg@users.soruceforge.net
 ---------------------------------------------
-
+1.4.2 - don't copy enabled state when duplication a filter
+1.4.1 - minor null-pointer exception fix
+1.4.0 - added file size min+max to filter criteria
+1.3.7 - added filter copy feature
 1.3.6 - magnet uri support
 
 1.3.4/5 - compatability fixes

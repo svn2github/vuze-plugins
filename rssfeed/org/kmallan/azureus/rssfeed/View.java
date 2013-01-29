@@ -1008,7 +1008,7 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
 	  tmpBean.setCategory(item.getCategory());
 	  tmpBean.setCleanFile(item.getCleanFile());
 	  tmpBean.setDisableAfter(item.getDisableAfter());
-	  tmpBean.setEnabled(item.getEnabled());
+	  tmpBean.setEnabled(false);	// request from http://forum.vuze.com/thread.jspa?threadID=113667
 	  tmpBean.setEndEpisode(item.getEndEpisode());
 	  tmpBean.setEndSeason(item.getEndSeason());
 	  tmpBean.setExpression(item.getExpression());
