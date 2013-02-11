@@ -2355,13 +2355,16 @@ RelatedContentUI
 
 				String id = "rcm.ftux.shell";
 				skin.createSkinObject(id, id, soExtra);
-				shell.setSize(300, SWT.DEFAULT);
-				
+
 				box.setButtonEnabled(0, false);
 
+				// dummy button so Windows doesn't automatically select the first one
+				new Button(soExtra.getComposite(), SWT.RADIO);
+				
 				final  Button [] buttons = { null, null };
 				final SWTSkinObjectContainer soOption1 = (SWTSkinObjectContainer) skin.getSkinObject("option-preselect");
 				if (soOption1 != null) {
+					
 					buttons[0] = new Button(soOption1.getComposite(), SWT.RADIO);
 					buttons[0].addSelectionListener(new SelectionAdapter() {
 						public void widgetSelected(SelectionEvent e) {
