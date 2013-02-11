@@ -22,11 +22,7 @@
 package com.aelitis.plugins.rcmplugin;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.MissingResourceException;
-import java.util.ResourceBundle;
+import java.util.*;
 
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.config.ParameterListener;
@@ -53,7 +49,11 @@ RCMPlugin
 	implements UnloadablePlugin
 {
 	protected static final int MIN_SEARCH_RANK_DEFAULT = 0;
-	
+
+	public static  final String PARAM_SOURCES_LIST = "Plugin.aercm.sources.setlist";
+
+	public static final String PARAM_FTUX_SHOWN = "rcm.ftux.shown2";
+
 	static{
 		COConfigurationManager.setParameter( "rcm.persist", true );
 	}
@@ -113,7 +113,7 @@ RCMPlugin
 		plugin_interface = _plugin_interface;
 			
 		COConfigurationManager.addAndFireParameterListener(
-			"Plugin.aercm.sources.setlist",
+				PARAM_SOURCES_LIST,
 			new ParameterListener()
 			{
 				public void 
@@ -268,14 +268,14 @@ RCMPlugin
 	protected boolean
 	hasFTUXBeenShown()
 	{
-		return( plugin_interface.getPluginconfig().getPluginBooleanParameter( "rcm.ftux.shown", false ));
+		return( plugin_interface.getPluginconfig().getPluginBooleanParameter( PARAM_FTUX_SHOWN, false ));
 	}
 
 	protected void
 	setFTUXBeenShown(
 		boolean b )
 	{
-		plugin_interface.getPluginconfig().setPluginParameter( "rcm.ftux.shown", b );
+		plugin_interface.getPluginconfig().setPluginParameter( PARAM_FTUX_SHOWN, b );
 				
 		hookSearch();
 		
@@ -350,9 +350,21 @@ RCMPlugin
 	{
 		List<String>	list = 
 			BDecoder.decodeStrings( 
-				COConfigurationManager.getListParameter( "Plugin.aercm.sources.setlist", source_map_defaults ));
+				COConfigurationManager.getListParameter( PARAM_SOURCES_LIST, source_map_defaults ));
 
 		return( list );
+	}
+	
+	public void setToDefaultSourcesList() {
+		COConfigurationManager.setParameter(PARAM_SOURCES_LIST, source_map_defaults);
+	}
+	
+	public void setToAllSources() {
+		COConfigurationManager.setParameter(PARAM_SOURCES_LIST, Arrays.asList("*"));
+	}
+	
+	public boolean isAllSources() {
+		return source_map_wildcard;
 	}
 	
 	public boolean

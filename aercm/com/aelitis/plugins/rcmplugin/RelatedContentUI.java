@@ -23,10 +23,13 @@ package com.aelitis.plugins.rcmplugin;
 import java.util.*;
 
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.graphics.Image;
+import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.MessageBox;
-import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.TreeItem;
+import org.eclipse.swt.widgets.Shell;
 
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.internat.MessageText;
@@ -324,6 +327,15 @@ RelatedContentUI
 					}		
 				});
 
+
+			ActionParameter sourcesAction = config_model.addActionParameter2(null, "rcm.button.sources");
+			sourcesAction.setMinimumRequiredUserMode(ActionParameter.MODE_INTERMEDIATE);
+			sourcesAction.addListener(new ParameterListener() {
+				public void parameterChanged(Parameter param) {
+					showSourcesList();
+				}
+			});
+
 			enable_ui = 
 				config_model.addBooleanParameter2( 
 					"rcm.ui.enable", "rcm.ui.enable",
@@ -437,9 +449,10 @@ RelatedContentUI
 
 			
 			if (Constants.IS_CVS_VERSION) {
-				config_model.addBooleanParameter2("rcm.ftux.shown", "!Debug:Was Welcome Shown!", false);
+				config_model.addBooleanParameter2(RCMPlugin.PARAM_FTUX_SHOWN, "!Debug:Was Welcome Shown?!", false);
 			}
-
+			
+			
 			buildSideBar( new MainViewInfo() );
 
 			COConfigurationManager.addAndFireParameterListener("rcm.overall.enabled",
@@ -455,6 +468,65 @@ RelatedContentUI
 			
 			Debug.out( e );
 		}
+	}
+
+	protected void showSourcesList() {
+
+		List<String> list = RelatedContentUI.getSingleton().getPlugin().getSourcesList();
+		
+		SimpleTextEntryWindow entryWindow = new SimpleTextEntryWindow(
+				"rcm.sources.title", "rcm.sources.text" );
+		
+		String 	text = "";
+		
+		for ( String s: list ){
+			
+			text += s + "\r\n";
+		}
+									
+		entryWindow.setPreenteredText( text, false );
+		
+		entryWindow.selectPreenteredText( false );
+		
+		entryWindow.setMultiLine( true );
+		
+		entryWindow.setLineHeight( list.size() + 3 );
+		
+		entryWindow.prompt(new UIInputReceiverListener() {
+			public void UIInputReceiverClosed(UIInputReceiver entryWindow) {
+				if (!entryWindow.hasSubmittedInput()) {
+					return;
+				}
+				
+				String input = entryWindow.getSubmittedInput();
+				
+				if ( input == null ){
+					
+					input = "";
+					
+				}else{
+					
+					input = input.trim();
+				}
+				
+				String[] lines = input.split( "\n" );
+				
+				List<String> list = new ArrayList<String>();
+				
+				for ( String line: lines ){
+					
+					line = line.trim();
+					
+					if ( line.length() > 0  ){
+						
+						list.add( line );
+					}
+				}
+				
+				COConfigurationManager.setParameter( RCMPlugin.PARAM_SOURCES_LIST, list );
+			}
+		});
+
 	}
 
 	private void
@@ -1338,7 +1410,7 @@ RelatedContentUI
 				
 				return( getTitle());
 				
-			}else if ( propertyID == TITLE_INDICATOR_TEXT ){
+			}else if ( propertyID == TITLE_INDICATOR_TEXT && plugin.isAllSources() ){
 				
 				int	 unread = manager==null?0:manager.getNumUnread();
 				
@@ -1387,7 +1459,7 @@ RelatedContentUI
 				
 				return( getTitle());
 				
-			}else if ( propertyID == TITLE_INDICATOR_TEXT ){
+			}else if ( propertyID == TITLE_INDICATOR_TEXT && plugin.isAllSources() ){
 				
 				if ( num_unread > 0 ){
 				
@@ -2268,10 +2340,12 @@ RelatedContentUI
 	}
 
 	public static void showFTUX(final SWTSkinObject so_list) {
-		VuzeMessageBox box = new VuzeMessageBox(MessageText.getString("rcm.ftux.title"), null, new String[] {
-			MessageText.getString("rcm.ftux.enable"),
-			MessageText.getString("rcm.ftux.disable"),
+		final VuzeMessageBox box = new VuzeMessageBox(MessageText.getString("rcm.ftux.title"), null, new String[] {
+			MessageText.getString("rcm.ftux.accept"),
+			MessageText.getString("rcm.ftux.decline"),
 		}, 0);
+		
+		final int[] radioResult = { -1 };
 		box.setSubTitle(MessageText.getString("rcm.ftux.heading"));
 		box.setListener(new VuzeMessageBoxListener() {
 			public void shellReady(Shell shell, SWTSkinObjectContainer soExtra) {
@@ -2281,13 +2355,47 @@ RelatedContentUI
 
 				String id = "rcm.ftux.shell";
 				skin.createSkinObject(id, id, soExtra);
+				shell.setSize(300, SWT.DEFAULT);
+				
+				box.setButtonEnabled(0, false);
+
+				final  Button [] buttons = { null, null };
+				final SWTSkinObjectContainer soOption1 = (SWTSkinObjectContainer) skin.getSkinObject("option-preselect");
+				if (soOption1 != null) {
+					buttons[0] = new Button(soOption1.getComposite(), SWT.RADIO);
+					buttons[0].addSelectionListener(new SelectionAdapter() {
+						public void widgetSelected(SelectionEvent e) {
+							box.setButtonEnabled(0, true);	
+							radioResult[0] = 0;
+							if (buttons[1] != null) {
+								buttons[1].setSelection(false);
+							}
+						}
+					});
+				}
+				
+				SWTSkinObjectContainer soOption2 = (SWTSkinObjectContainer) skin.getSkinObject("option-all");
+				if (soOption2 != null) {
+					buttons[1] = new Button(soOption2.getComposite(), SWT.RADIO);
+					buttons[1].addSelectionListener(new SelectionAdapter() {
+						public void widgetSelected(SelectionEvent e) {
+							box.setButtonEnabled(0, true);				
+							radioResult[0] = 1;
+							if (buttons[0] != null) {
+								buttons[0].setSelection(false);
+							}
+						}
+					});
+				}
 			}
 		});
 
 		box.open(new UserPrompterResultListener() {
 			public void prompterClosed(int result) {
 				if (result < 0) {
-					UIFunctionsManager.getUIFunctions().openView(UIFunctions.VIEW_MYTORRENTS, null);
+					if (so_list != null) {
+						UIFunctionsManager.getUIFunctions().openView(UIFunctions.VIEW_MYTORRENTS, null);
+					}
 					return;
 				}
 				boolean enabled = result == 0;				
@@ -2306,6 +2414,12 @@ RelatedContentUI
 					ui.setSearchEnabled(enabled);
 					ui.setUIEnabled(enabled);
 					ui.plugin.setFTUXBeenShown(true);
+					
+					if (radioResult[0] == 1) {
+						ui.plugin.setToAllSources();
+					} else {
+						ui.plugin.setToDefaultSourcesList();
+					}
 				}
 
 			}
