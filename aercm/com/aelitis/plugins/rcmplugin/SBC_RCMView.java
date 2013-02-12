@@ -113,6 +113,8 @@ SBC_RCMView
 	private boolean showIndirect = true;
 
 	private Object ds;
+
+	private ParameterListener paramSourceListener;
 	
 	public
 	SBC_RCMView()
@@ -489,11 +491,12 @@ SBC_RCMView
 			initTable((Composite) so_list.getControl());
 		}
 		
-		COConfigurationManager.addParameterListener(RCMPlugin.PARAM_SOURCES_LIST, new ParameterListener() {
+		paramSourceListener = new ParameterListener() {
 			public void parameterChanged(String parameterName) {
 				refilter();
 			}
-		});
+		};
+		COConfigurationManager.addParameterListener(RCMPlugin.PARAM_SOURCES_LIST, paramSourceListener);
 
 		return null;
 	}
@@ -524,7 +527,7 @@ SBC_RCMView
 			table_parent,
 		});
 
-		COConfigurationManager.removeParameter(RCMPlugin.PARAM_SOURCES_LIST);
+		COConfigurationManager.removeParameterListener(RCMPlugin.PARAM_SOURCES_LIST, paramSourceListener);
 
 		return( super.skinObjectHidden(skinObject, params));
 	}
