@@ -2401,33 +2401,78 @@ RelatedContentUI
 					}
 					return;
 				}
-				boolean enabled = result == 0;				
+				boolean enabled = result == 0;
 				
-				if ( so_list != null ){
-					so_list.setVisible(enabled);
+				if (enabled && radioResult[0] == 1) {
+					showFTUX2(new UserPrompterResultListener() {
+						public void prompterClosed(int result) {
+							if (result == 0) {
+								enableRCM(true, true, so_list);
+							} else if (so_list != null) {
+								UIFunctionsManager.getUIFunctions().openView(UIFunctions.VIEW_MYTORRENTS, null);
+							}
+						}
+					});
+					return;
 				}
-
-
-				RelatedContentUI ui = RelatedContentUI.getSingleton();
-
-				if (ui != null) {
-					if (enabled) {
-						ui.plugin.setRCMEnabled(enabled);
-					}
-					ui.setSearchEnabled(enabled);
-					ui.setUIEnabled(enabled);
-					ui.plugin.setFTUXBeenShown(true);
-					
-					if (radioResult[0] == 1) {
-						ui.plugin.setToAllSources();
-					} else {
-						ui.plugin.setToDefaultSourcesList();
-					}
-				}
-
+				enableRCM(enabled, false, so_list);
 			}
 		});
 		
 		box.waitUntilClosed();
+	}
+
+	private static void enableRCM(boolean enabled, boolean all, SWTSkinObject so_list) {
+		if ( so_list != null ){
+			so_list.setVisible(enabled);
+		}
+
+		RelatedContentUI ui = RelatedContentUI.getSingleton();
+
+		if (ui != null) {
+			if (enabled) {
+				ui.plugin.setRCMEnabled(enabled);
+			}
+			ui.setSearchEnabled(enabled);
+			ui.setUIEnabled(enabled);
+			ui.plugin.setFTUXBeenShown(true);
+			
+			if (all) {
+				ui.plugin.setToAllSources();
+			} else {
+				ui.plugin.setToDefaultSourcesList();
+			}
+		}
+
+	}
+
+	protected static void showFTUX2(UserPrompterResultListener l) {
+		final VuzeMessageBox box = new VuzeMessageBox(
+				MessageText.getString("rcm.ftux2.title"), null, new String[] {
+					MessageText.getString("Button.ok"),
+					MessageText.getString("Button.cancel"),
+				}, 0);
+		box.setSubTitle(MessageText.getString("rcm.ftux2.heading"));
+		box.setListener(new VuzeMessageBoxListener() {
+			public void shellReady(Shell shell, SWTSkinObjectContainer soExtra) {
+				SWTSkin skin = soExtra.getSkin();
+				addResourceBundle(skin, "com/aelitis/plugins/rcmplugin/skins/",
+						"skin3_rcm_ftux2");
+
+				String id = "rcm.ftux2.shell";
+				skin.createSkinObject(id, id, soExtra);
+
+				box.setButtonEnabled(0, false);
+
+				final SWTSkinObjectCheckbox cb = (SWTSkinObjectCheckbox) skin.getSkinObject("agree-checkbox");
+				cb.addSelectionListener(new SWTSkinCheckboxListener() {
+					public void checkboxChanged(SWTSkinObjectCheckbox so, boolean checked) {
+						box.setButtonEnabled(0, checked);
+					}
+				});
+			}
+		});
+		
+		box.open(l);
 	}
 }
