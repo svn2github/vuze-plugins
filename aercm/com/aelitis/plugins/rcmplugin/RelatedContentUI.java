@@ -124,7 +124,7 @@ RelatedContentUI
 	
 	private Image			swarm_image;
 	
-	private List<TableContextMenuItem>	menus = new ArrayList<TableContextMenuItem>();
+	private List<MenuItem>	menus = new ArrayList<MenuItem>();
 		
 	private ByteArrayHashMap<RCMItem>	rcm_item_map = new ByteArrayHashMap<RCMItem>();
 	
@@ -190,7 +190,7 @@ RelatedContentUI
 					}
 					
 					try{
-						for ( TableContextMenuItem menu: menus ){
+						for ( MenuItem menu: menus ){
 							
 							menu.remove();
 						}
@@ -553,7 +553,7 @@ RelatedContentUI
 		
 		if (!enable) {
 			if ( menus.size() > 0 ){ 
-				for (TableContextMenuItem menuitem : menus) {
+				for (MenuItem menuitem : menus) {
 					menuitem.remove();
 				}
 				menus.clear();
@@ -979,6 +979,7 @@ RelatedContentUI
 			MenuItem menu_item;
 			
 			menu_item = menu_manager.addMenuItem( MenuManager.MENU_MENUBAR, "rcm.view.heading" );
+			menus.add(menu_item);
 
 			menu_item.addListener( 
 					new MenuItemListener() 
