@@ -29,22 +29,21 @@ import java.util.*;
 
 import org.bouncycastle.util.encoders.Base64;
 import org.gudy.azureus2.core3.config.COConfigurationManager;
+import org.gudy.azureus2.core3.config.impl.TransferSpeedValidator;
 import org.gudy.azureus2.core3.disk.DiskManager;
-import org.gudy.azureus2.core3.disk.DiskManagerFileInfo;
-import org.gudy.azureus2.core3.disk.DiskManagerFileInfoSet;
 import org.gudy.azureus2.core3.disk.DiskManagerPiece;
 import org.gudy.azureus2.core3.download.DownloadManager;
 import org.gudy.azureus2.core3.download.DownloadManagerState;
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.ipfilter.IpFilter;
 import org.gudy.azureus2.core3.ipfilter.IpFilterManagerFactory;
+import org.gudy.azureus2.core3.ipfilter.impl.IpFilterAutoLoaderImpl;
 import org.gudy.azureus2.core3.logging.LogAlert;
 import org.gudy.azureus2.core3.logging.Logger;
 import org.gudy.azureus2.core3.peer.PEPeer;
 import org.gudy.azureus2.core3.peer.PEPeerManager;
 import org.gudy.azureus2.core3.peer.PEPeerSource;
 import org.gudy.azureus2.core3.peer.PEPeerStats;
-import org.gudy.azureus2.core3.torrent.TOTorrent;
 import org.gudy.azureus2.core3.tracker.client.TRTrackerAnnouncer;
 import org.gudy.azureus2.core3.tracker.client.TRTrackerAnnouncerResponse;
 import org.gudy.azureus2.core3.tracker.client.TRTrackerScraper;
@@ -56,10 +55,12 @@ import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.UnloadablePlugin;
 import org.gudy.azureus2.plugins.config.ConfigParameter;
 import org.gudy.azureus2.plugins.config.ConfigParameterListener;
+import org.gudy.azureus2.plugins.disk.DiskManagerFileInfo;
 import org.gudy.azureus2.plugins.download.*;
 import org.gudy.azureus2.plugins.torrent.Torrent;
 import org.gudy.azureus2.plugins.torrent.TorrentAttribute;
 import org.gudy.azureus2.plugins.torrent.TorrentDownloader;
+import org.gudy.azureus2.plugins.torrent.TorrentManager;
 import org.gudy.azureus2.plugins.tracker.web.TrackerWebPageRequest;
 import org.gudy.azureus2.plugins.tracker.web.TrackerWebPageResponse;
 import org.gudy.azureus2.plugins.ui.config.BooleanParameter;
@@ -67,6 +68,8 @@ import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.gudy.azureus2.ui.webplugin.WebPlugin;
 
+import com.aelitis.azureus.core.AzureusCore;
+import com.aelitis.azureus.core.AzureusCoreFactory;
 import com.aelitis.azureus.core.tracker.TrackerPeerSource;
 import com.aelitis.azureus.core.util.MultiPartDecoder;
 import com.aelitis.azureus.plugins.dht.DHTPlugin;
@@ -512,7 +515,7 @@ XMWebUIPlugin
 							}
 							
 							try{
-								Download download = addTorrent( torrent, add_stopped );
+								Download download = addTorrent( torrent, null, add_stopped, null );
 								
 								response.setContentType( "text/xml; charset=UTF-8" );
 								
@@ -658,26 +661,42 @@ XMWebUIPlugin
 	
 	protected Download
 	addTorrent(
-		Torrent		torrent,
-		boolean		add_stopped )
+		final Torrent		torrent,
+		File download_dir,
+		boolean		add_stopped,
+		final DownloadWillBeAddedListener listener)
 	
 		throws DownloadException
 	{
 		synchronized( add_torrent_lock ){
+
 			
-			org.gudy.azureus2.plugins.download.DownloadManager dm = plugin_interface.getDownloadManager();
+			final org.gudy.azureus2.plugins.download.DownloadManager dm = plugin_interface.getDownloadManager();
+			
 			
 			Download download = dm.getDownload( torrent );
 			
 			if ( download == null ){
-				
+
+				if (listener != null) {
+  				dm.addDownloadWillBeAddedListener(new DownloadWillBeAddedListener() {
+  					public void initialised(Download dlAdding) {
+  						boolean b = Arrays.equals(dlAdding.getTorrent().getHash(), torrent.getHash());
+  						if (b) {
+  							dm.removeDownloadWillBeAddedListener(this);
+  							listener.initialised(dlAdding);
+  						}
+  					}
+  				});
+				}
+
 				if ( add_stopped ){
 					
-					download = dm.addDownloadStopped( torrent, null, null );
+					download = dm.addDownloadStopped( torrent, null, download_dir );
 					
 				}else{
 					
-					download = dm.addDownload( torrent );
+					download = dm.addDownload( torrent, null, download_dir );
 				}
 			}
 			
@@ -776,6 +795,7 @@ XMWebUIPlugin
 		return defaultNumber;
 	}
 	
+	@SuppressWarnings("unchecked")
 	protected Map
 	processRequest(
 		String					method,
@@ -801,7 +821,9 @@ XMWebUIPlugin
 			
 			String 	save_dir 	= pc.getCoreStringParameter( PluginConfig.CORE_PARAM_STRING_DEFAULT_SAVE_PATH );
 			int		tcp_port 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_INCOMING_TCP_PORT );
-			int		up_limit 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_KBYTES_PER_SEC );
+			int		up_limit_normal 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_KBYTES_PER_SEC );
+			int		up_limit_seedingOnly 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_SEEDING_KBYTES_PER_SEC );
+			int up_limit = pc.getCoreIntParameter( TransferSpeedValidator.getActiveUploadParameter(AzureusCoreFactory.getSingleton().getGlobalManager()));
 			int		down_limit 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_DOWNLOAD_SPEED_KBYTES_PER_SEC );
 			int		glob_con	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_CONNECTIONS_GLOBAL );
 			int		tor_con 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_CONNECTIONS_PER_TORRENT );
@@ -813,113 +835,7 @@ XMWebUIPlugin
 			boolean require_enc = COConfigurationManager.getBooleanParameter("network.transport.encrypted.require");
 			
 			if ( method.equals( "session-set" )){
-				
-				checkUpdatePermissions();
-				
-				for( Map.Entry<String,Object> arg: ((Map<String,Object>)args).entrySet()){
-					
-					String	key = arg.getKey();
-					Object	val	= arg.getValue();
-					try {
-					if ( key.equals( "speed-limit-down-enabled" ) || key.equals("downloadLimited")){
-								
-						boolean enabled = getBoolean( val );
-						
-						if ( !enabled && down_limit != 0 ){
-							
-							down_limit = 0;
-							
-							pc.setCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_DOWNLOAD_SPEED_KBYTES_PER_SEC, 0 );
-						}
-					}else if ( key.equals( "speed-limit-down" ) || key.equals("downloadLimit")){
-					
-						int	limit = getNumber(val).intValue();
-						
-						if ( limit != down_limit ){
-							
-							down_limit = limit;
-							
-							pc.setCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_DOWNLOAD_SPEED_KBYTES_PER_SEC, limit );
-						}
-					}else if ( key.equals( "speed-limit-up-enabled") || key.equals("uploadLimited")){
-						
-						if ( auto_speed_on ){
-							
-							pc.setCoreBooleanParameter( PluginConfig.CORE_PARAM_BOOLEAN_AUTO_SPEED_ON, false );
-							pc.setCoreBooleanParameter( PluginConfig.CORE_PARAM_BOOLEAN_AUTO_SPEED_SEEDING_ON, false );
-						}
-						
-						boolean enabled = getBoolean( val );
-						
-						if ( !enabled && up_limit != 0 ){
-							
-							up_limit = 0;
-							
-							pc.setCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_KBYTES_PER_SEC, 0 );
-						}
-					}else if ( key.equals( "speed-limit-up" ) || key.equals("uploadLimit")){
-					
-						if ( auto_speed_on ){
-							
-							pc.setCoreBooleanParameter( PluginConfig.CORE_PARAM_BOOLEAN_AUTO_SPEED_ON, false );
-							pc.setCoreBooleanParameter( PluginConfig.CORE_PARAM_BOOLEAN_AUTO_SPEED_SEEDING_ON, false );
-						}
-
-						int	limit = getNumber(val).intValue();
-						
-						if ( limit != up_limit ){
-							
-							up_limit = limit;
-							
-							pc.setCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_KBYTES_PER_SEC, limit );
-						}
-					}else if ( key.equals( "download-dir" )){
-
-						String	dir = (String)val;
-						
-						if ( !save_dir.equals( dir )){
-							
-							save_dir = dir;
-							
-							pc.setCoreStringParameter( PluginConfig.CORE_PARAM_STRING_DEFAULT_SAVE_PATH, dir );
-						}
-					}else if ( key.equals( "peer-port" ) || key.equals( "port" )){
-						
-						int	port = getNumber(val).intValue();
-
-						if ( port != tcp_port ){
-							
-							tcp_port = port;
-							
-							pc.setCoreIntParameter( PluginConfig.CORE_PARAM_INT_INCOMING_TCP_PORT, port );
-						}
-					}else if ( key.equals( "encryption" )){
-						
-						String	value = (String)val;
-						
-						boolean	required = value.equals( "required" );
-						
-						if ( required != require_enc ){
-							
-							require_enc = required;
-							
-							COConfigurationManager.setParameter("network.transport.encrypted.require", required );
-						}
-					}else if ( key.equals( "seedRatioLimit" )){
-						// RPC v5
-
-						float	ratio = getNumber(val).floatValue();
-
-						COConfigurationManager.setParameter( "Stop Ratio", ratio );
-						
-					}else{
-						
-						System.out.println( "Unhandled session-set field: " + key );
-					}
-					} catch (Throwable t) {
-						Debug.out(key + ":" + val, t);
-					}
-				}
+				method_Session_Set(args, result);
 			}		
 			
 			float stop_ratio = COConfigurationManager.getFloatParameter( "Stop Ratio" );
@@ -1070,6 +986,16 @@ XMWebUIPlugin
 			// RPC v5
 
 			method_Torrent_Reannounce(args, result);
+			
+		}else if ( method.equals( "torrent-set-location" )){
+			// RPC v6
+			
+			method_Torrent_Set_Location(args, result);
+
+		}else if ( method.equals( "blocklist-update" )){
+			// RPC v5
+			
+			method_Blocklist_Update(args, result);
 
 		}else{
 			
@@ -1078,7 +1004,279 @@ XMWebUIPlugin
 
 		return( result );
 	}
-	
+
+	private void method_Session_Set(Map args, Map result)
+			throws IOException {
+
+		checkUpdatePermissions();
+
+		PluginConfig pc = plugin_interface.getPluginconfig();
+/*
+ "download-queue-size"            | number     | max number of torrents to download at once (see download-queue-enabled)
+ "download-queue-enabled"         | boolean    | if true, limit how many torrents can be downloaded at once
+ "dht-enabled"                    | boolean    | true means allow dht in public torrents
+ "encryption"                     | string     | "required", "preferred", "tolerated"
+ "idle-seeding-limit"             | number     | torrents we're seeding will be stopped if they're idle for this long
+ "idle-seeding-limit-enabled"     | boolean    | true if the seeding inactivity limit is honored by default
+ "incomplete-dir"                 | string     | path for incomplete torrents, when enabled
+ "incomplete-dir-enabled"         | boolean    | true means keep torrents in incomplete-dir until done
+ "lpd-enabled"                    | boolean    | true means allow Local Peer Discovery in public torrents
+ "peer-limit-global"              | number     | maximum global number of peers
+ "peer-limit-per-torrent"         | number     | maximum global number of peers
+ "pex-enabled"                    | boolean    | true means allow pex in public torrents
+ "peer-port"                      | number     | port number
+ "peer-port-random-on-start"      | boolean    | true means pick a random peer port on launch
+ "port-forwarding-enabled"        | boolean    | true means enabled
+ "queue-stalled-enabled"          | boolean    | whether or not to consider idle torrents as stalled
+ "queue-stalled-minutes"          | number     | torrents that are idle for N minuets aren't counted toward seed-queue-size or download-queue-size
+ "rename-partial-files"           | boolean    | true means append ".part" to incomplete files
+ "script-torrent-done-filename"   | string     | filename of the script to run
+ "script-torrent-done-enabled"    | boolean    | whether or not to call the "done" script
+ "seedRatioLimit"                 | double     | the default seed ratio for torrents to use
+ "seedRatioLimited"               | boolean    | true if seedRatioLimit is honored by default
+ "seed-queue-size"                | number     | max number of torrents to uploaded at once (see seed-queue-enabled)
+ "seed-queue-enabled"             | boolean    | if true, limit how many torrents can be uploaded at once
+ "speed-limit-down"               | number     | max global download speed (KBps)
+ "speed-limit-down-enabled"       | boolean    | true means enabled
+ "speed-limit-up"                 | number     | max global upload speed (KBps)
+ "speed-limit-up-enabled"         | boolean    | true means enabled
+ "start-added-torrents"           | boolean    | true means added torrents will be started right away
+ "trash-original-torrent-files"   | boolean    | true means the .torrent file of added torrents will be deleted
+ "utp-enabled"                    | boolean    | true means allow utp
+ */
+		for (Map.Entry<String, Object> arg : ((Map<String, Object>) args).entrySet()) {
+
+			String key = arg.getKey();
+			Object val = arg.getValue();
+			try {
+				if (key.startsWith("alt-speed")) {
+					// TODO:
+          // "alt-speed-down"                 | number     | max global download speed (KBps)
+          // "alt-speed-enabled"              | boolean    | true means use the alt speeds
+          // "alt-speed-time-begin"           | number     | when to turn on alt speeds (units: minutes after midnight)
+          // "alt-speed-time-enabled"         | boolean    | true means the scheduled on/off times are used
+          // "alt-speed-time-end"             | number     | when to turn off alt speeds (units: same)
+          // "alt-speed-time-day"             | number     | what day(s) to turn on alt speeds (look at tr_sched_day)
+          // "alt-speed-up"                   | number     | max global upload speed (KBps)
+
+				} else if (key.equals("blocklist-url")) {
+					// "blocklist-url"                  | string     | location of the blocklist to use for "blocklist-update"
+					IpFilter ipFilter = IpFilterManagerFactory.getSingleton().getIPFilter();
+					COConfigurationManager.setParameter("Ip Filter Autoload File",
+							(String) val);
+					COConfigurationManager.setParameter(
+							IpFilterAutoLoaderImpl.CFG_AUTOLOAD_LAST, 0);
+					try {
+						ipFilter.reload();
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+					
+				} else if (key.equals("blocklist-enabled")) {
+					// "blocklist-enabled"              | boolean    | true means enabled
+					plugin_interface.getIPFilter().setEnabled(getBoolean(val));
+					
+				} else if (key.equals("cache-size-mb")) {
+					// "cache-size-mb"                  | number     | maximum size of the disk cache (MB)
+					// umm.. not needed
+
+				} else if (key.equals("download-dir")) {
+					// "download-dir"                   | string     | default path to download torrents
+
+					String dir = (String) val;
+
+					String save_dir = pc.getCoreStringParameter(PluginConfig.CORE_PARAM_STRING_DEFAULT_SAVE_PATH);
+					if (!save_dir.equals(dir)) {
+
+						save_dir = dir;
+
+						pc.setCoreStringParameter(
+								PluginConfig.CORE_PARAM_STRING_DEFAULT_SAVE_PATH, dir);
+					}
+
+				} else if (key.equals("")) {
+
+				} else if (key.equals("")) {
+				} else if (key.equals("")) {
+				} else if (key.equals("")) {
+				} else if (key.equals("")) {
+				} else if (key.equals("")) {
+				} else if (key.equals("")) {
+				} else if (key.equals("")) {
+				} else if (key.equals("speed-limit-down-enabled")
+						|| key.equals("downloadLimited")) {
+
+					int down_limit = pc.getCoreIntParameter(PluginConfig.CORE_PARAM_INT_MAX_DOWNLOAD_SPEED_KBYTES_PER_SEC);
+					
+					boolean enable = getBoolean(val);
+
+					if (!enable && down_limit != 0) {
+
+						down_limit = 0;
+
+						pc.setCoreIntParameter(
+								PluginConfig.CORE_PARAM_INT_MAX_DOWNLOAD_SPEED_KBYTES_PER_SEC,
+								down_limit);
+					}
+				} else if (key.equals("speed-limit-down")
+						|| key.equals("downloadLimit")) {
+
+					int down_limit = pc.getCoreIntParameter(PluginConfig.CORE_PARAM_INT_MAX_DOWNLOAD_SPEED_KBYTES_PER_SEC);
+
+					int limit = getNumber(val).intValue();
+
+					if (limit != down_limit) {
+
+						down_limit = limit;
+
+						pc.setCoreIntParameter(
+								PluginConfig.CORE_PARAM_INT_MAX_DOWNLOAD_SPEED_KBYTES_PER_SEC,
+								limit);
+					}
+				} else if (key.equals("speed-limit-up-enabled")
+						|| key.equals("uploadLimited")) {
+					boolean enable = getBoolean(val);
+
+					// turn off auto speed for both normal and seeding-only mode
+					// this will reset upload speed to what it was before it was on
+					pc.setCoreBooleanParameter(
+							PluginConfig.CORE_PARAM_BOOLEAN_AUTO_SPEED_ON, false);
+					pc.setCoreBooleanParameter(
+							PluginConfig.CORE_PARAM_BOOLEAN_AUTO_SPEED_SEEDING_ON, false);
+
+					if (!enable) {
+						pc.setCoreIntParameter(
+								PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_KBYTES_PER_SEC, 0);
+						pc.setCoreIntParameter(
+								PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_SEEDING_KBYTES_PER_SEC,
+								0);
+					}
+				} else if (key.equals("speed-limit-up") || key.equals("uploadLimit")) {
+
+					// turn off auto speed for both normal and seeding-only mode
+					// this will reset upload speed to what it was before it was on
+					pc.setCoreBooleanParameter(
+							PluginConfig.CORE_PARAM_BOOLEAN_AUTO_SPEED_ON, false);
+					pc.setCoreBooleanParameter(
+							PluginConfig.CORE_PARAM_BOOLEAN_AUTO_SPEED_SEEDING_ON, false);
+
+					int limit = getNumber(val).intValue();
+
+					pc.setCoreIntParameter(
+							PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_KBYTES_PER_SEC,
+							limit);
+					pc.setCoreIntParameter(
+							PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_SEEDING_KBYTES_PER_SEC,
+							limit);
+				} else if (key.equals("peer-port") || key.equals("port")) {
+
+					int port = getNumber(val).intValue();
+
+					pc.setCoreIntParameter(PluginConfig.CORE_PARAM_INT_INCOMING_TCP_PORT,
+							port);
+				} else if (key.equals("encryption")) {
+
+					String value = (String) val;
+
+					boolean required = value.equals("required");
+
+					COConfigurationManager.setParameter(
+							"network.transport.encrypted.require", required);
+				} else if (key.equals("seedRatioLimit")) {
+					// RPC v5
+
+					float ratio = getNumber(val).floatValue();
+
+					COConfigurationManager.setParameter("Stop Ratio", ratio);
+
+				} else {
+
+					System.out.println("Unhandled session-set field: " + key);
+				}
+			} catch (Throwable t) {
+				Debug.out(key + ":" + val, t);
+			}
+		}
+	}
+
+	private void method_Blocklist_Update(Map args, Map result) {
+		// TODO
+		log("blocklist-update not supported");
+	}
+
+	private void 
+	method_Torrent_Set_Location(
+			Map args, 
+			Map result)
+	throws IOException, DownloadException
+	{
+		/*
+ Request arguments:
+
+ string                     | value type & description
+ ---------------------------+-------------------------------------------------
+ "ids"                      | array      torrent list, as described in 3.1
+ "location"                 | string     the new torrent location
+ "move"                     | boolean    if true, move from previous location.
+                            |            otherwise, search "location" for files
+                            |            (default: false)
+
+ Response arguments: none
+		 */
+		checkUpdatePermissions();
+		
+		Object	ids = args.get( "ids" );
+
+		boolean	moveData = getBoolean( args.get( "move" ));
+		String sSavePath = (String) args.get("location");
+		
+		List<Download>	downloads = getDownloads( ids );
+
+		File fSavePath = new File(sSavePath);
+
+		for ( Download download: downloads ){
+			if (moveData) {
+				download.moveDataFiles(fSavePath);
+			} else {
+  			DownloadManager dm = PluginCoreUtils.unwrap(download);
+  			
+  			// This is copied from TorrentUtils.changeDirSelectedTorrent
+  			
+  			int state = dm.getState();
+  			if (state == DownloadManager.STATE_STOPPED) {
+  				if (!dm.filesExist(true)) {
+  					state = DownloadManager.STATE_ERROR;
+  				}
+  			}
+  
+  			if (state == DownloadManager.STATE_ERROR) {
+  				
+  				dm.setTorrentSaveDir(sSavePath);
+  				
+  				boolean found = dm.filesExist(true);
+  				if (!found && dm.getTorrent() != null
+  						&& !dm.getTorrent().isSimpleTorrent()) {
+  					String parentPath = fSavePath.getParent();
+  					if (parentPath != null) {
+  						dm.setTorrentSaveDir(parentPath);
+  						found = dm.filesExist(true);
+  						if (!found) {
+  							dm.setTorrentSaveDir(sSavePath);
+  						}
+  					}
+  				}
+  
+  
+  				if (found) {
+  					dm.stopIt(DownloadManager.STATE_STOPPED, false, false);
+  
+  					dm.setStateQueued();
+  				}
+  			}
+			}
+		}
+	}
+
 	private void 
 	method_Session_Stats(
 			Map args, 
@@ -1261,7 +1459,7 @@ XMWebUIPlugin
 			}			
 			
 								
-			DiskManagerFileInfo[] files = core_download.getDiskManagerFileInfo();
+			DiskManagerFileInfo[] files = download.getDiskManagerFileInfo();
 				
 			if ( files_unwanted != null ){
 				
@@ -1297,7 +1495,7 @@ XMWebUIPlugin
 					
 					if ( index >= 0 && index <= files.length ){
 						
-						files[index].setPriority( 1 );
+						files[index].setNumericPriority( DiskManagerFileInfo.PRIORITY_HIGH );
 					}
 				}
 			}
@@ -1310,7 +1508,7 @@ XMWebUIPlugin
 					
 					if ( index >= 0 && index <= files.length ){
 						
-						files[index].setPriority( 0 );
+						files[index].setNumericPriority( DiskManagerFileInfo.PRIORITY_NORMAL );
 					}
 				}
 			}
@@ -1323,7 +1521,7 @@ XMWebUIPlugin
 					
 					if ( index >= 0 && index <= files.length ){
 						
-						files[index].setPriority( 0 );
+						files[index].setNumericPriority( DiskManagerFileInfo.PRIORITY_LOW );
 					}
 				}
 			}
@@ -1372,6 +1570,16 @@ XMWebUIPlugin
 			Map result) 
 	throws IOException 
 	{
+		/*
+ Request arguments:
+
+ string                     | value type & description
+ ---------------------------+-------------------------------------------------
+ "ids"                      | array      torrent list, as described in 3.1
+ "delete-local-data"        | boolean    delete local data. (default: false)
+
+ Response arguments: none
+		 */
 		checkUpdatePermissions();
 		
 		Object	ids = args.get( "ids" );
@@ -1521,58 +1729,170 @@ XMWebUIPlugin
 
 	private void 
 	method_Torrent_Add(
-			Map args, 
+			final Map args, 
 			Map result) 
 	throws IOException, DownloadException
-	{
+ {
+		/*
+		   Request arguments:
+
+		   key                  | value type & description
+		   ---------------------+-------------------------------------------------
+		   "cookies"            | string      pointer to a string of one or more cookies.
+		   "download-dir"       | string      path to download the torrent to
+		   "filename"           | string      filename or URL of the .torrent file
+		   "metainfo"           | string      base64-encoded .torrent content
+		   "paused"             | boolean     if true, don't start the torrent
+		   "peer-limit"         | number      maximum number of peers
+		   "bandwidthPriority"  | number      torrent's bandwidth tr_priority_t 
+		   "files-wanted"       | array       indices of file(s) to download
+		   "files-unwanted"     | array       indices of file(s) to not download
+		   "priority-high"      | array       indices of high-priority file(s)
+		   "priority-low"       | array       indices of low-priority file(s)
+		   "priority-normal"    | array       indices of normal-priority file(s)
+
+		   Either "filename" OR "metainfo" MUST be included.
+		   All other arguments are optional.
+
+		   The format of the "cookies" should be NAME=CONTENTS, where NAME is the
+		   cookie name and CONTENTS is what the cookie should contain.
+		   Set multiple cookies like this: "name1=content1; name2=content2;" etc. 
+		   <http://curl.haxx.se/libcurl/c/curl_easy_setopt.html#CURLOPTCOOKIE>
+
+		   Response arguments: on success, a "torrent-added" object in the
+		                       form of one of 3.3's tr_info objects with the
+		                       fields for id, name, and hashString.
+		 */
 		checkUpdatePermissions();
-		
-		boolean add_stopped = getBoolean( args.get( "paused" ));
-		
-		String	url = (String)args.get( "filename" );
-		
-		if ( url == null ){
-			
-			throw( new IOException( "url missing" ));
-		}
-		
-		url = url.trim().replaceAll( " ", "%20");
+
+		Torrent torrent;
+
+		String url = (String) args.get("filename");
+		String metainfo = (String) args.get("metainfo");
+
+		TorrentManager torrentManager = plugin_interface.getTorrentManager();
+
+		if (metainfo != null) {
+			try {
+				torrent = torrentManager.createFromBEncodedData(Base64.decode(metainfo));
+			} catch (Throwable e) {
+
+				e.printStackTrace();
+
+				throw (new IOException("torrent download failed: "
+						+ Debug.getNestedExceptionMessage(e)));
+			}
+		} else if (url == null) {
+
+			throw (new IOException("url missing"));
+
+		} else {
+
+			url = url.trim().replaceAll(" ", "%20");
 
 			// hack due to core bug - have to add a bogus arg onto magnet uris else they fail to parse
-		
-		if ( url.toLowerCase().startsWith( "magnet:" )){
-			
-			url += "&dummy_param=1";
-		} else if (!url.startsWith("http")) {
-			url = UrlUtils.parseTextForURL(url, true, true);
-		}
-		
-		URL	torrent_url = new URL( url );
-			
-		Torrent torrent;
-		
-		try{
-			TorrentDownloader dl = 
-				plugin_interface.getTorrentManager().getURLDownloader( torrent_url, null, null );
-			
-			torrent = dl.download( Constants.DEFAULT_ENCODING );
-			
-		}catch( Throwable e ){
 
-			e.printStackTrace();
-			
-			throw( new IOException( "torrent download failed: " + Debug.getNestedExceptionMessage( e )));
-		}
-		
-		Download download = addTorrent( torrent, add_stopped );
+			if (url.toLowerCase().startsWith("magnet:")) {
 
-		Map torrent_details = new HashMap();
-		
-		torrent_details.put( "id", new Long( getID( download, true )));
-		torrent_details.put( "name", escapeXML( download.getName()));
-		torrent_details.put( "hashString", ByteFormatter.encodeString( torrent.getHash()));
-		
-		result.put( "torrent-added", torrent_details );
+				url += "&dummy_param=1";
+			} else if (!url.startsWith("http")) {
+				url = UrlUtils.parseTextForURL(url, true, true);
+			}
+
+			URL torrent_url = new URL(url);
+
+			try {
+				TorrentDownloader dl = torrentManager.getURLDownloader(torrent_url,
+						null, null);
+
+				Object cookies = args.get("cookies");
+				if (cookies != null) {
+					dl.setRequestProperty("URL_Cookie", cookies);
+				}
+
+				torrent = dl.download(Constants.DEFAULT_ENCODING);
+
+			} catch (Throwable e) {
+
+				e.printStackTrace();
+
+				throw (new IOException("torrent download failed: "
+						+ Debug.getNestedExceptionMessage(e)));
+			}
+		}
+
+		boolean add_stopped = getBoolean(args.get("paused"));
+		String download_dir = (String) args.get("download-dir");
+		File file_Download_dir = download_dir == null ? null : new File(
+				download_dir);
+
+		// peer-limit not used
+		//getNumber(args.get("peer-limit"), 0);
+
+		// bandwidthPriority not used
+		//getNumber(args.get("bandwidthPriority"), TransmissionVars.TR_PRI_NORMAL);
+
+		Download download = addTorrent(torrent, file_Download_dir, add_stopped,
+				new DownloadWillBeAddedListener() {
+					public void initialised(Download download) {
+						int numFiles = download.getDiskManagerFileCount();
+						List files_wanted = getList(args.get("files-wanted"));
+						List files_unwanted = getList(args.get("files-unwanted"));
+
+						boolean[] toDelete = new boolean[numFiles]; // all false
+
+						int numWanted = files_wanted.size();
+						if (numWanted != 0 && numWanted != numFiles) {
+							// some wanted -- so, set all toDelete and reset ones in list
+							Arrays.fill(toDelete, true);
+							for (Object oWanted : files_wanted) {
+								int idx = getNumber(oWanted, -1).intValue();
+								if (idx >= 0 && idx < numFiles) {
+									toDelete[idx] = false;
+								}
+							}
+						}
+						for (Object oUnwanted : files_unwanted) {
+							int idx = getNumber(oUnwanted, -1).intValue();
+							if (idx >= 0 && idx < numFiles) {
+								toDelete[idx] = true;
+							}
+						}
+
+						for (int i = 0; i < toDelete.length; i++) {
+							if (toDelete[i]) {
+								download.getDiskManagerFileInfo(i).setDeleted(true);
+							}
+						}
+
+						List priority_high = getList(args.get("priority-high"));
+						for (Object oHighPriority : priority_high) {
+							int idx = getNumber(oHighPriority, -1).intValue();
+							if (idx >= 0 && idx < numFiles) {
+								download.getDiskManagerFileInfo(idx).setNumericPriority(
+										DiskManagerFileInfo.PRIORITY_HIGH);
+							}
+						}
+						List priority_low = getList(args.get("priority-low"));
+						for (Object oLowPriority : priority_low) {
+							int idx = getNumber(oLowPriority, -1).intValue();
+							if (idx >= 0 && idx < numFiles) {
+								download.getDiskManagerFileInfo(idx).setNumericPriority(
+										DiskManagerFileInfo.PRIORITY_LOW);
+							}
+						}
+						// don't need priority-normal if they are normal by default.
+					}
+				});
+
+		Map<String, Object> torrent_details = new HashMap<String, Object>();
+
+		torrent_details.put("id", new Long(getID(download, true)));
+		torrent_details.put("name", escapeXML(download.getName()));
+		torrent_details.put("hashString",
+				ByteFormatter.encodeString(torrent.getHash()));
+
+		result.put("torrent-added", torrent_details);
 	}
 
 	private Map
@@ -1791,7 +2111,7 @@ XMWebUIPlugin
 				}else if ( field.equals( "fileStats" )){
 					// RPC v5
 					
-					value = torrentGet_fileStats(core_download);
+					value = torrentGet_fileStats(download);
 					
 				}else if ( field.equals( "hashString" )){
 					// RPC v0
@@ -1942,7 +2262,7 @@ XMWebUIPlugin
 
 				}else if ( field.equals( "priorities" )){
 					
-					value = torrentGet_priorities(core_download);
+					value = torrentGet_priorities(download);
 
 				}else if ( field.equals( "queuePosition" )){
 					// RPC v14
@@ -2054,7 +2374,7 @@ XMWebUIPlugin
 
 				}else if ( field.equals( "wanted" )){
 					
-					value = torrentGet_wanted(core_download);
+					value = torrentGet_wanted(download);
 
 				}else if ( field.equals( "webseeds" )){
 					value = torrentGet_webSeeds(t);
@@ -2228,17 +2548,16 @@ XMWebUIPlugin
 		return x;
 	}
 
-	private Object torrentGet_priorities(DownloadManager core_download) {
+	private Object torrentGet_priorities(Download download) {
     // | an array of tr_info.filecount        | tr_info
     // | numbers. each is the tr_priority_t   |
     // | mode for the corresponding file.     |
 		List list = new ArrayList();
 		
-		DiskManagerFileInfoSet files = core_download.getDiskManagerFileInfoSet();
+		DiskManagerFileInfo[] fileInfos = download.getDiskManagerFileInfo();
 		
-		DiskManagerFileInfo[] fileInfos = files.getFiles();
 		for (DiskManagerFileInfo fileInfo : fileInfos) {
-			int priority = fileInfo.getPriority();
+			int priority = fileInfo.getNumericPriorty();
 			long newPriority = TransmissionVars.convertVuzePriority(priority);
 			list.add(newPriority);
 		}
@@ -2667,14 +2986,14 @@ XMWebUIPlugin
   	return status_int;
 	}
 
-	private Object torrentGet_wanted(DownloadManager core_download) {
+	private Object torrentGet_wanted(Download download) {
     // wanted             
     // | an array of tr_info.fileCount        | tr_info
     // | 'booleans' true if the corresponding |
     // | file is to be downloaded.            |
 		List<Object> list = new ArrayList<Object>();
 		
-		DiskManagerFileInfo[] files = core_download.getDiskManagerFileInfoSet().getFiles();
+		DiskManagerFileInfo[] files = download.getDiskManagerFileInfo();
 		
 		for ( DiskManagerFileInfo file: files ){
 			list.add( !file.isSkipped() );
@@ -2683,7 +3002,7 @@ XMWebUIPlugin
 		return list;
 	}
 
-	private Object torrentGet_fileStats(DownloadManager core_download) {
+	private Object torrentGet_fileStats(Download download) {
 		// | a file's non-constant properties.    |
     // | array of tr_info.filecount objects,  |
     // | each containing:                     |
@@ -2693,7 +3012,7 @@ XMWebUIPlugin
     // | priority                | number     | tr_info
 		List<Map> stats_list = new ArrayList<Map>();
 		
-		DiskManagerFileInfo[] files = core_download.getDiskManagerFileInfoSet().getFiles();
+		DiskManagerFileInfo[] files = download.getDiskManagerFileInfo();
 		
 		for ( DiskManagerFileInfo file: files ){
 			
@@ -2703,7 +3022,7 @@ XMWebUIPlugin
 			
 			obj.put( "bytesCompleted", file.getDownloaded());
 			obj.put( "wanted", !file.isSkipped());
-			obj.put( "priority", TransmissionVars.convertVuzePriority(file.getPriority()));
+			obj.put( "priority", TransmissionVars.convertVuzePriority(file.getNumericPriorty()));
 		}
 		
 		return stats_list;
@@ -2718,9 +3037,9 @@ XMWebUIPlugin
 
 		List<Map> file_list = new ArrayList<Map>();
 		
-		DiskManagerFileInfo[] files = core_download.getDiskManagerFileInfoSet().getFiles();
+		org.gudy.azureus2.core3.disk.DiskManagerFileInfo[] files = core_download.getDiskManagerFileInfoSet().getFiles();
 		
-		for ( DiskManagerFileInfo file: files ){
+		for ( org.gudy.azureus2.core3.disk.DiskManagerFileInfo file: files ){
 			
 			Map obj = new HashMap();
 			
@@ -3013,6 +3332,17 @@ XMWebUIPlugin
 		return( downloads );
 	}
 
+	protected List
+	getList(
+		Object	o )
+	{
+		if ( o instanceof List ) {
+			return (List) o;
+		} else {
+			return new ArrayList();
+		}
+	}
+	
 	protected boolean
 	getBoolean(
 		Object	o )
