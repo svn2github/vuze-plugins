@@ -786,7 +786,68 @@ public class View implements UISWTViewEventListener {
     localeList.put(locale, mapEntries);
 
     keysSorted = (String[])keyList.toArray(new String[keyList.size()]);
-    Arrays.sort(keysSorted, String.CASE_INSENSITIVE_ORDER);
+    Arrays.sort(
+    	keysSorted, 
+    	new Comparator<String>()
+    	{
+    		@Override
+    		public int 
+    		compare(
+    			String s1, String s2) 
+    		{
+    				// if we just do a case insensitive sort then we end up with the tree view showing (e.g.)
+    				//  Button.asdasd
+    				//  button.nmmm
+    				//  Button.xxxxx
+    				// (shown as 3 root nodes: Button, button, Button) 
+    				// as the tree building logic sees alternation is case as time to start a new
+    				// node. Easy fix is to ensure that prefixes are sorted ascending
+    				//  button.nmmm
+    				//  Button.asdasd
+    				//  Button.xxxxxx
+    				// (shown as 2 root nodes: button, Button)
+    			
+      			String ls1 = s1.toLowerCase( Locale.US );
+      			String ls2 = s2.toLowerCase( Locale.US );
+      			    
+      			int	prefix_length = 0;
+      			
+      			for ( int i=0;i<Math.min(ls1.length(),ls2.length());i++){
+      				
+      				char lc1 = ls1.charAt(i);
+      				char lc2 = ls2.charAt(i);
+      				
+      				if ( lc1 == lc2 ){
+      					
+      					if ( lc1 == '.' ){
+      						
+      						prefix_length = i;
+      						
+      						break;
+      					}
+      				}else{
+      					
+      					break;
+      				}
+      			}
+      			
+      			if ( prefix_length > 0 ){
+      				
+      				int	result = s2.substring(0,prefix_length).compareTo( s1.substring(0, prefix_length ));
+      				
+      				if ( result != 0 ){
+      					
+      					return( result );
+      					
+      				}else{
+      					
+      					return( s1.substring( prefix_length ).compareToIgnoreCase( s2.substring( prefix_length )));
+      				}
+      			}
+      			
+      			return( s1.compareToIgnoreCase( s2 ));
+    		}
+    	});
   }
 
   /** Saves all languages except the reference language */
