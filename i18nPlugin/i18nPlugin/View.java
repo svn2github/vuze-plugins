@@ -898,14 +898,18 @@ public class View implements UISWTViewEventListener {
         widgetsToDispose[i] = null;      
       }
     }
-    if (!imgExtra.isDisposed()) {
-      imgExtra.dispose();
+    if ( imgExtra != null ){
+	    if (!imgExtra.isDisposed()) {
+	      imgExtra.dispose();
+	    }
+	    imgExtra = null;
     }
-    imgExtra = null;
-    if (!imgMissing.isDisposed()) {
-      imgMissing.dispose();
+    if ( imgMissing != null ){
+	    if (!imgMissing.isDisposed()) {
+	      imgMissing.dispose();
+	    }
+	    imgMissing = null;
     }
-    imgMissing = null;
   }
 
 	public boolean eventOccurred(UISWTViewEvent event) {
