@@ -26,11 +26,7 @@ import java.util.*;
 
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.config.ParameterListener;
-import org.gudy.azureus2.core3.util.BDecoder;
-import org.gudy.azureus2.core3.util.ByteArrayHashMap;
-import org.gudy.azureus2.core3.util.Constants;
-import org.gudy.azureus2.core3.util.Debug;
-import org.gudy.azureus2.core3.util.SystemProperties;
+import org.gudy.azureus2.core3.util.*;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
@@ -348,9 +344,8 @@ RCMPlugin
 	public List<String>
 	getSourcesList()
 	{
-		List<String>	list = 
-			BDecoder.decodeStrings( 
-				COConfigurationManager.getListParameter( PARAM_SOURCES_LIST, source_map_defaults ));
+		List original_list = COConfigurationManager.getListParameter( PARAM_SOURCES_LIST, source_map_defaults );
+		List<String>	list = BDecoder.decodeStrings( BEncoder.cloneList(original_list) );
 
 		return( list );
 	}
