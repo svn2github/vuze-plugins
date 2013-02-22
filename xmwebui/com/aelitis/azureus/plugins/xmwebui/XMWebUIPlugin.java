@@ -356,6 +356,14 @@ XMWebUIPlugin
 
 			if (!isSessionValid(request)) {
 				log("SessionID " + getSessionID(request) + " Not Valid -- returning 409");
+				LineNumberReader lnr = new LineNumberReader( new InputStreamReader( request.getInputStream(), "UTF-8" ));
+				while( true ){
+					String	line = lnr.readLine();
+					if ( line == null ){
+						break;
+					}
+					log(line);
+				}
 				response.setReplyStatus( 409 );
 				return true;
 			}
@@ -633,7 +641,7 @@ XMWebUIPlugin
 		}
 
 		if (header_session_id == null) {
-			log("no header " + session_id);
+			log("no header " + session_id + ";" + request.getAbsoluteURL() + "\n" + request.getHeader());
 			return false;
 		}
 
@@ -756,7 +764,7 @@ XMWebUIPlugin
 			throw( e );
 			
 		}catch( Throwable e ){
-		
+			log("processRequest", e);
 			response.put( "result", "error: " + Debug.getNestedExceptionMessage( e ));
 		}
 		
@@ -862,6 +870,7 @@ XMWebUIPlugin
 	    result.put(TransmissionVars.TR_PREFS_KEY_UTP_ENABLED, hasUTP );
 	    result.put(TransmissionVars.TR_PREFS_KEY_LPD_ENABLED, false );
 	    result.put(TransmissionVars.TR_PREFS_KEY_DOWNLOAD_DIR, save_dir);
+	    // RPC 12 to 14
 	    result.put("download-dir-free-space", -1);
 
 	    result.put(TransmissionVars.TR_PREFS_KEY_DSPEED_KBps, down_limit );
@@ -922,7 +931,7 @@ XMWebUIPlugin
 
 
 			result.put( "port", new Long( tcp_port ) );                	// number     port number
-			result.put( "rpc-version", new Long( 15 ));              	// number     the current RPC API version
+			result.put( "rpc-version", new Long( 14 ));              	// number     the current RPC API version
 			result.put( "rpc-version-minimum", new Long( 6 ));      	// number     the minimum RPC API version supported
 			result.put( "seedRatioLimit", new Double(stop_ratio) );          	// double     the default seed ratio for torrents to use
 			result.put( "seedRatioLimited", stop_ratio>0 );         			// boolean    true if seedRatioLimit is honored by default
@@ -3212,7 +3221,7 @@ XMWebUIPlugin
 			if (isDownloadingFrom) {
 				flagStr.append('D');
 			}
-			map.put("flagStr", flagStr);
+			map.put("flagStr", flagStr.toString());
 
 			
 			map.put("isDownloadingFrom", isDownloadingFrom);
@@ -3500,6 +3509,7 @@ XMWebUIPlugin
 		return Long.valueOf((source.getName().hashCode() << 4l) + source.getType());
 	}
 
+	// Copy of RelatedContentManager.getURLList, except with Torrent (not TOTorrent)
 	protected List
 	getURLList(
 		Torrent	torrent,
@@ -3509,15 +3519,15 @@ XMWebUIPlugin
 		
 		if ( obj instanceof byte[] ){
 			
-              List l = new ArrayList();
-              
+            List l = new ArrayList();
+            
 	        l.add(obj);
 	        
 	        return( l );
 	        
 		}else if ( obj instanceof List ){
 			
-			return((List)obj);
+			return (List)BEncoder.clone(obj);
 			
 		}else{
 			
