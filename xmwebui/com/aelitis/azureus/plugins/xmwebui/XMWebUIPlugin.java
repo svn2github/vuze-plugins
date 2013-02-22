@@ -2040,7 +2040,7 @@ XMWebUIPlugin
 			    /** When the torrent finished downloading. */
 					if (core_download.isDownloadComplete(false)) {
 						value = core_download.getDownloadState().getLongParameter(
-								DownloadManagerState.PARAM_DOWNLOAD_COMPLETED_TIME);
+								DownloadManagerState.PARAM_DOWNLOAD_COMPLETED_TIME) / 1000;
 					} else {
 						// TODO: Verify what value to send when not complete
 						value = 0;
