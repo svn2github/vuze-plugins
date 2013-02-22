@@ -356,15 +356,17 @@ XMWebUIPlugin
 
 			if (!isSessionValid(request)) {
 				log("SessionID " + getSessionID(request) + " Not Valid -- returning 409");
+				log(request.getHeader());
 				LineNumberReader lnr = new LineNumberReader( new InputStreamReader( request.getInputStream(), "UTF-8" ));
 				while( true ){
 					String	line = lnr.readLine();
 					if ( line == null ){
 						break;
 					}
-					log(line);
+					log("409: " + line);
 				}
 				response.setReplyStatus( 409 );
+				response.getOutputStream().write("You_didn_t_set_the_X-Transmission-Session-Id".getBytes());
 				return true;
 			}
 			
