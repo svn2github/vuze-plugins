@@ -871,7 +871,7 @@ XMWebUIPlugin
 			// RPC v5, but no constant!
 			result.put( "blocklist-size", ipFilter.getNbRanges());           	// number     number of rules in the blocklist
 	    result.put(TransmissionVars.TR_PREFS_KEY_MAX_CACHE_SIZE_MB, 0 );  // TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_DHT_ENABLED, dht.isEnabled() );
+	    result.put(TransmissionVars.TR_PREFS_KEY_DHT_ENABLED, dht.isInitialising() || dht.isEnabled() );
 	    result.put(TransmissionVars.TR_PREFS_KEY_UTP_ENABLED, hasUTP );
 	    result.put(TransmissionVars.TR_PREFS_KEY_LPD_ENABLED, false );
 	    result.put(TransmissionVars.TR_PREFS_KEY_DOWNLOAD_DIR, save_dir);
