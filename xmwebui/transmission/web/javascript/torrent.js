@@ -11,13 +11,14 @@ function Torrent( transferListParent, fileListParent, controller, data) {
 }
 
 // Constants
-Torrent._StatusWaitingToCheck  = 1;
-Torrent._StatusChecking        = 2;
-Torrent._StatusDownloading     = 4;
-Torrent._StatusQueuedIncomplete= 5;
-Torrent._StatusSeeding         = 8;
-Torrent._StatusQueuedComplete  = 9;
-Torrent._StatusPaused          = 16;
+
+Torrent._StatusStopped         = 0;
+Torrent._StatusCheckWait       = 1;
+Torrent._StatusCheck           = 2;
+Torrent._StatusDownloadWait    = 3;
+Torrent._StatusDownload        = 4;
+Torrent._StatusSeedWait        = 5;
+Torrent._StatusSeed            = 6;
 Torrent._InfiniteTimeRemaining = 215784000; // 999 Hours - may as well be infinite
 
 Torrent._RatioUseGlobal        = 0;
@@ -194,10 +195,10 @@ Torrent.prototype =
 	downloadTotal: function() {return this._download_total;},
 	hash: function() {return this._hashString;},
 	id: function() {return this._id;},
-	isActive: function() {return this.state() != Torrent._StatusPaused;},
-	isDownloading: function() {return this.state() == Torrent._StatusDownloading || this.state() == Torrent._StatusQueuedIncomplete;},
-	isSeeding: function() {return this.state() == Torrent._StatusSeeding || this.state() == Torrent._StatusQueuedComplete;},
-        isQueued: function() {return this.state() == Torrent._StatusQueuedComplete || this.state() == Torrent._StatusQueuedIncomplete;},
+	isActive: function() {return this.state() != Torrent._StatusStopped;},
+	isDownloading: function() {return this.state() == Torrent._StatusDownload || this.state() == Torrent._StatusDownloadWait;},
+	isSeeding: function() {return this.state() == Torrent._StatusSeed || this.state() == Torrent._StatusSeedWait;},
+        isQueued: function() {return this.state() == Torrent._StatusSeedWait || this.state() == Torrent._StatusDownloadWait;},
 	name: function() {return this._name;},
 	peersSendingToUs: function() {return this._peers_sending_to_us;},
 	peersGettingFromUs: function() {return this._peers_getting_from_us;},
@@ -215,14 +216,14 @@ Torrent.prototype =
 	state: function() {return this._state;},
 	stateStr: function() {
 		switch( this.state() ) {
-			case Torrent._StatusSeeding:return 'Seeding';
-			case Torrent._StatusDownloading:return 'Downloading';
-                        case Torrent._StatusQueuedComplete:
-                        case Torrent._StatusQueuedIncomplete:return 'Queued';
-                        case Torrent._StatusPaused:return 'Stopped';
+			case Torrent._StatusSeed:return 'Seeding';
+			case Torrent._StatusDownload:return 'Downloading';
+                        case Torrent._StatusSeedWait:
+                        case Torrent._StatusDownloadWait:return 'Queued';
+                        case Torrent._StatusStopped:return 'Stopped';
 			case Torrent._StatusStopped:return 'Stopped';
-			case Torrent._StatusChecking:return 'Verifying local data';
-			case Torrent._StatusWaitingToCheck:return 'Waiting to verify';
+			case Torrent._StatusCheck:return 'Verifying local data';
+			case Torrent._StatusCheckWait:return 'Waiting to verify';
 			default:return 'error';
 		}
 	},
@@ -415,14 +416,13 @@ Torrent.prototype =
 		switch( st )
 		{
 			case Torrent._StatusStopped:
-			case Torrent._StatusPaused:
-			case Torrent._StatusWaitingToCheck:
-                        case Torrent._StatusQueuedIncomplete:
-                        case Torrent._StatusQueuedComplete:
+			case Torrent._StatusCheckWait:
+			case Torrent._StatusDownloadWait:
+			case Torrent._StatusSeedWait:
 				c = this.stateStr( );
 				break;
 
-			case Torrent._StatusDownloading:
+			case Torrent._StatusDownload:
 				// 'Downloading from 36 of 40 peers - DL: 60.2 KB/s UL: 4.3 KB/s'
 				c = 'Downloading from ';
 				c += this.peersSendingToUs();
@@ -435,7 +435,7 @@ Torrent.prototype =
 				c += '/s';
 				break;
 
-			case Torrent._StatusSeeding:
+			case Torrent._StatusSeed:
 				// 'Seeding to 13 of 22 peers - UL: 36.2 KB/s'
 				c = 'Seeding to ';
 				c += this.peersGettingFromUs();
@@ -446,12 +446,13 @@ Torrent.prototype =
 				c += '/s';
 				break;
 
-			case Torrent._StatusChecking:
+			case Torrent._StatusCheck:
 				// 'Verifying local data (40% tested)'
 				c = 'Verifying local data (';
 				c += Math.roundWithPrecision( 100.0 * this._recheckProgress, 0 );
 				c += '% tested)';
 				break;
+			default: c = '' . st; break;
 		}
 		return c;
 	},
@@ -470,7 +471,7 @@ Torrent.prototype =
 
 		// Fix for situation
 		// when a verifying/downloading torrent gets state seeding
-		if( this._state === Torrent._StatusSeeding )
+		if( this._state === Torrent._StatusSeed )
 			notDone = false ;
 
 		if( this.needsMetaData() ){
@@ -579,7 +580,7 @@ Torrent.prototype =
 
 		// Update the peer details and pause/resume button
 		e = root._pause_resume_button_image;
-		if ( this.state() === Torrent._StatusPaused || this.state() === Torrent._StatusStopped ) {
+		if ( this.state() === Torrent._StatusStopped ) {
 			e.alt = 'Start';
 			e.className = "torrent_resume";
 		} else {
