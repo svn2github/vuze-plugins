@@ -43,6 +43,7 @@ import org.gudy.azureus2.plugins.ui.menus.MenuItemListener;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.plugins.ui.tables.TableContextMenuItem;
 import org.gudy.azureus2.plugins.ui.tables.TableManager;
+import org.gudy.azureus2.plugins.ui.tables.TableRow;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 
 import com.aimedia.stopseeding.core.AutoStopConfiguration;
@@ -64,6 +65,25 @@ public class AutoStopPlugin implements Plugin {
      */
     public static class SingleDownloadListener {
 
+        protected List<Download> getDownload (Object data) {
+        	List<Download> result = new ArrayList<Download>();
+        	
+        	if ( data instanceof TableRow ){
+        	
+        		result.add((Download)((TableRow)data).getDataSource());
+        		
+        	}else if ( data instanceof TableRow[] ){
+        		
+        		for( TableRow row: (TableRow[])data ){
+        			
+               		result.add((Download)row.getDataSource());
+        		}
+        	}
+        	
+        	return( result );
+        }
+        
+    	/*
         protected List<Download> getDownload (Object data) {
             List<Download> downloads = new ArrayList<Download> ();
             if (data.getClass ().isArray ()) {
@@ -126,6 +146,7 @@ public class AutoStopPlugin implements Plugin {
                 return Collections.singletonList ((Download) obj);
             }
         }
+        */
 
         /**
          * @param downloads
