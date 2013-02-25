@@ -348,14 +348,14 @@ XMWebUIPlugin
 	{
 		boolean logit = trace_param.getValue();
 
+		
 		try{
 			// Set cookie just in case client is looking for one..
 			response.setHeader( "Set-Cookie", "X-Transmission-Session-Id=" + getSessionID(request) + "; HttpOnly" );
 			// This is the actual spec for massing session-id
 			response.setHeader("X-Transmission-Session-Id", getSessionID(request));
-
+			
 			if (!isSessionValid(request)) {
-				log("SessionID " + getSessionID(request) + " Not Valid -- returning 409");
 				log(request.getHeader());
 				LineNumberReader lnr = new LineNumberReader( new InputStreamReader( request.getInputStream(), "UTF-8" ));
 				while( true ){
@@ -396,24 +396,24 @@ XMWebUIPlugin
 				
 					log( "-> " + request_json_str );
 				}
-				
+
 				Map request_json = JSONUtils.decodeJSON( request_json_str.toString());
 								
 				Map response_json = processRequest( request_json );
-					
+
 				String response_json_str = JSONUtils.encodeToJSON( response_json );
 				
 				if ( logit ){
 				
 					log( "<- " + response_json_str );
 				}
-				
+
 				PrintWriter pw =new PrintWriter( new OutputStreamWriter( response.getOutputStream(), "UTF-8" ));
 			
 				pw.println( response_json_str );
 				
 				pw.flush();
-				
+
 				response.setContentType( "application/json; charset=UTF-8" );
 				
 				response.setGZIP( true );
@@ -629,6 +629,10 @@ XMWebUIPlugin
 	isSessionValid(
 			TrackerWebPageRequest request) 
  {
+		if (!request.getURL().startsWith("/transmission/")) {
+			return true;
+		}
+
 		String session_id = getSessionID(request);
 		String header_session_id = (String) request.getHeaders().get(
 				"X-Transmission-Session-Id");
@@ -643,7 +647,6 @@ XMWebUIPlugin
 		}
 
 		if (header_session_id == null) {
-			log("no header " + session_id + ";" + request.getAbsoluteURL() + "\n" + request.getHeader());
 			return false;
 		}
 
@@ -748,10 +751,10 @@ XMWebUIPlugin
 			
 			args = new HashMap();
 		}
-		
+
 		try{
 			Map	result = processRequest( method, args );
-			
+
 			if ( result == null ){
 				
 				result = new HashMap();
@@ -862,7 +865,7 @@ XMWebUIPlugin
 			PluginInterface piUTP = plugin_interface.getPluginManager().getPluginInterfaceByID("azutp");
 			boolean hasUTP = piUTP != null && piUTP.getPluginState().isOperational() && piUTP.getPluginconfig().getPluginBooleanParameter("utp.enabled", true);
 			
-			
+
 	    result.put(TransmissionVars.TR_PREFS_KEY_BLOCKLIST_ENABLED, ipFilter.isEnabled() );
 	    result.put(TransmissionVars.TR_PREFS_KEY_BLOCKLIST_URL, filter_url );
 			// RPC v5, but no constant!
