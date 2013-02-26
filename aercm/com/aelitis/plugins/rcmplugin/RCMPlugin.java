@@ -52,6 +52,8 @@ RCMPlugin
 
 	static{
 		COConfigurationManager.setParameter( "rcm.persist", true );
+		
+		new RCMPatcher();
 	}
 	
 	private PluginInterface			plugin_interface;
@@ -119,41 +121,6 @@ RCMPlugin
 					updateSourcesList();
 				}
 			});
-		
-		
-			/*
-			 * Hack for 4800 OSX default save dir issue
-			 */
-		
-		if ( 	Constants.isOSX &&
-				( Constants.AZUREUS_VERSION.startsWith( "4.8.0.0" ) || Constants.AZUREUS_VERSION.startsWith( "4.8.0.1" ))){
-		
-			String	key = "Default save path";
-			
-			if ( !COConfigurationManager.doesParameterNonDefaultExist( key )){
-				
-				String docPath =  SystemProperties.getDocPath();
-				
-				File f = new File( docPath, "Azureus Downloads" );
-				
-					// switch to Vuze Downloads for new installs
-				
-				if ( !f.exists()){
-					
-					f = new File( docPath, "Vuze Downloads" );
-				}
-				
-				Debug.out( "Hack: Updating default save path from '" + COConfigurationManager.getParameter( key ) + "' to '" + f.getAbsolutePath() + "'" );
-				
-				COConfigurationManager.setParameter( key, f.getAbsolutePath());
-				
-				COConfigurationManager.save();
-				
-			}else{
-				
-				// Debug.out( "Non def exists: " +  COConfigurationManager.getParameter( key ) + ",user-path='" + SystemProperties.getUserPath() + "'" );
-			}
-		}
 		
 		LocaleUtilities loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
 
