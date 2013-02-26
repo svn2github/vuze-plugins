@@ -111,7 +111,7 @@ RCMPatcher
 		if ( Constants.isCurrentVersionLT( "4.9.0.2 ")){
 			
 			try{
-				if ( COConfigurationManager.getBooleanParameter( "rcmplugin.patcher.2.done", false )){
+				if ( COConfigurationManager.getBooleanParameter( "rcmplugin.patcher.2.done.2", false )){
 					
 					return;
 				}
@@ -146,7 +146,9 @@ RCMPatcher
 				
 				String truststore_name 	= FileUtil.getUserFile(SESecurityManager.SSL_CERTS).getAbsolutePath();
 	
-				if ( !new File( truststore_name ).exists()){
+				File truststore_file = new File( truststore_name );
+				
+				if ((!truststore_file.exists()) || truststore_file.length() < 512 ){
 			
 					copy_certs = true;
 					
@@ -182,7 +184,13 @@ RCMPatcher
 						
 						String str = Debug.getNestedExceptionMessage( e );
 						
-						if ( str.contains( "CertificateParsingException") || str.contains( "NoSuchAlgorithmException" )){
+						System.err.println( str );
+						
+						e.printStackTrace();
+						
+						if ( 	str.contains( "CertificateParsingException") || 
+								str.contains( "NoSuchAlgorithmException" ) || 
+								str.contains( "InvalidAlgorithm")){
 							
 							copy_certs = true;
 						}
@@ -237,7 +245,7 @@ RCMPatcher
 				
 			}finally{
 				
-				COConfigurationManager.setParameter( "rcmplugin.patcher.2.done", true );
+				COConfigurationManager.setParameter( "rcmplugin.patcher.2.done.2", true );
 			}
 		}
 	}
