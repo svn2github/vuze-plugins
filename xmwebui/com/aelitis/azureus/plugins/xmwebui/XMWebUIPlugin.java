@@ -633,16 +633,24 @@ XMWebUIPlugin
 			return true;
 		}
 
+		Map headers = request.getHeaders();
+		
+			// tunnel requests are already strongly authenticated and session based
+		String tunnel = (String)headers.get( "x-vuze-is-tunnel" );
+		
+		if ( tunnel != null && tunnel.equalsIgnoreCase( "true" )){
+			return true;
+		}
 		String session_id = getSessionID(request);
-		String header_session_id = (String) request.getHeaders().get(
+		String header_session_id = (String) headers.get(
 				"X-Transmission-Session-Id");
 		if (header_session_id == null) {
-			header_session_id = (String) request.getHeaders().get(
+			header_session_id = (String) headers.get(
 					"x-transmission-session-id");
 		}
 		if (header_session_id == null) {
 			header_session_id = getCookie(
-					(String) request.getHeaders().get("cookie"),
+					(String) headers.get("cookie"),
 					"X-Transmission-Session-Id");
 		}
 
