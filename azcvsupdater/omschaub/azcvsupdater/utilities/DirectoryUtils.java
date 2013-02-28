@@ -14,13 +14,13 @@ import omschaub.azcvsupdater.main.View;
 public class DirectoryUtils {
 	
 	public static String getInstallDirectory(){ 
-		String installDirectory = new String (System.getProperty("user.dir"));
+		String installDirectory = View.getPluginInterface().getUtilities().getAzureusProgramDir();
 		installDirectory = doubleSlash_At_End_Check(installDirectory);
 		return installDirectory;
 	}
 
 	public static String getBackupDirectory(){
-		String installDirectory = new String (System.getProperty("user.dir"));
+		String installDirectory = View.getPluginInterface().getUtilities().getAzureusProgramDir();
 		installDirectory = doubleSlash_At_End_Check(installDirectory);
 		String backupInstallDirectory = View.getPluginInterface().getPluginconfig().getPluginStringParameter("backup_directory", installDirectory + System.getProperty("file.separator") + "backup");
 
