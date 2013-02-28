@@ -27,6 +27,8 @@ import java.io.*;
 import java.net.*;
 import java.util.*;
 import java.util.regex.*;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.InflaterInputStream;
 
 public class Downloader extends InputStream {
 
@@ -265,7 +267,28 @@ public class Downloader extends InputStream {
       }
       try {
         in = con.getInputStream();
-        size = con.getContentLength();
+        
+        String encoding = con.getHeaderField( "content-encoding");
+
+        boolean compressed = false;
+        
+        if ( encoding != null ){
+
+        	if ( encoding.equalsIgnoreCase( "gzip"  )){
+
+        		compressed = true;
+
+        		in = new GZIPInputStream( in );
+
+        	}else if ( encoding.equalsIgnoreCase( "deflate" )){
+
+        		compressed = true;
+
+        		in = new InflaterInputStream( in );
+        	}
+        }
+			
+        size = compressed?-1:con.getContentLength();
         percentDone = readTotal = 0;
       } catch(Exception e) {
         error("Exception while downloading '" + url.toString() + "':" + e.getMessage());
