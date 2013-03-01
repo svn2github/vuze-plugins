@@ -151,12 +151,16 @@ XMRPCClientTest
 	}
 	
 	private static void
-	test2()
+	test2(
+		String	code,
+		String	password )
 	
 		throws Exception
 	{
-		//XMRPCClient client = XMRPCClientFactory.createDirect( "BV5ZMA" );
-		XMRPCClient client = XMRPCClientFactory.createTunnel( "BV5ZMA", "vuze", "arse" );
+		XMRPCClient client = XMRPCClientFactory.createDirect( false, "127.0.0.1", 9091, "vuze", password );
+		
+		//XMRPCClient client = XMRPCClientFactory.createIndirect( code );
+		//XMRPCClient client = XMRPCClientFactory.createTunnel( code, "vuze", password );
 		
 		try{
 			JSONObject	request = new JSONObject();
@@ -179,7 +183,7 @@ XMRPCClientTest
 	{
 		try{
 	
-			test2();
+			test2(args[0], args[1]);
 			
 		}catch( Throwable e ){
 			

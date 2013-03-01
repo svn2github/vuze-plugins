@@ -27,6 +27,8 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
+import org.bouncycastle.util.encoders.Base64;
+
 public class 
 XMRPCClientUtils 
 {
@@ -74,9 +76,21 @@ XMRPCClientUtils
 	}
 	
 	protected static byte[]
+  	postToURL(
+  		String		url,
+  		byte[]		payload )
+  	
+  		throws XMRPCClientException
+  	{
+		return( postToURL( url, payload, null, null ));
+  	}
+	
+	protected static byte[]
 	postToURL(
 		String		url,
-		byte[]		payload )
+		byte[]		payload,
+		String		username,
+		String		password )
 	
 		throws XMRPCClientException
 	{
@@ -88,6 +102,15 @@ XMRPCClientUtils
 				connection.setRequestMethod( "POST" );
 				
 				connection.setRequestProperty( "Connection", "Keep-Alive" );
+				
+				if ( username != null ){
+					
+					String login = username + ":" + password;
+					
+					String encodedLogin = new String( Base64.encode( login.getBytes( "UTF-8" )));
+					
+					connection.setRequestProperty("Authorization", "Basic " + encodedLogin);
+				}
 				
 				if ( session_id != null ){
 					

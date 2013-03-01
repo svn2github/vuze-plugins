@@ -80,9 +80,20 @@ XMRPCClientFactory
     
 	public static XMRPCClient
 	createDirect(
+		boolean		http,
+		String		host,
+		int			port,
+		String		username,
+		String		password )
+	{
+		return( new XMRPCClientDirect( http, host, port, username, password ));
+	}
+	
+	public static XMRPCClient
+	createIndirect(
 		String	access_code )
 	{
-		return( new XMRPCClientDirect( access_code ));
+		return( new XMRPCClientIndirect( access_code ));
 	}
 	
 	public static XMRPCClient

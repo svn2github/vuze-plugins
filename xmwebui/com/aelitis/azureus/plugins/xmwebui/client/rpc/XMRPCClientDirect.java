@@ -1,5 +1,5 @@
 /*
- * Created on Feb 28, 2013
+ * Created on Mar 1, 2013
  * Created by Paul Gardner
  * 
  * Copyright 2013 Azureus Software, Inc.  All rights reserved.
@@ -29,64 +29,29 @@ import org.json.simple.JSONObject;
 import com.aelitis.azureus.util.JSONUtils;
 
 public class 
-XMRPCClientDirect 
+XMRPCClientDirect
 	implements XMRPCClient
 {
-	private String access_code;
+	private boolean	http;
+	private String 	host;
+	private int		port;
 	
-	private String binding_url;
+	private String	username;
+	private String	password;
 	
-	public
+	public 
 	XMRPCClientDirect(
-		String		ac )
+		boolean	_http,
+		String	_host,
+		int		_port,
+		String	_username,
+		String	_password )
 	{
-		access_code	= ac;
-	}
-	
-	private String
-	getCurrentBinding()
-	
-		throws XMRPCClientException
-	{
-		if ( binding_url == null ){
-			
-			String str = XMRPCClientUtils.getFromURL( PAIRING_URL + "pairing/remote/getBinding?ac=" + access_code + "&sid=" + SID );
-			
-			System.out.println( "Binding result: " + str );
-			
-			Map map = JSONUtils.decodeJSON( str );
-			
-			JSONObject error = (JSONObject)map.get( "error" );
-
-			if ( error != null ){
-				
-				long code = (Long)error.get( "code" );
-				
-					// 1, 2, 3 -> bad code/not registered
-				
-				if ( code == 1 ){
-					
-					throw( new XMRPCClientException( XMRPCClientException.ET_BAD_ACCESS_CODE ));
-					
-				}else if ( code == 2 || code == 3 ){
-					
-					throw( new XMRPCClientException( XMRPCClientException.ET_NO_BINDING ));
-				}else{
-					
-					throw( new XMRPCClientException( "Uknown error creating tunnel: " + str ));
-				}
-			}
-			
-			Map result = (Map)map.get( "result" );
-			
-			String protocol = (String)result.get( "protocol" );
-			String ip		= (String)result.get( "ip" );
-			String port		= (String)result.get( "port" );
-			
-			binding_url = protocol + "://" + ip + ":" + port + "/transmission/rpc";
-		}
-		
-		return( binding_url );
+		http		= _http;
+		host		= _host;
+		port		= _port;
+		username	= _username;
+		password	= _password;
 	}
 	
 	public JSONObject
@@ -96,11 +61,11 @@ XMRPCClientDirect
 		throws XMRPCClientException
 	{
 		try{
-			String url = getCurrentBinding();
+			String url = (http?"http":"https") + "://" + host + ":" + port + "/transmission/rpc";
 			
 			String json = JSONUtils.encodeToJSON( request );
 			
-			byte[] reply = XMRPCClientUtils.postToURL( url , json.getBytes( "UTF-8" ));
+			byte[] reply = XMRPCClientUtils.postToURL( url , json.getBytes( "UTF-8" ), username, password );
 			
 			Map m = JSONUtils.decodeJSON( new String( reply, "UTF-8" ));
 			
@@ -113,11 +78,12 @@ XMRPCClientDirect
 		}catch( IOException e ){
 			
 			throw( new XMRPCClientException( "unexpected" ));
-		}
+		}	
 	}
 	
-	public void 
-	destroy() 
+	public void
+	destroy()
 	{
+		
 	}
 }
