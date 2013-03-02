@@ -2803,14 +2803,21 @@ XMWebUIPlugin
 	    /* whether or not we've ever scraped to this tracker */
 	    map.put("hasScraped", false); // todo: bool);
 
+	    String name = "";
+	    try {
+		    name = tps.getName();
+	    } catch (Exception e) {
+	    	// NPE at com.aelitis.azureus.plugins.extseed.ExternalSeedPlugin$5.getName(ExternalSeedPlugin.java:561
+	    }
+
 	    /* human-readable string identifying the tracker */
-	    map.put("host", tps.getName()); // TODO
+    	map.put("host", name); // TODO
 
 	    /* the full announce URL */
-	    map.put("announce", tps.getName()); // TODO
+	    map.put("announce", name); // TODO
 
 	    /* the full scrape URL */
-	    map.put("scrape", tps.getName()); // TODO
+	    map.put("scrape", name); // TODO
 
 	    /* Transmission uses one tracker per tier,
 	     * and the others are kept as backups */
