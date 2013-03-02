@@ -108,6 +108,7 @@ Torrent.prototype =
 		top_e.appendChild( e );
 		element._name_container = e;
 
+		/* Vuze: We swapped the 'progress details' and 'peer details for some reason */
 		// Create the 'progress details' <div>
 		e = document.createElement( 'div' );
 		e.className = 'torrent_progress_details';
@@ -133,6 +134,7 @@ Torrent.prototype =
 		top_e.appendChild( e );
 		element._progress_incomplete_container = e;
 
+		/* >> Vuze */
         // Add info button
 		var image = document.createElement( 'div' );
 		image.className = 'torrent_info';
@@ -143,6 +145,7 @@ Torrent.prototype =
 		top_e.appendChild( e );
 		element._info_button_image = image;
 		if (!iPhone) $(e).bind('click', function(e) {element._torrent.clickInfoButton(e);});
+		/* << Vuze */
 
 		// Add the pause/resume button - don't specify the
 		// image or alt text until the 'refresh()' function
@@ -150,13 +153,16 @@ Torrent.prototype =
 		var image = document.createElement( 'div' );
 		image.className = 'torrent_pause';
 		e = document.createElement( 'a' );
+		/* >> Vuze */
 		e.href="javascript:void(0)";
 		e.className="torrent_button";
+		/* << Vuze */
 		e.appendChild( image );
 		top_e.appendChild( e );
 		element._pause_resume_button_image = image;
 		if (!iPhone) $(e).bind('click', function(e) {element._torrent.clickPauseResumeButton(e);});
 
+		/* Vuze: We swapped the 'progress details' and 'peer details for some reason */
 		// Create the 'peer details' <div>
 		e = document.createElement( 'div' );
 		e.className = 'torrent_peer_details';
@@ -268,11 +274,10 @@ Torrent.prototype =
 	isDownloading: function() { return this.state() == Torrent._StatusDownload; },
 	isFinished: function() { return this._isFinishedSeeding; },
 	isSeeding: function() { return this.state() == Torrent._StatusSeed; },
-        isQueued: function() { return ( this.state() == Torrent._StatusSeedWait )
-                                   || ( this.state() == Torrent._StatusDownloadWait ); },
 	name: function() {return this._name;},
         queuePosition: function() { return this._queue_position; },
-        isQueued: function() { return this.queuePosition() >= 0; },
+        isQueued: function() { return ( this.state() == Torrent._StatusSeedWait )
+            || ( this.state() == Torrent._StatusDownloadWait ); },
 	webseedsSendingToUs: function() { return this._webseeds_sending_to_us; },
 	peersSendingToUs: function() {return this._peers_sending_to_us;},
 	peersGettingFromUs: function() {return this._peers_getting_from_us;},
@@ -297,9 +302,9 @@ Torrent.prototype =
 			case Torrent._StatusStopped:        return this.isFinished() ? 'Seeding complete' : 'Stopped';
 			case Torrent._StatusCheckWait:      return 'Queued for verification';
 			case Torrent._StatusCheck:          return 'Verifying local data';
-			case Torrent._StatusDownloadWait:   return 'Queued for Download';
+			case Torrent._StatusDownloadWait:   return 'Queued for download';
 			case Torrent._StatusDownload:       return 'Downloading';
-			case Torrent._StatusSeedWait:       return 'Queued for Seeding';
+			case Torrent._StatusSeedWait:       return 'Queued for seeding';
 			case Torrent._StatusSeed:           return 'Seeding';
  			default:                            return 'error';
 		}
@@ -536,7 +541,12 @@ Torrent.prototype =
 				break;
 
 			case Torrent._StatusSeed:
-				c = [ 'Seeding to', this.peersGettingFromUs(), 'of', this._peers_connected, 'peers', '-', this.formatUL() ].join(' ');
+				if(compact_mode){
+					c = this.formatUL();
+				} else {
+					// 'Seeding to 13 of 22 peers - UL: 36.2 KiB/s'
+					c = [ 'Seeding to', this.peersGettingFromUs(), 'of', this._peers_connected, 'peers', '-', this.formatUL() ].join(' ');
+				}
 				break;
 
 			case Torrent._StatusCheck:
@@ -590,7 +600,7 @@ Torrent.prototype =
 			root._progress_complete_container.style.width = metaPercentComplete + "%";
 			root._progress_complete_container.className = 'torrent_progress_bar in_progress meta ' + empty+compact;
 			root._progress_incomplete_container.style.width = 100 - metaPercentComplete + "%"
-			root._progress_incomplete_container.className = 'torrent_progress_bar incomplete meta'+compact;
+			root._progress_incomplete_container.className = 'torrent_progress_bar incomplete compact meta'+compact;
 			root._progress_incomplete_container.style.display = 'block';
 
 		}
@@ -693,7 +703,6 @@ Torrent.prototype =
 			e = root._progress_complete_container;
 			e.className = 'torrent_progress_bar ' + status;
 		}
-
 
 		var hasError = this.getErrorMessage( ) != undefined;
 		// Update the progress details
