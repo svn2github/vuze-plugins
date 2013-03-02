@@ -61,14 +61,20 @@ div.torrent_global_menu h1 {
 
 div.torrent_global_menu ul {
 	height: 50px;
+	/* Vuze: original:
+	margin: 0;
+	padding: 0 7px;
+	*/
 	padding: 0;
 	text-align: center;
+	/* >> Vuze */
     background:url(../images/graphics/vuze_remote_nav_bg.png) 0 -58px no-repeat;
     width:390px;
     margin:0 auto;
     position: relative;
     left:50%;
     margin-left:-195px;
+	/* << Vuze */
 }
 
 div.torrent_global_menu ul li {
@@ -79,12 +85,13 @@ div.torrent_global_menu ul li {
 	margin: 13px 0 0 0;
 	vertical-align: middle;
 	height: 50px;
+	/* >> Vuze */
     width:62px
+	/* << Vuze */
 }
 
 div.torrent_global_menu ul li#filter,
 div.torrent_global_menu ul li#inspector {
-	float: right;
     display:none;
 }
 
@@ -107,6 +114,9 @@ div.torrent_global_menu ul li div.toolbar_image {
 	background-image: url('../images/buttons/toolbar_buttons.png');
 }
 
+/* Vuze: Original:
+li#open div div.toolbar_image, li#open.disabled div:active div.toolbar_image {
+*/
 li#open div div.toolbar_image, li#open.disabled div:active div.toolbar_image, li#open.disabled div:hover div.toolbar_image {
 	background-position: left 0;
 }
@@ -114,10 +124,10 @@ li#open div div.toolbar_image, li#open.disabled div:active div.toolbar_image, li
 li#open div:active div.toolbar_image {
 	background-position: right 0;
 }
-/*li#open div:hover div.toolbar_image {
-	background-position: center 0;
-}*/
 
+/* Vuze: Original:
+li#remove div div.toolbar_image, li#remove.disabled div:active div.toolbar_image {
+*/
 li#remove div div.toolbar_image, li#remove.disabled div:active div.toolbar_image, li#remove.disabled div:hover div.toolbar_image {
 	background-position: left -32px;
 }
@@ -125,10 +135,10 @@ li#remove div div.toolbar_image, li#remove.disabled div:active div.toolbar_image
 li#remove div:active div.toolbar_image {
 	background-position: right -32px;
 }
-/*li#remove div:hover div.toolbar_image {
-	background-position: center -32px;
-}*/
 
+/* Vuze: Original:
+li#resume_selected div div.toolbar_image, li#resume_selected.disabled div:active div.toolbar_image {
+*/
 li#resume_selected div div.toolbar_image, li#resume_selected.disabled div:active div.toolbar_image, li#resume_selected.disabled div:hover div.toolbar_image {
 	background-position: left -96px;
 }
@@ -136,10 +146,10 @@ li#resume_selected div div.toolbar_image, li#resume_selected.disabled div:active
 li#resume_selected div:active div.toolbar_image {
 	background-position: right -96px;
 }
-/*li#resume_selected div:hover div.toolbar_image {
-	background-position: center -96px;
-}*/
 
+/* Vuze: Original:
+li#pause_selected div div.toolbar_image, li#pause_selected.disabled div:active div.toolbar_image {
+*/
 li#pause_selected div div.toolbar_image, li#pause_selected.disabled div:active div.toolbar_image, li#pause_selected.disabled div:hover div.toolbar_image {
 	background-position: left -64px;
 }
@@ -147,10 +157,10 @@ li#pause_selected div div.toolbar_image, li#pause_selected.disabled div:active d
 li#pause_selected div:active div.toolbar_image {
 	background-position: right -64px;
 }
-/*li#pause_selected div:hover div.toolbar_image {
-	background-position: right -64px;
-}*/
 
+/* Vuze: Original:
+li#pause_all div div.toolbar_image, li#pause_all.disabled div:active div.toolbar_image {
+*/
 li#pause_all div div.toolbar_image, li#pause_all.disabled div:active div.toolbar_image, li#pause_all.disabled div:hover div.toolbar_image {
 	background-position: left -128px;
 }
@@ -158,10 +168,10 @@ li#pause_all div div.toolbar_image, li#pause_all.disabled div:active div.toolbar
 li#pause_all div:active div.toolbar_image {
 	background-position: right -128px;
 }
-/*li#pause_all div:hover div.toolbar_image {
-	background-position: center -128px;
-}*/
 
+/* Vuze: Original:
+li#resume_all div div.toolbar_image, li#resume_all.disabled div:active div.toolbar_image {
+*/
 li#resume_all div div.toolbar_image, li#resume_all.disabled div:active div.toolbar_image, li#resume_all.disabled div:hover div.toolbar_image {
 	background-position: left -160px;
 }
@@ -169,9 +179,6 @@ li#resume_all div div.toolbar_image, li#resume_all.disabled div:active div.toolb
 li#resume_all div:active div.toolbar_image {
 	background-position: right -160px;
 }
-/*li#resume_all div:hover div.toolbar_image {
-	background-position: center -160px;
-}*/
 
 li#filter div div.toolbar_image, li#filter.disabled div:active div.toolbar_image {
 	background-position: left -192px;
@@ -201,7 +208,9 @@ div.torrent_global_menu ul li.divider {
 	opacity: 0.2;
 	margin: 14px 4px 0;
 	height: 49px;
+	/* >> Vuze */
     display:none
+	/* << Vuze */
 }
 
 /*--------------------------------------
@@ -211,11 +220,11 @@ div.torrent_global_menu ul li.divider {
  *--------------------------------------*/
 
 div.torrent_global_details {
-/*
+/* Vuze: Original:
 	width: 100%;
 	height: 20px;
 	margin: 0;
-	background: #ddd url('../images/graphics/filter_bar.png') repeat-x left -58px;
+	background: #ddd url('../images/graphics/filter_bar.png') repeat-x left -51px;
 	font-size: 1.1em;
 	font-weight: normal;
 	border-bottom: 1px solid #888;
@@ -237,6 +246,10 @@ div.torrent_global_details {
 }
 
 div.torrent_global_details div {
+	/* Vuze: ORiginal:
+	padding: 0 10px 1px 10px;
+	margin: 3px 0 0 0;
+	*/	
 	padding: 0 0 1px 10px;
 	margin: 4px 0 0 0;
     font-size:10px
@@ -245,15 +258,20 @@ div.torrent_global_details div {
 div.torrent_global_details div#torrent_global_transfer {
 	clear: left;
 	float: left;
+	/* >> Vuze */
     font-weight:bold;
     color:#333;
+	/* << Vuze */
 }
 
 div.torrent_global_details div#torrent_global_upload,
 div.torrent_global_details div#torrent_global_download {
+	/* Vuze: Original:
+	float: right;
+	padding-left: 13px;
+	*/
 	float: left;
-    color:#666;
-	/*padding-left: 13px;*/
+	color:#666;
 }
 
 div.torrent_global_details div#torrent_global_upload {
@@ -262,13 +280,18 @@ div.torrent_global_details div#torrent_global_upload {
 
 div.torrent_global_details div#torrent_global_download {
 	background: url('../images/graphics/transfer_arrows.png') left 2px no-repeat;
-    clear:left;
+	/* >> Vuze */
+		clear:left;
     margin-left:8px;
     margin-right:6px
+	/* << Vuze */
 }
 
+/* >> Vuze */
 div#torrent_logo {position:absolute;top:0;left:0;z-index:3}
 div#torrent_logo {margin-top:12px;margin-left:12px}
+/* << Vuze */
+
 /*--------------------------------------
  *
  * T O R R E N T   F I L T E R   B A R
@@ -277,15 +300,23 @@ div#torrent_logo {margin-top:12px;margin-left:12px}
 
 div#torrent_filter_bar {
 	margin: 0;
+/* Vuze: Original:
+	height: 24px;
+*/
 	height: 33px;
 	background: #ddd url('../images/graphics/filter_bar.png') repeat-x bottom left;
 	position: fixed;
 	left: 0;
 	right: 0px;
-	top: 75px; /*97px;*/
+/* Vuze: Original:
+	top: 97px;
+*/
+	top: 75px;
 	z-index: 2;
 	display: none;
-	/*overflow: hidden;*/
+	/* Vuze: Removed Line:
+	overflow: hidden;
+	*/
 }
 
 div#torrent_filter_bar ul#t_filters {
@@ -311,6 +342,12 @@ div#torrent_filter_bar ul#t_filters li a {
 	font-size: 1.2em;
 	color: #222;
 	text-shadow: 0 1px 0 #fff;
+	/* Vuze: We used to have this, but it breaks the filter bar now:
+	position:absolute;
+	right: 0px;
+	top: 0px;
+	border-radius: 10px;
+	*/
 	text-decoration: none;
 	font-weight: bold;
 	padding: 0 7px 0 0;
@@ -440,15 +477,29 @@ ul.torrent_list li.torrent.selected {
 ul.torrent_list li.torrent div.torrent_name {
 	font-size: 1.3em;
 	font-weight: bold;
-	word-wrap: break-word;
 	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 	color: #1f384e;
 	margin-bottom: 2px;
 }
 
+ul.torrent_list li.torrent div.torrent_name.compact {
+	float: left;
+	z-index: 1;
+	position: absolute;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 ul.torrent_list li.torrent div.torrent_progress_details,
 ul.torrent_list li.torrent div.torrent_peer_details {
+	clear: left;
 	font-size: 1em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 ul.torrent_list li.torrent div.torrent_progress_details{color:#3e5365}
 ul.torrent_list li.torrent div.torrent_peer_details{color:#4f5b65}
@@ -574,7 +625,7 @@ div#torrent_inspector {
 	top: 75px; /*97px;*/
 	bottom: 0; /*22px;*/
 	right: 0px;
-	width: 350px;
+	width: 570px;
 	background-color: #E0E9EF;
 	border-left: 1px solid #888;
   	border-top: 1px solid #667A8A;
@@ -599,24 +650,75 @@ div#inspector_header {
 	padding-right: 10px;
 }
 div#inspector_tabs {
-	width: 189px;
+	width: 303px;
 	margin: 0 auto;
 	padding-top: 10px;
 }
 .inspector_tab {
 	float: left;
 	height: 17px;
-	background: transparent url('../images/buttons/tab_backgrounds.png') left -1px repeat-x;
-	border: 1px solid #888;
-	margin: 0px 1px;
-	padding: 5px 15px 4px; /* 5px + 4px == ( (bg image height - fg image height) ) */
+	background: transparent url('../images/buttons/tab_backgrounds_highlight.png') left -1px repeat-x;
+	margin: 0px;
+	padding: 3px 15px; /* 5px + 4px == ( (bg image height - fg image height) ) */
 	cursor: pointer;
 }
 #inspector_tabs .selected {
-	background-position: left -29px; /* the highlighted part of the image */
+	background-position: left -26px; /* the highlighted part of the image */
+}
+
+#inspector_tab_info {
+	background: transparent url('../images/buttons/tab_backgrounds.png') left -1px repeat-x;
+	border: 1px solid #aaa;
+	-webkit-border-top-left-radius: 5px;
+	-webkit-border-top-right-radius: 0px;
+	-webkit-border-bottom-right-radius: 0px;
+	-webkit-border-bottom-left-radius: 5px;
+	-moz-border-radius-topleft: 5px;
+	-moz-border-radius-topright: 0px;
+	-moz-border-radius-bottomright: 0px;
+	-moz-border-radius-bottomleft: 5px;
+	border-top-left-radius: 5px;
+	border-top-right-radius: 0px;
+	border-bottom-right-radius: 0px;
+	border-bottom-left-radius: 5px;
+}
+
+#inspector_tab_info .selected {
+	background: transparent url('../images/buttons/tab_backgrounds.png') left -26px repeat-x;
+}
+
+#inspector_tabs #inspector_tab_info .selected {
+	background: transparent url('../images/buttons/tab_backgrounds.png') left -26px repeat-x !important;
+}
+
+#inspector_tabs #inspector_tab_activity, #inspector_tabs #inspector_tab_peers {
+	border-top: 1px solid #aaa;
+	border-bottom: 1px solid #aaa;
+	border-right: 1px solid #aaa;
+}
+
+#inspector_tabs #inspector_tab_activity, #inspector_tabs #inspector_tab_trackers {
+	border-top: 1px solid #aaa;
+	border-bottom: 1px solid #aaa;
+}
+
+#inspector_tabs #inspector_tab_files {
+	border: 1px solid #aaa;
+	-webkit-border-top-left-radius: 0px;
+	-webkit-border-top-right-radius: 5px;
+	-webkit-border-bottom-right-radius: 5px;
+	-webkit-border-bottom-left-radius: 0px;
+	-moz-border-radius-topleft: 0px;
+	-moz-border-radius-topright: 5px;
+	-moz-border-radius-bottomright: 5px;
+	-moz-border-radius-bottomleft: 0px;
+	border-top-left-radius: 0px;
+	border-top-right-radius: 5px;
+	border-bottom-right-radius: 5px;
+	border-bottom-left-radius: 0px;
 }
 .inspector_container {
-	margin: 3%;
+	margin: 0 3%;
 	width: 94%;
 }
 .inspector_group {
@@ -638,9 +740,137 @@ div#inspector_tabs {
 	width: 100px; /* this + the next 230 == inspector_container_with */
 }
 .inspector_row > div {
-	display: table-cell;
+	word-wrap: break-word;
 	padding-top: 10px;
-	width: 230px; /* inspector_container_width==330 - inspector_label_width==100 */
+	width: 380px; /* inspector_container_width==480 - inspector_label_width==100 */
+}
+
+/* Peers Inspector Tab */
+#inspector_peers_list {
+	padding: 0 0 0 0;
+	margin: 0 0 0 0;
+	text-align: left;
+	cursor: default;
+	overflow: hidden;
+}
+
+#inspector_peers_list > div.inspector_group {
+	padding-bottom: 0;
+	margin-bottom: 0;
+}
+
+table.peer_list {
+	width: 100%;
+	border-collapse: collapse;
+	text-align: left;
+	cursor: default;
+	clear: both;
+	table-layout: fixed;
+}
+
+.peer_list .encryptedCol {
+	width: 16px;
+}
+
+.peer_list .upCol {
+	width: 70px;
+}
+
+.peer_list .downCol {
+	width: 70px;
+}
+
+.peer_list .percentCol {
+	width: 30px;
+	padding-right: 5px;
+}
+
+.peer_list td.percentCol {
+	text-align: right;
+}
+
+.peer_list .statusCol {
+	width: 40px;
+	padding-right: 5px;
+}
+
+.peer_list .addressCol {
+	width: 180px;
+}
+
+.peer_list .clientCol {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+tr.inspector_peer_entry {
+
+}
+
+tr.inspector_peer_entry.odd {
+	background-color: #EEEEEE;
+}
+
+/* Trackers Inspector Tab */
+#inspector_trackers_list {
+	padding: 0 0 0 0;
+	margin: 0 0 0 0;
+	text-align: left;
+	cursor: default;
+	overflow: hidden;
+}
+
+#inspector_trackers_list > div.inspector_group {
+	padding-bottom: 0;
+	margin-bottom: 0;
+}
+
+ul.tier_list {
+	width: 100%;
+	margin: 2px 0 8px 0;
+	padding-left: 0px;
+	text-align: left;
+	display: block;
+	cursor: default;
+	list-style-type: none;
+	list-style: none;
+	list-style-image: none;
+	clear: both;
+}
+.tier_list li{
+	overflow: hidden;
+}
+.tier_list .tracker_activity{
+	float: left;
+	color: #666;
+	width: 330px;
+	display: table;
+	margin-top: 1px;
+}
+.tier_list .tracker_activity div{
+	padding: 2px;
+}
+.tier_list table{
+	float: right;
+	color: #666;
+}
+.tier_list th{
+	text-align: right;
+}
+
+li.inspector_tracker_entry {
+	padding: 3px 0 3px 2px;
+	display: block;
+}
+
+li.inspector_tracker_entry.odd {
+	background-color: #EEEEEE;
+}
+div.tracker_host {
+	font-size: 1.2em;
+	font-weight: bold;
+	color: #222;
 }
 
 /* Files Inspector Tab */
@@ -821,6 +1051,28 @@ div.torrent_footer div#disk_space_container {
 	padding: 0px;
 }
 
+div.torrent_footer div#turtle_button {
+	height: 22px;
+	width: 32px !important;
+	margin: 0 0 0 38px;
+	padding: 0;
+	-moz-user-select: none;
+	-webkit-user-select: none;
+}
+
+.turtleEnabled {
+	background: transparent url('../images/graphics/chrome.png') left -119px no-repeat;
+}
+.turtleEnabled:active {
+	background: transparent url('../images/graphics/chrome.png') -32px -119px no-repeat;
+}
+.turtleDisabled {
+	background: transparent url('../images/graphics/chrome.png') left -97px no-repeat;
+}
+.turtleDisabled:active {
+	background: transparent url('../images/graphics/chrome.png') -32px -97px no-repeat;
+}
+
 /*--------------------------------------
  *
  * D I A L O G S
@@ -867,6 +1119,11 @@ div#prefs_container div.dialog_window {
 	padding: 0 15px;
 }
 
+div#stats_container div.dialog_window {
+	width: 255px;
+	padding: 0 15px;
+}
+
 div.dialog_container div.dialog_window img {
 	margin: 20px 20px 0 20px;
 	float: left;
@@ -909,7 +1166,7 @@ div.dialog_container div.dialog_window a {
 
 div.dialog_container div.dialog_window a:hover,
 div.dialog_container div.dialog_window a:active {
-	background: #C0C8D6 url('../images/graphics/filter_bar.png') 0px -60px repeat-x;
+	background: #C0C8D6 url('../images/graphics/filter_bar.png') bottom repeat-x;
 }
 
 div#upload_container div.dialog_window div.dialog_message label {
@@ -957,12 +1214,12 @@ iframe#torrent_upload_frame {
 
 div#prefs_container label {
 	display: block;
+	margin: 0 0 0 2px;
 }
 
 div#prefs_container label.category {
 	clear: both;
 	font-size: 1.2em;
-	margin: 0 0 0 2px;
 }
 
 div#prefs_container label.item {
@@ -981,7 +1238,11 @@ div#prefs_container div.formdiv.checkbox label.item {
 }
 
 div#prefs_container div.limit_total label.item {
-	width: 91px;
+	width: 102px;
+}
+
+div#prefs_container div.limit_turtle label.item {
+	width: 120px;
 }
 
 div#prefs_container div.preference input[type=checkbox] {
@@ -1000,16 +1261,18 @@ div#prefs_container div.preference input[type=text] {
 	padding: 0px !important;
 	height: 18px;
 	margin-top: 2px;
-	text-align:right;
 }
 
 div#prefs_container div.preference input {
 	float: left;
 }
 
+div#prefs_container div.block_url input {
+	width: 256px !important;
+}
+
 div#prefs_container div.download_location input {
 	width: 256px !important;
-	text-align: left !important;
 }
 div#prefs_container div.download_location .checkbox input {
 	width: auto !important;
@@ -1031,6 +1294,7 @@ div#prefs_container h2.dialog_heading {
 
 div#prefs_container div#prefs_tabs {
 	clear: both;
+	table-layout: fixed;
 }
 
 div#prefs_container div#prefs_tabs ul {
@@ -1048,17 +1312,71 @@ div#prefs_container div#prefs_tabs ul li {
 	border-right: 1px solid #787878;
 	border-top: 1px solid #787878;
 	margin-bottom: -1px;
-    margin-right:3px;
-    cursor:pointer;
 }
 .prefs_tab_disabled {
-	background: #C0C8D6 url('../images/graphics/filter_bar.png') center -69px repeat-x;
+	background: #C0C8D6 url('../images/graphics/filter_bar.png') bottom repeat-x;
 	border-bottom: 1px solid #787878;
 }
 .prefs_tab_enabled {
 	background: none;
 	border-bottom: 1px solid #efefef;
 }
+div#stats_container h2.dialog_heading {
+	display: none;
+}
+div#stats_container div#stats_error {
+	display: none;
+	width: 395px;
+	margin: 6px auto 6px auto;
+	white-space: nowrap;
+	overflow: hidden;
+	padding: 3px 0 3px 0;
+	border: 2px solid #cc3333;
+	color: #cc3333;
+	font-size: 1.2em;
+	vertical-align: middle;
+	text-align: center;
+	height: 20px;
+	line-height: 20px;
+	background-color: #FFEFEF;
+}
+.stats_info_container {
+	clear: both;
+	padding: 0px 7px 0px 7px;
+}
+.stats_group {
+	display: table;
+	margin: 5px 0px 0px 0px;
+	padding: 5px 0px 0px 0px;
+	width: 100%;
+}
+.stats_row {
+	display: table-row;
+}
+.stats_row > div {
+	padding-top: 4px;
+}
+div#stats_container label.category {
+	clear: both;
+	font-size: 1.2em;
+	margin: 5px 0px;
+}
+div#stats_container div.item {
+	font-size: 11px !important;
+	margin: 0 5px 0 20px;
+	float: left;
+	width: 100px;
+}
+div#stats_container div.item2 {
+	font-size: 11px !important;
+	margin: 0 5px 0 20px;
+	float: left;
+}
+div#stats_container a {
+	clear: left;
+	margin: 10px 5px 10px 7px;
+}
+
 div.dialog_container div#prefs_tabs ul li.prefs_tab_disabled:hover,
 div.dialog_container div#prefs_tabs ul li.prefs_tab_disabled:active {
 	background: none;
@@ -1082,6 +1400,13 @@ div#prefs_container div#pref_error {
 	height: 20px;
 	line-height: 20px;
 	background-color: #FFEFEF;
+}
+
+#transmission_version{
+	position: absolute;
+	bottom: 10px;
+	left:   10px;
+	color:  #999;
 }
 
 /*--------------------------------------

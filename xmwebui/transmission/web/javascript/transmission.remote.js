@@ -1,5 +1,6 @@
+/* Transmission Revision 12650 */
 /*
- * Copyright © Dave Perrett and Malcolm Jarvis
+ * Copyright © Dave Perrett, Malcolm Jarvis and Bruno Bierbaumer
  * This code is licensed under the GPL version 2.
  * For details, see http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
  *
@@ -11,6 +12,9 @@ function RPC() { }
 
 // Constants
 RPC._Root                   = './transmission/rpc';
+/* Original:
+RPC._Root                   = '../rpc';
+*/
 RPC._DaemonVersion          = 'version';
 RPC._Encryption             = 'encryption';
 RPC._EncryptionPreferred    = 'preferred';
@@ -28,6 +32,22 @@ RPC._TurtleTimeEnabled      = 'alt-speed-time-enabled';
 RPC._TurtleTimeBegin        = 'alt-speed-time-begin';
 RPC._TurtleTimeEnd          = 'alt-speed-time-end';
 RPC._TurtleTimeDay          = 'alt-speed-time-day';
+RPC._PeerLimitGlobal        = 'peer-limit-global';
+RPC._PeerLimitPerTorrent    = 'peer-limit-per-torrent';
+RPC._PexEnabled	            = 'pex-enabled';
+RPC._DhtEnabled             = 'dht-enabled';
+RPC._LpdEnabled             = 'lpd-enabled';
+RPC._BlocklistEnabled       = 'blocklist-enabled';
+RPC._BlocklistURL           = 'blocklist-url';
+RPC._BlocklistSize          = 'blocklist-size';
+RPC._UtpEnabled	            = 'utp-enabled';
+RPC._PeerPortRandom         = 'peer-port-random-on-start';
+RPC._PortForwardingEnabled  = 'port-forwarding-enabled';
+RPC._StartAddedTorrent      = 'start-added-torrents';
+RPC._QueueMoveTop			= 'queue-move-top';
+RPC._QueueMoveBottom		= 'queue-move-bottom';
+RPC._QueueMoveUp			= 'queue-move-up';
+RPC._QueueMoveDown			= 'queue-move-down';
 
 function TransmissionRemote( controller )
 {
@@ -44,17 +64,21 @@ TransmissionRemote.prototype =
 		this._controller = controller;
 		this._error = '';
 		this._token = '';
-                this._request_count = 0;
-                this._error_array = new Array();
-                this._errors_tolerated = 5;
+		/* >> Vuze Added */
+		this._request_count = 0;
+		this._error_array = new Array();
+		this._errors_tolerated = 5;
+   		/* << Vuze Added */
 	},
 
-        isPersistentError: function(){
-            var max = remote._error_array.length > 0 ? Math.max.apply(null, remote._error_array) : 0;
-            return $.grep(remote._error_array, function(n, i){
-                return n >= ( max - remote._errors_tolerated )
-            }).length > remote._errors_tolerated
-        },
+	/* >> Vuze Added */
+    isPersistentError: function(){
+        var max = remote._error_array.length > 0 ? Math.max.apply(null, remote._error_array) : 0;
+        return $.grep(remote._error_array, function(n, i){
+            return n >= ( max - remote._errors_tolerated )
+        }).length > remote._errors_tolerated
+    },
+	/* << Vuze Added */
 
 	/*
 	 * Display an error if an ajax request fails, and stop sending requests
@@ -71,15 +95,18 @@ TransmissionRemote.prototype =
 			return;
 		}
 
-                remote._error_array.push( remote._request_count )
+		/* >> Vuze Added */
+		remote._error_array.push( remote._request_count )
 
-                if( !remote.isPersistentError() ) return
+		if( !remote.isPersistentError() ) return
+   		/* << Vuze Added */
 
 		remote._error = request.responseText
 					? request.responseText.trim().replace(/(<([^>]+)>)/ig,"")
 					: "";
 		if( !remote._error.length )
 			 remote._error = 'Server not responding' + ( error_string ? ' ( ' + error_string + ' )' : '' );
+
 
 		dialog.confirm('Connection Failed',
 			'Could not connect to the server. You may need to reload the page to reconnect.',
@@ -92,7 +119,9 @@ TransmissionRemote.prototype =
 	},
 
 	appendSessionId: function(XHR) {
+		/* >> Vuze Added */
 		if(this._token)
+		/* << Vuze Added */
 			XHR.setRequestHeader('X-Transmission-Session-Id', this._token);
 	},
 
@@ -101,7 +130,9 @@ TransmissionRemote.prototype =
 		if( typeof async != 'boolean' )
 		  async = true;
 
-                remote._request_count += 1
+		/* >> Vuze Added */
+		remote._request_count += 1
+   		/* >> Vuze Added */
 
 		var ajaxSettings = {
 			url: RPC._Root,
@@ -124,12 +155,40 @@ TransmissionRemote.prototype =
 		var o = { method: 'session-get' };
 		this.sendRequest( o, callback, async );
 	},
-
+	
+	checkPort: function( callback, async ) {
+		var tr = this._controller;
+		var o = { method: 'port-test' };
+		this.sendRequest( o, callback, async );
+	},
+	
+	loadDaemonStats: function( callback, async ) {
+		var tr = this._controller;
+		var o = { method: 'session-stats' };
+		this.sendRequest( o, callback, async );
+	},
 	getInitialDataFor: function(torrent_ids, callback) {
 		var o = {
 			method: 'torrent-get',
 			arguments: {
-			fields: Torrent._StaticFields.concat(Torrent._DynamicFields, [ 'files', 'fileStats' ])
+				fields: Torrent._StaticFields.concat( Torrent._MetaDataFields,
+                        Torrent._DynamicFields,
+                        [ 'files', 'fileStats' ] )
+			}
+		};
+
+		if(torrent_ids)
+			o.arguments.ids = torrent_ids;
+
+		this.sendRequest( o, function(data){ callback(data.arguments.torrents)} );
+	},
+
+	getMetaDataFor: function(torrent_ids, callback) {
+		var o = {
+			method: 'torrent-get',
+			arguments: {
+			fields: Torrent._StaticFields.concat( Torrent._MetaDataFields,
+			                                      [ 'files', 'fileStats' ] )
 			}
 		};
 
@@ -191,8 +250,9 @@ TransmissionRemote.prototype =
 		this.sendTorrentSetRequests( method, torrent_ids, null, callback );
 	},
 
-	startTorrents: function( torrent_ids, callback ) {
-		this.sendTorrentActionRequests( 'torrent-start', torrent_ids, callback );
+	startTorrents: function( torrent_ids, noqueue, callback ) {
+		var name = noqueue ? 'torrent-start-now' : 'torrent-start';
+		this.sendTorrentActionRequests( name, torrent_ids, callback );
 	},
 	stopTorrents: function( torrent_ids, callback ) {
 		this.sendTorrentActionRequests( 'torrent-stop', torrent_ids, callback );
@@ -220,8 +280,14 @@ TransmissionRemote.prototype =
 	verifyTorrents: function( torrent_ids, callback ) {
 		this.sendTorrentActionRequests( 'torrent-verify', torrent_ids, callback );
 	},
+	reannounceTorrents: function( torrent_ids, callback ) {
+		this.sendTorrentActionRequests( 'torrent-reannounce', torrent_ids, callback );
+	},
 	addTorrentByUrl: function( url, options ) {
 		var remote = this;
+        if(url.match(/^[0-9a-f]{40}$/i)) {
+            url = 'magnet:?xt=urn:btih:'+url;
+        }
 		var o = {
 			method: 'torrent-add',
 			arguments: {
@@ -244,10 +310,33 @@ TransmissionRemote.prototype =
 			remote._controller.loadDaemonPrefs();
 		} );
 	},
+	updateBlocklist: function() {
+		var remote = this;
+		var o = {
+			method: 'blocklist-update',
+		};
+		this.sendRequest( o, function() {
+			remote._controller.loadDaemonPrefs();
+		} );
+	},
 	filesSelectAll: function( torrent_ids, files, callback ) {
 		this.sendTorrentSetRequests( 'torrent-set', torrent_ids, { 'files-wanted': files }, callback );
 	},
 	filesDeselectAll: function( torrent_ids, files, callback ) {
 		this.sendTorrentSetRequests( 'torrent-set', torrent_ids, { 'files-unwanted': files }, callback );
+	},
+
+	// Added queue calls
+	moveTorrentsToTop: function( torrent_ids, callback ) {
+		this.sendTorrentActionRequests( RPC._QueueMoveTop, torrent_ids, callback );
+	},
+	moveTorrentsToBottom: function( torrent_ids, callback ) {
+		this.sendTorrentActionRequests( RPC._QueueMoveBottom, torrent_ids, callback );
+	},
+	moveTorrentsUp: function( torrent_ids, callback ) {
+		this.sendTorrentActionRequests( RPC._QueueMoveUp, torrent_ids, callback );
+	},
+	moveTorrentsDown: function( torrent_ids, callback ) {
+		this.sendTorrentActionRequests( RPC._QueueMoveDown, torrent_ids, callback );
 	}
 };

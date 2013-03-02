@@ -1,18 +1,26 @@
+/* Transmission Revision 11157, with changes */
+
 div.torrent_global_menu ul li {
-	/*width: 87px;*/
+	/*
+	width: 87px;
+	*/
 }
 div#torrent_container {
 	overflow-x: hidden;
 }
 div#torrent_container ul li {
-	/*padding-right: 40px;*/
+	/*
+	padding-right: 40px;
+	*/
 }
 li.torrent .torrent_progress_bar.incomplete{
   margin-right: 0 !important;
 }
 li.torrent a div {
-	/*right: -50px;
-	top: 2px;*/
+	/*
+	right: -5px;
+	top: 2px;
+	*/
 }
 div.torrent_global_details div#torrent_global_transfer {float:none;display:block;text-align:left}
 
@@ -44,6 +52,9 @@ div.torrent_footer ul#settings_menu li#button:hover {
 .trans_menu ul {
 	width: 210px;
 }
+.dialog_container{
+	z-index: 4
+}
 .trans_menu .innerBox li.separator {
 	line-height: 0px;
 	height: 1px !important;
@@ -65,15 +76,14 @@ div.torrent_footer ul#settings_menu li#button:hover {
 	margin-left: 0px !important;
 }
 .trans_menu li .innerBox .outerbox {
-	/*top: auto !important;
-	bottom: 0px !important;*/
+	/*
+	top: auto !important;
+	bottom: 0px !important;
+	*/
 	top: 0 !important
 }
 .trans_menu div.inner {
 	left:-36px
-}
-.dialog_container{
-  z-index: 4
 }
 
 .inspector_row, .inspector_row div, .inspector_row .inspector_label {display:block}

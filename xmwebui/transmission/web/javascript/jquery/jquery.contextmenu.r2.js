@@ -117,7 +117,14 @@
 
     menu.css({'left':e[cur.eventPosX],'top':e[cur.eventPosY]}).show();
     if (cur.shadow) shadow.css({width:menu.width(),height:menu.height(),left:e.pageX+2,top:e.pageY+2}).show();
-    $(document).one('click', hide);
+    
+    setTimeout( function() { // Delay for Mozilla
+		$(document).click( function() {
+			$(document).unbind('click');
+			hide();
+			return false;
+		});
+	}, 0);
   }
 
   function hide() {

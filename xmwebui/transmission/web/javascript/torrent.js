@@ -1,3 +1,4 @@
+/* Transmission Revision 12650 */
 /*
  *	Copyright © Dave Perrett and Malcolm Jarvis
  *	This code is licensed under the GPL version 2.
@@ -30,35 +31,63 @@ Torrent._ErrTrackerWarning     = 1;
 Torrent._ErrTrackerError       = 2;
 Torrent._ErrLocalError         = 3;
 
+Torrent._TrackerInactive       = 0;
+Torrent._TrackerWaiting        = 1;
+Torrent._TrackerQueued         = 2;
+Torrent._TrackerActive         = 3;
+
+
 Torrent._StaticFields = [ 'addedDate', 'comment', 'creator', 'dateCreated',
 		'hashString', 'id', 'isPrivate', 'name', 'totalSize', 'pieceCount', 'pieceSize' ]
+
+Torrent._MetaDataFields = [ 'addedDate', 'comment', 'creator', 'dateCreated',
+		'isPrivate', 'name', 'totalSize', 'pieceCount', 'pieceSize' ]
+
 Torrent._DynamicFields = [ 'downloadedEver', 'error', 'errorString', 'eta',
-    'haveUnchecked', 'haveValid', 'leftUntilDone', 'metadataPercentComplete', 'peersConnected',
-    'peersGettingFromUs', 'peersSendingToUs', 'rateDownload', 'rateUpload',
-    'recheckProgress', 'sizeWhenDone', 'status',
-    'uploadedEver', 'uploadRatio', 'seedRatioLimit', 'seedRatioMode', 'downloadDir' ]
+    'haveUnchecked', 'haveValid', 'leftUntilDone', 'metadataPercentComplete',
+    'peers', 'peersConnected', 'peersGettingFromUs', 'peersSendingToUs',
+    'queuePosition', 'rateDownload', 'rateUpload', 'recheckProgress',
+    'sizeWhenDone', 'status', 'trackerStats', 'desiredAvailable',
+    'uploadedEver', 'uploadRatio', 'seedRatioLimit', 'seedRatioMode',
+    'downloadDir', 'isFinished' ]
 
 Torrent.prototype =
 {
+	initMetaData: function( data ) {
+		this._date          = data.addedDate;
+		this._comment       = data.comment;
+		this._creator       = data.creator;
+		this._creator_date  = data.dateCreated;
+		this._is_private    = data.isPrivate;
+		this._name          = data.name;
+		this._name_lc       = this._name.toLowerCase( );
+		this._size          = data.totalSize;
+		this._pieceCount    = data.pieceCount;
+		this._pieceSize     = data.pieceSize;
+
+		if( data.files ) {
+			for( var i=0, row; row=data.files[i]; ++i ) {
+				this._file_model[i] = {
+					'index': i,
+					'torrent': this,
+					'length': row.length,
+					'name': row.name
+				};
+			}
+		}
+	},
+
 	/*
 	 * Constructor
 	 */
 	initialize: function( transferListParent, fileListParent, controller, data) {
 		this._id            = data.id;
-		this._is_private    = data.isPrivate;
 		this._hashString    = data.hashString;
-		this._date          = data.addedDate;
-		this._size          = data.totalSize;
-		this._pieceCount    = data.pieceCount;
-		this._pieceSize     = data.pieceSize;
-		this._comment       = data.comment;
-		this._creator       = data.creator;
-		this._creator_date  = data.dateCreated;
 		this._sizeWhenDone  = data.sizeWhenDone;
-		this._name          = data.name;
-		this._name_lc       = this._name.toLowerCase( );
+		this._trackerStats  = this.buildTrackerStats(data.trackerStats);
 		this._file_model    = [ ];
 		this._file_view     = [ ];
+		this.initMetaData( data );
 
 		// Create a new <li> element
 		var top_e = document.createElement( 'li' );
@@ -68,6 +97,7 @@ Torrent.prototype =
 		var element = $(top_e);
                 $(element).bind('dblclick', function(e) {transmission.toggleInspector();});
 		element._torrent = this;
+		element._id = this._id;
 		this._element = element;
 		this._controller = controller;
 		controller._rows.push( element );
@@ -83,6 +113,11 @@ Torrent.prototype =
 		e.className = 'torrent_progress_details';
 		top_e.appendChild( e );
 		element._progress_details_container = e;
+
+		//Create a progress bar container
+		top_a = document.createElement( 'div' );
+		top_a.className = 'torrent_progress_bar_container';
+		element._progress_bar_container = top_a;
 
 		// Create the 'in progress' bar
 		e = document.createElement( 'div' );
@@ -138,6 +173,7 @@ Torrent.prototype =
 
 		this.initializeTorrentFilesInspectorGroup( fileListParent );
 
+		/* >> Vuze */
 		if( data.files ) {
 			for( var i=0, row; row=data.files[i]; ++i ) {
 				this._file_model[i] = {
@@ -148,6 +184,7 @@ Torrent.prototype =
 				};
 			}
 		}
+		/* << Vuze */
 
 		// Update all the labels etc
 		this.refresh(data);
@@ -166,6 +203,34 @@ Torrent.prototype =
 
 	fileList: function() {
 		return $(this._fileList);
+	},
+
+	buildTrackerStats: function(trackerStats) {
+		result = [];
+		for( var i=0, tracker; tracker=trackerStats[i]; ++i ) {
+			tier = result[tracker.tier] || [];
+			tier[tier.length] = {
+				'host': tracker.host,
+				'announce': tracker.announce,
+				'hasAnnounced': tracker.hasAnnounced,
+				'lastAnnounceTime': tracker.lastAnnounceTime,
+				'lastAnnounceSucceeded': tracker.lastAnnounceSucceeded,
+				'lastAnnounceResult': tracker.lastAnnounceResult,
+				'lastAnnouncePeerCount': tracker.lastAnnouncePeerCount,
+				'announceState': tracker.announceState,
+				'nextAnnounceTime': tracker.nextAnnounceTime,
+				'isBackup': tracker.isBackup,
+				'hasScraped': tracker.hasScraped,
+				'lastScrapeTime': tracker.lastScrapeTime,
+				'lastScrapeSucceeded': tracker.lastScrapeSucceeded,
+				'lastScrapeResult': tracker.lastScrapeResult,
+				'seederCount': tracker.seederCount,
+				'leecherCount': tracker.leecherCount,
+				'downloadCount': tracker.downloadCount
+			};
+			result[tracker.tier] = tier;
+		}
+		return result;
 	},
 
 	/*--------------------------------------------
@@ -195,11 +260,20 @@ Torrent.prototype =
 	downloadTotal: function() {return this._download_total;},
 	hash: function() {return this._hashString;},
 	id: function() {return this._id;},
-	isActive: function() {return this.state() != Torrent._StatusStopped;},
-	isDownloading: function() {return this.state() == Torrent._StatusDownload || this.state() == Torrent._StatusDownloadWait;},
-	isSeeding: function() {return this.state() == Torrent._StatusSeed || this.state() == Torrent._StatusSeedWait;},
-        isQueued: function() {return this.state() == Torrent._StatusSeedWait || this.state() == Torrent._StatusDownloadWait;},
+	isActiveFilter: function() { return this.peersGettingFromUs() > 0
+					 || this.peersSendingToUs() > 0
+					 || this.webseedsSendingToUs() > 0
+					 || this.state() == Torrent._StatusCheck; },
+	isActive: function() { return this.state() != Torrent._StatusStopped; },
+	isDownloading: function() { return this.state() == Torrent._StatusDownload; },
+	isFinished: function() { return this._isFinishedSeeding; },
+	isSeeding: function() { return this.state() == Torrent._StatusSeed; },
+        isQueued: function() { return ( this.state() == Torrent._StatusSeedWait )
+                                   || ( this.state() == Torrent._StatusDownloadWait ); },
 	name: function() {return this._name;},
+        queuePosition: function() { return this._queue_position; },
+        isQueued: function() { return this.queuePosition() >= 0; },
+	webseedsSendingToUs: function() { return this._webseeds_sending_to_us; },
 	peersSendingToUs: function() {return this._peers_sending_to_us;},
 	peersGettingFromUs: function() {return this._peers_getting_from_us;},
 	needsMetaData: function(){return this._metadataPercentComplete < 1},
@@ -209,24 +283,28 @@ Torrent.prototype =
 		return ( this._sizeWhenDone - this._leftUntilDone ) / this._sizeWhenDone;
 	},
 	getPercentDoneStr: function() {
+		/* >> Vuze (might be the same?)
+		return Transmission.fmt.percentString( 100 * this.getPercentDone() );
+		*/
 		return Math.floor(100 * Math.ratio( 100 * ( this._sizeWhenDone - this._leftUntilDone ),
 		                           this._sizeWhenDone )) / 100;
+		/* << Vuze */
 	},
 	size: function() {return this._size;},
 	state: function() {return this._state;},
 	stateStr: function() {
 		switch( this.state() ) {
-			case Torrent._StatusSeed:return 'Seeding';
-			case Torrent._StatusDownload:return 'Downloading';
-                        case Torrent._StatusSeedWait:
-                        case Torrent._StatusDownloadWait:return 'Queued';
-                        case Torrent._StatusStopped:return 'Stopped';
-			case Torrent._StatusStopped:return 'Stopped';
-			case Torrent._StatusCheck:return 'Verifying local data';
-			case Torrent._StatusCheckWait:return 'Waiting to verify';
-			default:return 'error';
+			case Torrent._StatusStopped:        return this.isFinished() ? 'Seeding complete' : 'Stopped';
+			case Torrent._StatusCheckWait:      return 'Queued for verification';
+			case Torrent._StatusCheck:          return 'Verifying local data';
+			case Torrent._StatusDownloadWait:   return 'Queued for Download';
+			case Torrent._StatusDownload:       return 'Downloading';
+			case Torrent._StatusSeedWait:       return 'Queued for Seeding';
+			case Torrent._StatusSeed:           return 'Seeding';
+ 			default:                            return 'error';
 		}
 	},
+	trackerStats: function() {return this._trackerStats; },
 	uploadSpeed: function() {return this._upload_speed;},
 	uploadTotal: function() {return this._upload_total;},
 	showFileList: function() {
@@ -320,6 +398,7 @@ Torrent.prototype =
 			torrent._controller.startTorrent( torrent );
 	},
 
+	/* >> Vuze */
     /*
 	 * Process a click event on the info button
 	 */
@@ -340,12 +419,20 @@ Torrent.prototype =
             }
         }
 	},
+	/* << Vuze */
 
 	/*--------------------------------------------
 	 *
 	 *  I N T E R F A C E   F U N C T I O N S
 	 *
 	 *--------------------------------------------*/
+
+	refreshMetaData: function(data) {
+		this.initMetaData( data );
+		this.ensureFileListExists();
+		this.refreshFileView();
+		this.refreshHTML( );
+	},
 
 	refresh: function(data) {
 		this.refreshData( data );
@@ -355,7 +442,11 @@ Torrent.prototype =
 	/*
 	 * Refresh display
 	 */
-	refreshData: function(data) {
+	refreshData: function(data) 
+	{
+		if( this.needsMetaData() && ( data.metadataPercentComplete >= 1 ) )
+			transmission.refreshMetaData( [ this._id ] );
+
 		this._completed               = data.haveUnchecked + data.haveValid;
 		this._verified                = data.haveValid;
 		this._leftUntilDone           = data.leftUntilDone;
@@ -366,17 +457,23 @@ Torrent.prototype =
 		this._seed_ratio_mode         = data.seedRatioMode;
 		this._download_speed          = data.rateDownload;
 		this._upload_speed            = data.rateUpload;
+		this._peers                   = data.peers;
 		this._peers_connected         = data.peersConnected;
 		this._peers_getting_from_us   = data.peersGettingFromUs;
 		this._peers_sending_to_us     = data.peersSendingToUs;
+		this._queue_position          = data.queuePosition;
+		this._webseeds_sending_to_us  = data.webseedsSendingToUs;
 		this._sizeWhenDone            = data.sizeWhenDone;
 		this._recheckProgress         = data.recheckProgress;
 		this._error                   = data.error;
 		this._error_string            = data.errorString;
 		this._eta                     = data.eta;
+		this._trackerStats            = this.buildTrackerStats(data.trackerStats);
 		this._state                   = data.status;
 		this._download_dir            = data.downloadDir;
 		this._metadataPercentComplete = data.metadataPercentComplete;
+		this._isFinishedSeeding       = data.isFinished;
+		this._desiredAvailable        = data.desiredAvailable;
 
 		if (data.fileStats)
 			this.refreshFileModel( data );
@@ -405,10 +502,18 @@ Torrent.prototype =
 		return null;
 	},
 
+	formatUL: function() {
+		return 'UL: ' + Transmission.fmt.speedBps(this._upload_speed);
+	},
+	formatDL: function() {
+		return 'DL: ' + Transmission.fmt.speedBps(this._download_speed);
+	},
+
 	getPeerDetails: function()
 	{
 		var c;
 
+		var compact_mode = this._controller[Prefs._CompactDisplayState];
 		if(( c = this.getErrorMessage( )))
 			return c;
 
@@ -423,34 +528,20 @@ Torrent.prototype =
 				break;
 
 			case Torrent._StatusDownload:
-				// 'Downloading from 36 of 40 peers - DL: 60.2 KB/s UL: 4.3 KB/s'
-				c = 'Downloading from ';
-				c += this.peersSendingToUs();
-				c += ' of ';
-				c += this._peers_connected;
-				c += ' peers - DL: ';
-				c += Math.formatBytes(this._download_speed);
-				c += '/s UL: ';
-				c += Math.formatBytes(this._upload_speed);
-				c += '/s';
+				var a = [ ];
+				if(!compact_mode)
+					a.push( 'Downloading from', this.peersSendingToUs(), 'of', this._peers_connected, 'peers', '-' );
+				a.push( this.formatDL(), this.formatUL() );
+				c = a.join(' ');
 				break;
 
 			case Torrent._StatusSeed:
-				// 'Seeding to 13 of 22 peers - UL: 36.2 KB/s'
-				c = 'Seeding to ';
-				c += this.peersGettingFromUs();
-				c += ' of ';
-				c += this._peers_connected;
-				c += ' peers - UL: ';
-				c += Math.formatBytes(this._upload_speed);
-				c += '/s';
+				c = [ 'Seeding to', this.peersGettingFromUs(), 'of', this._peers_connected, 'peers', '-', this.formatUL() ].join(' ');
 				break;
 
 			case Torrent._StatusCheck:
 				// 'Verifying local data (40% tested)'
-				c = 'Verifying local data (';
-				c += Math.roundWithPrecision( 100.0 * this._recheckProgress, 0 );
-				c += '% tested)';
+				c = [ 'Verifying local data (', Transmission.fmt.percentString( 100.0 * this._recheckProgress ), '% tested)' ].join('');
 				break;
 			default: c = '' . st; break;
 		}
@@ -463,6 +554,18 @@ Torrent.prototype =
 		var progress_details;
 		var root = this._element;
 		var MaxBarWidth = 100; // reduce this to make the progress bar shorter (%)
+		var compact_mode = this._controller[Prefs._CompactDisplayState];
+		var compact = '';
+		if(compact_mode){
+			compact = ' compact';
+			root._peer_details_container.style.display = 'none';
+		} else {
+			root._peer_details_container.style.display = 'block';
+		}
+
+		root._progress_details_container.className = 'torrent_progress_details'+compact
+		root._progress_bar_container.className = 'torrent_progress_bar_container'+compact;
+		root._name_container.className = 'torrent_name'+compact;
 
 		setInnerHTML( root._name_container, this._name );
 
@@ -475,55 +578,48 @@ Torrent.prototype =
 			notDone = false ;
 
 		if( this.needsMetaData() ){
-			var metaPercentComplete = this._metadataPercentComplete * 1000 / 100
-			progress_details = "Magnetized transfer - retrieving metadata (";
-			progress_details += metaPercentComplete;
-			progress_details += "%)";
+			var metaPercentComplete = this._metadataPercentComplete * 100;
+			progress_details = [ "Magnetized transfer - retrieving metadata (",
+			                     Transmission.fmt.percentString( metaPercentComplete ),
+			                     "%)" ].join('');
 
 			var empty = "";
 			if(metaPercentComplete == 0)
 				empty = "empty";
 
 			root._progress_complete_container.style.width = metaPercentComplete + "%";
-			root._progress_complete_container.className = 'torrent_progress_bar in_progress meta ' + empty;
+			root._progress_complete_container.className = 'torrent_progress_bar in_progress meta ' + empty+compact;
 			root._progress_incomplete_container.style.width = 100 - metaPercentComplete + "%"
-			root._progress_incomplete_container.className = 'torrent_progress_bar incomplete meta';
+			root._progress_incomplete_container.className = 'torrent_progress_bar incomplete meta'+compact;
 			root._progress_incomplete_container.style.display = 'block';
 
 		}
 		else if( notDone )
 		{
-			var eta = '';
-
-			if( this.isActive( ) )
-			{
-				eta = ' - ';
-				if (this._eta < 0 || this._eta >= Torrent._InfiniteTimeRemaining )
-					eta += 'remaining time unknown';
-				else
-					eta += Math.formatSeconds(this._eta) + ' remaining';
-			}
-
 			// Create the 'progress details' label
-			// Eg: '101 MB of 631 MB (16.02%) - 2 hr remaining'
-			c = Math.formatBytes( this._sizeWhenDone - this._leftUntilDone );
-			c += ' of ';
-			c += Math.formatBytes( this._sizeWhenDone );
-			c += ' (';
-			c += this.getPercentDoneStr();
-			c += '%)';
-			c += eta;
-			progress_details = c;
+			// Eg: '101 MiB of 631 MiB (16.02%) - 2 hr remaining'
+
+			c = [ Transmission.fmt.size( this._sizeWhenDone - this._leftUntilDone ),
+			      ' of ', Transmission.fmt.size( this._sizeWhenDone ),
+			      ' (', this.getPercentDoneStr(), '%)' ];
+			if( this.isActive( ) ) {
+				c.push( ' - ' );
+				if (this._eta < 0 || this._eta >= Torrent._InfiniteTimeRemaining )
+					c.push( 'remaining time unknown' );
+				else
+					c.push( Transmission.fmt.timeInterval(this._eta) + ' remaining' );
+			}
+			progress_details = c.join('');
 
 			// Figure out the percent completed
-			var css_completed_width = Math.floor( this.getPercentDone() * 100 * MaxBarWidth ) / 100;
+			var css_completed_width = ( this.getPercentDone() * MaxBarWidth ).toTruncFixed( 2 );
 
 			// Update the 'in progress' bar
 			e = root._progress_complete_container;
-			c = 'torrent_progress_bar';
-			c += this.isActive() ? ' in_progress' : ' incomplete_stopped';
-			if(css_completed_width === 0) {c += ' empty';}
-			e.className = c;
+			c = [ 'torrent_progress_bar'+compact,
+			      this.isActive() ? 'in_progress' : 'incomplete_stopped' ];
+			if(css_completed_width === 0) { c.push( 'empty' ); }
+			e.className = c.join(' ');
 			e.style.width = css_completed_width + '%';
 
 			// Update the 'incomplete' bar
@@ -535,14 +631,35 @@ Torrent.prototype =
 		else
 		{
 			// Create the 'progress details' label
-			// Eg: '698.05 MB, uploaded 8.59 GB (Ratio: 12.3)'
-			c = Math.formatBytes( this._size );
-			c += ', uploaded ';
-			c += Math.formatBytes( this._upload_total );
-			c += ' (Ratio ';
-			c += Math.round(this._upload_ratio*100)/100;
-			c += ')';
-			progress_details = c;
+
+			if( this._size == this._sizeWhenDone )
+			{
+				// seed: '698.05 MiB'
+				c = [ Transmission.fmt.size( this._size ) ];
+			}
+			else
+			{
+				// partial seed: '127.21 MiB of 698.05 MiB (18.2%)'
+				c = [ Transmission.fmt.size( this._sizeWhenDone ), ' of ', Transmission.fmt.size( this._size ),
+				      ' (', Transmission.fmt.percentString( 100.0 * this._sizeWhenDone / this._size ), '%)' ];
+			}
+
+			// append UL stats: ', uploaded 8.59 GiB (Ratio: 12.3)'
+			c.push( ', uploaded ', Transmission.fmt.size( this._upload_total ),
+			        ' (Ratio ', Transmission.fmt.ratioString( this._upload_ratio ), ')' );
+
+			// maybe append remaining time
+			if( this.isActive( ) && this.seedRatioLimit( ) > 0 )
+			{
+				c.push(' - ');
+
+				if (this._eta < 0 || this._eta >= Torrent._InfiniteTimeRemaining )
+					c.push( 'remaining time unknown' );
+				else
+					c.push( Transmission.fmt.timeInterval(this._eta), ' remaining' );
+			}
+
+			progress_details = c.join('');
 
 			var status = this.isActive() ? 'complete' : 'complete_stopped';
 
@@ -550,7 +667,9 @@ Torrent.prototype =
 				status = 'complete seeding'
 				var seedRatioRatio = this._upload_ratio / this.seedRatioLimit();
 				var seedRatioPercent = Math.round( seedRatioRatio * 100 * MaxBarWidth ) / 100;
-                                seedRatioPercent = seedRatioPercent < 0 ? 0 : ( seedRatioPercent > 100 ? 100 : seedRatioPercent );
+				/* >> Vuze: Protect against bounds overrun */
+				seedRatioPercent = seedRatioPercent < 0 ? 0 : ( seedRatioPercent > 100 ? 100 : seedRatioPercent );
+                /* << Vuze */
 
 				// Set progress to percent seeded
 				root._progress_complete_container.style.width =	seedRatioPercent + '%';
@@ -575,17 +694,33 @@ Torrent.prototype =
 			e.className = 'torrent_progress_bar ' + status;
 		}
 
+
+		var hasError = this.getErrorMessage( ) != undefined;
 		// Update the progress details
+		if(compact_mode){
+			progress_details = this.getPeerDetails();
+			$(root._progress_details_container).toggleClass('error',hasError);
+		} else {
+			$(root._peer_details_container).toggleClass('error',hasError);
+		}
 		setInnerHTML( root._progress_details_container, progress_details );
+
+		if( compact ){
+			var width = root._progress_details_container.offsetLeft - root._name_container.offsetLeft;
+			root._name_container.style.width = width + 'px';
+		}
+		else {
+			root._name_container.style.width = '100%';
+		}
 
 		// Update the peer details and pause/resume button
 		e = root._pause_resume_button_image;
 		if ( this.state() === Torrent._StatusStopped ) {
 			e.alt = 'Start';
-			e.className = "torrent_resume";
+			e.className = "torrent_resume"+compact;
 		} else {
 			e.alt = 'Stop';
-			e.className = "torrent_pause";
+			e.className = "torrent_pause"+compact;
 		}
 
 		setInnerHTML( root._peer_details_container, this.getPeerDetails( ) );
@@ -634,17 +769,24 @@ Torrent.prototype =
 	test: function( filter, search )
 	{
 		var pass = false;
+                var s = this.state( );
 
 		switch( filter )
 		{
+			case Prefs._FilterActive:
+				pass = this.isActiveFilter();
+				break;
 			case Prefs._FilterSeeding:
-				pass = this.isSeeding();
+				pass = ( s == Torrent._StatusSeed ) || ( s == Torrent._StatusSeedWait );
 				break;
 			case Prefs._FilterDownloading:
-				pass = this.isDownloading();
+				pass = ( s == Torrent._StatusDownload ) || ( s == Torrent._StatusDownloadWait );
 				break;
 			case Prefs._FilterPaused:
 				pass = !this.isActive();
+				break;
+			case Prefs._FilterFinished:
+				pass = this.isFinished();
 				break;
 			default:
 				pass = true;
@@ -667,32 +809,65 @@ Torrent.compareById = function( a, b ) {
 };
 
 /** Helper function for sortTorrents(). */
-Torrent.compareByAge = function( a, b ) {
-	return a.dateAdded() - b.dateAdded();
-};
-
-/** Helper function for sortTorrents(). */
 Torrent.compareByName = function( a, b ) {
-	return a._name_lc.compareTo( b._name_lc );
+	var i = a._name_lc.compareTo( b._name_lc );
+	if( i )
+		return i;
+	return Torrent.compareById( a, b );
 };
 
 /** Helper function for sortTorrents(). */
-Torrent.compareByState = function( a, b ) {
-	return a.state() - b.state();
+Torrent.compareByQueue = function( a, b )
+{
+	return a.queuePosition( ) - b.queuePosition();
 };
 
 /** Helper function for sortTorrents(). */
-Torrent.compareByActivity = function( a, b ) {
-	return a.activity() - b.activity();
+Torrent.compareByAge = function( a, b )
+{
+	var a_age = a.dateAdded();
+	var b_age = b.dateAdded();
+	if( a_age != b_age )
+		return a_age - b_age;
+
+	return Torrent.compareByQueue( a, b );
 };
 
 /** Helper function for sortTorrents(). */
+Torrent.compareByState = function( a, b )
+{
+	var a_state = a.state( );
+	var b_state = b.state( );
+	if( a_state != b_state )
+		return b_state - a_state;
+
+	return Torrent.compareByQueue( a, b );
+};
+
+/** Helper function for sortTorrents(). */
+Torrent.compareByActivity = function( a, b )
+{
+	var a_activity = a.activity( );
+	var b_activity = b.activity( );
+	if( a_activity != b_activity )
+		return a_activity - b_activity;
+
+	return Torrent.compareByState( a, b );
+};
+
+/** Helper function for sortTorrents(). */
+Torrent.compareByRatio = function( a, b ) {
+	var a_ratio = Math.ratio( a._upload_total, a._download_total );
+	var b_ratio = Math.ratio( b._upload_total, b._download_total );
+	if( a_ratio != b_ratio )
+		return a_ratio - b_ratio;
+	return Torrent.compareByState( a, b );
+};
+
 Torrent.compareByProgress = function( a, b ) {
 	if( a.getPercentDone() !== b.getPercentDone() )
 		return a.getPercentDone() - b.getPercentDone();
-	var a_ratio = Math.ratio( a._upload_total, a._download_total );
-	var b_ratio = Math.ratio( b._upload_total, b._download_total );
-	return a_ratio - b_ratio;
+	return Torrent.compareByRatio( a, b );
 };
 
 /**
@@ -711,7 +886,7 @@ Torrent.sortTorrents = function( torrents, sortMethod, sortDirection )
 			torrents.sort( this.compareByAge );
 			break;
 		case Prefs._SortByQueue:
-			torrents.sort( this.compareById );
+			torrents.sort( this.compareByQueue );
 			break;
 		case Prefs._SortByProgress:
 			torrents.sort( this.compareByProgress );
@@ -721,6 +896,9 @@ Torrent.sortTorrents = function( torrents, sortMethod, sortDirection )
 			break;
 		case Prefs._SortByName:
 			torrents.sort( this.compareByName );
+			break;
+		case Prefs._SortByRatio:
+			torrents.sort( this.compareByRatio );
 			break;
 		default:
 			console.warn( "unknown sort method: " + sortMethod );
@@ -882,32 +1060,32 @@ TorrentFile.prototype = {
 	},
 
 	refreshProgressHTML: function() {
-		var c = Math.formatBytes(this._done);
-		c += ' of ';
-		c += Math.formatBytes(this._size);
-		c += ' (';
-		c += Math.ratio(100 * this._done, this._size);
-		c += '%)';
+		var c = [ Transmission.fmt.size(this._done),
+		          ' of ',
+		          Transmission.fmt.size(this._size),
+		          ' (',
+		          this._size ? Transmission.fmt.percentString(100 * this._done / this._size) : '100',
+		          '%)' ].join('');
 		setInnerHTML(this._progress[0], c);
 	},
 
 	refreshWantedHTML: function() {
 		var e = this.domElement();
-		var c = e.classNameConst;
-		if(!this._wanted) {c += ' skip';}
-		if(this.isDone()) {c += ' complete';}
-		e.className = c;
+		var c = [ e.classNameConst ];
+		if(!this._wanted) { c.push( 'skip' ); }
+		if(this.isDone()) { c.push( 'complete' ); }
+		e.className = c.join(' ');
 	},
 
 	refreshPriorityHTML: function() {
 		var e = this._priority_control;
-		var c = e.classNameConst;
+		var c = [ e.classNameConst ];
 		switch( this._prio ) {
-			case 1:c += ' high';break;
-			case -1:c += ' low';break;
-			default:c += ' normal';break;
+			case 1  : c.push( 'high'   ); break;
+			case -1 : c.push( 'low'    ); break;
+			default : c.push( 'normal' ); break;
 		}
-		e.className = c;
+		e.className = c.join(' ');
 	},
 
 	fileWantedControlClicked: function(event) {
@@ -924,12 +1102,20 @@ TorrentFile.prototype = {
 		var prio;
 		if(iPhone)
 		{
+			/* Vuze: Original:
+			if( x < 8 ) prio = -1;
+			else if( x < 27 ) prio = 0;
+			*/
 			if( x < 18 ) prio = 0;
 			//else if( x < 27 ) prio = 0;
 			else prio = 1;
 		}
 		else
 		{
+			/* Vuze: Original:
+			if( x < 12 ) prio = -1;
+			else if( x < 23 ) prio = 0;
+			*/
 			if( x < 18 ) prio = 0;
 			//else if( x < 23 ) prio = 0;
 			else prio = 1;

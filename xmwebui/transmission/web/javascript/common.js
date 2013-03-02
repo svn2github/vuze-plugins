@@ -1,3 +1,4 @@
+/* Transmission Revision 12650 */
 /*
  *	Copyright © Dave Perrett and Malcolm Jarvis
  *	This code is licensed under the GPL version 2.
@@ -8,12 +9,23 @@
 
 var transmission;
 var dialog;
+var resizeTimer = null;
 // Test for a Webkit build that supports box-shadow: 521+ (release Safari 3 is
 // actually 523.10.3). We need 3.1 for CSS animation (dialog sheets) but as it
 // degrades gracefully let's not worry too much.
 var Safari3 = testSafari3();
-var iPhone = RegExp("(iPhone|iPod|Android)").test(navigator.userAgent);
+var iPhone = RegExp("(iPhone|iPod)").test(navigator.userAgent);
 if (iPhone) var scroll_timeout;
+
+if(!Array.indexOf){
+	Array.prototype.indexOf = function(obj){
+		var i, len;
+		for(i=0, len=this.length; i<len; i++)
+			if(this[i]==obj)
+				return i;
+		return -1;
+	}
+}
 
 function testSafari3()
 {
@@ -29,7 +41,7 @@ function testSafari3()
         if (versionField > minimumField) return true;
         if (versionField < minimumField) return false;
     }
-    return true;
+	return true;
 };
 
 $(document).ready( function() {
@@ -42,14 +54,16 @@ $(document).ready( function() {
 	// IE specific fixes here
 	if ($.browser.msie) {
 		try {
-		  document.execCommand("BackgroundImageCache", false, true);
+			document.execCommand("BackgroundImageCache", false, true);
 		} catch(err) {}
 		$('.dialog_container').css('height',$(window).height()+'px');
 	}
 
 	if ($.browser.safari) {
 		// Move search field's margin down for the styled input
-		//$('#torrent_search').css('margin-top', 3);
+		/* Vuze Removed (no idea why)
+		$('#torrent_search').css('margin-top', 3);
+		*/
 	}
 	if (!Safari3 && !iPhone) {
 		// Fix for non-Safari-3 browsers: dark borders to replace shadows.
@@ -79,6 +93,13 @@ $(document).ready( function() {
 			$('body div#torrent_container').css('min-height', '338px');
 		$("label[for=torrent_upload_url]").text("URL: ");
 	}
+
+	// Add resize event handler with a timeout to handle browsers that fire a
+	// resize event for every pixel changed
+	$(window).bind('resize', function() {
+		if (resizeTimer) clearTimeout(resizeTimer);
+		resizeTimer = setTimeout('transmission.refreshDisplay()', 50)
+		});
 });
 
 /*
@@ -97,6 +118,9 @@ Array.prototype.clone = function () {
  */
 function setInnerHTML( e, html )
 {
+	if( e == undefined )
+		return;
+
 	/* innerHTML is listed as a string, but the browser seems to change it.
 	 * For example, "&infin;" gets changed to "∞" somewhere down the line.
 	 * So, let's use an arbitrary  different field to test our state... */
@@ -108,116 +132,6 @@ function setInnerHTML( e, html )
 };
 
 /*
- *   Converts file & folder byte size values to more
- *   readable values (bytes, KB, MB, GB or TB).
- *
- *   @param integer bytes
- *   @returns string
- */
-Math.formatBytes = function(bytes) {
-    var size;
-    var unit;
-
-    // Terabytes (TB).
-    if ( bytes >= 1099511627776 ) {
-        size = bytes / 1099511627776;
-		unit = ' TB';
-
-    // Gigabytes (GB).
-    } else if ( bytes >= 1073741824 ) {
-        size = bytes / 1073741824;
-		unit = ' GB';
-
-    // Megabytes (MB).
-    } else if ( bytes >= 1048576 ) {
-        size = bytes / 1048576;
-		unit = ' MB';
-
-    // Kilobytes (KB).
-    } else if ( bytes >= 1024 ) {
-        size = bytes / 1024;
-		unit = ' KB';
-
-    // The file is less than one KB
-    } else {
-        size = bytes;
-		unit = ' bytes';
-    }
-
-	// Single-digit numbers have greater precision
-	var precision = 1;
-	if (size < 10) {
-	    precision = 2;
-	}
-	size = Math.roundWithPrecision(size, precision);
-
-	// Add the decimal if this is an integer
-	if ((size % 1) == 0 && unit != ' bytes') {
-		size = size + '.0';
-	}
-
-    return size + unit;
-};
-
-
-/*
- *   Converts seconds to more readable units (hours, minutes etc).
- *
- *   @param integer seconds
- *   @returns string
- */
-Math.formatSeconds = function(seconds)
-{
-	var result;
-	var days = Math.floor(seconds / 86400);
-	var hours = Math.floor((seconds % 86400) / 3600);
-	var minutes = Math.floor((seconds % 3600) / 60);
-	var seconds = Math.floor((seconds % 3600) % 60);
-
-	if (days > 0 && hours == 0)
-		result = days + ' days';
-	else if (days > 0 && hours > 0)
-		result = days + ' days ' + hours + ' hr';
-	else if (hours > 0 && minutes == 0)
-		result = hours + ' hr';
-	else if (hours > 0 && minutes > 0)
-		result = hours + ' hr ' + minutes + ' min';
-	else if (minutes > 0 && seconds == 0)
-		result = minutes + ' min';
-	else if (minutes > 0 && seconds > 0)
-		result = minutes + ' min ' + seconds + ' seconds';
-	else
-		result = seconds + ' seconds';
-
-	return result;
-};
-
-
-/*
- *   Converts a unix timestamp to a human readable value
- *
- *   @param integer seconds
- *   @returns string
- */
-Math.formatTimestamp = function(seconds) {
-	var myDate = new Date(seconds*1000);
-	return myDate.toGMTString();
-};
-
-/*
- *   Round a float to a specified number of decimal
- *   places, stripping trailing zeroes
- *
- *   @param float floatnum
- *   @param integer precision
- *   @returns float
- */
-Math.roundWithPrecision = function(floatnum, precision) {
-    return Math.round ( floatnum * Math.pow ( 10, precision ) ) / Math.pow ( 10, precision );
-};
-
-
-/*
  *   Given a numerator and denominator, return a ratio string
  */
 Math.ratio = function( numerator, denominator )
@@ -225,15 +139,32 @@ Math.ratio = function( numerator, denominator )
 	var result = Math.floor(100 * numerator / denominator) / 100;
 
 	// check for special cases
-	if (isNaN(result)) result = 0;
-	if (result=="Infinity") result = "&infin;";
-
-	// Add the decimals if this is an integer
-	if ((result % 1) == 0)
-		result = result + '.00';
+	if(result==Number.POSITIVE_INFINITY || result==Number.NEGATIVE_INFINITY) result = -2;
+	else if(isNaN(result)) result = -1;
 
 	return result;
 };
+
+/*
+ *   Truncate a float to a specified number of decimal
+ *   places, stripping trailing zeroes
+ *
+ *   @param float floatnum
+ *   @param integer precision
+ *   @returns float
+ */
+Math.truncateWithPrecision = function(floatnum, precision) {
+	return Math.floor( floatnum * Math.pow ( 10, precision ) ) / Math.pow( 10, precision );
+};
+
+/*
+ *   Round a string of a number to a specified number of decimal
+ *   places
+ */
+Number.prototype.toTruncFixed = function( place ) {
+	var ret = Math.truncateWithPrecision( this, place );
+	return ret.toFixed( place );
+}
 
 /*
  * Trim whitespace from a string
@@ -283,8 +214,6 @@ function changeTab(tab, id) {
 function Prefs() { }
 Prefs.prototype = { };
 
-Prefs._AutoStart          = 'auto-start-torrents';
-
 Prefs._RefreshRate        = 'refresh_rate';
 Prefs._SessionRefreshRate        = 'session_refresh_rate';
 
@@ -294,9 +223,11 @@ Prefs._ShowInspector      = 'show_inspector';
 
 Prefs._FilterMode         = 'filter';
 Prefs._FilterAll          = 'all';
+Prefs._FilterActive       = 'active';
 Prefs._FilterSeeding      = 'seeding';
 Prefs._FilterDownloading  = 'downloading';
 Prefs._FilterPaused       = 'paused';
+Prefs._FilterFinished     = 'finished';
 
 Prefs._SortDirection      = 'sort_direction';
 Prefs._SortAscending      = 'ascending';
@@ -305,13 +236,15 @@ Prefs._SortDescending     = 'descending';
 Prefs._SortMethod         = 'sort_method';
 Prefs._SortByAge          = 'age';
 Prefs._SortByActivity     = 'activity';
-Prefs._SortByQueue        = 'queue_order';
 Prefs._SortByName         = 'name';
+Prefs._SortByQueue        = 'queue_order';
 Prefs._SortByProgress     = 'percent_completed';
+Prefs._SortByRatio        = 'ratio';
 Prefs._SortByState        = 'state';
 Prefs._SortByTracker      = 'tracker';
 
 Prefs._TurtleState        = 'turtle-state';
+Prefs._CompactDisplayState= 'compact_display_state';
 
 Prefs._Defaults =
 {
@@ -322,7 +255,8 @@ Prefs._Defaults =
 	'show_inspector': false,
 	'sort_direction': 'ascending',
 	'sort_method': 'name',
-	'turtle-state' : false
+	'turtle-state' : false,
+	'compact_display_state' : false
 };
 
 /*

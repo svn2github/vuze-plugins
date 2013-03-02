@@ -1,3 +1,4 @@
+/* Transmission Revision 11157 */
 /*--------------------------------------
  *
  * G L O B A L
@@ -245,6 +246,10 @@ div#torrent_filter_bar ul li.selected a {
 	background-position: right top;
 }
 
+div#torrent_filter_bar ul li a.finished {
+	display: none;
+}
+
 div#torrent_filter_bar input#torrent_search {
 	position: absolute;
 	height: 20px;
@@ -396,7 +401,7 @@ div#dialog_message.dialog_message {
 }
 
 #torrent_upload_file, label[for="torrent_upload_file"]{
-  display:none;
+	display:none;
 }
 
 h2.dialog_heading {
@@ -419,6 +424,7 @@ div.dialog_container a {
 	width: 90px;
 	font-size: 12px;
 	text-align: center;
+	overflow: hidden;
 }
 
 div.dialog_container a#dialog_cancel_button, div.dialog_container a#prefs_cancel_button {

@@ -1,5 +1,5 @@
 /*
- *	Copyright © Dave Perrett and Malcolm Jarvis
+ *	Copyright ?? Dave Perrett and Malcolm Jarvis
  *	This code is licensed under the GPL version 2.
  *	For more details, see http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
  *
@@ -102,7 +102,7 @@ Dialog.prototype = {
 			setTimeout("$('div#dialog_container div.dialog_window').css('top', '0px');",10);
 		}
 	},
- 
+
     /*
      * Display an alert dialog
      */
