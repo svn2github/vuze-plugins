@@ -70,7 +70,7 @@ public class DHTConstants {
 	public static final int		ANNOUNCE_CACHE_MAX_AGE					= 30 * 60 * 1000;
 
 
-	public static final String[]			BOOTSTRAP_NODES							= new String[]	{ "mldht.wifi.pps.jussieu.fr", 	"router.bittorrent.com" };
+	public static final String[]			BOOTSTRAP_NODES							= new String[]	{ "mldht.wifi.pps.univ-paris-diderot.fr", 	"router.bittorrent.com" };
 	public static final int[]				BOOTSTRAP_PORTS							= new int[]		{ 6881, 						6881 };
 	public static List<InetSocketAddress>	BOOTSTRAP_NODE_ADDRESSES				= Collections.EMPTY_LIST;
 	private static String version = "AZ00";
