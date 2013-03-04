@@ -1,4 +1,4 @@
-/* Transmission Revision 12650 */
+/* Transmission Revision 12690 */
 /*
  * Copyright © Dave Perrett, Malcolm Jarvis and Bruno Bierbaumer
  * This code is licensed under the GPL version 2.
@@ -122,13 +122,13 @@ TransmissionRemote.prototype =
 		/* >> Vuze Added */
 		if(this._token)
 		/* << Vuze Added */
-			XHR.setRequestHeader('X-Transmission-Session-Id', this._token);
+		XHR.setRequestHeader('X-Transmission-Session-Id', this._token);
 	},
 
 	sendRequest: function( data, success, async ) {
 		remote = this;
 		if( typeof async != 'boolean' )
-		  async = true;
+			async = true;
 
 		/* >> Vuze Added */
 		remote._request_count += 1
@@ -171,9 +171,9 @@ TransmissionRemote.prototype =
 		var o = {
 			method: 'torrent-get',
 			arguments: {
-				fields: Torrent._StaticFields.concat( Torrent._MetaDataFields,
-                        Torrent._DynamicFields,
-                        [ 'files', 'fileStats' ] )
+			fields: Torrent._StaticFields.concat( Torrent._MetaDataFields,
+			                                      Torrent._DynamicFields,
+			                                      [ 'files', 'fileStats' ] )
 			}
 		};
 
@@ -220,17 +220,20 @@ TransmissionRemote.prototype =
 		} );
 	},
 
-	changeFileCommand: function( command, torrent, file ) {
+	changeFileCommand: function( command, rows ) {
 		var remote = this;
-		var torrent_ids = [ torrent.id() ];
+		var torrent_ids = [ rows[0].getTorrent().id() ];
+		var files = [ ];
+		for( var i=0, row; row=rows[i]; ++i )
+			files.push( row.getIndex( ) );
 		var o = {
 			method: 'torrent-set',
 			arguments: { ids: torrent_ids }
 		};
-		o.arguments[command] = [ file._index ];
+		o.arguments[command] = files;
 		this.sendRequest( o, function( ) {
 			remote._controller.refreshTorrents( torrent_ids );
-		} );
+		});
 	},
 
 	sendTorrentSetRequests: function( method, torrent_ids, args, callback ) {
@@ -295,7 +298,6 @@ TransmissionRemote.prototype =
 				filename: url
 			}
 		};
-
 		this.sendRequest(o, function() {
 			remote._controller.refreshTorrents();
 		} );
@@ -319,12 +321,14 @@ TransmissionRemote.prototype =
 			remote._controller.loadDaemonPrefs();
 		} );
 	},
+/*
 	filesSelectAll: function( torrent_ids, files, callback ) {
 		this.sendTorrentSetRequests( 'torrent-set', torrent_ids, { 'files-wanted': files }, callback );
 	},
 	filesDeselectAll: function( torrent_ids, files, callback ) {
 		this.sendTorrentSetRequests( 'torrent-set', torrent_ids, { 'files-unwanted': files }, callback );
 	},
+*/
 
 	// Added queue calls
 	moveTorrentsToTop: function( torrent_ids, callback ) {

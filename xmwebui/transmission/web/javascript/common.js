@@ -1,4 +1,4 @@
-/* Transmission Revision 12650 */
+/* Transmission Revision 12690 */
 /*
  *	Copyright © Dave Perrett and Malcolm Jarvis
  *	This code is licensed under the GPL version 2.
@@ -14,7 +14,7 @@ var resizeTimer = null;
 // actually 523.10.3). We need 3.1 for CSS animation (dialog sheets) but as it
 // degrades gracefully let's not worry too much.
 var Safari3 = testSafari3();
-var iPhone = RegExp("(iPhone|iPod)").test(navigator.userAgent);
+var iPhone = RegExp("(iPhone|iPod|Android)").test(navigator.userAgent);
 if (iPhone) var scroll_timeout;
 
 if(!Array.indexOf){
@@ -29,18 +29,18 @@ if(!Array.indexOf){
 
 function testSafari3()
 {
-    var minimum = new Array(521,0);
-    var webKitFields = RegExp("( AppleWebKit/)([^ ]+)").exec(navigator.userAgent);
-    if (!webKitFields || webKitFields.length < 3) return false;
-    var version = webKitFields[2].split(".");
-    for (var i = 0; i < minimum.length; i++) {
-        var toInt = parseInt(version[i]);
-        var versionField = isNaN(toInt) ? 0 : toInt;
-        var minimumField = minimum[i];
+	var minimum = new Array(521,0);
+	var webKitFields = RegExp("( AppleWebKit/)([^ ]+)").exec(navigator.userAgent);
+	if (!webKitFields || webKitFields.length < 3) return false;
+	var version = webKitFields[2].split(".");
+	for (var i = 0; i < minimum.length; i++) {
+		var toInt = parseInt(version[i]);
+		var versionField = isNaN(toInt) ? 0 : toInt;
+		var minimumField = minimum[i];
 
-        if (versionField > minimumField) return true;
-        if (versionField < minimumField) return false;
-    }
+		if (versionField > minimumField) return true;
+		if (versionField < minimumField) return false;
+	}
 	return true;
 };
 
@@ -134,8 +134,7 @@ function setInnerHTML( e, html )
 /*
  *   Given a numerator and denominator, return a ratio string
  */
-Math.ratio = function( numerator, denominator )
-{
+Math.ratio = function( numerator, denominator ) {
 	var result = Math.floor(100 * numerator / denominator) / 100;
 
 	// check for special cases
@@ -178,9 +177,9 @@ String.prototype.trim = function () {
  */
 String.prototype.compareTo = function( that ) {
 	// FIXME: how to fold these two comparisons together?
-        if( this < that ) return -1;
-        if( this > that ) return 1;
-        return 0;
+	if( this < that ) return -1;
+	if( this > that ) return 1;
+	return 0;
 }
 
 /**
@@ -215,7 +214,7 @@ function Prefs() { }
 Prefs.prototype = { };
 
 Prefs._RefreshRate        = 'refresh_rate';
-Prefs._SessionRefreshRate        = 'session_refresh_rate';
+Prefs._SessionRefreshRate = 'session_refresh_rate';
 
 Prefs._ShowFilter         = 'show_filter';
 
@@ -248,7 +247,9 @@ Prefs._CompactDisplayState= 'compact_display_state';
 
 Prefs._Defaults =
 {
+	/* >> Vuze */
 	'auto-start-torrents': true,
+	/* << Vuze */
 	'filter': 'all',
 	'refresh_rate' : 5,
 	'show_filter': true,
@@ -286,8 +287,8 @@ Prefs.getValue = function( key, fallback )
 	if( Prefs._Defaults[key] == undefined )
 		console.warn( "unrecognized preference key '%s'", key );
 
-        var lines = document.cookie.split( ';' );
-        for( var i=0, len=lines.length; !val && i<len; ++i ) {
+	var lines = document.cookie.split( ';' );
+	for( var i=0, len=lines.length; !val && i<len; ++i ) {
 		var line = lines[i].trim( );
 		var delim = line.indexOf( '=' );
 		if( ( delim == key.length ) && line.indexOf( key ) == 0 )

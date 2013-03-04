@@ -1,4 +1,4 @@
-/* Transmission Revision 12650 */
+/* Transmission Revision 12690 */
 /**
 ***  This file Copyright (C) Mnemosyne LLC
 ***
@@ -10,6 +10,7 @@ Transmission.fmt = (function()
 {
 	var speed_K = 1000;
 	var speed_B_str = 'B';
+	// Vuze: k should be lowercase
 	var speed_K_str = 'kB/s';
 	var speed_M_str = 'MB/s';
 	var speed_G_str = 'GB/s';
@@ -17,6 +18,7 @@ Transmission.fmt = (function()
 
 	var size_K = 1024;
 	var size_B_str = 'B';
+	// Vuze: k should be lowercase
 	var size_K_str = 'KB';
 	var size_M_str = 'MB';
 	var size_G_str = 'GB';
