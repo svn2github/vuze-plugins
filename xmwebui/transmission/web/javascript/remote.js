@@ -8,7 +8,7 @@
  */
 
 var RPC = {
-	_Root                   : './transmission/rpc';
+	_Root                   : './transmission/rpc',
 	/* Original:
 	_Root                   : '../rpc',
 	*/
