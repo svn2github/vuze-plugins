@@ -33,13 +33,13 @@ vz.executeSearch = function(){
     }
     vz.searchQuery = search_url
     $("#torrent_filter_bar").hide();
-    if( !iPhone && transmission[Prefs._ShowInspector] ) $("#torrent_inspector").hide();
+    if( !isMobileDevice && transmission[Prefs._ShowInspector] ) $("#torrent_inspector").hide();
     $("#torrent_container").hide();
     $("#remotesearch_container").show()
 }
 vz.backFromSearch = function(){
     $("#torrent_filter_bar").show();
-    if( !iPhone && transmission[Prefs._ShowInspector] ) $("#torrent_inspector").show();
+    if( !isMobileDevice && transmission[Prefs._ShowInspector] ) $("#torrent_inspector").show();
     $("#torrent_container").show();
     $("#remotesearch_container").hide()
 }
