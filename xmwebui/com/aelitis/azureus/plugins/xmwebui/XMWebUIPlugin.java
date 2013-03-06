@@ -2761,11 +2761,17 @@ XMWebUIPlugin
       //| scrape                  | string     | tr_tracker_info
       //| tier                    | number     | tr_tracker_info
 
+	    String name = "";
+	    try {
+		    name = tps.getName();
+	    } catch (Exception e) {
+	    	// NPE at com.aelitis.azureus.plugins.extseed.ExternalSeedPlugin$5.getName(ExternalSeedPlugin.java:561
+	    }
 	    map.put("id", tps.hashCode());
 	    /* the full announce URL */
-	    map.put("announce", tps.getName()); // TODO
+	    map.put("announce", name); // TODO
 	    /* the full scrape URL */
-	    map.put("scrape", tps.getName()); // TODO
+	    map.put("scrape", name); // TODO
 	    /* which tier this tracker is in */
 	    map.put("tier", 0); // TODO: int);
 
