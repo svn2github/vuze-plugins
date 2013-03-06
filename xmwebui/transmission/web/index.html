@@ -8,8 +8,13 @@
 		<link href="./images/favicon.ico" rel="icon" />
 		<link href="./images/favicon.png" rel="shortcut icon" />
 		<link rel="apple-touch-icon" href="./images/webclip-icon.png"/>
-		<script type="text/javascript" src="./javascript/jquery/jquery.min.js"></script>
-		<link media="only screen and (max-device-width: 480px)" href="./stylesheets/iphone.css" type= "text/css" rel="stylesheet" />
+		<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.3/jquery.min.js"></script>
+		<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js"></script>
+		<link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/themes/base/jquery-ui.css" type="text/css" media="all" /> 
+<!--
+		<link media="screen" href="./stylesheets/mobile.css" type= "text/css" rel="stylesheet" />
+-->
+		<link media="only screen and (max-device-width: 480px)" href="./stylesheets/mobile.css" type= "text/css" rel="stylesheet" />
 		<link media="screen and (min-device-width: 481px)" href="./stylesheets/common.css" type="text/css" rel="stylesheet" />
 		<link media="screen and (min-device-width: 481px)" href="./stylesheets/vuze.css" type="text/css" rel="stylesheet" />
 		<!--[if IE]>
@@ -17,21 +22,18 @@
 		  <link media="screen" href="./stylesheets/ieAll.css" type="text/css" rel="stylesheet" />
 		  <link media="screen" href="./stylesheets/vuze.css" type="text/css" rel="stylesheet" />
 		<![endif]-->
-		<!--[if IE 6]>
-		<link media="screen" href="./stylesheets/ie6.css" type="text/css" rel="stylesheet" />
-		<script type="text/javascript" src="./javascript/iepngfix_tilebg.js"></script>
-		<![endif]-->
 		<!--[if IE 7]><link media="screen" href="./stylesheets/ie7.css" type="text/css" rel="stylesheet" /><![endif]-->
 		<script type="text/javascript" src="./javascript/jquery/jquery.transmenu.min.js"></script>
 		<script type="text/javascript" src="./javascript/jquery/jquery.contextmenu.min.js"></script>
 		<script type="text/javascript" src="./javascript/menu.js"></script>
 		<script type="text/javascript" src="./javascript/jquery/jquery.form.min.js"></script>
-		<script type="text/javascript" src="./javascript/jquery/json.min.js"></script>
+		<script type="text/javascript" src="./javascript/jquery/json2.min.js"></script>
 		<script type="text/javascript" src="./javascript/common.js"></script>
-		<script type="text/javascript" src="./javascript/transmission.remote.js"></script>
+		<script type="text/javascript" src="./javascript/inspector.js"></script>
+		<script type="text/javascript" src="./javascript/remote.js"></script>
 		<script type="text/javascript" src="./javascript/transmission.js"></script>
 		<script type="text/javascript" src="./javascript/torrent.js"></script>
-		<script type="text/javascript" src="./javascript/torrent-renderer.js"></script>
+		<script type="text/javascript" src="./javascript/torrent-row.js"></script>
 		<script type="text/javascript" src="./javascript/file-row.js"></script>
 		<script type="text/javascript" src="./javascript/dialog.js"></script>
 		<script type="text/javascript" src="./javascript/formatter.js"></script>
@@ -41,7 +43,7 @@
 	</head>
 	<body id="transmission_body">
 
-		<div class="torrent_global_menu">
+		<div id="toolbar">
 			<ul id="t_bar">
 				<li id="open"><div id="open_link"><div class="toolbar_image"></div><span>Add Torrent</span></div></li>
 				<li id="remove" class="disabled"><div id="remove_link"><div class="toolbar_image"></div>Remove</div></li>
@@ -63,7 +65,6 @@
 				<li id="remote_search"><div id="remote_search_link" onclick="vz.ui.toggleRemoteSearch()"><div class="toolbar_image"></div><span id="remote_search_link_span">Search</span></div></li>
 				<li id="inspector"><div id="inspector_link"><div class="toolbar_image"></div>Inspector</div></li>
 				<li><a href="#finished" id="filter_finished_link" class="finished">Finished</a></li>
-				<li id="filter"><div id="filter_toggle_link"><div class="toolbar_image"></div>Filter</div></li>
 			</ul>
 		</div>
 
@@ -71,96 +72,102 @@
 			<img src="./images/graphics/vuze_remote_logo.png" alt="Vuze Remote">
 		</div>
 
-		<div class="torrent_global_details">
-			<div id="torrent_global_transfer">0 Transfers</div>
-			<div id="torrent_global_download">0 B/s</div>
-			<div id="torrent_global_upload">0 B/s</div>
-		</div>
-
 		<div id="remotesearch_container" style="display:none">
 			<!-- iframe id="remotesearch" src="about:blank"></iframe-->
 		</div>
 
-		<div id="torrent_filter_bar">
+		<div id="statusbar">
 			<div id="torrent_pref">
-			<ul id="settings_menu">
-				<li id="button">&nbsp;
-					<ul id="footer_super_menu">
-						<li id="preferences">Preferences</li>
-						<li id="statistics">Statistics</li>
-						<li class="separator"></li>
-						<li>Total Download Rate
-							<ul id="footer_download_rate_menu">
-								<li id="unlimited_download_rate">Unlimited</li>
-								<li id="limited_download_rate">Limit (10 KB/s)</li>
-								<li class="separator"></li>
-								<li>5 KB/s</li>
-								<li>10 KB/s</li>
-								<li>20 KB/s</li>
-								<li>30 KB/s</li>
-								<li>40 KB/s</li>
-								<li>50 KB/s</li>
-								<li>75 KB/s</li>
-								<li>100 KB/s</li>
-								<li>150 KB/s</li>
-								<li>200 KB/s</li>
-								<li>250 KB/s</li>
-								<li>500 KB/s</li>
-								<li>750 KB/s</li>
-							</ul>
-						</li>
-						<li>Total Upload Rate
-							<ul id="footer_upload_rate_menu">
-								<li id="unlimited_upload_rate">Unlimited</li>
-								<li id="limited_upload_rate">Limit (10 KB/s)</li>
-								<li class="separator"></li>
-								<li>5 KB/s</li>
-								<li>10 KB/s</li>
-								<li>20 KB/s</li>
-								<li>30 KB/s</li>
-								<li>40 KB/s</li>
-								<li>50 KB/s</li>
-								<li>75 KB/s</li>
-								<li>100 KB/s</li>
-								<li>150 KB/s</li>
-								<li>200 KB/s</li>
-								<li>250 KB/s</li>
-								<li>500 KB/s</li>
-								<li>750 KB/s</li>
-							</ul>
-						</li>
-						<li class="separator"></li>
-						<li>Sort Transfers By
-							<ul id="footer_sort_menu">
-								<li id="sort_by_activity">Activity</li>
-								<li id="sort_by_age">Age</li>
-								<li id="sort_by_name">Name</li>
-								<li id="sort_by_percent_completed">Progress</li>
-								<li id="sort_by_ratio">Ratio</li>
-								<li id="sort_by_queue_order">Queue Order</li>
-								<li id="sort_by_state">State</li>
-								<li class="separator"></li>
-								<li id="reverse_sort_order">Reverse Sort Order</li>
-							</ul>
-						</li>
-						<li class="separator"></li>
-						<li id="compact_view">Compact View</li>
-						<li id="tipjar">Transmission Tip Jar</li>
-					</ul>
-				</li>
-			</ul>
+				<ul id="settings_menu">
+					<li id="button">&nbsp;
+						<ul id="footer_super_menu">
+							<li id="preferences">Preferences</li>
+							<li id="statistics">Statistics</li>
+							<li class="separator"></li>
+							<li>Total Download Rate
+								<ul id="footer_download_rate_menu">
+									<li id="unlimited_download_rate">Unlimited</li>
+									<li id="limited_download_rate">Limit (10 KB/s)</li>
+									<li class="separator"></li>
+									<li>5 KB/s</li>
+									<li>10 KB/s</li>
+									<li>20 KB/s</li>
+									<li>30 KB/s</li>
+									<li>40 KB/s</li>
+									<li>50 KB/s</li>
+									<li>75 KB/s</li>
+									<li>100 KB/s</li>
+									<li>150 KB/s</li>
+									<li>200 KB/s</li>
+									<li>250 KB/s</li>
+									<li>500 KB/s</li>
+									<li>750 KB/s</li>
+								</ul>
+							</li>
+							<li>Total Upload Rate
+								<ul id="footer_upload_rate_menu">
+									<li id="unlimited_upload_rate">Unlimited</li>
+									<li id="limited_upload_rate">Limit (10 KB/s)</li>
+									<li class="separator"></li>
+									<li>5 KB/s</li>
+									<li>10 KB/s</li>
+									<li>20 KB/s</li>
+									<li>30 KB/s</li>
+									<li>40 KB/s</li>
+									<li>50 KB/s</li>
+									<li>75 KB/s</li>
+									<li>100 KB/s</li>
+									<li>150 KB/s</li>
+									<li>200 KB/s</li>
+									<li>250 KB/s</li>
+									<li>500 KB/s</li>
+									<li>750 KB/s</li>
+								</ul>
+							</li>
+							<li class="separator"></li>
+							<li>Sort Transfers By
+								<ul id="footer_sort_menu">
+									<li id="sort_by_activity">Activity</li>
+									<li id="sort_by_age">Age</li>
+									<li id="sort_by_name">Name</li>
+									<li id="sort_by_percent_completed">Progress</li>
+									<li id="sort_by_ratio">Ratio</li>
+									<li id="sort_by_queue_order">Queue Order</li>
+									<li id="sort_by_state">State</li>
+									<li class="separator"></li>
+									<li id="reverse_sort_order">Reverse Sort Order</li>
+								</ul>
+							</li>
+							<li class="separator"></li>
+							<li id="compact_view">Compact View</li>
+							<li id="tipjar">Transmission Tip Jar</li>
+						</ul>
+					</li>
+				</ul>
+				<div id="turtle-button">&nbsp;</div> 
+				<div id="compact-button">&nbsp;</div>
 			</div>
-			<ul id="t_filters">
-				<li><a href="#all" id="filter_all_link" class="active">All</a></li>
-				<li><a href="#active" id="filter_active_link">Active</a></li>
-				<li><a href="#downloading" id="filter_downloading_link">Downloading</a></li>
-				<li><a href="#seeding" id="filter_seeding_link">Seeding</a></li>
-				<li><a href="#paused" id="filter_paused_link">Stopped</a></li>
-				<li><a href="#finished" id="filter_finished_link" class="finished">Finished</a></li>
-			</ul>
+
+			<div id='filter-button'></div>
+
 			<div id="log_out" style="display:none"><a href="/pairedServiceLogout?redirect_to=http%3A//remote.vuze.com/logout.php">log out</a></div>
 			<input type="search" id="torrent_search" placeholder="Filter" results="0" />
+
+			<div id='speed-info'>
+				<span id="speed-dn-label">0 B/s</span>
+				<span id="speed-up-label">0 B/s</span>
+			</div>			
 		</div>
+
+
+		<div id="filter-popup" style="display:none;">
+			<div id='filter-popup-workarea'>
+				<div id='filter-by-state'></div>
+				<div id='filter-by-tracker'></div>
+			</div>
+		</div>
+
+
 		<div id="torrent_inspector" style="display:none;">
 
 			<div class="inspector_close" id="inspector_close"><img id="inspector_close_image" src="./images/buttons/cancel.png"/></div>
@@ -301,7 +308,7 @@
  		</div>
  
  		<div id="torrent_container">
-			<ul class="torrent_list" id="torrent_list"><li style="display: none;"></li></ul>
+			<ul class="torrent_list" id="torrent_list"></ul>
 		</div>
 
 		<div class="dialog_container" id="dialog_container" style="display:none;">
@@ -323,12 +330,12 @@
 				<form action="" id="prefs_form">
 					<div id="prefs_tabs">
 						<ul>
-							<li id="prefs_tab_general_tab" class="prefs_tab_enabled">General</li>
-							<li id="prefs_tab_speed_tab" class="prefs_tab_disabled">Speed</li>
-							<li id="prefs_tab_peers_tab" class="prefs_tab_disabled">Peers</li>
-							<li id="prefs_tab_network_tab" class="prefs_tab_disabled">Network</li>
+							<li id="prefs-tab-general" class="prefs-tab selected">General</li>
+							<li id="prefs-tab-speed" class="prefs-tab">Speed</li>
+							<li id="prefs-tab-peers" class="prefs-tab">Peers</li>
+							<li id="prefs-tab-network" class="prefs-tab">Network</li>
 						</ul>
-						<div id="prefs_tab_general" class="prefs_tab">
+						<div id="prefs-page-general" class="prefs-page">
 							<div class="preference download_location">
 								<label class="category">Add transfers:</label>
 								<div class="formdiv">
@@ -351,25 +358,25 @@
 								<label class="category">Web Client:</label>
 								<div class="formdiv">
 									<label for="refresh_rate" class="item">Refresh Rate:</label>
-									<input type="text" name="refresh_rate" id="refresh_rate"/>
+									<input type="text" name="refresh_rate" id="refresh_rate" class="numberinput"/>
 									<label class="suffix">seconds</label>
 								</div>
 							</div>
 							<div style="clear: both; visibility: hidden;"></div>
 						</div>
-						<div id="prefs_tab_speed" class="prefs_tab" style="display: none;">
+						<div id="prefs-page-speed" class="prefs-page" style="display: none;">
 							<div class="preference limit_total">
 								<label class="category">Speed Limits:</label>
 								<div class="formdiv checkbox">
 									<input type="checkbox" name="limit_download" id="limit_download"/>
 									<label for="limit_download" class="item">Download Rate:</label>
-									<input type="text" name="download_rate" id="download_rate"/>
+									<input type="text" name="download_rate" id="download_rate" class="numberinput"/>
 									<label class="suffix">kB/s</label>
 								</div>
 								<div class="formdiv checkbox">
 									<input type="checkbox" name="limit_upload" id="limit_upload"/>
 									<label for="limit_upload" class="item">Upload Rate:</label>
-									<input type="text" name="upload_rate" id="upload_rate"/>
+									<input type="text" name="upload_rate" id="upload_rate" class="numberinput"/>
 									<label class="suffix">kB/s</label>
 								</div>
 							</div>
@@ -378,12 +385,12 @@
 								<label>Override normal speed limits manually or at scheduled times</label>
 								<div class="formdiv">
 									<label for="turtle_download_rate" class="item">Download Rate:</label>
-									<input type="text" name="turtle_download_rate" id="turtle_download_rate"/>
+									<input type="text" name="turtle_download_rate" id="turtle_download_rate" class="numberinput"/>
 									<label class="suffix">kB/s</label>
 								</div>
 								<div class="formdiv">
 									<label for="turtle_upload_rate" class="item">Upload Rate:</label>
-									<input type="text" name="turtle_upload_rate" id="turtle_upload_rate"/>
+									<input type="text" name="turtle_upload_rate" id="turtle_upload_rate" class="numberinput"/>
 									<label class="suffix">kB/s</label>
 								</div>
 								<div class="formdiv checkbox">
@@ -412,17 +419,17 @@
 							</div>
 							<div style="clear: both; visibility: hidden;"></div>
 						</div>
-						<div id="prefs_tab_peers" class="prefs_tab" style="display: none;">
+						<div id="prefs-page-peers" class="prefs-page" style="display: none;">
 							<div class="preference peers_conn">
 								<label class="category">Connections:</label>
 								<div class="formdiv">
 									<label for="conn_global" class="item">Global maximum connections:</label>
-									<input type="text" name="conn_global" id="conn_global"/>
+									<input type="text" name="conn_global" id="conn_global" class="numberinput"/>
 									<label class="suffix">peers</label>
 								</div>
 								<div class="formdiv">
 									<label for="conn_torrent" class="item">Maximum connections for new transfers:</label>
-									<input type="text" name="conn_torrent" id="conn_torrent"/>
+									<input type="text" name="conn_torrent" id="conn_torrent" class="numberinput"/>
 									<label class="suffix">peers</label>
 								</div>
 								<div class="formdiv checkbox">
@@ -455,7 +462,7 @@
 							</div>
 							<div style="clear: both; visibility: hidden;"></div>
 						</div>
-						<div id="prefs_tab_network" class="prefs_tab" style="display: none;">
+						<div id="prefs-page-network" class="prefs-page" style="display: none;">
 							<div class="preference utp">
 								<label class="category">Peer communication:</label>
 								<div class="formdiv checkbox">
@@ -467,7 +474,7 @@
 								<label class="category">Peer listening port:</label>
 								<div class="formdiv">
 									<label for="port" class="item">Incoming TCP Port:</label>
-									<input type="text" id="port" name="port"/>
+									<input type="text" id="port" name="port" class="numberinput"/>
 									<label class="suffix" id="port_test"></label>
 								</div>
 								<div class="formdiv checkbox">
@@ -563,7 +570,6 @@
 			</div>
 		</div>
 		<div class="torrent_footer">
-			<div id="disk_space_container"></div>
 		</div>
 
 		<div class="contextMenu" id="torrent_context_menu" style="display:none">

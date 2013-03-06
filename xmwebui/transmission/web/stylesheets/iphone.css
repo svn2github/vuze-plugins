@@ -115,7 +115,7 @@ div.torrent_global_menu ul li div div.toolbar_image {
 	width: 32px;
 	height: 32px;
 	margin: 0 auto 2px;
-	background-image: url('../images/buttons/toolbar_buttons.png');
+	background-image: url('../images/buttons/toolbar_buttons_vuze.png');
 }
 
 div.torrent_global_menu ul li#remove div div.toolbar_image {
