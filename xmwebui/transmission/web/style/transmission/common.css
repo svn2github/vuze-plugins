@@ -171,7 +171,9 @@ li#inspector       div:active div.toolbar_image { background-position: right -22
 	border: 1px outset #AEBBCB;
 	height: 24px;
 	width: 100%;
+	/* Vuze: Removed so menu works
 	overflow: hidden;
+	*/
 	position: relative;
 }
 
@@ -837,6 +839,7 @@ li.torrent a:active div.torrent_info {
  *
  *--------------------------------------*/
 
+
 #inspector_close {
 	align: right;
 	text-align: center;
@@ -844,6 +847,9 @@ li.torrent a:active div.torrent_info {
 	padding-right: 10px;
 	padding-top: 12px;
         cursor: pointer;
+	width: 20px;
+	height: 20px;
+	background: transparent url('images/buttons/cancel.png') no-repeat;
 }
 div#torrent_inspector {
 	position: fixed;

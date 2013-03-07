@@ -805,20 +805,22 @@ Transmission.prototype =
 			return;
 		}
 
-		/* >> Vuze */
-		// handle the per-row "torrent_info" button
-		if (ev.target.className === 'torrent_info') {
-			this.selectRow(row);
-			this.setInspectorVisible(true);
-			return;
-		}
-		/* << Vuze */
-
 		// Prevents click carrying to parent element
 		// which deselects all on click
 		ev.stopPropagation();
 		// but still hide the context menu if it is showing
 		$('#jqContextMenu').hide();
+
+		/* >> Vuze */
+		// handle the per-row "torrent_info" button
+		if (ev.target.className === 'torrent_info') {
+			if (!row.isSelected()) {
+				this.setSelectedRow(row);
+			}
+			this.setInspectorVisible(true);
+			return;
+		}
+		/* << Vuze */
 
 		if (isMobileDevice) {
 			if (row.isSelected())
