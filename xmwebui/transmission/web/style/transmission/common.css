@@ -1279,7 +1279,7 @@ div.torrent_footer > *,
 }
 
 div.torrent_footer ul#settings_menu li#button {
-	background: transparent url('images/graphics/chrome.png') left top no-repeat;
+	background: transparent url('images/chrome.png') left top no-repeat;
 	padding: 0;
 	position: relative;
 }
@@ -1290,7 +1290,7 @@ div.torrent_footer ul#settings_menu li#button {
 
 #turtle-button {
 	display:none;
-	background: transparent url('images/graphics/chrome.png') left -18px no-repeat;
+	background: transparent url('images/chrome.png') left -18px no-repeat;
 }
 #turtle-button:hover,
 #turtle-button:active {
@@ -1306,7 +1306,7 @@ div.torrent_footer ul#settings_menu li#button {
 
 #compact-button {
 	display:none;
-	background: transparent url('images/graphics/chrome.png') left -54px no-repeat;
+	background: transparent url('images/chrome.png') left -54px no-repeat;
 }
 #compact-button:hover,
 #compact-button:active {
@@ -1329,7 +1329,7 @@ div#torrent_pref ul#settings_menu {float:right;margin:0px 7px 0}
 /*div.torrent_footer */ul#settings_menu li#button {
 	height: 18px;
 	width: 32px;
-	background: transparent url('images/graphics/chrome.png') left top no-repeat;
+	background: transparent url('images/chrome.png') left top no-repeat;
 	margin: 0 0 0 3px;
 	padding: 0;
 	float: left;
