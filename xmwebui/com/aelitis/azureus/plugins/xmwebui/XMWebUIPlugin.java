@@ -117,6 +117,8 @@ XMWebUIPlugin
     private RemSearchPluginPageGenerator	search_handler;
     private TimerEventPeriodic				search_timer;
     
+    private String							az_mode;
+    
     private boolean							check_ids_outstanding = true;
     
     public
@@ -861,7 +863,7 @@ XMWebUIPlugin
 			
 			float stop_ratio = COConfigurationManager.getFloatParameter( "Stop Ratio" );
 			
-			String az_mode = plugin_interface.getUtilities().getFeatureManager().isFeatureInstalled( "core" )?"plus":"trial";
+			String az_mode = getAZMode();
 
 			IpFilter ipFilter = IpFilterManagerFactory.getSingleton().getIPFilter();
 			String filter_url = COConfigurationManager.getStringParameter("Ip Filter Autoload File", "");
@@ -3490,6 +3492,16 @@ XMWebUIPlugin
 		return( id );
 	}
 	
+	private String
+	getAZMode()
+	{
+		if ( az_mode == null ){
+		
+			az_mode = plugin_interface.getUtilities().getFeatureManager().isFeatureInstalled( "core" )?"plus":"trial";
+		}
+		
+		return( az_mode );
+	}
 	protected class
 	PermissionDeniedException
 		extends IOException
