@@ -1,5 +1,5 @@
 div#torrent_filter_bar input#torrent_search {
-	background: #FFF url('../images/graphics/filter_icon.png') 0px 2px no-repeat;
+	background: #FFF url('images/graphics/filter_icon.png') 0px 2px no-repeat;
 	border: 1px solid #5D80A1;
 	margin-top: 7px;
 	padding: 2px 10px 1px 18px;

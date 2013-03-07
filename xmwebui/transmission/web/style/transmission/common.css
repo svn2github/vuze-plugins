@@ -42,6 +42,26 @@ a {
 
 /***
 ****
+****  ABOUT DIALOG
+****
+***/
+
+#about-dialog > * {
+	text-align: center;
+}
+#about-dialog > #about-logo {
+	background: transparent url('images/logo.png') top left no-repeat;
+	width: 64px;
+	height: 64px;
+	margin-left: 100px;
+}
+#about-dialog > #about-title {
+	font-size: 1.3em;
+	font-weight: bold;
+}
+
+/***
+****
 ****  TOOLBAR
 ****
 ***/
@@ -50,18 +70,10 @@ a {
 	width: 100%;
 	height: 75px;
 	margin: 0;
-	overflow: hidden;
 	border: 1px outset #AEBBCB;
+	overflow: hidden;
 	-moz-user-select: none;
 	-webkit-user-select: none;
-}
-
-#toolbar h1 {
-	height: inherit;
-	width: 205px;
-	text-indent: -9000px !important;
-	padding: 0;
-	margin: 0 0 0 5px;
 }
 
 #toolbar ul {
@@ -73,7 +85,7 @@ a {
 	padding: 0;
 	text-align: center;
 	/* >> Vuze */
-    background:url(../images/graphics/vuze_remote_nav_bg.png) 0 -58px no-repeat;
+    background:url(images/graphics/vuze_remote_nav_bg.png) 0 -58px no-repeat;
     width:390px;
     margin:0 auto;
     position: relative;
@@ -111,7 +123,7 @@ a {
 	width: 32px;
 	height: 32px;
 	margin: 0 auto 5px;
-	background-image: url('../images/buttons/toolbar_buttons_vuze.png');
+	background-image: url('images/buttons/toolbar_buttons_vuze.png');
 }
 
 /* toolbar images */
@@ -159,6 +171,7 @@ li#inspector       div:active div.toolbar_image { background-position: right -22
 	border: 1px outset #AEBBCB;
 	height: 24px;
 	width: 100%;
+	overflow: hidden;
 	position: relative;
 }
 
@@ -196,7 +209,7 @@ li#inspector       div:active div.toolbar_image { background-position: right -22
 /* Safari-look filter input for Firefox */
 @-moz-document url-prefix() {
 	div#statusbar input#torrent_search {
-		background: #FFF url('../images/graphics/filter_icon.png') top left no-repeat;
+		background: #FFF url('images/filter_icon.png') top left no-repeat;
 		border: 1px solid #5D80A1;
 		margin-top: 3px;
 		padding: 1px 10px 1px 18px;
@@ -234,7 +247,6 @@ div#filter-popup #filter-by-state .row .filter-name {
         left: 0px;
 }
 #filter-popup .row {
-	font-size: 1.2em;
 	text-align: left;
 	cursor: pointer;
 	margin: 8px 2px;
@@ -290,7 +302,7 @@ div.torrent_global_details {
 	width: 100%;
 	height: 20px;
 	margin: 0;
-	background: #ddd url('../images/graphics/filter_bar.png') repeat-x left -51px;
+	background: #ddd url('images/graphics/filter_bar.png') repeat-x left -51px;
 	font-size: 1.1em;
 	font-weight: normal;
 	border-bottom: 1px solid #888;
@@ -306,7 +318,7 @@ div.torrent_global_details {
     top:16px;
     right:8px;
     z-index:3;
-    background: transparent url(../images/graphics/vuze_remote_stats_bg.png) top left;
+    background: transparent url(images/graphics/vuze_remote_stats_bg.png) top left;
     width:145px;
     height:38px;
 }
@@ -341,11 +353,11 @@ div.torrent_global_details div#torrent_global_download {
 }
 
 div.torrent_global_details div#torrent_global_upload {
-	background: url('../images/graphics/transfer_arrows.png') left -11px no-repeat;
+	background: url('images/graphics/transfer_arrows.png') left -11px no-repeat;
 }
 
 div.torrent_global_details div#torrent_global_download {
-	background: url('../images/graphics/transfer_arrows.png') left 2px no-repeat;
+	background: url('images/graphics/transfer_arrows.png') left 2px no-repeat;
 	/* >> Vuze */
 		clear:left;
     margin-left:8px;
@@ -370,7 +382,7 @@ div#torrent_filter_bar {
 	height: 24px;
 */
 	height: 33px;
-	background: #ddd url('../images/graphics/filter_bar.png') repeat-x bottom left;
+	background: #ddd url('images/graphics/filter_bar.png') repeat-x bottom left;
 	position: fixed;
 	left: 0;
 	right: 0px;
@@ -424,7 +436,7 @@ div#torrent_filter_bar ul#t_filters li a {
 }
 
 div#torrent_filter_bar ul#t_filters li.selected, div#torrent_filter_bar ul#t_filters li.selected a, div#torrent_filter_bar ul#t_filters li:hover, div#torrent_filter_bar ul#t_filters li:hover a, div#torrent_filter_bar ul#t_filters li:active, div#torrent_filter_bar ul#t_filters li:active a {
-	background-image: url('../images/graphics/filter_bar.png');
+	background-image: url('images/graphics/filter_bar.png');
 	background-repeat: no-repeat;
 	text-shadow: 0 1px 0 #444;
 	color: #fff !important;
@@ -465,7 +477,7 @@ div#torrent_filter_bar input#torrent_search {
 /* Safari-look filter input for Firefox */
 @-moz-document url-prefix() {
 	div#statusbar input#torrent_search {
-		background: #FFF url('../images/graphics/filter_icon.png') top left no-repeat;
+		background: #FFF url('images/filter_icon.png') top left no-repeat;
 		border: 1px solid #5D80A1;
 		margin-top: 8px;
 		padding: 1px 10px 1px 18px;
@@ -668,7 +680,7 @@ ul.torrent_list div.torrent_progress_bar {
 	position: absolute;
 	top: 0px;
 	left: 0px;
-	background-image: url('../images/progress/progress.png');
+	background-image: url('images/progress.png');
 	background-repeat: repeat-x;
 	border: 1px solid #888;
 }
@@ -735,7 +747,7 @@ li.torrent a {
 	top: -1px;
 }
 li.torrent a div {
-	background: url('../images/buttons/torrent_buttons_vuze.png');
+	background: url('images/buttons/torrent_buttons_vuze.png');
 	height: 18px;
 	width: 18px;
     margin-right:12px
@@ -769,6 +781,54 @@ li.torrent a:hover div.torrent_info {
 
 li.torrent a:active div.torrent_info {
 	background-position: -36px -36px;
+}
+
+/***
+****
+****  PREFERENCES
+****
+***/
+
+#prefs-dialog.ui-tabs .ui-tabs-panel {
+	padding: 0px;
+	-moz-user-select: none;
+	-webkit-user-select: none;
+}
+.prefs-section {
+	margin: 10px;
+	text-align: left;
+}
+.prefs-section > * {
+	padding-top: 8px;
+	padding-left: 8px;
+}
+.prefs-section .title {
+	font-weight: bold;
+	padding-left: 0px;
+}
+.prefs-section .row .key {
+	float: left;
+	padding-top: 3px;
+}
+.prefs-section .row .key > * {
+	margin-left: 0px;
+}
+.prefs-section .row .value {
+	margin-left: 150px;
+}
+.prefs-section .row .value > * {
+	width: 100%;
+}
+.prefs-section .checkbox-row > input {
+	margin: 0px;
+}
+.prefs-section .checkbox-row > label {
+	margin-left: 5px;
+}
+
+.prefs-section #alternative-speed-limits-title {
+	padding-left: 18px;
+	background: transparent url('images/blue-turtle.png') no-repeat;
 }
 
 /*--------------------------------------
@@ -822,7 +882,7 @@ div#inspector_tabs {
 .inspector_tab {
 	float: left;
 	height: 17px;
-	background: transparent url('../images/buttons/tab_backgrounds_highlight.png') left -1px repeat-x;
+	background: transparent url('images/buttons/tab_backgrounds_highlight.png') left -1px repeat-x;
 	margin: 0px;
 	padding: 3px 15px; /* 5px + 4px == ( (bg image height - fg image height) ) */
 	cursor: pointer;
@@ -831,8 +891,34 @@ div#inspector_tabs {
 	background-position: left -26px; /* the highlighted part of the image */
 }
 
+.inspector_tab > #inspector-tab-label-info {
+	width: 24px;
+	height: 20px;
+	background: transparent url('images/buttons/info_general.png') no-repeat;
+}
+.inspector_tab > #inspector-tab-label-activity {
+	width: 24px;
+	height: 20px;
+	background: transparent url('images/buttons/info_activity.png') no-repeat;
+}
+.inspector_tab > #inspector-tab-label-peers {
+	width: 24px;
+	height: 20px;
+	background: transparent url('images/buttons/info_peers.png') no-repeat;
+}
+.inspector_tab > #inspector-tab-label-trackers {
+	width: 24px;
+	height: 20px;
+	background: transparent url('images/buttons/info_trackers.png') no-repeat;
+}
+.inspector_tab > #inspector-tab-label-files {
+	width: 24px;
+	height: 20px;
+	background: transparent url('images/buttons/info_files.png') no-repeat;
+}
+
 #inspector_tab_info {
-	background: transparent url('../images/buttons/tab_backgrounds.png') left -1px repeat-x;
+	background: transparent url('images/buttons/tab_backgrounds.png') left -1px repeat-x;
 	border: 1px solid #aaa;
 	-webkit-border-top-left-radius: 5px;
 	-webkit-border-top-right-radius: 0px;
@@ -849,11 +935,11 @@ div#inspector_tabs {
 }
 
 #inspector_tab_info .selected {
-	background: transparent url('../images/buttons/tab_backgrounds.png') left -26px repeat-x;
+	background: transparent url('images/buttons/tab_backgrounds.png') left -26px repeat-x;
 }
 
 #inspector_tabs #inspector_tab_info .selected {
-	background: transparent url('../images/buttons/tab_backgrounds.png') left -26px repeat-x !important;
+	background: transparent url('images/buttons/tab_backgrounds.png') left -26px repeat-x !important;
 }
 
 #inspector_tabs #inspector_tab_activity, #inspector_tabs #inspector_tab_peers {
@@ -1050,7 +1136,7 @@ div.tracker_host {
 	width: 100%;
 }
 #inspector_tab_files_container .select_all_button {
-	background: transparent url(../images/buttons/tab_backgrounds.png) repeat-x scroll left -6px;
+	background: transparent url(images/buttons/tab_backgrounds.png) repeat-x scroll left -6px;
 	border: 1px solid #888888;
 	cursor: pointer;
 	float: right;
@@ -1108,7 +1194,7 @@ div.file_wanted_control {
 	margin: 3px 0 0 0;
 	width: 19px;
 	height: 19px;
-	background-image: url('../images/buttons/file_wanted_buttons.png');
+	background-image: url('images/buttons/file_wanted_buttons.png');
 	background-repeat: no-repeat;
 	background-color: transparent;
 }
@@ -1132,7 +1218,7 @@ div.file_priority_control {
 	margin: 4px 0 0 0;
 	width: 35px;
 	height: 19px;
-	background-image: url('../images/buttons/file_priority_buttons.png');
+	background-image: url('images/buttons/file_priority_buttons.png');
 	background-repeat: no-repeat;
 	background-color: transparent;
 	cursor: pointer;
@@ -1161,11 +1247,11 @@ li.inspector_torrent_file_list_entry.complete div.file_priority_control {
   cursor: default;
 }
 
-/*--------------------------------------
- *
- * T O R R E N T   F O O T E R
- *
- *--------------------------------------*/
+/****
+*****
+*****  MAIN WINDOW FOOTER
+*****
+****/
 
 div.torrent_footer {
 	height: 22px;
@@ -1193,21 +1279,21 @@ div.torrent_footer > *,
 }
 
 div.torrent_footer ul#settings_menu li#button {
-	background: transparent url('../images/graphics/chrome.png') left top no-repeat;
+	background: transparent url('images/graphics/chrome.png') left top no-repeat;
 	padding: 0;
 	position: relative;
 }
-/*div.torrent_footer */ul#settings_menu li#button:active,
-/*div.torrent_footer */ul#settings_menu li#button:hover {
+/*div.torrent_footer */ul#settings_menu li#button:hover,
+/*div.torrent_footer */ul#settings_menu li#button:active {
 	background-position: -32px top;
 }
 
 #turtle-button {
 	display:none;
-	background: transparent url('../images/graphics/chrome.png') left -18px no-repeat;
+	background: transparent url('images/graphics/chrome.png') left -18px no-repeat;
 }
-#turtle-button:active,
-#turtle-button:hover {
+#turtle-button:hover,
+#turtle-button:active {
 	background-position: -32px -18px;
 }
 #turtle-button.enabled {
@@ -1220,17 +1306,17 @@ div.torrent_footer ul#settings_menu li#button {
 
 #compact-button {
 	display:none;
-	background: transparent url('../images/graphics/chrome.png') left -54px no-repeat;
+	background: transparent url('images/graphics/chrome.png') left -54px no-repeat;
 }
-#compact-button:active,
-#compact-button:hover {
+#compact-button:hover,
+#compact-button:active {
 	background-position: -32px -54px;
 }
 #compact-button.enabled {
 	background-position: left -72px;
 }
-#compact-button.enabled:active,
-#compact-button.enabled:hover {
+#compact-button.enabled:hover,
+#compact-button.enabled:active {
 	background-position: -32px -72px;
 }
 
@@ -1243,7 +1329,7 @@ div#torrent_pref ul#settings_menu {float:right;margin:0px 7px 0}
 /*div.torrent_footer */ul#settings_menu li#button {
 	height: 18px;
 	width: 32px;
-	background: transparent url('../images/graphics/chrome.png') left top no-repeat;
+	background: transparent url('images/graphics/chrome.png') left top no-repeat;
 	margin: 0 0 0 3px;
 	padding: 0;
 	float: left;
@@ -1252,11 +1338,15 @@ div#torrent_pref ul#settings_menu {float:right;margin:0px 7px 0}
 	-webkit-user-select: none;
 }
 
-/*--------------------------------------
- *
- * D I A L O G S
- *
- *--------------------------------------*/
+#prefs-button {
+	display: none;
+}
+
+/****
+*****
+*****  DIALOGS
+*****
+****/
 
 div.dialog_container {
 	position: absolute;
@@ -1290,19 +1380,12 @@ div.dialog_container div.dialog_window {
 	}
 }
 
-div#prefs_container div.dialog_window {
-	width: 410px;
-	padding: 0 15px;
-}
-
-div#stats_container div.dialog_window {
-	width: 255px;
-	padding: 0 15px;
-}
-
-div.dialog_container div.dialog_window img {
+div.dialog_container #dialog_logo {
+	width: 64px;
+	height: 64px;
 	margin: 20px 20px 0 20px;
 	float: left;
+	background: transparent url('images/logo.png') top left no-repeat;
 }
 
 div.dialog_container div.dialog_window h2.dialog_heading {
@@ -1342,7 +1425,7 @@ div.dialog_container div.dialog_window a {
 
 div.dialog_container div.dialog_window a:hover,
 div.dialog_container div.dialog_window a:active {
-	background: #C0C8D6 url('../images/graphics/filter_bar.png') bottom repeat-x;
+	background: #C0C8D6 url('images/graphics/filter_bar.png') bottom repeat-x;
 }
 
 div#upload_container div.dialog_window div.dialog_message label {
@@ -1388,201 +1471,11 @@ iframe#torrent_upload_frame {
 	margin: 0;
 }
 
-div#prefs_container label {
-	display: block;
-	margin: 0 0 0 2px;
-}
-
-div#prefs_container label.category {
-	clear: both;
-	font-size: 1.2em;
-}
-
-div#prefs_container label.item {
-	font-size: 11px !important;
-	margin: 0 5px 0 20px;
-	float: left;
-}
-
-div#prefs_container label.suffix {
-	margin: 0 5px 0 10px;
-	float: left;
-}
-
-div#prefs_container div.formdiv.checkbox label.item {
-	margin: 0 5px 0 2px;
-}
-
-div#prefs_container div.limit_total label.item {
-	width: 103px;
-}
-
-div#prefs_container div.limit_turtle label.item {
-	width: 120px;
-}
-
-div#prefs_container div.preference input[type=checkbox] {
-	float: left;
-	margin-left: 20px;
-	margin-top: 9px;
-}
-@-moz-document url-prefix() {
-	div#prefs_container div.preference input[type=checkbox] {
-		margin-top: 8px;
-	}
-}
-
-div#prefs_container div.preference input[type=text] {
-	width: 50px;
-	padding: 0px !important;
-	height: 18px;
-	margin-top: 2px;
-}
-
-div#prefs_container div.preference input {
-	float: left;
-}
-
-div#prefs_container div.block_url input {
-	width: 256px !important;
-}
-
-div#prefs_container div.download_location input {
-	width: 256px !important;
-}
-div#prefs_container div.download_location .checkbox input {
-	width: auto !important;
-}
-
-div#prefs_container div.formdiv {
-	clear: both;
-	line-height: 30px;
-}
-
-div#prefs_container a {
-	clear: left;
-	margin: 10px 5px 10px 7px;
-}
-
-div#prefs_container h2.dialog_heading {
-	display: none;
-}
-
-div#prefs_container div#prefs_tabs {
-	clear: both;
-	table-layout: fixed;
-}
-div#prefs_container div#prefs_tabs ul {
-	margin: 0;
-	padding: 0 0 0 10px;
-}
-.prefs-tab {
-	cursor: pointer;
-	display: block;
-	float: left;
-	font-size: 1.2em;
-	color: #323232;
-	text-align: center;
-	padding: 2px 20px;
-	border-left: 1px solid #787878;
-	border-right: 1px solid #787878;
-	border-top: 1px solid #787878;
-	margin-bottom: -1px;
-	background: #C0C8D6 url('../images/graphics/filter_bar.png') bottom repeat-x;
-	border-bottom: 1px solid #787878;
-}
-.prefs-tab.selected {
-	background: none;
-	border-bottom: 1px solid #efefef;
-}
-.prefs-page {
-	border-top: 1px solid #787878;
-	clear: both;
-	padding: 7px;
-}
-div#stats_container h2.dialog_heading {
-	display: none;
-}
-div#stats_container div#stats_error {
-	display: none;
-	width: 395px;
-	margin: 6px auto 6px auto;
-	white-space: nowrap;
-	overflow: hidden;
-	padding: 3px 0 3px 0;
-	border: 2px solid #cc3333;
-	color: #cc3333;
-	font-size: 1.2em;
-	vertical-align: middle;
-	text-align: center;
-	height: 20px;
-	line-height: 20px;
-	background-color: #FFEFEF;
-}
-.stats_info_container {
-	clear: both;
-	padding: 0px 7px 0px 7px;
-}
-.stats_group {
-	display: table;
-	margin: 5px 0px 0px 0px;
-	padding: 5px 0px 0px 0px;
-	width: 100%;
-}
-.stats_row {
-	display: table-row;
-}
-.stats_row > div {
-	padding-top: 4px;
-}
-div#stats_container label.category {
-	clear: both;
-	font-size: 1.2em;
-	margin: 5px 0px;
-}
-div#stats_container div.item {
-	font-size: 11px !important;
-	margin: 0 5px 0 20px;
-	float: left;
-	width: 100px;
-}
-div#stats_container div.item2 {
-	font-size: 11px !important;
-	margin: 0 5px 0 20px;
-	float: left;
-}
-div#stats_container a {
-	clear: left;
-	margin: 10px 5px 10px 7px;
-}
-
-div#prefs_container div#pref_error {
-	display: none;
-	width: 395px;
-	margin: 6px auto 6px auto;
-	padding: 3px 0 3px 0;
-	border: 2px solid #cc3333;
-	color: #cc3333;
-	font-size: 1.2em;
-	vertical-align: middle;
-	text-align: center;
-	height: 20px;
-	line-height: 20px;
-	background-color: #FFEFEF;
-}
-
-#transmission_version{
-	position: absolute;
-	bottom: 10px;
-	left:   10px;
-	color:  #999;
-}
-
-/*--------------------------------------
- *
- * T R A N S   M E N U
- *
- *--------------------------------------*/
+/****
+*****
+*****  POPUP MENU
+*****
+****/
 
 .trans_menu {
 	margin: 0;
@@ -1618,9 +1511,8 @@ div#prefs_container div#pref_error {
 
 .trans_menu > * li {
 	margin: 0;
-	padding: 0 10px 2px 20px !important;
+	padding: 3px 10px 3px 20px !important;
 	color: #000;
-	font-size: 14px;
 	cursor: default;
 	text-indent: auto !important;
 	width: inherit;
@@ -1643,10 +1535,6 @@ div#prefs_container div#pref_error {
 
 .trans_menu li span.arrow {
 	float: right;
-	margin: 3px 0 0;
-	font-size: 11px;
-	color: #333;
-	text-shadow: none;
 }
 
 .trans_menu li.hover li.hover span.arrow, .trans_menu li.hover li.hover li.hover span.selected {
@@ -1655,7 +1543,6 @@ div#prefs_container div#pref_error {
 
 .trans_menu span.selected {
 	margin: 0 3px 0 -15px;
-	font-size: 14px;
 	color: #666;
 	float: left;
 }
@@ -1712,6 +1599,6 @@ div#jqContextMenu li.separator, div#jqContextMenu li.separator:hover {
 }
 
 #log_out {float:right;height:33px;line-height:33px;margin-right:8px; margin-top:-5px}
-#log_out a {background: transparent url(../images/graphics/reset_link_btn.png) top left no-repeat;float:left;width:60px;height:17px;text-align:center;margin-top:9px;line-height:17px;color:#264356;text-decoration:none;font-weight:bold}
+#log_out a {background: transparent url(images/graphics/reset_link_btn.png) top left no-repeat;float:left;width:60px;height:17px;text-align:center;margin-top:9px;line-height:17px;color:#264356;text-decoration:none;font-weight:bold}
 #log_out a:active {background-position:left bottom}
 #log_out a:hover {background-position:left center}

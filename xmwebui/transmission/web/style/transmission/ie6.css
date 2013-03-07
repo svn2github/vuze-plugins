@@ -112,7 +112,7 @@ div.torrent_footer ul#settings_menu li#button:hover {
 	top: 0 !important
 }
 ul#settings_menu li#button.active {
-	background: transparent url('../images/graphics/chrome.png') -35px -75px no-repeat !important;
+	background: transparent url('images/graphics/chrome.png') -35px -75px no-repeat !important;
 }
 .trans_menu div.inner {
 	left:-36px

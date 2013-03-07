@@ -1,7 +1,8 @@
-/*
- * Copyright ?? Jordan Lee, Dave Perrett, Malcolm Jarvis and Bruno Bierbaumer
- * This code is licensed under the GPL version 2.
- * For details, see http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+/**
+ * Copyright © Jordan Lee, Dave Perrett, Malcolm Jarvis and Bruno Bierbaumer
+ *
+ * This file is licensed under the GPLv2.
+ * http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
  */
 
 function Inspector(controller) {
@@ -119,10 +120,16 @@ function Inspector(controller) {
             directory   = accumulateString(directory, t.getDownloadDir());
         }
 
-        setInnerHTML(e.pieces, (pieceSize==='Mixed') ? 'Mixed' : ''+pieceCount+' pieces @ '+pieceSize);
+        if (!pieceCount)
+            setInnerHTML(e.pieces, na);
+        else if (pieceSize == 'Mixed')
+            setInnerHTML(e.pieces, 'Mixed');
+        else
+            setInnerHTML(e.pieces, pieceCount + ' pieces @ ' + pieceSize);
+
         setInnerHTML(e.hash, hash || na);
         setInnerHTML(e.secure, secure || na);
-        setInnerHTML(e.comment, comment || na);
+        setInnerHTML(e.comment, comment.replace(/(https?|ftp):\/\/([\w\-]+(\.[\w\-]+)*(\.[a-z]{2,4})?)(\d{1,5})?(\/([^<>\s]*))?/g, '<a target="_blank" href="$&">$&</a>') || na);
         setInnerHTML(e.creator, creator || na);
         setInnerHTML(e.date, date || na);
         setInnerHTML(e.directory, directory || na);
@@ -486,6 +493,14 @@ function Inspector(controller) {
         data.elements.uploaded       = $(ti+'uploaded')[0];
         data.elements.upload_speed   = $(ti+'upload_speed')[0];
         data.elements.upload_to      = $(ti+'upload_to')[0];
+
+        // force initial 'N/A' updates on all the pages
+        updateInspector();
+        updateInfoPage();
+        updateActivityPage();
+        updatePeersPage();
+        updateTrackersPage();
+        updateFilesPage();
     };
 
     /****
