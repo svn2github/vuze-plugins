@@ -180,10 +180,12 @@ public class Plugin3D implements Plugin {
 					break;
 				}
 				case UISWTViewEvent.TYPE_DESTROY:{
+					if ( _3D_view != null ){
 					
-					_3D_view.delete();
+						_3D_view.delete();
 					
-					_3D_view	= null;
+						_3D_view	= null;
+					}
 					
 					isCreated = false;
 					
