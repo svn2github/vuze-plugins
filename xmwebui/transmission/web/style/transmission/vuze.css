@@ -179,3 +179,188 @@ div#torrent_filter_bar input#torrent_search {
 	background: transparent url('images/buttons/cancel.png') no-repeat;
 }
 
+/***************/
+
+#toolbar ul {
+	padding: 0;
+	background:url(images/graphics/vuze_remote_nav_bg.png) 0 -58px no-repeat;
+	width:390px;
+	margin:0 auto;
+	position: relative;
+	left:50%;
+	margin-left:-195px;
+}
+
+#toolbar ul li > div {
+	color: #3c5e79;
+	font-size: 9px;
+}
+
+#toolbar ul li {
+	padding: 0;
+	width:53px;
+}
+
+#toolbar ul li div.toolbar_image {
+	background-image: url('images/buttons/toolbar_buttons_vuze.png');
+}
+
+#toolbar ul li.divider {
+	display:none
+}
+
+/***
+****
+****  STATUSBAR
+****
+***/
+
+#statusbar {
+	/*
+	overflow: hidden;
+	*/
+	overflow: visible;
+	/* might need position: none
+	position: relative;
+	*/
+}
+
+#statusbar #speed-info {
+	margin-top: 0px;
+	padding-top: 6px;
+}
+
+
+/***
+****
+****  TORRENT CONTAINER
+****
+***/
+
+div#torrent_container {
+	position: fixed;
+	top: 103px;
+}
+
+ul.torrent_list li.torrent {
+	/* Vuze: More right padding for info button */
+	padding: 4px 80px 5px 10px; /* Make space for buttons on the right */
+}
+
+ul.torrent_list li.torrent div.torrent_progress_details{color:#3e5365}
+ul.torrent_list li.torrent div.torrent_peer_details{color:#4f5b65}
+
+/****
+*****  START / STOP BUTTON
+****/
+
+/* >> Vuze: buttons changed to add info button */
+li.torrent a {
+	float: right;
+	position: relative;
+	right: -78px;
+	top: -1px;
+}
+li.torrent a div {
+	background: url('images/buttons/torrent_buttons_vuze.png');
+	height: 18px;
+	width: 18px;
+    margin-right:12px
+}
+li.torrent a div.torrent_pause {
+	background-position: left top;
+}
+li.torrent a:hover div.torrent_pause {
+	background-position: 0 -18px;
+}
+li.torrent a:active div.torrent_pause {
+	background-position: 0 -36px;
+}
+li.torrent a div.torrent_resume {
+	background-position: -18px 0;
+}
+li.torrent a:hover div.torrent_resume {
+	background-position: -18px -18px;
+}
+li.torrent a:active div.torrent_resume {
+	background-position: -18px -36px;
+}
+
+li.torrent a div.torrent_info {
+	background-position: -36px top;
+}
+
+li.torrent a:hover div.torrent_info {
+	background-position: -36px -18px;
+}
+
+li.torrent a:active div.torrent_info {
+	background-position: -36px -36px;
+}
+/* << Vuze: buttons changed to add info button */
+
+/*--------------------------------------
+ *
+ * T O R R E N T   I N S P E C T O R
+ *
+ *--------------------------------------*/
+
+
+div#torrent_inspector {
+	top: 103px; /*102px;*/
+	/* Vuze: No bottom bar, so inspector can go to bottom */
+	bottom: 0; /*22px;*/
+}
+
+/****
+*****
+*****  MAIN WINDOW FOOTER
+*****
+****/
+
+div.torrent_footer {
+	/* Vuze: Hide torrent footer */
+	display:none;
+}
+
+#turtle-button {
+	display:none;
+}
+
+#compact-button {
+	/* Vuze: hide compact buttonf or now (we still have a menu) */
+	display:none;
+}
+
+/* >> Vuze: Misc stuff, no idea if needed */
+div#torrent_container {bottom:0}
+
+div#torrent_pref {
+	float:left;
+	position:relative;
+	z-index:5
+}
+
+div#torrent_pref ul#settings_menu {
+	float:right;
+	margin:1px 7px 0;
+}
+
+/* << Vuze: Misc stuff, no idea if needed */
+
+
+/****
+*****
+*****  POPUP MENU
+*****
+****/
+
+.trans_menu ul {
+	/* Vuze: Place it below the button! */
+	bottom: 0px;
+}
+
+.trans_menu div.inner {
+	/* Vuze: pad it down below the button */
+	margin: 5px 0 0;
+}
