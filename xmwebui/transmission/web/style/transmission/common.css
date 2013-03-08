@@ -1,3 +1,4 @@
+/* Transmission Revision 13020 */
 /*--------------------------------------
  *
  * G L O B A L
@@ -108,14 +109,13 @@ a {
 }
 
 #toolbar #inspector {
-    display:none;
+	float: right;
 }
 
 #toolbar ul li > div {
+	text-shadow: 0 1px 0 #ccc;
 	color: #3c5e79;
 	font-size: 9px;
-/*	text-decoration: none; */
-/*	text-shadow: 0 1px 0 #ccc; */
 	min-width: 32px;
 }
 
@@ -178,7 +178,6 @@ li#inspector       div:active div.toolbar_image { background-position: right -22
 }
 
 #statusbar #speed-info {
-	float: center;
 	margin-top: 5px;
 	margin-left: 45%;
 	text-align: left;
@@ -292,276 +291,6 @@ div#filter-popup .row .filter-img {
         text-overflow: ellipsis;
 }
 
-
-/*--------------------------------------
- *
- * G L O B A L   D E T A I L S
- *
- *--------------------------------------*/
-
-div.torrent_global_details {
-/* Vuze: Original:
-	width: 100%;
-	height: 20px;
-	margin: 0;
-	background: #ddd url('images/graphics/filter_bar.png') repeat-x left -51px;
-	font-size: 1.1em;
-	font-weight: normal;
-	border-bottom: 1px solid #888;
-	position: fixed;
-	left: 0;
-	right: 0;
-	top: 76px;
-	z-index: 2;
-	color: #000;
-	text-shadow: 0 1px 0 #f4f4f4;
-    */
-    position:absolute;
-    top:16px;
-    right:8px;
-    z-index:3;
-    background: transparent url(images/graphics/vuze_remote_stats_bg.png) top left;
-    width:145px;
-    height:38px;
-}
-
-div.torrent_global_details div {
-	/* Vuze: ORiginal:
-	padding: 0 10px 1px 10px;
-	margin: 3px 0 0 0;
-	*/	
-	padding: 0 0 1px 10px;
-	margin: 4px 0 0 0;
-    font-size:10px
-}
-
-div.torrent_global_details div#torrent_global_transfer {
-	clear: left;
-	float: left;
-	/* >> Vuze */
-    font-weight:bold;
-    color:#333;
-	/* << Vuze */
-}
-
-div.torrent_global_details div#torrent_global_upload,
-div.torrent_global_details div#torrent_global_download {
-	/* Vuze: Original:
-	float: right;
-	padding-left: 13px;
-	*/
-	float: left;
-	color:#666;
-}
-
-div.torrent_global_details div#torrent_global_upload {
-	background: url('images/graphics/transfer_arrows.png') left -11px no-repeat;
-}
-
-div.torrent_global_details div#torrent_global_download {
-	background: url('images/graphics/transfer_arrows.png') left 2px no-repeat;
-	/* >> Vuze */
-		clear:left;
-    margin-left:8px;
-    margin-right:6px
-	/* << Vuze */
-}
-
-/* >> Vuze */
-div#torrent_logo {position:absolute;top:0;left:0;z-index:3}
-div#torrent_logo {margin-top:12px;margin-left:12px}
-/* << Vuze */
-
-/*--------------------------------------
- *
- * T O R R E N T   F I L T E R   B A R
- *
- *--------------------------------------*/
-
-div#torrent_filter_bar {
-	margin: 0;
-/* Vuze: Original:
-	height: 24px;
-*/
-	height: 33px;
-	background: #ddd url('images/graphics/filter_bar.png') repeat-x bottom left;
-	position: fixed;
-	left: 0;
-	right: 0px;
-/* Vuze: Original:
-	top: 97px;
-*/
-	top: 103px;
-	z-index: 2;
-	display: none;
-	/* Vuze: Removed Line:
-	overflow: hidden;
-	*/
-}
-
-div#torrent_filter_bar ul#t_filters {
-	height: 18px;
-	margin: 0;
-	padding: 0;
-	text-align: left;
-	display: inline;
-}
-
-div#torrent_filter_bar ul#t_filters li {
-	list-style-type: none;
-	list-style-image: none;
-	float: left;
-	padding: 0;
-	margin: 8px 0 0 5px;
-	vertical-align: middle;
-	height: 18px;
-    line-height:18px;
-}
-
-div#torrent_filter_bar ul#t_filters li a {
-	font-size: 1.2em;
-	color: #222;
-	text-shadow: 0 1px 0 #fff;
-	/* Vuze: We used to have this, but it breaks the filter bar now:
-	position:absolute;
-	right: 0px;
-	top: 0px;
-	border-radius: 10px;
-	*/
-	text-decoration: none;
-	font-weight: bold;
-	padding: 0 7px 0 0;
-	margin: 0 0 0 7px;
-	height: 18px;
-	display: block;
-	cursor: default;
-}
-
-div#torrent_filter_bar ul#t_filters li.selected, div#torrent_filter_bar ul#t_filters li.selected a, div#torrent_filter_bar ul#t_filters li:hover, div#torrent_filter_bar ul#t_filters li:hover a, div#torrent_filter_bar ul#t_filters li:active, div#torrent_filter_bar ul#t_filters li:active a {
-	background-image: url('images/graphics/filter_bar.png');
-	background-repeat: no-repeat;
-	text-shadow: 0 1px 0 #444;
-	color: #fff !important;
-}
-
-div#torrent_filter_bar ul#t_filters li:hover {
-	background-position: left -19px;
-}
-
-div#torrent_filter_bar ul#t_filters li:hover a {
-	background-position: right -19px;
-}
-
-div#torrent_filter_bar ul#t_filters li:active {
-	background-position: left -38px;
-}
-
-div#torrent_filter_bar ul#t_filters li:active a {
-	background-position: right -38px;
-}
-
-div#torrent_filter_bar ul#t_filters li.selected {
-	background-position: left top;
-}
-
-div#torrent_filter_bar ul#t_filters li.selected a {
-	background-position: right top;
-}
-
-div#torrent_filter_bar input#torrent_search {
-	float: right;
-	height: 18px;
-	width: 100px;
-	border: solid 0 #fff;
-	padding: 1px 2px;
-	margin: 8px 8px 0 0;
-}
-/* Safari-look filter input for Firefox */
-@-moz-document url-prefix() {
-	div#statusbar input#torrent_search {
-		background: #FFF url('images/filter_icon.png') top left no-repeat;
-		border: 1px solid #5D80A1;
-		margin-top: 8px;
-		padding: 1px 10px 1px 18px;
-		width: 76px;
-		-moz-border-radius: 10px;
-		height:15px
-	}
-	div#torrent_filter_bar input#torrent_search.blur {
-		border-color: #CCC;
-	}
-}
-
-#statusbar input#torrent_search.blur {
-	color: #999;
-}
-
-/***
-****
-****  FILTER POPUP
-****
-***/
-
-#filter-popup .count {
-        padding-left: 3px;
-}
-#filter-popup {
-        color: #222;/* !important; */
-        background: #FFF;
-        z-index: 100;
-}
-
-#filter-popup #filter-by-state .row .filter-img {
-        display: none;
-}
-div#filter-popup #filter-by-state .row .filter-name {
-        left: 0px;
-}
-#filter-popup .row {
-	font-size: 1.2em;
-	text-align: left;
-	cursor: pointer;
-	margin: 8px 2px;
-	position: relative;
-	height: 18px;
-	-moz-user-select: none;
-	-webkit-user-select: none;
-}
-div#filter-popup .row .filter-img {
-        border: none;
-        width: 16px;
-        height: 16px;
-        position: absolute;
-        left: 0px;
-}
-#filter-popup .row .filter-name {
-        position: absolute;
-        left: 20px;
-}
-#filter-popup .row .count {
-        float: right;
-        color: #aaa;
-}
-#filter-popup li {
-        text-align: left
-}
-#filter-popup .row:hover,
-#filter-popup .row.selected {
-        font-weight: bold;
-}
-#filter-popup #filter-by-state {
-        float: left;
-        width: 120px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-}
-#filter-popup #filter-by-tracker {
-        float: right;
-        width: 130px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-}
-
 /***
 ****
 ****  TORRENT CONTAINER
@@ -589,9 +318,9 @@ ul.torrent_list {
 
 ul.torrent_list li.torrent {
 	border-bottom: 1px solid #ccc;
+	/* Vuze: More right padding for info button */
 	padding: 4px 80px 5px 10px; /* Make space for buttons on the right */
 	color: #666;
-    background-color: #ddebf5;
 }
 ul.torrent_list li.torrent.compact {
 	padding: 4px;
@@ -603,11 +332,12 @@ ul.torrent_list li.torrent a img {
 }
 
 ul.torrent_list li.torrent.even {
-	background-color: #F0F5F9;
+	background-color: #EDF3FE;
 }
 
 ul.torrent_list li.torrent.selected {
-	background-color: #fffdda;
+	background-color: #3879D7;
+	color: #FFF;
 }
 
 ul.torrent_list li.torrent div.torrent_name {
@@ -616,7 +346,7 @@ ul.torrent_list li.torrent div.torrent_name {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	color: #1f384e;
+	color: #222;
 	margin-top: 2px;
 	margin-bottom: 2px;
 }
@@ -631,6 +361,10 @@ ul.torrent_list li.torrent div.torrent_name.paused {
 	color: #777;
 }
 
+ul.torrent_list li.torrent.selected div.torrent_name {
+	color: #fff;
+}
+
 ul.torrent_list div.torrent_progress_details,
 ul.torrent_list div.torrent_peer_details {
 	clear: left;
@@ -639,8 +373,25 @@ ul.torrent_list div.torrent_peer_details {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
+
+/* >> Vuze */
 ul.torrent_list li.torrent div.torrent_progress_details{color:#3e5365}
 ul.torrent_list li.torrent div.torrent_peer_details{color:#4f5b65}
+/* << Vuze */
+
+ul.torrent_list li.torrent div.torrent_progress_details.error {
+	color: #FF0000;
+}
+ul.torrent_list li.torrent.selected div.torrent_progress_details.error {
+	color: #FFF;
+}
+ul.torrent_list li.torrent div.torrent_peer_details.error {
+	color: #FF0000;
+}
+ul.torrent_list li.torrent.selected div.torrent_peer_details.error {
+	color: #FFF;
+}
+
 
 /**
  * Progressbar
@@ -742,6 +493,7 @@ ul.torrent_list div.torrent_progress_bar.incomplete.seeding {
 *****  START / STOP BUTTON
 ****/
 
+/* >> Vuze: buttons changed to add info button */
 li.torrent a {
 	float: right;
 	position: relative;
@@ -784,6 +536,7 @@ li.torrent a:hover div.torrent_info {
 li.torrent a:active div.torrent_info {
 	background-position: -36px -36px;
 }
+/* << Vuze: buttons changed to add info button */
 
 /***
 ****
@@ -840,26 +593,15 @@ li.torrent a:active div.torrent_info {
  *--------------------------------------*/
 
 
-#inspector_close {
-	align: right;
-	text-align: center;
-	float: right;
-	padding-right: 10px;
-	padding-top: 12px;
-        cursor: pointer;
-	width: 20px;
-	height: 20px;
-	background: transparent url('images/buttons/cancel.png') no-repeat;
-}
 div#torrent_inspector {
 	position: fixed;
-	top: 102px; /*102px;*/
+	top: 103px; /*102px;*/
+	/* Vuze: No bottom bar, so inspector can go to bottom */
 	bottom: 0; /*22px;*/
 	right: 0px;
 	width: 570px;
-	background-color: #E0E9EF;
+	background-color: #ddd;
 	border-left: 1px solid #888;
-  	border-top: 1px solid #667A8A;
 	z-index: 5;
 	text-align: left;
 	overflow: auto;
@@ -881,16 +623,15 @@ div#inspector_header {
 	padding-right: 10px;
 }
 div#inspector_tabs {
-	width: 303px;
-	margin: 0 auto;
-	padding-top: 10px;
+	width: 283px;
+	margin: 10px auto 0 auto;
 }
 .inspector_tab {
 	float: left;
 	height: 17px;
 	background: transparent url('images/buttons/tab_backgrounds_highlight.png') left -1px repeat-x;
 	margin: 0px;
-	padding: 3px 15px; /* 5px + 4px == ( (bg image height - fg image height) ) */
+	padding: 3px 15px; /* 3px == ((bg image height - fg image height) / 2) */
 	cursor: pointer;
 }
 #inspector_tabs .selected {
@@ -976,7 +717,7 @@ div#inspector_tabs {
 }
 .inspector_container {
 	margin: 0 3%;
-	width: 94%;
+	width: 96%;
 }
 .inspector_group {
 	display: table;
@@ -984,6 +725,11 @@ div#inspector_tabs {
 	border-top: 1px solid #888;
 	margin: 10px 0px;
 	padding: 10px 0px;
+}
+.inspector_torrent_label {
+	display: table-caption;
+	font-size: 1.2em;
+	font-weight: bold;
 }
 .inspector_group_label {
 	display: table-header-group;
@@ -994,7 +740,7 @@ div#inspector_tabs {
 }
 .inspector_row > .inspector_label {
 	display: table-cell;
-	width: 100px; /* this + the next 230 == inspector_container_with */
+	width: 100px; /* this + the next 380 == inspector_container_with */
 }
 .inspector_row > div {
 	word-wrap: break-word;
@@ -1063,6 +809,12 @@ table.peer_list {
 
 tr.inspector_peer_entry {
 
+}
+
+tr.inspector_peer_entry div.encrypted-peer-cell {
+	width: 16px;
+	height: 16px;
+	background: transparent url('images/lock_icon.png') no-repeat;
 }
 
 tr.inspector_peer_entry.odd {
@@ -1142,7 +894,7 @@ div.tracker_host {
 	width: 100%;
 }
 #inspector_tab_files_container .select_all_button {
-	background: transparent url(images/buttons/tab_backgrounds.png) repeat-x scroll left -6px;
+	background: transparent url('images/buttons/tab_backgrounds.png') repeat-x scroll left -6px;
 	border: 1px solid #888888;
 	cursor: pointer;
 	float: right;
@@ -1173,7 +925,7 @@ li.inspector_torrent_file_list_entry.skip {
 }
 
 li.inspector_torrent_file_list_entry.even {
-	background-color: #f0f5f9;
+	background-color: #EEEEEE;
 }
 div.inspector_torrent_file_list_entry_name {
 	font-size: 1.2em;
@@ -1183,9 +935,6 @@ div.inspector_torrent_file_list_entry_name {
 }
 li.inspector_torrent_file_list_entry.skip>.inspector_torrent_file_list_entry_name {
 	color: #666;
-}
-li.inspector_torrent_file_list_entry.even {
-	background-color: #f0f5f9;
 }
 div.inspector_torrent_file_list_entry_progress {
 	font-size: 1em;
@@ -1219,39 +968,112 @@ li.inspector_torrent_file_list_entry.complete>.file_wanted_control {
 	cursor: default;
 }
 
-div.file_priority_control {
+div.file-priority-radiobox {
+	display: inline;
 	float: right;
-	margin: 4px 0 0 0;
-	width: 35px;
-	height: 19px;
-	background-image: url('images/buttons/file_priority_buttons.png');
-	background-repeat: no-repeat;
-	background-color: transparent;
+	margin: 4px;
+	margin-top: 2px;
+}
+div.file-priority-radiobox > * {
+	font-size: 20px;
 	cursor: pointer;
+	display: inline-block;
+	width: 30px;
+	height: 12px;
+	border-style: solid;
+	border-color: #aaa;
+	border-width: 1px;
+	padding: 3px;
 }
-div.file_priority_control.normal {
-	background-position: left top;
+
+div.file-priority-radiobox > div.low {
+	border-top-left-radius: 5px;
+	border-bottom-left-radius: 5px;
+	-moz-border-radius-topleft: 5px;
+	-moz-border-radius-bottomleft: 5px;
+	border-right-width: 0px;
+
+	background: #D7D7D7;
+	background-image: url(images/file-priority-low.png); /* fallback */
+	background-image: url(images/file-priority-low.png), -webkit-gradient(linear, left top, left bottom, from(#EDEDED), to(#D7D7D7)); /* Saf4+, Chrome */
+	background-image: url(images/file-priority-low.png), -webkit-linear-gradient(top, #EDEDED, #D7D7D7); /* Chrome 10+, Saf5.1+ */
+	background-image: url(images/file-priority-low.png), -moz-linear-gradient(top, #EDEDED, #D7D7D7); /* FF3.6+ */
+	background-image: url(images/file-priority-low.png), -ms-linear-gradient(top, #EDEDED, #D7D7D7); /* IE10 */
+	background-image: url(images/file-priority-low.png), -o-linear-gradient(top, #EDEDED, #D7D7D7); /* Opera 11.10+ */
+	background-image: url(images/file-priority-low.png), linear-gradient(top, #EDEDED, #D7D7D7); /* W3C */
+	background-position: center;
+	background-repeat: no-repeat;
 }
-div.file_priority_control.normal:hover {
-	background-position: right top;
+div.file-priority-radiobox > div.low.selected {
+	background: #93e8ff;
+	background-image: url(images/file-priority-low.png); /* fallback */
+	background-image: url(images/file-priority-low.png), -webkit-gradient(linear, left top, left bottom, from(#68abe6), to(#93e8ff)); /* Saf4+, Chrome */
+	background-image: url(images/file-priority-low.png), -webkit-linear-gradient(top, #68abe6, #93e8ff); /* Chrome 10+, Saf5.1+ */
+	background-image: url(images/file-priority-low.png), -moz-linear-gradient(top, #68abe6, #93e8ff); /* FF3.6+ */
+	background-image: url(images/file-priority-low.png), -ms-linear-gradient(top, #68abe6, #93e8ff); /* IE10 */
+	background-image: url(images/file-priority-low.png), -o-linear-gradient(top, #68abe6, #93e8ff); /* Opera 11.10+ */
+	background-image: url(images/file-priority-low.png), linear-gradient(top, #68abe6, #93e8ff); /* W3C */
+	background-position: center;
+	background-repeat: no-repeat;
 }
-div.file_priority_control.high {
-	background-position: left -19px;
+
+
+div.file-priority-radiobox > div.normal {
+	background: #D7D7D7;
+	background-image: url(images/file-priority-normal.png); /* fallback */
+	background-image: url(images/file-priority-normal.png), -webkit-gradient(linear, left top, left bottom, from(#EDEDED), to(#D7D7D7)); /* Saf4+, Chrome */
+	background-image: url(images/file-priority-normal.png), -webkit-linear-gradient(top, #EDEDED, #D7D7D7); /* Chrome 10+, Saf5.1+ */
+	background-image: url(images/file-priority-normal.png), -moz-linear-gradient(top, #EDEDED, #D7D7D7); /* FF3.6+ */
+	background-image: url(images/file-priority-normal.png), -ms-linear-gradient(top, #EDEDED, #D7D7D7); /* IE10 */
+	background-image: url(images/file-priority-normal.png), -o-linear-gradient(top, #EDEDED, #D7D7D7); /* Opera 11.10+ */
+	background-image: url(images/file-priority-normal.png), linear-gradient(top, #EDEDED, #D7D7D7); /* W3C */
+	background-position: center;
+	background-repeat: no-repeat;
 }
-div.file_priority_control.high:hover {
-	background-position: right -19px;
+div.file-priority-radiobox > div.normal.selected {
+	background: #93e8ff;
+	background-image: url(images/file-priority-normal.png); /* fallback */
+	background-image: url(images/file-priority-normal.png), -webkit-gradient(linear, left top, left bottom, from(#68abe6), to(#93e8ff)); /* Saf4+, Chrome */
+	background-image: url(images/file-priority-normal.png), -webkit-linear-gradient(top, #68abe6, #93e8ff); /* Chrome 10+, Saf5.1+ */
+	background-image: url(images/file-priority-normal.png), -moz-linear-gradient(top, #68abe6, #93e8ff); /* FF3.6+ */
+	background-image: url(images/file-priority-normal.png), -ms-linear-gradient(top, #68abe6, #93e8ff); /* IE10 */
+	background-image: url(images/file-priority-normal.png), -o-linear-gradient(top, #68abe6, #93e8ff); /* Opera 11.10+ */
+	background-image: url(images/file-priority-normal.png), linear-gradient(top, #68abe6, #93e8ff); /* W3C */
+	background-position: center;
+	background-repeat: no-repeat;
 }
-div.file_priority_control.low {
-	background-position: left -38px;
+
+
+div.file-priority-radiobox > div.high {
+	border-top-right-radius: 5px;
+	border-bottom-right-radius: 5px;
+	-moz-border-radius-topright: 5px;
+	-moz-border-radius-bottomright: 5px;
+	border-left-width: 0px;
+	background: #D7D7D7;
+	background-image: url(images/file-priority-high.png); /* fallback */
+	background-image: url(images/file-priority-high.png), -webkit-gradient(linear, left top, left bottom, from(#EDEDED), to(#D7D7D7)); /* Saf4+, Chrome */
+	background-image: url(images/file-priority-high.png), -webkit-linear-gradient(top, #EDEDED, #D7D7D7); /* Chrome 10+, Saf5.1+ */
+	background-image: url(images/file-priority-high.png), -moz-linear-gradient(top, #EDEDED, #D7D7D7); /* FF3.6+ */
+	background-image: url(images/file-priority-high.png), -ms-linear-gradient(top, #EDEDED, #D7D7D7); /* IE10 */
+	background-image: url(images/file-priority-high.png), -o-linear-gradient(top, #EDEDED, #D7D7D7); /* Opera 11.10+ */
+	background-image: url(images/file-priority-high.png), linear-gradient(top, #EDEDED, #D7D7D7); /* W3C */
+	background-position: center;
+	background-repeat: no-repeat;
 }
-div.file_priority_control.low:hover {
-	background-position: right -38px;
+div.file-priority-radiobox > div.high.selected {
+	background: #93e8ff;
+	background-image: url(images/file-priority-high.png); /* fallback */
+	background-image: url(images/file-priority-high.png), -webkit-gradient(linear, left top, left bottom, from(#68abe6), to(#93e8ff)); /* Saf4+, Chrome */
+	background-image: url(images/file-priority-high.png), -webkit-linear-gradient(top, #68abe6, #93e8ff); /* Chrome 10+, Saf5.1+ */
+	background-image: url(images/file-priority-high.png), -moz-linear-gradient(top, #68abe6, #93e8ff); /* FF3.6+ */
+	background-image: url(images/file-priority-high.png), -ms-linear-gradient(top, #68abe6, #93e8ff); /* IE10 */
+	background-image: url(images/file-priority-high.png), -o-linear-gradient(top, #68abe6, #93e8ff); /* Opera 11.10+ */
+	background-image: url(images/file-priority-high.png), linear-gradient(top, #68abe6, #93e8ff); /* W3C */
+	background-position: center;
+	background-repeat: no-repeat;
 }
-ul.single_file li.inspector_torrent_file_list_entry>.file_priority_control,
-li.inspector_torrent_file_list_entry.complete div.file_priority_control {
-  background-position: left -57px;
-  cursor: default;
-}
+
 
 /****
 *****
@@ -1267,6 +1089,7 @@ div.torrent_footer {
 	width: 100%;
 	z-index: 3;
 
+	/* Vuze: Hide torrent footer */
 	display:none;
 }
 
@@ -1275,6 +1098,8 @@ div.torrent_footer > * {
 	float: left;
 	margin: 2px 4px;
 }
+/* Vuze: Remove "div.torrent_footer" from setting_menu css since the menu is now at the top */
+
 div.torrent_footer > *,
 /*div.torrent_footer*/ ul#settings_menu li#button {
 	height: 18px;
@@ -1311,6 +1136,7 @@ div.torrent_footer ul#settings_menu li#button {
 }
 
 #compact-button {
+	/* Vuze: hide compact buttonf or now (we still have a menu) */
 	display:none;
 	background: transparent url('images/chrome.png') left -54px no-repeat;
 }
@@ -1326,6 +1152,7 @@ div.torrent_footer ul#settings_menu li#button {
 	background-position: -32px -72px;
 }
 
+/* >> Vuze: Misc stuff, no idea if needed */
 div#torrent_container {bottom:0}
 
 div#torrent_pref {float:left;position:relative;z-index:5}
@@ -1343,6 +1170,7 @@ div#torrent_pref ul#settings_menu {float:right;margin:0px 7px 0}
 	-moz-user-select: none;
 	-webkit-user-select: none;
 }
+/* << Vuze: Misc stuff, no idea if needed */
 
 #prefs-button {
 	display: none;
@@ -1386,7 +1214,7 @@ div.dialog_container div.dialog_window {
 	}
 }
 
-div.dialog_container #dialog_logo {
+div.dialog_container .dialog_logo {
 	width: 64px;
 	height: 64px;
 	margin: 20px 20px 0 20px;
@@ -1431,7 +1259,7 @@ div.dialog_container div.dialog_window a {
 
 div.dialog_container div.dialog_window a:hover,
 div.dialog_container div.dialog_window a:active {
-	background: #C0C8D6 url('images/graphics/filter_bar.png') bottom repeat-x;
+	background: #C0C8D6 url('images/filter_bar.png') bottom repeat-x;
 }
 
 div#upload_container div.dialog_window div.dialog_message label {
@@ -1496,7 +1324,9 @@ iframe#torrent_upload_frame {
 .trans_menu ul {
 	/* place it right above the button */
 	position: relative;
+	/* Vuze: Place it below the button!
 	bottom: 18px;
+	*/
 
 	min-width: 210px;
 	background-color: white;
@@ -1558,12 +1388,12 @@ iframe#torrent_upload_frame {
 	background: transparent;
 	border: 1px solid rgba(0,0,0,0.1);
 	-webkit-border-radius: 5px;
-        top:22px
 }
 
 .trans_menu div.inner {
-	left: 2px;
-	margin: 3px 0 0;
+	left: 0;
+	/* Vuze: pad it down below the button */
+	margin: 5px 0 0;
 }
 
 .trans_menu li.main li {
@@ -1604,7 +1434,5 @@ div#jqContextMenu li.separator, div#jqContextMenu li.separator:hover {
 	padding: 0px;
 }
 
-#log_out {float:right;height:33px;line-height:33px;margin-right:8px; margin-top:-5px}
-#log_out a {background: transparent url(images/graphics/reset_link_btn.png) top left no-repeat;float:left;width:60px;height:17px;text-align:center;margin-top:9px;line-height:17px;color:#264356;text-decoration:none;font-weight:bold}
-#log_out a:active {background-position:left bottom}
-#log_out a:hover {background-position:left center}
+/* >> Vuze */
+/* << Vuze */

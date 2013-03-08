@@ -1,4 +1,4 @@
-/* Transmission Revision 12984 */
+/* Transmission Revision 13020 */
 /**
  * Copyright © Mnemosyne LLC
  *
@@ -397,5 +397,5 @@ TorrentRow.prototype =
 	},
 	getTorrentId: function() {
 		return this.getTorrent().getId();
-	},
+	}
 };

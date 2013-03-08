@@ -1,4 +1,4 @@
-/* Transmission Revision 12984 */
+/* Transmission Revision 13020 */
 /**
  * Copyright © Mnemosyne LLC
  *
@@ -305,7 +305,7 @@ Transmission.fmt = (function()
 				} 
 			} 
 			return formattedFlags.join(''); 
-		},
+		}
 	}
 })();
 

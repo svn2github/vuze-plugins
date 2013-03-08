@@ -34,3 +34,148 @@ background-color:transparent;font-size:12px;color:#013B61}
 
 div.torrent_global_menu ul li {width:54px}
 div.torrent_global_menu ul li#remote_search {width:44px}
+
+
+#log_out {float:right;height:33px;line-height:33px;margin-right:8px; margin-top:-5px}
+#log_out a {background: transparent url(images/graphics/reset_link_btn.png) top left no-repeat;float:left;width:60px;height:17px;text-align:center;margin-top:9px;line-height:17px;color:#264356;text-decoration:none;font-weight:bold}
+#log_out a:active {background-position:left bottom}
+#log_out a:hover {background-position:left center}
+
+div#torrent_logo {position:absolute;top:0;left:0;z-index:3}
+div#torrent_logo {margin-top:12px;margin-left:12px}
+
+/*--------------------------------------
+ *
+ * T O R R E N T   F I L T E R   B A R
+ *
+ *--------------------------------------*/
+
+div#torrent_filter_bar {
+	margin: 0;
+/* Vuze: Original:
+	height: 24px;
+*/
+	height: 33px;
+	background: #ddd url('images/filter_bar.png') repeat-x bottom left;
+	position: fixed;
+	left: 0;
+	right: 0px;
+/* Vuze: Original:
+	top: 97px;
+*/
+	top: 103px;
+	z-index: 2;
+	display: none;
+	/* Vuze: Removed Line:
+	overflow: hidden;
+	*/
+}
+
+div#torrent_filter_bar ul#t_filters {
+	height: 18px;
+	margin: 0;
+	padding: 0;
+	text-align: left;
+	display: inline;
+}
+
+div#torrent_filter_bar ul#t_filters li {
+	list-style-type: none;
+	list-style-image: none;
+	float: left;
+	padding: 0;
+	margin: 8px 0 0 5px;
+	vertical-align: middle;
+	height: 18px;
+    line-height:18px;
+}
+
+div#torrent_filter_bar ul#t_filters li a {
+	font-size: 1.2em;
+	color: #222;
+	text-shadow: 0 1px 0 #fff;
+	/* Vuze: We used to have this, but it breaks the filter bar now:
+	position:absolute;
+	right: 0px;
+	top: 0px;
+	border-radius: 10px;
+	*/
+	text-decoration: none;
+	font-weight: bold;
+	padding: 0 7px 0 0;
+	margin: 0 0 0 7px;
+	height: 18px;
+	display: block;
+	cursor: default;
+}
+
+div#torrent_filter_bar ul#t_filters li.selected, div#torrent_filter_bar ul#t_filters li.selected a, div#torrent_filter_bar ul#t_filters li:hover, div#torrent_filter_bar ul#t_filters li:hover a, div#torrent_filter_bar ul#t_filters li:active, div#torrent_filter_bar ul#t_filters li:active a {
+	background-image: url('images/filter_bar.png');
+	background-repeat: no-repeat;
+	text-shadow: 0 1px 0 #444;
+	color: #fff !important;
+}
+
+div#torrent_filter_bar ul#t_filters li:hover {
+	background-position: left -19px;
+}
+
+div#torrent_filter_bar ul#t_filters li:hover a {
+	background-position: right -19px;
+}
+
+div#torrent_filter_bar ul#t_filters li:active {
+	background-position: left -38px;
+}
+
+div#torrent_filter_bar ul#t_filters li:active a {
+	background-position: right -38px;
+}
+
+div#torrent_filter_bar ul#t_filters li.selected {
+	background-position: left top;
+}
+
+div#torrent_filter_bar ul#t_filters li.selected a {
+	background-position: right top;
+}
+
+div#torrent_filter_bar input#torrent_search {
+	float: right;
+	height: 18px;
+	width: 100px;
+	border: solid 0 #fff;
+	padding: 1px 2px;
+	margin: 8px 8px 0 0;
+}
+/* Safari-look filter input for Firefox */
+@-moz-document url-prefix() {
+	div#statusbar input#torrent_search {
+		background: #FFF url('images/filter_icon.png') top left no-repeat;
+		border: 1px solid #5D80A1;
+		margin-top: 8px;
+		padding: 1px 10px 1px 18px;
+		width: 76px;
+		-moz-border-radius: 10px;
+		height:15px
+	}
+	div#torrent_filter_bar input#torrent_search.blur {
+		border-color: #CCC;
+	}
+}
+
+#statusbar input#torrent_search.blur {
+	color: #999;
+}
+
+/********************/
+#inspector_close {
+	float: right;
+	margin-right: 10px;
+	margin-top: 12px;
+  cursor: pointer;
+	width: 20px;
+	height: 20px;
+	background: transparent url('images/buttons/cancel.png') no-repeat;
+}
+
