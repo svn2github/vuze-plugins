@@ -50,8 +50,11 @@ import org.gudy.azureus2.core3.tracker.client.TRTrackerScraper;
 import org.gudy.azureus2.core3.tracker.client.TRTrackerScraperResponse;
 import org.gudy.azureus2.core3.util.*;
 import org.gudy.azureus2.plugins.PluginConfig;
+import org.gudy.azureus2.plugins.PluginEvent;
+import org.gudy.azureus2.plugins.PluginEventListener;
 import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
+import org.gudy.azureus2.plugins.PluginManager;
 import org.gudy.azureus2.plugins.UnloadablePlugin;
 import org.gudy.azureus2.plugins.config.ConfigParameter;
 import org.gudy.azureus2.plugins.config.ConfigParameterListener;
@@ -290,6 +293,41 @@ XMWebUIPlugin
 						LogAlert.AT_ERROR,
 						MessageText.getString( "xmwebui.error.torrent_path" )));	
 			}
+		}
+	}
+	
+	@Override
+	protected void
+	setupServer()
+	{
+		PluginManager pm = plugin_interface.getPluginManager();
+		
+		if ( pm.isInitialized()){
+			
+			super.setupServer();
+			
+		}else{
+			
+				// defer the creation of the server as there are a bunch of features of the
+				// rpc that require things to be reasonably well initialised to function
+				// correctly (e.g. tracker peer sources logic needs other plugins to
+				// have initialised)
+			
+			plugin_interface.addEventListener(
+					new PluginEventListener()
+					{
+						public void 
+						handleEvent(
+							PluginEvent 	ev ) 
+						{
+							if ( ev.getType() == PluginEvent.PEV_ALL_PLUGINS_INITIALISED ){
+								
+								plugin_interface.removeEventListener( this );
+
+								XMWebUIPlugin.super.setupServer();
+							}
+						}
+					});
 		}
 	}
 	
