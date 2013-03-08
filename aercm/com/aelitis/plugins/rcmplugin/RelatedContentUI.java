@@ -2341,6 +2341,10 @@ RelatedContentUI
 	}
 
 	public static void showFTUX(final SWTSkinObject so_list) {
+		showFTUX( so_list, null );
+	}
+	
+	public static void showFTUX(final SWTSkinObject so_list, final  UserPrompterResultListener listener ) {
 		final VuzeMessageBox box = new VuzeMessageBox(MessageText.getString("rcm.ftux.title"), null, new String[] {
 			MessageText.getString("rcm.ftux.accept"),
 			MessageText.getString("rcm.ftux.decline"),
@@ -2400,6 +2404,10 @@ RelatedContentUI
 					if (so_list != null) {
 						UIFunctionsManager.getUIFunctions().openView(UIFunctions.VIEW_MYTORRENTS, null);
 					}
+					
+					if ( listener != null ){
+						listener.prompterClosed(result);
+					}
 					return;
 				}
 				boolean enabled = result == 0;
@@ -2412,11 +2420,19 @@ RelatedContentUI
 							} else if (so_list != null) {
 								UIFunctionsManager.getUIFunctions().openView(UIFunctions.VIEW_MYTORRENTS, null);
 							}
+							
+							if ( listener != null ){
+								listener.prompterClosed(result);
+							}
 						}
 					});
 					return;
 				}
 				enableRCM(enabled, false, so_list);
+				
+				if ( listener != null ){
+					listener.prompterClosed(result);
+				}
 			}
 		});
 		

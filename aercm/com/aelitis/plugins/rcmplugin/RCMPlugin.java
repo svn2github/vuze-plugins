@@ -28,6 +28,8 @@ import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.config.ParameterListener;
 import org.gudy.azureus2.core3.util.*;
 import org.gudy.azureus2.plugins.*;
+import org.gudy.azureus2.plugins.download.Download;
+import org.gudy.azureus2.plugins.ipc.IPCException;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
@@ -36,6 +38,7 @@ import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 
 import com.aelitis.azureus.core.cnetwork.ContentNetwork;
 import com.aelitis.azureus.core.content.RelatedContent;
+import com.aelitis.azureus.ui.UserPrompterResultListener;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinFactory;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinProperties;
 
@@ -434,6 +437,141 @@ RCMPlugin
 				
 				Debug.out( e );
 			}
+		}
+	}
+	
+		// IPC methods
+	
+	public void
+	lookupByDownload(
+		final Download	download )
+	
+		throws IPCException
+	{
+		RelatedContentUI current_ui = ui;
+		
+		if ( current_ui == null ){
+			
+			throw( new IPCException( "UI not bound" ));
+		}
+		
+		if ( !hasFTUXBeenShown() || !isRCMEnabled()){
+			
+			RelatedContentUI.showFTUX( 
+				null,
+				new UserPrompterResultListener()
+				{
+					public void 
+					prompterClosed(
+						int result) 
+					{
+						if ( isRCMEnabled()){
+							
+							RelatedContentUI current_ui = ui;
+							
+							if ( current_ui != null ){
+							
+								current_ui.setUIEnabled( true );
+								
+								current_ui.addSearch( download );
+							}
+						}
+					}
+				});
+		}else{
+			
+			current_ui.setUIEnabled( true );
+			
+			current_ui.addSearch( download );
+		}
+	}
+	
+	public void
+	lookupBySize(
+		final long	size )
+	
+		throws IPCException
+	{
+		RelatedContentUI current_ui = ui;
+		
+		if ( current_ui == null ){
+			
+			throw( new IPCException( "UI not bound" ));
+		}
+		
+		if ( !hasFTUXBeenShown() || !isRCMEnabled()){
+			
+			RelatedContentUI.showFTUX( 
+				null,
+				new UserPrompterResultListener()
+				{
+					public void 
+					prompterClosed(
+						int result) 
+					{
+						if ( isRCMEnabled()){
+							
+							RelatedContentUI current_ui = ui;
+							
+							if ( current_ui != null ){
+							
+								current_ui.setUIEnabled( true );
+								
+								current_ui.addSearch( size );
+							}
+						}
+					}
+				});
+		}else{
+			
+			current_ui.setUIEnabled( true );
+			
+			current_ui.addSearch( size );
+		}
+	}
+	
+	public void
+	lookupByHash(
+		final byte[]	hash,
+		final String	name )
+	
+		throws IPCException
+	{
+		RelatedContentUI current_ui = ui;
+		
+		if ( current_ui == null ){
+			
+			throw( new IPCException( "UI not bound" ));
+		}
+		
+		if ( !hasFTUXBeenShown() || !isRCMEnabled()){
+			
+			RelatedContentUI.showFTUX( 
+				null,
+				new UserPrompterResultListener()
+				{
+					public void 
+					prompterClosed(
+						int result) 
+					{
+						if ( isRCMEnabled()){
+							
+							RelatedContentUI current_ui = ui;
+							
+							if ( current_ui != null ){
+							
+								current_ui.setUIEnabled( true );
+								
+								current_ui.addSearch( hash, name );
+							}
+						}
+					}
+				});
+		}else{
+			
+			current_ui.setUIEnabled( true );
+			
+			current_ui.addSearch( hash, name );
 		}
 	}
 }
