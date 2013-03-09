@@ -306,6 +306,15 @@ public class RatingsUpdater implements DownloadManagerListener,AggregatedListAcc
       plugin.logInfo(torrentName + " : publishing rating");
       DistributedDatabaseKey ddKey = database.createKey(KeyGenUtils.buildRatingKey(download),"Registering ratings for " + torrentName);
       DistributedDatabaseValue ddValue = database.createValue(value);
+      
+      	// handle missing method as new @4901_b08
+      
+      try{
+    	  ddKey.setFlags( 0x00000001 );
+      }catch( Throwable e ){
+    	  
+      }
+      
       database.write(new DistributedDatabaseListener() {
         public void event(DistributedDatabaseEvent event) {
           if(event.getType() == DistributedDatabaseEvent.ET_OPERATION_COMPLETE) {

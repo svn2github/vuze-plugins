@@ -40,6 +40,8 @@ import org.eclipse.swt.widgets.Text;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.gudy.azureus2.ui.swt.ImageRepository;
+import org.gudy.azureus2.ui.swt.Utils;
+
 import com.aelitis.azureus.plugins.rating.RatingPlugin;
 import com.aelitis.azureus.plugins.rating.updater.RatingData;
 import com.aelitis.azureus.plugins.rating.updater.RatingResults;
@@ -194,6 +196,8 @@ public class RatingWindow {
     });
     
     shell.setSize(350,400);
+    
+    Utils.centreWindow( shell );
     
     shell.open();
   }

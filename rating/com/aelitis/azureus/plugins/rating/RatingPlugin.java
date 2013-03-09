@@ -59,6 +59,15 @@ public class RatingPlugin implements Plugin, ConfigParameterListener, PluginList
   private String nick;
   private RatingsUpdater updater;
   
+  private static String[] table_names = {
+	  TableManager.TABLE_MYTORRENTS_INCOMPLETE,
+	  TableManager.TABLE_MYTORRENTS_COMPLETE,
+	  TableManager.TABLE_MYTORRENTS_ALL_BIG,
+	  TableManager.TABLE_MYTORRENTS_COMPLETE_BIG,
+	  TableManager.TABLE_MYTORRENTS_INCOMPLETE_BIG,
+	  TableManager.TABLE_MYTORRENTS_UNOPENED,
+	  TableManager.TABLE_MYTORRENTS_UNOPENED_BIG,
+  };
   
   public void initialize(PluginInterface pluginInterface) {
     this.pluginInterface = pluginInterface;
@@ -139,9 +148,9 @@ public class RatingPlugin implements Plugin, ConfigParameterListener, PluginList
   
   private void addMyTorrentsColumn() {
     RatingColumn ratingColumn = new RatingColumn(this);
-    
-    addRatingColumnToTable(TableManager.TABLE_MYTORRENTS_INCOMPLETE,ratingColumn);
-    addRatingColumnToTable(TableManager.TABLE_MYTORRENTS_COMPLETE,ratingColumn);
+    for ( String table_name: table_names ){
+    	addRatingColumnToTable(table_name,ratingColumn);
+    }
   }
   
   private void addRatingColumnToTable(String tableID,RatingColumn ratingColumn) {
@@ -154,7 +163,7 @@ public class RatingPlugin implements Plugin, ConfigParameterListener, PluginList
     activityColumn.setWidth(95);
     activityColumn.setRefreshInterval(TableColumn.INTERVAL_GRAPHIC);
     activityColumn.setType(TableColumn.TYPE_GRAPHIC);
-    
+    activityColumn.setVisible( true );
     activityColumn.addListeners(ratingColumn);
     
     tableManager.addColumn(activityColumn);
@@ -181,11 +190,12 @@ public class RatingPlugin implements Plugin, ConfigParameterListener, PluginList
         }
       };
     
-    TableContextMenuItem menu1 = pluginInterface.getUIManager().getTableManager().addContextMenuItem(TableManager.TABLE_MYTORRENTS_INCOMPLETE, "RatingPlugin.contextmenu.manageRating" );
-    TableContextMenuItem menu2 = pluginInterface.getUIManager().getTableManager().addContextMenuItem(TableManager.TABLE_MYTORRENTS_COMPLETE,   "RatingPlugin.contextmenu.manageRating" );
+      for ( String table_name: table_names ){
+    	  TableContextMenuItem menu1 = pluginInterface.getUIManager().getTableManager().addContextMenuItem(table_name, "RatingPlugin.contextmenu.manageRating" );
       
-    menu1.addListener( listener );
-    menu2.addListener( listener );      
+    	  menu1.addListener( listener );
+      }
+   
   }
   
   public void configParameterChanged(ConfigParameter param) {
