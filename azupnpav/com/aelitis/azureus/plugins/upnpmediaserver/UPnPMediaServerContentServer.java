@@ -112,7 +112,7 @@ UPnPMediaServerContentServer
 			port = random.nextInt(20000) + 40000;
 		}
 		
-		InetAddress[] bind_ips = NetworkAdmin.getSingleton().getMultiHomedServiceBindAddresses(true); 
+		InetAddress[] bind_ips = plugin.getApplyBindIPs()?NetworkAdmin.getSingleton().getMultiHomedServiceBindAddresses(true):new InetAddress[0]; 
 		
 		if (	bind_ips.length == 0 || 
 				bind_ips.length == 1 && bind_ips[0].isAnyLocalAddress()){

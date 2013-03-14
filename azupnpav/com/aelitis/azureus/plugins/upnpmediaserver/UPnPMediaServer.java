@@ -226,6 +226,7 @@ UPnPMediaServer
 
 		
 	private BooleanParameter 		stream_port_upnp_param;
+	private BooleanParameter		apply_bind;
 	
 	private BooleanParameter 		main_auth;
 	private BooleanParameter 		main_auth_ext_only;
@@ -394,7 +395,9 @@ UPnPMediaServer
 				});
 			
 			stream_port_upnp_param = config_model.addBooleanParameter2( "upnpmediaserver.stream_port_upnp", "upnpmediaserver.stream_port_upnp", false );
-
+			
+			apply_bind = config_model.addBooleanParameter2( "upnpmediaserver.bind.use.default", "upnpmediaserver.bind.use.default", true );
+			
 			String	default_name = null;
 			
 			try{
@@ -592,6 +595,7 @@ UPnPMediaServer
 							stream_port_p,
 							active_port,
 							stream_port_upnp_param,
+							apply_bind,
 							snp,
 							sort_order, sort_order_ascending, 
 							show_percent_done,
@@ -2569,6 +2573,12 @@ UPnPMediaServer
 	getContentDirectory()
 	{
 		return( content_directory );
+	}
+	
+	protected boolean
+	getApplyBindIPs()
+	{
+		return( apply_bind.getValue());
 	}
 	
 	protected int
