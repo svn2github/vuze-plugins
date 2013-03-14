@@ -83,7 +83,7 @@ XMRPCClientIndirect
 			String ip		= (String)result.get( "ip" );
 			String port		= (String)result.get( "port" );
 			
-			binding_url = protocol + "://" + ip + ":" + port + "/transmission/rpc";
+			binding_url = protocol + "://" + ip + ":" + port;
 		}
 		
 		return( binding_url );
@@ -98,9 +98,11 @@ XMRPCClientIndirect
 		try{
 			String url = getCurrentBinding();
 			
+			url += "/transmission/rpc";
+			
 			String json = JSONUtils.encodeToJSON( request );
 			
-			byte[] reply = XMRPCClientUtils.postToURL( url , json.getBytes( "UTF-8" ));
+			byte[] reply = XMRPCClientUtils.postToURL( url , json.getBytes( "UTF-8" ), "vuze", access_code );
 			
 			Map m = JSONUtils.decodeJSON( new String( reply, "UTF-8" ));
 			
@@ -113,6 +115,31 @@ XMRPCClientIndirect
 		}catch( IOException e ){
 			
 			throw( new XMRPCClientException( "unexpected" ));
+		}
+	}
+	
+	public HTTPResponse 
+	call(
+		String 					method, 
+		String 					url_suffix,
+		Map<String, String> 	headers, 
+		byte[] 					data)
+	
+		throws XMRPCClientException 
+	{
+		if ( method.equals( "GET" )){
+			
+			String url = getCurrentBinding();
+			
+			url += url_suffix;
+	
+			byte[] output_data = XMRPCClientUtils.getFromURL( url, headers, "vuze", access_code );
+			
+			return( XMRPCClientUtils.createHTTPResponse( output_data ));
+			
+		}else{
+			
+			throw( new XMRPCClientException( "Not supported" ));
 		}
 	}
 	

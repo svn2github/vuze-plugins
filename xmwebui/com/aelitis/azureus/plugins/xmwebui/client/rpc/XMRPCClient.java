@@ -22,6 +22,8 @@
 package com.aelitis.azureus.plugins.xmwebui.client.rpc;
 
 
+import java.util.Map;
+
 import org.json.simple.JSONObject;
 
 public interface 
@@ -38,6 +40,25 @@ XMRPCClient
 	
 		throws XMRPCClientException;
 	
+	public HTTPResponse
+	call(
+		String				method,
+		String				url,
+		Map<String,String>	headers,
+		byte[]				data )
+	
+		throws XMRPCClientException;
+	
 	public void
 	destroy();
+	
+	public interface
+	HTTPResponse
+	{
+		public Map<String,String>
+		getHeaders();
+		
+		public byte[]
+		getData();
+	}
 }

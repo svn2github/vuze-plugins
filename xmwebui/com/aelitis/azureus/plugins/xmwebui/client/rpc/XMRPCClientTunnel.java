@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.security.AlgorithmParameters;
 import java.security.SecureRandom;
+import java.util.Map;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
@@ -36,6 +37,7 @@ import org.bouncycastle.util.encoders.Hex;
 import org.gudy.azureus2.core3.util.Base32;
 import org.json.simple.JSONObject;
 
+import com.aelitis.azureus.plugins.xmwebui.client.rpc.XMRPCClient.HTTPResponse;
 import com.aelitis.azureus.util.JSONUtils;
 
 public class 
@@ -312,6 +314,18 @@ XMRPCClientTunnel
 		}
 	}
 		
+	public HTTPResponse 
+	call(
+		String 					method, 
+		String 					url,
+		Map<String, String> 	headers, 
+		byte[] 					data)
+	
+		throws XMRPCClientException 
+	{
+		throw( new XMRPCClientException( "derp" ));
+	}
+	
 	public void
 	destroy()
 	{

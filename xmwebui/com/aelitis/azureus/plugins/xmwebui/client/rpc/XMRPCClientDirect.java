@@ -81,6 +81,29 @@ XMRPCClientDirect
 		}	
 	}
 	
+	public HTTPResponse 
+	call(
+		String 					method, 
+		String 					url,
+		Map<String, String> 	headers, 
+		byte[] 					input_data)
+	
+		throws XMRPCClientException 
+	{
+		if ( method.equals( "GET" )){
+			
+			url = (http?"http":"https") + "://" + host + ":" + port + url;
+	
+			byte[] output_data = XMRPCClientUtils.getFromURL( url, headers, username, password );
+			
+			return( XMRPCClientUtils.createHTTPResponse( output_data ));
+			
+		}else{
+			
+			throw( new XMRPCClientException( "Not supported" ));
+		}
+	}
+	
 	public void
 	destroy()
 	{
