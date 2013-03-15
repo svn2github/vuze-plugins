@@ -297,7 +297,9 @@ XMRPCClientTunnel
 				reply.putAll( JSONUtils.decodeJSON( new String( reply_bytes, reply_bytes_offset,reply_bytes_length , "UTF-8" )));
 			}
 			
-			System.out.println( "Received reply: " + reply);
+			String reply_str = reply.toString();
+			
+			System.out.println( "Received reply: " + (reply_str.length()>256?(reply_str.substring(0,256)+"... (" + reply_str.length() + ")"):reply_str) );
 		
 			return( reply );
 			
