@@ -104,7 +104,7 @@ XMClientProxy
 		{
 			ByteArrayOutputStream result	= new ByteArrayOutputStream( 1024 );
 
-			System.out.println( url_path );
+			//System.out.println( url_path );
 			
 			//System.out.println( input_header );
 			
@@ -143,7 +143,9 @@ XMClientProxy
 					
 					XMRPCClient.HTTPResponse resp = rpc.call( "GET", url_path, headers, null );
 					
-					data.write( resp.getData());
+					byte[]	reply_data = resp.getDataBuffer();
+					
+					data.write(reply_data, resp.getDataBufferOffset(), reply_data.length - resp.getDataBufferOffset());
 					
 				}else{
 					

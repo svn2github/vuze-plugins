@@ -96,7 +96,7 @@ XMRPCClientDirect
 	
 			byte[] output_data = XMRPCClientUtils.getFromURL( url, headers, username, password );
 			
-			return( XMRPCClientUtils.createHTTPResponse( output_data ));
+			return( XMRPCClientUtils.createHTTPResponse( null, output_data, 0 ));
 			
 		}else{
 			

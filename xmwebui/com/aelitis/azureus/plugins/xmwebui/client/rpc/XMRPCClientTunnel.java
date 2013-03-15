@@ -21,13 +21,13 @@
 
 package com.aelitis.azureus.plugins.xmwebui.client.rpc;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
 import java.math.BigInteger;
 import java.security.AlgorithmParameters;
 import java.security.SecureRandom;
 import java.util.Map;
+import java.util.zip.GZIPInputStream;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
@@ -39,7 +39,6 @@ import org.bouncycastle.util.encoders.Hex;
 import org.gudy.azureus2.core3.util.Base32;
 import org.json.simple.JSONObject;
 
-import com.aelitis.azureus.plugins.xmwebui.client.rpc.XMRPCClient.HTTPResponse;
 import com.aelitis.azureus.util.JSONUtils;
 
 public class 
@@ -248,7 +247,11 @@ XMRPCClientTunnel
 		try{
 			byte[] req_bytes = json.getBytes( "UTF-8" );
 	
-			CallResult temp = call( new JSONObject(), req_bytes );
+			JSONObject request_headers = new JSONObject();
+			
+			request_headers.put( "Accept-Encoding", "gzip" );
+			
+			CallResult temp = call( request_headers, req_bytes );
 			
 			JSONObject	reply_headers		= temp.getHeaders();
 			byte[]		reply_bytes			= temp.getBytes();
@@ -256,9 +259,43 @@ XMRPCClientTunnel
 			int			reply_bytes_length	= temp.getBytesLength();
 			
 			
-			JSONObject reply = new JSONObject();
+			String	http_status = (String)reply_headers.get( "HTTP-Status" );
+
+			if ( http_status != null && !http_status.equals( "200") ){
+				
+				throw( new XMRPCClientException( "Request failed: HTTP status " + http_status ));
+			}
 			
-			reply.putAll( JSONUtils.decodeJSON( new String( reply_bytes, reply_bytes_offset,reply_bytes_length , "UTF-8" )));
+			JSONObject reply = new JSONObject();
+
+			String	encoding = (String)reply_headers.get( "Content-Encoding" );
+			
+			if ( encoding != null && encoding.equals( "gzip" )){
+				
+				GZIPInputStream gis = new GZIPInputStream( new ByteArrayInputStream( reply_bytes, reply_bytes_offset,reply_bytes_length ));
+				
+				ByteArrayOutputStream baos = new ByteArrayOutputStream( reply_bytes_length );
+				
+				byte[]	buffer = new byte[128*1024];
+				
+				while( true ){
+					
+					int	len = gis.read( buffer );
+					
+					if ( len <= 0 ){
+						
+						break;
+					}
+					
+					baos.write( buffer, 0, len );
+				}
+				
+				reply.putAll( JSONUtils.decodeJSON( new String( baos.toByteArray(), "UTF-8" )));
+				
+			}else{
+						
+				reply.putAll( JSONUtils.decodeJSON( new String( reply_bytes, reply_bytes_offset,reply_bytes_length , "UTF-8" )));
+			}
 			
 			System.out.println( "Received reply: " + reply);
 		
@@ -281,6 +318,11 @@ XMRPCClientTunnel
 	
 		throws XMRPCClientException
 	{
+		if ( request == null ){
+			
+			request = new byte[0];
+		}
+		
 		Object[] tunnel = getCurrentTunnel( false );
 		
 		String			url		= (String)tunnel[0];
@@ -389,8 +431,79 @@ XMRPCClientTunnel
 	
 		throws XMRPCClientException 
 	{
-		throw( new XMRPCClientException( "derp" ));
-	}
+		System.out.println( "Sending request: " + method + "" + url + ": " + headers + " - " + data );
+		
+		try{	
+			JSONObject request_headers = new JSONObject();
+			
+			request_headers.putAll( headers );
+			
+			request_headers.put( "HTTP-Method", method );
+			request_headers.put( "HTTP-URL", url );
+			request_headers.put( "Accept-Encoding", "gzip" );
+			
+			CallResult temp = call( request_headers, data );
+			
+			JSONObject	reply_headers		= temp.getHeaders();
+			byte[]		reply_bytes			= temp.getBytes();
+			int			reply_bytes_offset	= temp.getBytesOffset();
+			int			reply_bytes_length	= temp.getBytesLength();
+			
+			
+			String	http_status = (String)reply_headers.get( "HTTP-Status" );
+
+			if ( http_status != null && !http_status.equals( "200") ){
+				
+				throw( new XMRPCClientException( "Request failed: HTTP status " + http_status ));
+			}
+			
+			JSONObject reply = new JSONObject();
+
+			String	encoding = (String)reply_headers.get( "Content-Encoding" );
+			
+			byte[]	reply_data;
+			int		reply_data_offset;
+			
+			if ( encoding != null && encoding.equals( "gzip" )){
+				
+				GZIPInputStream gis = new GZIPInputStream( new ByteArrayInputStream( reply_bytes, reply_bytes_offset,reply_bytes_length ));
+				
+				ByteArrayOutputStream baos = new ByteArrayOutputStream( reply_bytes_length );
+				
+				byte[]	buffer = new byte[128*1024];
+				
+				while( true ){
+					
+					int	len = gis.read( buffer );
+					
+					if ( len <= 0 ){
+						
+						break;
+					}
+					
+					baos.write( buffer, 0, len );
+				}
+				
+				reply_data 			= baos.toByteArray();
+				reply_data_offset	= 0;
+			}else{
+						
+				reply_data 			= reply_bytes;
+				reply_data_offset 	= reply_bytes_offset;
+			}
+			
+			System.out.println( "Received reply: " + reply);
+		
+			return( XMRPCClientUtils.createHTTPResponse( reply_headers, reply_data, reply_data_offset ));
+			
+		}catch( XMRPCClientException e ){
+			
+			throw( e );
+			
+		}catch( Throwable e ){
+			
+			throw( new XMRPCClientException( "Failed to use tunnel", e ));
+		}	}
 	
 	public void
 	destroy()

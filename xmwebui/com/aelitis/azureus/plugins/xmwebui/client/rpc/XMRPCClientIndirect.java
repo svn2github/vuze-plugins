@@ -135,7 +135,7 @@ XMRPCClientIndirect
 	
 			byte[] output_data = XMRPCClientUtils.getFromURL( url, headers, "vuze", access_code );
 			
-			return( XMRPCClientUtils.createHTTPResponse( output_data ));
+			return( XMRPCClientUtils.createHTTPResponse( null, output_data, 0 ));
 			
 		}else{
 			

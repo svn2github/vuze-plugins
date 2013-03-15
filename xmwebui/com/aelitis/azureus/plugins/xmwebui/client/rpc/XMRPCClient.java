@@ -29,8 +29,8 @@ import org.json.simple.JSONObject;
 public interface 
 XMRPCClient 
 {
-	public static final String PAIRING_URL 	= "https://pair.vuze.com/";
-	//public static final String PAIRING_URL 	= "http://127.0.0.1:4080/";
+	//public static final String PAIRING_URL 	= "https://pair.vuze.com/";
+	public static final String PAIRING_URL 	= "http://127.0.0.1:4080/";
 	
 	public static final String SID			= "xmwebui";
 	
@@ -59,6 +59,9 @@ XMRPCClient
 		getHeaders();
 		
 		public byte[]
-		getData();
+		getDataBuffer();
+		
+		public int
+		getDataBufferOffset();
 	}
 }

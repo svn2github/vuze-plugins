@@ -96,6 +96,9 @@ XMRPCClientUtils
 					connection.setRequestProperty( "X-Transmission-Session-Id", session_id );
 				}
 				
+				connection.setConnectTimeout( 30*1000 );
+				connection.setReadTimeout( 30*1000 );
+
 				try{
 					InputStream is = connection.getInputStream();
 					
@@ -185,7 +188,8 @@ XMRPCClientUtils
 					connection.setRequestProperty( "X-Transmission-Session-Id", session_id );
 				}
 				
-				connection.setReadTimeout( 5*60*1000 );
+				connection.setConnectTimeout( 30*1000 );
+				connection.setReadTimeout( 30*1000 );
 				
 				connection.setDoOutput( true );
 				
@@ -240,7 +244,9 @@ XMRPCClientUtils
 	
 	protected static HTTPResponse
 	createHTTPResponse(
-		final byte[]	data )
+		final Map<String,String>	headers,
+		final byte[]				data,
+		final int					offset )
 	{
 		return(
 			new HTTPResponse()
@@ -248,13 +254,19 @@ XMRPCClientUtils
 				public Map<String,String>
 				getHeaders()
 				{
-					return( null );
+					return( headers );
 				}
 				
 				public byte[]
-				getData()
+				getDataBuffer()
 				{
 					return( data );
+				}
+				
+				public int 
+				getDataBufferOffset() 
+				{
+					return( offset );
 				}
 			});
 	}
