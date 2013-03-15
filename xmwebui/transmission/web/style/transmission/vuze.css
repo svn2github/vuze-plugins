@@ -1,55 +1,75 @@
-#remotesearch_container {position:fixed;left:0;top:75px;bottom:0;width:100%;padding:0;margin:0;border:0;border-top:1px solid #667A8A}
-#remotesearch_container iframe {width:100%;height:100%;padding:0;margin:0;border:0}
-
-div.torrent_global_menu ul.search {background-position:0 12px;}
-div.torrent_global_menu ul li#search_li {width:270px;}
-
-li#remote_search div div.toolbar_image, li#remote_search.disabled div:active div.toolbar_image, li#remote_search.disabled div:hover div.toolbar_image {
-	background-position: left -192px;
-}
-li#remote_search div:active div.toolbar_image {
-	background-position: right -192px;
-}
-ul.search li#remote_search div div.toolbar_image, ul.search li#remote_search.disabled div:active div.toolbar_image, ul.search li#remote_search.disabled div:hover div.toolbar_image {
-	background-position: left -224px;
-}
-ul.search li#remote_search div:active div.toolbar_image {
-	background-position: right -224px;
-}
-li#search_btn div div.toolbar_image, li#search_btn.disabled div:active div.toolbar_image, li#search_btn.disabled div:hover div.toolbar_image {
-	background-position: left -257px;
-}
-li#search_btn div:active div.toolbar_image {
-	background-position: right -257px;
+#remotesearch_container {
+	position: fixed;
+	left: 0;
+	top: 83px;
+	bottom: 0;
+	width: 100%;
+	padding: 0;
+	margin: 0;
+	border: 0;
+	border-top: 1px solid #667A8A
 }
 
-.search_term, .search_term form, .search_term input {/*float:left;*/}
-.search_term a {margin-left:6px;color:#264356}
-div.torrent_global_menu ul li div.search_term {padding:3px 16px}
-div.torrent_global_menu ul li div.search_term form {padding-top:0px}
-div.torrent_global_menu ul li div.search_term #search_input { margin-right:10px;
-padding:1px 5px;font-size:18px; width:245px;border:1px solid #c3c3c3;background-color: #f7f7f7;color:#97a4ae;height:22px}
-div.torrent_global_menu ul li div.search_term #search_submit {position:absolute;top:-500px;padding:2px 4px;border:1px solid #97A7BB;
-background-color:transparent;font-size:12px;color:#013B61}
+#remotesearch_container iframe {
+	width: 100%;
+	height: 100%;
+	padding: 0;
+	margin: 0;
+	border: 0
+}
 
-div.torrent_global_menu ul li {width:54px}
-div.torrent_global_menu ul li#remote_search {width:44px}
+div.torrent_global_menu ul.search {
+	background-position: 0 12px;
+}
 
+div#search_li {
+	width: 240px;
+	border:none;
+}
+
+.search_term, .search_term form, .search_term input {
+/*float:left;*/
+}
+div#search_term a {
+	margin-left:6px;color:#264356
+}
+div#search_term {
+	padding:3px 16px
+}
+div#search_term form {
+	padding-top: 0px
+}
+
+form #search_input {
+	margin-right: 10px;
+	padding: 1px 5px;
+	font-size: 20px;
+	width: 245px;
+	border: 1px solid #c3c3c3;
+	background-color: #f7f7f7;
+	color: #97a4ae;
+	height: 26px;
+}
 
 #log_out {float:right;height:33px;line-height:33px;margin-right:8px; margin-top:-5px}
 #log_out a {background: transparent url(images/graphics/reset_link_btn.png) top left no-repeat;float:left;width:60px;height:17px;text-align:center;margin-top:9px;line-height:17px;color:#264356;text-decoration:none;font-weight:bold}
 #log_out a:active {background-position:left bottom}
 #log_out a:hover {background-position:left center}
 
-div#torrent_logo {position:absolute;top:0;left:0;z-index:3}
-div#torrent_logo {margin-top:12px;margin-left:12px}
+div#torrent_logo {
+	position: absolute;
+	top: 0;
+	left: 0;
+	z-index: 3;
+	margin-top: 4px;
+	margin-left: 4px;
+}
 
 /*--------------------------------------
  *
  * T O R R E N T   F I L T E R   B A R
  *
  *--------------------------------------*/
-
 div#torrent_filter_bar {
 	margin: 0;
 /* Vuze: Original:
@@ -63,7 +83,7 @@ div#torrent_filter_bar {
 /* Vuze: Original:
 	top: 97px;
 */
-	top: 103px;
+	top: 75px;
 	z-index: 2;
 	display: none;
 	/* Vuze: Removed Line:
@@ -181,6 +201,28 @@ div#torrent_filter_bar input#torrent_search {
 
 /***************/
 
+div#toolbar {
+	width: 400px;
+	height: 38px; /*25px*/
+	margin: 0px auto; /*0px*/
+	padding: 9px 0 0 0; /*2px*/
+}
+
+div#toolbar-area
+{
+	width: 100%;
+	height: 50px;
+}
+
+div#toolbar > * {
+	width: 32px; /*18px*/
+	height: 30px; /*18px*/
+}
+
+.toolbar-vuze {
+	display: none;
+}
+
 #toolbar ul {
 	padding: 0;
 	background:url(images/graphics/vuze_remote_nav_bg.png) 0 -58px no-repeat;
@@ -220,6 +262,8 @@ div#torrent_filter_bar input#torrent_search {
 	overflow: hidden;
 	*/
 	overflow: visible;
+	z-index: 1;
+	height: 32px;
 	/* might need position: none
 	position: relative;
 	*/
@@ -230,6 +274,9 @@ div#torrent_filter_bar input#torrent_search {
 	padding-top: 6px;
 }
 
+div.main_container {
+	height: 20px;
+}
 
 /***
 ****
@@ -239,7 +286,7 @@ div#torrent_filter_bar input#torrent_search {
 
 div#torrent_container {
 	position: fixed;
-	top: 103px;
+	top: 83px; /* 55 */
 }
 
 ul.torrent_list li.torrent {
@@ -307,7 +354,7 @@ li.torrent a:active div.torrent_info {
 
 
 div#torrent_inspector {
-	top: 103px; /*102px;*/
+	top: 83px; /*55;*/
 	/* Vuze: No bottom bar, so inspector can go to bottom */
 	bottom: 0; /*22px;*/
 }

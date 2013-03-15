@@ -42,29 +42,28 @@
 	</head>
 	<body id="transmission_body">
 
-		<div id="toolbar">
-			<ul id="t_bar">
-				<li id="open"><div id="open_link"><div class="toolbar_image"></div><span>Add Torrent</span></div></li>
-				<li id="remove" class="disabled"><div id="remove_link"><div class="toolbar_image"></div>Remove</div></li>
-				<li class="divider">&nbsp;</li>
-				<li id="pause_selected" class="disabled"><div id="pause_selected_link"><div class="toolbar_image"></div>Stop</div></li>
-				<li id="resume_selected" class="disabled"><div id="resume_selected_link"><div class="toolbar_image"></div>Start</div></li>
-				<li class="divider">&nbsp;</li>
-				<li id="pause_all" class="disabled"><div id="pause_all_link"><div class="toolbar_image"></div>Stop All</div></li>
-				<li id="resume_all" class="disabled"><div id="resume_all_link"><div class="toolbar_image"></div>Start All</div></li>
-				<li id="search_li" style="display:none">
-					<div class="search_term">
-						<form name="search_form" onsubmit="vz.executeSearch();return false;">
-							<input id="search_input" name="search_input" size="10" />
-							<input id="search_submit" type="submit" value="Search!" />
-						</form>
-					</div>
-				</li>
-				<li id="search_btn" style="display:none"><div id="search_btn_link" onclick="vz.executeSearch()"><div class="toolbar_image"></div>Search</div></li>
-				<li id="remote_search"><div id="remote_search_link" onclick="vz.ui.toggleRemoteSearch()"><div class="toolbar_image"></div><span id="remote_search_link_span">Search</span></div></li>
-				<li id="inspector"><div id="inspector_link"><div class="toolbar_image"></div>Inspector</div></li>
-				<li><a href="#finished" id="filter_finished_link" class="finished">Finished</a></li>
-			</ul>
+		<div id="toolbar-area">
+		<div id="toolbar" class="toolbar-main">
+			<div id="toolbar-open" title="Add Torrent"></div>
+			<div id="toolbar-select" title="Toggle Selection"></div>
+			<div id="toolbar-start" title="Start Selected Torrents"></div>
+			<div id="toolbar-pause" title="Stop Selected Torrents"></div>
+			<div id="toolbar-remove" title="Remove Selected Torrents"></div>
+			<div id="toolbar-search" title="Search"></div>
+			
+			<div id="toolbar-inspector" title="Toggle Inspector"></div>
+		</div>
+		<div id="toolbar" class="toolbar-vuze">
+			<div id="search_li">
+				<div class="search_term">
+					<form name="search_form" onsubmit="vz.executeSearch();return false;">
+						<input id="search_input" name="search_input" />
+					</form>
+				</div>
+			</div>
+			<div id="toolbar-remote-search" title="Search"></div>
+			<div id="toolbar-remote" title="Back to Remote"></div>
+		</div>
 		</div>
 
 		<div id="torrent_logo">
@@ -76,7 +75,6 @@
 		</div>
 
 		<div id="statusbar">
-			<div id="torrent_pref">
 				<ul id="settings_menu" title="Settings Menu">
 					<li id="button">&nbsp;
 						<ul id="footer_super_menu">
@@ -146,7 +144,6 @@
 				<div id="turtle-button" title="Alternative Speed Limits">&nbsp;</div> 
 				<div id="compact-button" title="Compact View">&nbsp;</div>
 				<div id="prefs-button" title="Edit Preferences...">&nbsp;</div> 
-			</div>
 
 			<div id='filter-button'></div>
 
@@ -276,7 +273,7 @@
 
 		<div id="torrent_inspector" style="display:none;">
 
-			<div id="inspector-close"></div>
+			<div id="inspector-close" class="inspector_close"></div>
 
 			<div id="inspector-tabs-wrapper">
 			<div id="inspector-tabs">
@@ -493,11 +490,6 @@
 				<li id="context_verify">Check Local Data</li>
 				<li class="separator"></li>
 				<li id="context_reannounce">Ask tracker for more peers</li>
-				<li class="separator"></li>
-				<li id="context_toggle_inspector">Show Inspector</li>
-				<li class="separator"></li>
-				<li id="context_select_all" class="context_select_all">Select All</li>
-				<li id="context_deselect_all" class="context_deselect_all">Deselect All</li>
 			</ul>
 		</div>
 

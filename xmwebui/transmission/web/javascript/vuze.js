@@ -92,31 +92,17 @@ vz.createRemote = function(remote_url){
 vz.ui = {}
 
 vz.ui.toggleRemoteSearch = function(){
-    if( $("#open").is(":visible") ) {
-        $("#open").hide();
-        $("#remove").hide();
-        $("#pause_selected").hide();
-        $("#resume_selected").hide();
-        $("#pause_all").hide();
-        $("#resume_all").hide();
-        $("#t_bar").addClass("search")
-        $("#search_li").show()
-        $("#search_btn").show()
-        $("#remote_search_link_span").html("Remote")
+    if( $(".toolbar-main").is(":visible") ) {
+        $(".toolbar-main").hide();
+        $(".toolbar-vuze").show();
+        //$("#toolbar").addClass("search")
         vz.executeSearch()
-        $("#search_input").focus()
+        $("#search_input").focus();
     } else {
-        $("#open").show();
-        $("#remove").show();
-        $("#pause_selected").show();
-        $("#resume_selected").show();
-        $("#pause_all").show();
-        $("#resume_all").show();
-        $("#t_bar").removeClass("search")
-        $("#search_li").hide()
-        $("#search_btn").hide()
-        $("#remote_search_link_span").html("Search")
-        vz.backFromSearch()
+        $(".toolbar-vuze").hide();
+        $(".toolbar-main").show();
+        //$("#toolbar").removeClass("search");
+        vz.backFromSearch();
     }
 }
 
