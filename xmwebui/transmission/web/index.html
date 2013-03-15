@@ -45,10 +45,11 @@
 		<div id="toolbar-area">
 		<div id="toolbar" class="toolbar-main">
 			<div id="toolbar-open" title="Add Torrent"></div>
-			<div id="toolbar-select" title="Toggle Selection"></div>
 			<div id="toolbar-start" title="Start Selected Torrents"></div>
 			<div id="toolbar-pause" title="Stop Selected Torrents"></div>
 			<div id="toolbar-remove" title="Remove Selected Torrents"></div>
+			<div id="toolbar-start-all" title="Start All Torrents"></div>
+			<div id="toolbar-pause-all" title="Pause All Torrents"></div>
 			<div id="toolbar-search" title="Search"></div>
 			
 			<div id="toolbar-inspector" title="Toggle Inspector"></div>
@@ -124,12 +125,13 @@
 							<li class="separator"></li>
 							<li>Sort Transfers By
 								<ul id="footer_sort_menu">
+									<li class='sort-mode' id="sort_by_queue_order">Queue Order</li>
 									<li class='sort-mode' id="sort_by_activity">Activity</li>
 									<li class='sort-mode' id="sort_by_age">Age</li>
 									<li class='sort-mode' id="sort_by_name">Name</li>
 									<li class='sort-mode' id="sort_by_percent_completed">Progress</li>
 									<li class='sort-mode' id="sort_by_ratio">Ratio</li>
-									<li class='sort-mode' id="sort_by_queue_order">Queue Order</li>
+									<li class='sort-mode' id="sort_by_size">Size</li>
 									<li class='sort-mode' id="sort_by_state">State</li>
 									<li class="separator"></li>
 									<li id="reverse_sort_order">Reverse Sort Order</li>
@@ -145,10 +147,22 @@
 				<div id="compact-button" title="Compact View">&nbsp;</div>
 				<div id="prefs-button" title="Edit Preferences...">&nbsp;</div>
 
-			<div id='filter-button'></div>
+			<div id='filter'>
+				Show
+				<select id="filter-mode">
+					<option value="all">All</option>
+					<option value="active">Active</option>
+					<option value="downloading">Downloading</option>
+					<option value="seeding">Seeding</option>
+					<option value="paused">Paused</option>
+					<option value="finished">Finished</option>
+				</select>
+				<select id="filter-tracker"></select>
+				<input type="search" id="torrent_search" placeholder="Filter" />
+				<span id="filter-count">&nbsp;</span>
+			</div>
 
 			<div id="log_out" style="display:none"><a href="/pairedServiceLogout?redirect_to=http%3A//remote.vuze.com/logout.php">log out</a></div>
-			<input type="search" id="torrent_search" placeholder="Filter" />
 
 			<div id='speed-info'>
 				<div id='speed-dn-container'>
@@ -160,14 +174,6 @@
 					<div id='speed-up-label'></div>
 				</div>
 			</div>			
-		</div>
-
-
-		<div id="filter-popup" style="display:none;">
-			<div id='filter-popup-workarea'>
-				<div id='filter-by-state'></div>
-				<div id='filter-by-tracker'></div>
-			</div>
 		</div>
 
 		<div id="prefs-dialog" style="display:none;">
@@ -327,6 +333,10 @@
 			</div><!-- id="inspector_tab_trackers_container" -->
 
 			<div style="display:none;" class="inspector-page" id="inspector-page-files">
+					<ul id="file-list-header">
+						<li id="select-all-files">Select All</li>
+						<li id="deselect-all-files">Deselect All</li>
+					</ul>
 					<ul id="inspector_file_list">
 					</ul>
 			</div><!-- id="inspector_tab_files_container" -->

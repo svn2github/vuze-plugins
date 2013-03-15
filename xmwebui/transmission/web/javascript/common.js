@@ -1,4 +1,4 @@
-/* Transmission Revision 13086 */
+/* Transmission Revision 13276 */
 /**
  * Copyright © Dave Perrett and Malcolm Jarvis
  *
@@ -43,12 +43,6 @@ $(document).ready(function() {
 		};
 	}
 
-	// Initialise the dialog controller
-	dialog = new Dialog();
-
-	// Initialise the main Transmission controller
-	transmission = new Transmission();
-
 	// IE specific fixes here
 	if ($.browser.msie) {
 		try {
@@ -79,6 +73,12 @@ $(document).ready(function() {
 		// and this kills the border we used to have
 		$('.trans_menu div.outerbox').css('border', 'none');
 	}
+
+	// Initialise the dialog controller
+	dialog = new Dialog();
+
+	// Initialise the main Transmission controller
+	transmission = new Transmission();
 });
 
 /**
@@ -161,6 +161,7 @@ Prefs._SortByAge          = 'age';
 Prefs._SortByActivity     = 'activity';
 Prefs._SortByName         = 'name';
 Prefs._SortByQueue        = 'queue_order';
+Prefs._SortBySize         = 'size';
 Prefs._SortByProgress     = 'percent_completed';
 Prefs._SortByRatio        = 'ratio';
 Prefs._SortByState        = 'state';

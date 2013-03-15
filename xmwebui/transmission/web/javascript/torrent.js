@@ -1,4 +1,4 @@
-/* Transmission Revision 13086 */
+/* Transmission Revision 13276 */
 /**
  * Copyright © Mnemosyne LLC
  *
@@ -413,6 +413,14 @@ Torrent.compareByProgress = function(ta, tb)
 	return (a - b) || Torrent.compareByRatio(ta, tb);
 };
 
+Torrent.compareBySize = function(ta, tb)
+{
+    var a = ta.getTotalSize(),
+        b = tb.getTotalSize();
+
+    return (a - b) || Torrent.compareByName(ta, tb);
+}
+
 Torrent.compareTorrents = function(a, b, sortMethod, sortDirection)
 {
 	var i;
@@ -431,6 +439,9 @@ Torrent.compareTorrents = function(a, b, sortMethod, sortDirection)
 		case Prefs._SortByProgress:
 			i = Torrent.compareByProgress(a,b);
 			break;
+        case Prefs._SortBySize:
+            i = Torrent.compareBySize(a,b);
+            break;
 		case Prefs._SortByState:
 			i = Torrent.compareByState(a,b);
 			break;
@@ -469,6 +480,9 @@ Torrent.sortTorrents = function(torrents, sortMethod, sortDirection)
 		case Prefs._SortByProgress:
 			torrents.sort(this.compareByProgress);
 			break;
+        case Prefs._SortBySize:
+            torrents.sort(this.compareBySize);
+            break;
 		case Prefs._SortByState:
 			torrents.sort(this.compareByState);
 			break;

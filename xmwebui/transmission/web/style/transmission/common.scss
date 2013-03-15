@@ -22,7 +22,7 @@
 
 @mixin buttonImage($image-url, $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom) {
 	@include imageOnVerticalGradient($image-url, $idle-color-top, $idle-color-bottom);
-	&:active, &:hover, &.selected {
+	&:active, &.selected {
 		@include imageOnVerticalGradient($image-url, $active-color-top, $active-color-bottom);
 	}
 }
@@ -119,17 +119,20 @@ body {
 ****  TOOLBAR
 ****
 ***/
+$toolbar-gradient-top: #ddd;
+$toolbar-gradient-bottom: #bbb;
+$toolbar-height: 36px;
 
 div#toolbar
 {
 	$separator-spacing: 20px;
 
 	width: 100%;
-	height: 35px;
+	height: $toolbar-height;
 	margin: 0px;
 	padding: 2px;
 	border-bottom: 1px solid #AAA;
-	background: url('images/red-texture.png') repeat;
+	@include verticalGradient($toolbar-gradient-top, $toolbar-gradient-bottom);
 
 	$idle-color-top: $nonselected-gradient-top;
 	$idle-color-bottom: $nonselected-gradient-bottom;
@@ -137,13 +140,19 @@ div#toolbar
 	$active-color-bottom: $selected-gradient-bottom;
 
 	> * {
-		@include button;
-		margin-top: 5px;
-		width: 18px;
-		height: 18px;
-		padding: 2px 8px;
+		width: 34px;
+		height: 34px;
 		float: left;
-		border: 1px solid #888;
+		border: none;
+		padding: 0px 3px;
+	}
+
+	>div#toolbar-separator {
+	        height: 25px;
+	        margin-top: 8px;
+	        margin-bottom: 5px;
+	        border-left: 1px solid #aaa;
+	        width: 3px;
 	}
 
 	div#toolbar-open {
@@ -154,12 +163,21 @@ div#toolbar
 	> div#toolbar-remove {
 		@include rightRoundedBox(10px);
 		@include buttonImage('images/toolbar-remove.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
+		margin-right: 8px;
 	}
 	> div#toolbar-start {
 		@include buttonImage('images/toolbar-start.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 	}
 	> div#toolbar-pause {
 		@include buttonImage('images/toolbar-stop.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
+	}
+	> div#toolbar-start-all {
+		@include leftRoundedBox(10px);
+		@include buttonImage('images/toolbar-start-all.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
+	}
+	> div#toolbar-pause-all {
+		@include rightRoundedBox(10px);
+		@include buttonImage('images/toolbar-stop-all.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 	}
 	> div#toolbar-search {
 		@include roundedBox(10px);
@@ -199,21 +217,37 @@ div#toolbar
 
 $statusbar-gradient-top: #ddd;
 $statusbar-gradient-bottom: #bbb;
+$statusbar-height: 26px;
 
 #statusbar
 {
-	height: 24px;
+	height: $statusbar-height;
 	width: 100%;
 	border-bottom: 1px solid #AAA;
 	overflow: hidden;
 	position: relative;
 	background-color: #CCC;
 
+	#filter
+	{
+		float: left;
+		margin-left: 5px;
+
+		input#torrent_search {
+			height: 18px;
+			width: 100px;
+			border-radius: 6px;
+			&.blur { color: #999; }
+		}
+
+		#filter-count { margin-left: 8px; }
+	}
+
 	#speed-info
 	{
+		float: right;
 		margin-top: 5px;
-		margin-left: 45%;
-		text-align: left;
+		margin-right: 10px;
 
 		* {
 			display: inline-block;
@@ -232,103 +266,9 @@ $statusbar-gradient-bottom: #bbb;
 			background: url('images/arrow-down.png') bottom no-repeat;
 		}
 
-		#speed-up-container {
-			display: none;
-			&.active { display: inline; }
+		#speed-up-container, #speed-dn-container {
+			display: inline;
 		}
-
-		#speed-dn-container {
-			display: none;
-			&.active { display: inline; }
-		}
-	}
-
-	#filter-button {
-		float: left;
-		text-shadow: 0 1px 0 #ccc;
-		margin: 5px 8px;
-		-moz-user-select: none;
-		-webkit-user-select: none;
-		&:hover { cursor: pointer };
-		#filter-button .filter-selection { text-decoration: underline; }
-	}
-
-	input#torrent_search {
-		float: right;
-		height: 15px;
-		width: 100px;
-		border: solid 0 #fff;
-		padding: 2px;
-		margin: 4px 5px 0 0;
-		border-radius: 10px;
-
-		&.blur {
-			color: #999;
-		}
-	}
-}
-
-/***
-****
-****  FILTER POPUP
-****
-***/
-
-#filter-popup
-{
-	color: #222;/* !important; */
-	background: #FFF;
-	z-index: 100;
-
-	li { text-align: left }
-
-	.count {
-		padding-left: 3px;
-	}
-
-	.row {
-		text-align: left;
-		cursor: pointer;
-		margin: 8px 2px;
-		position: relative;
-		height: 18px;
-		-moz-user-select: none;
-		-webkit-user-select: none;
-
-		.filter-img {
-			border: none;
-			width: 16px;
-			height: 16px;
-			position: absolute;
-			left: 0px;
-		}
-		.filter-name {
-			position: absolute;
-			left: 20px;
-		}
-		.count {
-			float: right;
-			color: #aaa;
-		}
-		&:hover, &.selected {
-			font-weight: bold;
-		}
-	}
-
-	#filter-by-state {
-		float: left;
-		width: 120px;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		.row .filter-img { display: none; }
-		.row .filter-name { left: 0px; }
-	}
-
-	#filter-by-tracker {
-		float: right;
-		width: 130px;
-		overflow: hidden;
-		text-overflow: ellipsis;
 	}
 }
 
@@ -338,7 +278,7 @@ $statusbar-gradient-bottom: #bbb;
 ****
 ***/
 
-$torrent-container-top: 65px;
+$torrent-container-top: $toolbar-height + $statusbar-height + 6px;
 $torrent-list-button-width: 14px;
 
 div#torrent_container {
@@ -572,6 +512,11 @@ div#torrent_inspector
 	bottom: 22px;
 	right: 0px;
 
+	$idle-color-top: $nonselected-gradient-top;
+	$idle-color-bottom: $nonselected-gradient-bottom;
+	$active-color-top: $selected-gradient-top;
+	$active-color-bottom: $selected-gradient-bottom;
+
 	#inspector-close
 	{
 		display: none;
@@ -586,10 +531,6 @@ div#torrent_inspector
 		#inspector-tabs
 		{
 			$border-radius: 5px;
-			$idle-color-top: $nonselected-gradient-top;
-			$idle-color-bottom: $nonselected-gradient-bottom;
-			$active-color-top: $selected-gradient-top;
-			$active-color-bottom: $selected-gradient-bottom;
 
 			display: inline-block;
 
@@ -682,6 +623,18 @@ div#torrent_inspector
 	}
 
 	/* Files Inspector Tab */
+
+	#file-list-header {
+		float: right;
+		> * {
+			@include roundedButton(5px);
+			@include verticalGradient($idle-color-top, $idle-color-bottom);
+			&:active {
+				@include verticalGradient($active-color-top, $active-color-bottom);
+			}
+		}
+	}
+
 	#inspector_file_list {
 		padding: 0 0 0 0;
 		margin: 0 0 0 0;
@@ -689,6 +642,7 @@ div#torrent_inspector
 		cursor: default;
 		overflow: hidden;
 	}
+
 	#inspector_file_list {
 		border-top: 1px solid #888;
 		width: 100%;
@@ -877,6 +831,9 @@ div.torrent_footer
 	#turtle-button {
 		@include roundedBox(5px);
 		@include buttonImage('images/turtle.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
+		&:active, &.selected {
+			@include imageOnVerticalGradient('images/blue-turtle.png', $active-color-top, $active-color-bottom);
+		}
 	}
 
 	#compact-button {

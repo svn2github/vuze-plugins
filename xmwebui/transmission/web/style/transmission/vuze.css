@@ -202,8 +202,8 @@ div#torrent_filter_bar input#torrent_search {
 /***************/
 
 div#toolbar {
-	width: 400px;
-	height: 38px; /*35px*/
+	width: 420px;
+	height: 38px; /*36px*/
 	margin: 0px auto; /*0px*/
 	padding: 2px 0 0 0; /*2px*/
 	border: none; /*border-bottom: 1px solid #AAA;*/
@@ -217,8 +217,9 @@ div#toolbar-area
 }
 
 div#toolbar > * {
-	width: 32px; /*18px*/
-	height: 30px; /*18px*/
+	width: 34px; /*34px*/
+	height: 30px; /*34px*/
+	border: 1px solid #888;
 }
 
 .toolbar-vuze {
@@ -265,7 +266,7 @@ div#toolbar > * {
 	*/
 	overflow: visible;
 	z-index: 1;
-	height: 32px;
+	height: 32px; /*26px*/
 	/* might need position: none
 	position: relative;
 	*/
