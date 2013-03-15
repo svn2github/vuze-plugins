@@ -28,6 +28,7 @@ import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.channels.SocketChannel;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -37,8 +38,10 @@ import org.gudy.azureus2.core3.tracker.server.impl.tcp.nonblocking.TRNonBlocking
 import org.gudy.azureus2.core3.tracker.server.impl.tcp.nonblocking.TRNonBlockingServerProcessorFactory;
 import org.gudy.azureus2.core3.util.AsyncController;
 import org.gudy.azureus2.core3.util.FileUtil;
+import org.gudy.azureus2.core3.util.TimeFormatter;
 import org.json.simple.JSONObject;
 
+import com.aelitis.azureus.core.util.HTTPUtils;
 import com.aelitis.azureus.plugins.xmwebui.client.rpc.XMRPCClient;
 import com.aelitis.azureus.plugins.xmwebui.client.rpc.XMRPCClientFactory;
 import com.aelitis.azureus.util.JSONUtils;
@@ -124,10 +127,15 @@ XMClientProxy
 				}
 			}
 
+			String content_type = "application/octet-stream";
+			
 			try{
 				
 				ByteArrayOutputStream data	= new ByteArrayOutputStream( 1024 );
 	
+				Map<String,String>	output_headers = new HashMap<String, String>();
+				
+				boolean	no_cache = true;
 				
 				if ( url_path.startsWith( "/transmission/rpc" )){
 					
@@ -139,6 +147,8 @@ XMClientProxy
 					
 					data.write( JSONUtils.encodeToJSON( rpc_reply ).getBytes( "UTF-8" ));
 					
+					content_type = "application/json; charset=UTF-8";
+					
 				}else if ( url_path.startsWith( "/psearch/" )){
 					
 					XMRPCClient.HTTPResponse resp = rpc.call( "GET", url_path, headers, null );
@@ -147,7 +157,11 @@ XMClientProxy
 					
 					data.write(reply_data, resp.getDataBufferOffset(), reply_data.length - resp.getDataBufferOffset());
 					
+					content_type = resp.getHeaders().get( "Content-Type" );
+					
 				}else{
+					
+					no_cache = false;
 					
 					if ( url_path.equals( "/" )){
 						
@@ -161,16 +175,46 @@ XMClientProxy
 					System.out.println( file + " -> " + file.exists());
 					
 					data.write( FileUtil.readFileAsByteArray( file ));
+					
+					String	formatted_date		 = TimeFormatter.getHTTPDate( file.lastModified());
+
+					output_headers.put( "Last-Modified", formatted_date );
+					
+					String name = file.getName();
+					
+					int	pos = name.lastIndexOf( "." );
+					
+					if ( pos != -1 ){
+					
+						content_type = HTTPUtils.guessContentTypeFromFileType( name.substring( pos+1 ));
+					}
 				}
 				
 				byte[] bytes = data.toByteArray();
 				
 	
-	
-				result.write((
-					"HTTP/1.1 200 OK" + NL + 
-					"Content-length: " + bytes.length + NL + 
-					NL ).getBytes());
+				output_headers.put( "Content-Type", content_type );
+				output_headers.put( "Content-length", String.valueOf( bytes.length ));
+				
+				if ( no_cache ){
+					
+					output_headers.put( "Cache-Control", "no-cache, no-store, must-revalidate" );
+					output_headers.put( "Pragma", "no-cache" );
+					output_headers.put( "Expires", "0" );
+				}
+				
+				String	header_str = "HTTP/1.1 200 OK" + NL;
+				
+				for ( Map.Entry<String, String> entry: output_headers.entrySet()){
+					
+					header_str += entry.getKey() + ": " + entry.getValue() + NL;
+				}
+				
+				header_str += NL;
+				
+				// System.out.println( header_str );
+				
+				result.write( header_str.getBytes( "UTF-8" ));
 				
 				result.write( bytes );
 				

@@ -457,8 +457,6 @@ XMRPCClientTunnel
 				throw( new XMRPCClientException( "Request failed: HTTP status " + http_status ));
 			}
 			
-			JSONObject reply = new JSONObject();
-
 			String	encoding = (String)reply_headers.get( "Content-Encoding" );
 			
 			byte[]	reply_data;
@@ -492,7 +490,7 @@ XMRPCClientTunnel
 				reply_data_offset 	= reply_bytes_offset;
 			}
 			
-			System.out.println( "Received reply: " + reply);
+			System.out.println( "Received reply: " + reply_headers );
 		
 			return( XMRPCClientUtils.createHTTPResponse( reply_headers, reply_data, reply_data_offset ));
 			
