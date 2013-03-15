@@ -1,33 +1,3 @@
-/*--------------------------------------
- *
- * G L O B A L
- *
- *--------------------------------------*/
-
-html {
-	margin: 0;
-/* setting border: 0 hoses ie6 win window inner well border */
-	padding: 0;
-	height: 100%;
-}
-
-body {
-	font: 62.5% "lucida grande", Tahoma, Verdana, Arial, Helvetica, sans-serif; /* Resets 1em to 10px */
-	color: #222;/* !important; */
-	background: #FFF;
-	text-align: center;
-	margin: 0 0 30px;
-	overflow: hidden;
-}
-
-img {
-	border: none;
-}
-
-a {
-	outline: 0;
-}
-
 @mixin verticalGradient($topColor, $bottomColor) {
 	background-color: mix($topColor, $bottomColor);
 	background-image: -webkit-gradient(linear, left top, left bottom, from($topColor), to($bottomColor)); 
@@ -46,15 +16,22 @@ a {
 	background-image: url($src), -moz-linear-gradient(top, $topColor, $bottomColor); /* FF3.6+ */
 	background-image: url($src), -ms-linear-gradient(top, $topColor, $bottomColor); /* IE10 */
 	background-image: url($src), -o-linear-gradient(top, $topColor, $bottomColor); /* Opera 11.10+ */
-	background-image: url($src), linear-gradient(top, $topColor, $bottomColor); /* W3C */
 	background-position: center;
 	background-repeat: no-repeat;
 }
 
-$nonselected-gradient-color-top: white;
-$nonselected-gradient-color-bottom: #BBB;
-$selected-gradient-color-top: #68abe6;
-$selected-gradient-color-bottom: #93e8ff;
+@mixin buttonImage($image-url, $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom) {
+	@include imageOnVerticalGradient($image-url, $idle-color-top, $idle-color-bottom);
+	&:active, &:hover, &.selected {
+		@include imageOnVerticalGradient($image-url, $active-color-top, $active-color-bottom);
+	}
+}
+
+$nonselected-gradient-top: white;
+$nonselected-gradient-bottom: #BBB;
+$selection-color: #cdcdff;
+$selected-gradient-top: $selection-color;
+$selected-gradient-bottom: white;
 
 @mixin button {
 	cursor: pointer;
@@ -66,16 +43,10 @@ $selected-gradient-color-bottom: #93e8ff;
 	border-width: 1px;
 	padding: 3px;
 }
-@mixin roundedButton($radius) {
-	@include button;
-	border-top-left-radius: $radius;
-	border-top-right-radius: $radius;
-	border-bottom-left-radius: $radius;
-	border-bottom-right-radius: $radius;
-	-moz-border-radius-topleft: $radius;
-	-moz-border-radius-bottomleft: $radius;
-	-moz-border-radius-topright: $radius;
-	-moz-border-radius-bottomright: $radius;
+
+@mixin roundedBox($radius) {
+	-moz-border-radius: $radius;
+	border-radius: $radius;
 }
 
 @mixin leftRoundedBox($radius) {
@@ -91,12 +62,33 @@ $selected-gradient-color-bottom: #93e8ff;
 	border-bottom-right-radius: $radius;
 }
 
+@mixin roundedButton($radius) {
+	@include button;
+	@include roundedBox($radius);
+}
 
-#toolbar,
-#statusbar,
-#toolbar-area,
-.torrent_footer {
-	background: #CCC;
+
+/*--------------------------------------
+ *
+ * G L O B A L
+ *
+ *--------------------------------------*/
+
+html {
+	margin: 0;
+	padding: 0;
+	height: 100%;
+}
+
+body {
+	font: 62.5% "lucida grande", Tahoma, Verdana, Arial, Helvetica, sans-serif; /* Resets 1em to 10px */
+	color: #222;/* !important; */
+	background: #FFF;
+	text-align: center;
+	margin: 0 0 30px;
+	overflow: hidden;
+	img { border: none; }
+	a { outline: 0; }
 }
 
 /***
@@ -133,12 +125,20 @@ div#toolbar
 	$separator-spacing: 20px;
 
 	width: 100%;
-	height: 25px;
+	height: 35px;
 	margin: 0px;
 	padding: 2px;
+	border-bottom: 1px solid #AAA;
+	background: url('images/red-texture.png') repeat;
+
+	$idle-color-top: $nonselected-gradient-top;
+	$idle-color-bottom: $nonselected-gradient-bottom;
+	$active-color-top: $selected-gradient-top;
+	$active-color-bottom: $selected-gradient-bottom;
 
 	> * {
 		@include button;
+		margin-top: 5px;
 		width: 18px;
 		height: 18px;
 		padding: 2px 8px;
@@ -148,79 +148,40 @@ div#toolbar
 
 	div#toolbar-open {
 		@include leftRoundedBox(10px);
-		$image-url: 'images/toolbar-add.png';
-		@include imageOnVerticalGradient($image-url, $nonselected-gradient-color-top, $nonselected-gradient-color-bottom);
-		&:active {
-			@include imageOnVerticalGradient($image-url, $selected-gradient-color-top, $selected-gradient-color-bottom);
-		}
+		@include buttonImage('images/toolbar-add.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 		margin-left: 4px;
 	}
 	> div#toolbar-remove {
 		@include rightRoundedBox(10px);
-		$image-url: 'images/toolbar-remove.png';
-		@include imageOnVerticalGradient($image-url, $nonselected-gradient-color-top, $nonselected-gradient-color-bottom);
-		&:active {
-			@include imageOnVerticalGradient($image-url, $selected-gradient-color-top, $selected-gradient-color-bottom);
-		}
+		@include buttonImage('images/toolbar-remove.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 	}
 	> div#toolbar-start {
-		$image-url: 'images/toolbar-start.png';
-		@include imageOnVerticalGradient($image-url, $nonselected-gradient-color-top, $nonselected-gradient-color-bottom);
-		&:active {
-			@include imageOnVerticalGradient($image-url, $selected-gradient-color-top, $selected-gradient-color-bottom);
-		}
+		@include buttonImage('images/toolbar-start.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 	}
 	> div#toolbar-pause {
-		$image-url: 'images/toolbar-stop.png';
-		@include imageOnVerticalGradient($image-url, $nonselected-gradient-color-top, $nonselected-gradient-color-bottom);
-		&:active {
-			@include imageOnVerticalGradient($image-url, $selected-gradient-color-top, $selected-gradient-color-bottom);
-		}
+		@include buttonImage('images/toolbar-stop.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 	}
 	> div#toolbar-search {
-		@include leftRoundedBox(10px);
-		@include rightRoundedBox(10px);
-		$image-url: 'images/toolbar-search.png';
-		@include imageOnVerticalGradient($image-url, $nonselected-gradient-color-top, $nonselected-gradient-color-bottom);
-		&:active {
-			@include imageOnVerticalGradient($image-url, $selected-gradient-color-top, $selected-gradient-color-bottom);
-		}
+		@include roundedBox(10px);
+		@include buttonImage('images/toolbar-search.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 		margin-left: $separator-spacing;
 	}
 	> div#toolbar-remote-search {
-		@include leftRoundedBox(10px);
-		@include rightRoundedBox(10px);
-		$image-url: 'images/toolbar-remote-search.png';
-		@include imageOnVerticalGradient($image-url, $nonselected-gradient-color-top, $nonselected-gradient-color-bottom);
-		&:active {
-			@include imageOnVerticalGradient($image-url, $selected-gradient-color-top, $selected-gradient-color-bottom);
-		}
+		@include roundedBox(10px);
+		@include buttonImage('images/toolbar-remove-search.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 		margin-left: $separator-spacing;
 	}
 	> div#toolbar-remote {
-		@include leftRoundedBox(10px);
-		@include rightRoundedBox(10px);
-		$image-url: 'images/toolbar-remote.png';
-		@include imageOnVerticalGradient($image-url, $nonselected-gradient-color-top, $nonselected-gradient-color-bottom);
-		&:active {
-			@include imageOnVerticalGradient($image-url, $selected-gradient-color-top, $selected-gradient-color-bottom);
-		}
+		@include roundedBox(10px);
+		@include buttonImage('images/toolbar-remote.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 	}
 	> div#toolbar-select {
 		$image-url: 'images/toolbar-pointer.png';
-		@include imageOnVerticalGradient($image-url, $nonselected-gradient-color-top, $nonselected-gradient-color-bottom);
-		&:active {
-			@include imageOnVerticalGradient($image-url, $selected-gradient-color-top, $selected-gradient-color-bottom);
-		}
+		@include buttonImage('images/toolbar-pointer.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 	}
 	> div#toolbar-inspector {
-		@include leftRoundedBox(10px);
-		@include rightRoundedBox(10px);
-		$image-url: 'images/toolbar-info.png';
-		@include imageOnVerticalGradient($image-url, $nonselected-gradient-color-top, $nonselected-gradient-color-bottom);
-		&:active, &.selected {
-			@include imageOnVerticalGradient($image-url, $selected-gradient-color-top, $selected-gradient-color-bottom);
-		}
+		@include roundedBox(10px);
+		@include buttonImage('images/toolbar-info.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 		float: right;
 		margin-right: 8px;
 	}
@@ -236,6 +197,9 @@ div#toolbar
 ****
 ***/
 
+$statusbar-gradient-top: #ddd;
+$statusbar-gradient-bottom: #bbb;
+
 #statusbar
 {
 	height: 24px;
@@ -243,11 +207,40 @@ div#toolbar
 	border-bottom: 1px solid #AAA;
 	overflow: hidden;
 	position: relative;
+	background-color: #CCC;
 
-	#speed-info {
+	#speed-info
+	{
 		margin-top: 5px;
 		margin-left: 45%;
 		text-align: left;
+
+		* {
+			display: inline-block;
+		}
+
+		#speed-up-icon {
+			margin-left: 8px;
+			width: 8px;
+			height: 8px;
+			background: url('images/arrow-up.png') bottom no-repeat;
+		}
+
+		#speed-dn-icon {
+			width: 8px;
+			height: 8px;
+			background: url('images/arrow-down.png') bottom no-repeat;
+		}
+
+		#speed-up-container {
+			display: none;
+			&.active { display: inline; }
+		}
+
+		#speed-dn-container {
+			display: none;
+			&.active { display: inline; }
+		}
 	}
 
 	#filter-button {
@@ -256,18 +249,11 @@ div#toolbar
 		margin: 5px 8px;
 		-moz-user-select: none;
 		-webkit-user-select: none;
-
-		&:hover {
-			cursor: pointer;
-		}
-
-		.filter-selection {
-			text-decoration: underline;
-		}
+		&:hover { cursor: pointer };
+		#filter-button .filter-selection { text-decoration: underline; }
 	}
 
-	input#torrent_search
-	{
+	input#torrent_search {
 		float: right;
 		height: 15px;
 		width: 100px;
@@ -290,9 +276,9 @@ div#toolbar
 
 #filter-popup
 {
-        color: #222;/* !important; */
-        background: #FFF;
-        z-index: 100;
+	color: #222;/* !important; */
+	background: #FFF;
+	z-index: 100;
 
 	li { text-align: left }
 
@@ -352,9 +338,12 @@ div#toolbar
 ****
 ***/
 
+$torrent-container-top: 65px;
+$torrent-list-button-width: 14px;
+
 div#torrent_container {
 	position: fixed;
-	top: 55px;
+	top: $torrent-container-top;
 	bottom: 22px;
 	right: 0px;
 	left: 0px;
@@ -374,29 +363,44 @@ ul.torrent_list
 	li.torrent
 	{
 		border-bottom: 1px solid #ccc;
-		padding: 4px 30px 5px 10px; /* Make space for buttons on the right */
+		padding: 4px 30px 5px $torrent-list-button-width;
 		color: #666;
 		background-color: white;
 
-		&.compact {
-			padding: 4px;
-		}
-
+		&.compact { padding: 4px; }
 		&.even { background-color: #F7F7F7; }
-		&.selected
-		{
-			color: white;
-			background-color: #3879D7;
+		&.selected { background-color: $selection-color; }
+		&.compact { div.torrent_name { color: black; } }
 
-			div.torrent_progress_details.error,
-			div.torrent_peer_details.error,
-			div.torrent_name { color: #FFF; }
-			&.compact { div.torrent_name { color: white; } }
-		}
-
-		a img {
+		// start-stop button
+		a {
+			float: right;
 			position: relative;
-			right: -10px;
+			right: -22px;
+			top: 1px;
+
+			img {
+				position: relative;
+				right: -10px;
+			}
+
+			div {
+				background: url('images/buttons/torrent_buttons.png');
+				height: 14px;
+				width: 14px;
+			}
+	
+			div.torrent_pause { background-position: left top; }
+			div.torrent_resume { background-position: center top; }
+	
+			&:active {
+				div.torrent_pause { background-position: left bottom; }
+				div.torrent_resume { background-position: center bottom; }
+			}
+			&:hover {
+				div.torrent_pause { background-position: left center; }
+				div.torrent_resume { background-position: center center; }
+			}
 		}
 
 		div.torrent_name
@@ -417,7 +421,6 @@ ul.torrent_list
 		div.torrent_progress_details,
 		div.torrent_peer_details {
 			clear: left;
-			font-size: 1em;
 			overflow: hidden;
 			text-overflow: ellipsis;
 			white-space: nowrap;
@@ -425,29 +428,29 @@ ul.torrent_list
 
 		div.torrent_progress_details.error,
 		div.torrent_peer_details.error {
-			color: #FF0000;
+			color: #F00;
+		}
+
+		&.selected div.torrent_progress_details.error,
+		&.selected div.torrent_peer_details.error {
+			color: #FFF;
 		}
 	}
-}
 
-
-/**
- * Progressbar
- *
- * Each progressbar has three elemens: a parent container and two children,
- * complete and incomplete.
- *
- * The only thing needed to set the progressbar percentage is to set
- * the complete child's width as a percentage. This is because incomplete
- * is pinned to the full width and height of the parent, and complete
- * is pinned to the left side of the parent and has a higher z-index.
- *
- * The progressbar has different colors depending on its state, so there
- * are five 'decorator' classNames: paused, queued, magnet, leeching, seeding.
- */
-
-ul.torrent_list
-{
+	/**
+	 * Progressbar
+	 *
+	 * Each progressbar has three elemens: a parent container and two children,
+	 * complete and incomplete.
+	 *
+	 * The only thing needed to set the progressbar percentage is to set
+	 * the complete child's width as a percentage. This is because incomplete
+	 * is pinned to the full width and height of the parent, and complete
+	 * is pinned to the left side of the parent and has a higher z-index.
+	 *
+	 * The progressbar has different colors depending on its state, so there
+	 * are five 'decorator' classNames: paused, queued, magnet, leeching, seeding.
+	 */
 	div.torrent_progress_bar_container
 	{
 		height: 10px;
@@ -497,36 +500,6 @@ ul.torrent_list
 	}
 }
 
-/****
-*****  START / STOP BUTTON
-****/
-
-li.torrent a
-{
-	float: right;
-	position: relative;
-	right: -22px;
-	top: 1px;
-
-	div {
-		background: url('images/buttons/torrent_buttons.png');
-		height: 14px;
-		width: 14px;
-	}
-
-	div.torrent_pause { background-position: left top; }
-	div.torrent_resume { background-position: center top; }
-
-	&:active {
-		div.torrent_pause { background-position: left bottom; }
-		div.torrent_resume { background-position: center bottom; }
-	}
-	&:hover {
-		div.torrent_pause { background-position: left center; }
-		div.torrent_resume { background-position: center center; }
-	}
-}
-
 /***
 ****
 ****  PREFERENCES
@@ -551,6 +524,7 @@ li.torrent a
 
 	.title {
 		font-weight: bold;
+		font-size: larger;
 		padding-left: 0px;
 	}
 
@@ -577,28 +551,26 @@ li.torrent a
 	}
 }
 
-/*--------------------------------------
- *
- * T O R R E N T   I N S P E C T O R
- *
- *--------------------------------------*/
+/***
+****
+****  TORRENT INSPECTOR
+****
+***/
 
 $inspector-width: 570px;
-$inspector-background: #eee;
 
 div#torrent_inspector
 {
-	padding: 15px;
-	position: fixed;
-	top: 55px;
-	bottom: 22px;
-	right: 0px;
-	width: $inspector-width;
-	background-color: $inspector-background;
-	border-left: 1px solid #888;
-	z-index: 5;
 	overflow: auto;
 	text-align: left;
+	padding: 15px;
+	top: $torrent-container-top;
+	position: fixed;
+	width: $inspector-width;
+	z-index: 5;
+	border-left: 1px solid #888;
+	bottom: 22px;
+	right: 0px;
 
 	#inspector-close
 	{
@@ -614,61 +586,36 @@ div#torrent_inspector
 		#inspector-tabs
 		{
 			$border-radius: 5px;
+			$idle-color-top: $nonselected-gradient-top;
+			$idle-color-bottom: $nonselected-gradient-bottom;
+			$active-color-top: $selected-gradient-top;
+			$active-color-bottom: $selected-gradient-bottom;
 
 			display: inline-block;
 
 			> * {
+				@include button;
 				width: 30px;
 				height: 20px;
 			}
 
 			> #inspector-tab-info {
-				$image-url: 'images/inspector-info.png';
-				@include button;
-				@include imageOnVerticalGradient($image-url, $nonselected-gradient-color-top, $nonselected-gradient-color-bottom);
                                 @include leftRoundedBox($border-radius);
+				@include buttonImage('images/inspector-info.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
                                 border-left-width: 1px;
-				&.selected {
-					@include imageOnVerticalGradient($image-url, $selected-gradient-color-top, $selected-gradient-color-bottom);
-				}
-			}
-
-			> #inspector-tab-activity {
-				$image-url: 'images/inspector-activity.png';
-				@include button;
-				@include imageOnVerticalGradient($image-url, $nonselected-gradient-color-top, $nonselected-gradient-color-bottom);
-				&.selected {
-					@include imageOnVerticalGradient($image-url, $selected-gradient-color-top, $selected-gradient-color-bottom);
-				}
 			}
 
 			> #inspector-tab-peers {
-				$image-url: 'images/inspector-peers.png';
-				@include button;
-				@include imageOnVerticalGradient($image-url, $nonselected-gradient-color-top, $nonselected-gradient-color-bottom);
-				&.selected {
-					@include imageOnVerticalGradient($image-url, $selected-gradient-color-top, $selected-gradient-color-bottom);
-				}
+				@include buttonImage('images/inspector-peers.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 			}
 
 			> #inspector-tab-trackers {
-				$image-url: 'images/inspector-trackers.png';
-				@include button;
-				@include imageOnVerticalGradient($image-url, $nonselected-gradient-color-top, $nonselected-gradient-color-bottom);
-				&.selected {
-					@include imageOnVerticalGradient($image-url, $selected-gradient-color-top, $selected-gradient-color-bottom);
-				}
+				@include buttonImage('images/inspector-trackers.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 			}
 
 			> #inspector-tab-files {
-				$image-url: 'images/inspector-files.png';
-				@include button;
-				@include imageOnVerticalGradient($image-url, $nonselected-gradient-color-top, $nonselected-gradient-color-bottom);
                                 @include rightRoundedBox($border-radius);
-                                border-right-width: 1px;
-				&.selected {
-					@include imageOnVerticalGradient($image-url, $selected-gradient-color-top, $selected-gradient-color-bottom);
-				}
+				@include buttonImage('images/inspector-files.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 			}
 		}
 	}
@@ -681,51 +628,6 @@ div#torrent_inspector
 		{
 			font-weight: bold;
 			font-size: large;
-		}
-	}
-
-	.inspector_group
-	{
-		display: table;
-		width: 100%;
-		border-top: 1px solid #888;
-		margin: 10px 0px;
-		padding: 10px 0px;
-
-		.inspector_group_label
-		{
-			display: table-header-group;
-			font-weight: bold;
-		}
-
-		.inspector_row
-		{
-			display: table-row;
-
-			> .inspector_label {
-				display: table-cell;
-				width: 100px; /* this + the next 380 == inspector_container_with */
-			}
-
-			> div {
-				padding-top: 10px;
-				width: 380px; /* inspector_container_width==480 - inspector_label_width==100 */
-			}
-		}
-
-		/* Trackers Inspector Tab */
-		#inspector_trackers_list
-		{
-			padding: 0 0 0 0;
-			margin: 0 0 0 0;
-			text-align: left;
-			cursor: default;
-			overflow: hidden;
-
-			& > div.inspector_group {
-				padding-bottom: 0;
-				margin-bottom: 0;
-			}
 		}
 	}
 
@@ -762,7 +664,6 @@ div#torrent_inspector
 		th {
 			text-align: right;
 		}
-
 	}
 
 	li.inspector_tracker_entry {
@@ -788,17 +689,11 @@ div#torrent_inspector
 		cursor: default;
 		overflow: hidden;
 	}
-	#inspector-page-files .select_all_button {
-		@include verticalGradient($nonselected-gradient-color-top, $nonselected-gradient-color-bottom);
-		@include roundedButton(5px);
-		float: left;
-		margin: 5px;
-		padding: 2px 5px;
-	}
-
 	#inspector_file_list {
+		border-top: 1px solid #888;
 		width: 100%;
-		margin: 0  0 0 0;
+		margin: 6px 0 0 0;
+		padding-top: 6px;
 		padding-bottom: 10px;
 		text-align: left;
 		display: block;
@@ -812,34 +707,21 @@ div#torrent_inspector
 		padding: 3px 0 3px 2px;
 		display: block;
 		&.skip { color: #666; }
-		&.even { background-color: #EEEEEE; }
+		&.even { background-color: #F7F7F7; }
 	}
 
 	div.inspector_torrent_file_list_entry_name {
 		font-size: 1.2em;
-		font-weight: bold;
-		color: #222;
-		margin-left: 20px;
+		color: black; 
+		display: inline;
+		margin-left: 0px;
 	}
 	li.inspector_torrent_file_list_entry.skip>.inspector_torrent_file_list_entry_name {
-		color: #666;
+		color: #999;
 	}
 	div.inspector_torrent_file_list_entry_progress {
-		font-size: 1em;
-		color: #666;
+		color: #999;
 		margin-left: 20px;
-	}
-	div.file_wanted_control {
-		background-position: left -19px;
-		float: left;
-		position: absolute;
-		cursor: pointer;
-		margin: 3px 0 0 0;
-		width: 19px;
-		height: 19px;
-		background-image: url('images/buttons/file_wanted_buttons.png');
-		background-repeat: no-repeat;
-		background-color: transparent;
 	}
 
 	li.inspector_torrent_file_list_entry.skip>.file_wanted_control {
@@ -879,38 +761,13 @@ table.peer_list {
 	clear: both;
 	table-layout: fixed;
 
-	.encryptedCol {
-		width: 16px;
-	}
-
-	.upCol {
-		width: 70px;
-	}
-
-	.downCol {
-		width: 70px;
-	}
-
-	.percentCol {
-		width: 30px;
-		padding-right: 5px;
-		text-align: right;
-	}
-
-	.statusCol {
-		width: 40px;
-		padding-right: 5px;
-	}
-
-	.addressCol {
-		width: 180px;
-	}
-
-	.clientCol {
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
+	.encryptedCol { width: 16px; }
+	.upCol { width: 70px; }
+	.downCol { width: 70px; }
+	.percentCol { width: 30px; padding-right: 5px; text-align: right; }
+	.statusCol { width: 40px; padding-right: 5px; }
+	.addressCol { width: 180px; }
+	.clientCol { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 
 tr.inspector_peer_entry
@@ -943,35 +800,30 @@ div.file-priority-radiobox
 
 	> * {
 		@include button;
-		width: 30px;
+		width: 20px;
 		height: 12px;
 	}
 
+	// We have row after row of these buttons, so the flashy colors used in the inspector tabs look harsh here.
+	// Keep the same basic color theme, but look less harsh, by cutting the gradient's color range.
+	$idle-color-top:      mix( $nonselected-gradient-top, $nonselected-gradient-bottom, 80% );
+	$idle-color-bottom:   mix( $nonselected-gradient-top, $nonselected-gradient-bottom, 20% );
+	$active-color-top:    mix( $selected-gradient-top,    $selected-gradient-bottom,    80% );
+	$active-color-bottom: mix( $selected-gradient-top,    $selected-gradient-bottom,    20% );
+
 	> div.low {
-		$image-url: 'images/file-priority-low.png';
 		@include leftRoundedBox($border-radius);
-		@include imageOnVerticalGradient($image-url, $nonselected-gradient-color-top, $nonselected-gradient-color-bottom);
-		&.selected {
-			@include imageOnVerticalGradient($image-url, $selected-gradient-color-top, $selected-gradient-color-bottom);
-		}
+		@include buttonImage('images/file-priority-low.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 		border-right-width: 0px;
 	}
 
 	> div.normal {
-		$image-url: 'images/file-priority-normal.png';
-		@include imageOnVerticalGradient($image-url, $nonselected-gradient-color-top, $nonselected-gradient-color-bottom);
-		&.selected {
-			@include imageOnVerticalGradient($image-url, $selected-gradient-color-top, $selected-gradient-color-bottom);
-		}
+		@include buttonImage('images/file-priority-normal.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 	}
 
 	> div.high {
-		$image-url: 'images/file-priority-high.png';
 		@include rightRoundedBox($border-radius);
-		@include imageOnVerticalGradient($image-url, $nonselected-gradient-color-top, $nonselected-gradient-color-bottom);
-		&.selected {
-			@include imageOnVerticalGradient($image-url, $selected-gradient-color-top, $selected-gradient-color-bottom);
-		}
+		@include buttonImage('images/file-priority-high.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 		border-left-width: 0px;
 	}
 }
@@ -992,7 +844,9 @@ div.torrent_footer
 	width: 100%;
 	z-index: 3;
 
-	> * { 
+	@include verticalGradient($statusbar-gradient-top, $statusbar-gradient-bottom);
+
+	> * {
 		float: left;
 		margin: 2px 4px;
 		width: 18px;
@@ -1000,45 +854,34 @@ div.torrent_footer
 		padding: 2px 8px;
 		float: left;
 		border: 1px solid #888;
+		-moz-user-select: none;
+		-webkit-user-select: none;
 	}
 } /* Vuze: don't require things to be in footer */
 
+	$idle-color-top: $nonselected-gradient-top;
+	$idle-color-bottom: $nonselected-gradient-bottom;
+	$active-color-top: $selected-gradient-top;
+	$active-color-bottom: $selected-gradient-bottom;
+
 	div.main_container {
-		float: left;
-		margin: 2px 4px;
-		width: 18px;
-		height: 12px;
-		padding: 2px 8px;
-		float: left;
-		border: 1px solid #888;
-
-		$image-url: 'images/settings.png';
-		@include leftRoundedBox(5px);
-		@include rightRoundedBox(5px);
-		@include imageOnVerticalGradient($image-url, $nonselected-gradient-color-top, $nonselected-gradient-color-bottom);
-		&:active {
-			@include imageOnVerticalGradient($image-url, $selected-gradient-color-top, $selected-gradient-color-bottom);
-		}
-	}
-
-	#turtle-button {
-		$image-url: 'images/turtle.png';
-		@include imageOnVerticalGradient($image-url, $nonselected-gradient-color-top, $nonselected-gradient-color-bottom);
-		&.selected {
-			@include imageOnVerticalGradient($image-url, $selected-gradient-color-top, $selected-gradient-color-bottom);
-		}
-	}
-
-	#compact-button {
-		$image-url: 'images/compact.png';
-		@include imageOnVerticalGradient($image-url, $nonselected-gradient-color-top, $nonselected-gradient-color-bottom);
-		&.selected {
-			@include imageOnVerticalGradient($image-url, $selected-gradient-color-top, $selected-gradient-color-bottom);
-		}
+		@include roundedBox(5px);
+		@include buttonImage('images/settings.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 	}
 
 	#prefs-button {
-		display: none;
+		@include roundedBox(5px);
+		@include buttonImage('images/wrench.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
+	}
+
+	#turtle-button {
+		@include roundedBox(5px);
+		@include buttonImage('images/turtle.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
+	}
+
+	#compact-button {
+		@include roundedBox(5px);
+		@include buttonImage('images/compact.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 	}
 
 

@@ -1,4 +1,4 @@
-/* Transmission Revision 13035 */
+/* Transmission Revision 13086 */
 /**
  * Copyright © Dave Perrett, Malcolm Jarvis and Bruno Bierbaumer
  *
@@ -27,6 +27,8 @@ Transmission.prototype =
 		this.remote = new TransmissionRemote(this);
 		this.inspector = new Inspector(this, this.remote);
 		this.prefsDialog = new PrefsDialog(this.remote);
+		$(this.prefsDialog).bind('closed', $.proxy(this.onPrefsDialogClosed,this));
+
 		this.isMenuEnabled = !isMobileDevice;
 
 		// Initialize the implementation fields
@@ -46,13 +48,14 @@ Transmission.prototype =
 		$('#toolbar-remove').click($.proxy(this.removeClicked,this));
 		$('#toolbar-open').click($.proxy(this.openTorrentClicked,this));
 		$('#toolbar-select').click($.proxy(this.toggleSelectionClicked,this));
+
+		$('#prefs-button').click($.proxy(this.togglePrefsDialogClicked,this)); 
 		// >> Vuze
 		$('#toolbar-search').click($.proxy(this.searchClicked,this));
 		$('#toolbar-remote').click($.proxy(this.returnFromSearchClicked,this));
 		$('#toolbar-remote-search').click($.proxy(this.remoteSearchClicked,this));
 		// << Vuze
 
-		$('#prefs-button').click($.proxy(this.showPrefsDialog,this));
 
 		$('#upload_confirm_button').click($.proxy(this.confirmUploadClicked,this));
 		$('#upload_cancel_button').click($.proxy(this.hideUploadDialog,this));
@@ -588,6 +591,22 @@ Transmission.prototype =
 	 *
 	 *--------------------------------------------*/
 
+	onPrefsDialogClosed: function() {
+		$('#prefs-button').removeClass('selected');
+	},
+
+	togglePrefsDialogClicked: function(ev)
+	{
+		var e = $('#prefs-button');
+
+		if (e.hasClass('selected'))
+			this.prefsDialog.close();
+		else {
+			e.addClass('selected');
+			this.prefsDialog.show();
+		}
+	},
+
 	showPrefsDialog: function()
 	{
 		this.prefsDialog.show();
@@ -870,9 +889,12 @@ Transmission.prototype =
 		}
 	},
 
+	shouldAddedTorrentsStart : function() {
+		return this.prefsDialog.shouldAddedTorrentsStart();
+	},
+	
 	/*
-	 * Select a torrent file to upload
-	 * FIXME
+	 * Select a torrent file to upload FIXME
 	 */
 	uploadTorrentFile: function(confirmed)
 	{
@@ -1098,8 +1120,8 @@ Transmission.prototype =
 
 	updateStatusbar: function()
 	{
-		var i, row, text,
-		    u=0, d=0,
+		var u=0, d=0,
+		    i, row, text,
 		    fmt = Transmission.fmt,
 		    torrents = this.getAllTorrents();
 
@@ -1111,11 +1133,11 @@ Transmission.prototype =
 			d += row.getDownloadSpeed();
 		}
 
-		text = u ? '&uarr; ' + fmt.speedBps(u) : '';
-		setInnerHTML($('#statusbar #speed-up-label')[0], text);
+		$('#speed-up-container').toggleClass('active', u>0 );
+		$('#speed-up-label').text( fmt.speedBps( u ) );
 
-		text = d ? '&darr; ' + fmt.speedBps(d) : '';
-		setInnerHTML($('#statusbar #speed-dn-label')[0], text);
+		$('#speed-dn-container').toggleClass('active', d>0 );
+		$('#speed-dn-label').text( fmt.speedBps( d ) );
 	},
 
 	setEnabled: function(key, flag)
@@ -1183,7 +1205,7 @@ Transmission.prototype =
 		$('#torrent_inspector').toggle(visible);
 		$('#toolbar-inspector').toggleClass('selected',visible);
 		this.hideMobileAddressbar();
-		if (!isMobileDevice) {
+		if (isMobileDevice) {
 			$('body').toggleClass('inspector_showing',visible);
 		} else {
 			var w = visible ? $('#torrent_inspector').outerWidth() + 1 + 'px' : '0px';
@@ -1493,8 +1515,7 @@ Transmission.prototype =
 			div = document.createElement('div');
 			div.id = 'show-tracker-' + name;
 			div.className = 'row' + (o.domain === tr.filterTracker  ? ' selected':'');
-			div.innerHTML = '<img class="filter-img" src="http://'+o.domain+'/favicon.ico"/>'
-			              + '<span class="filter-name">'+ name + '</span>'
+			div.innerHTML = '<span class="filter-name">'+ name + '</span>'
 			              + '<span class="count">'+ o.count.toStringWithCommas() + '</span>';
 			$(div).click({domain:o.domain}, function(ev) {
 				tr.setFilterTracker(ev.data.domain);

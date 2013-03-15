@@ -1,4 +1,4 @@
-/* Transmission Revision 13020 */
+/* Transmission Revision 13086 */
 /**
  * Copyright © Mnemosyne LLC
  *
@@ -273,7 +273,7 @@ Transmission.fmt = (function()
 
 		plural: function(i, word)
 		{
-			return [ i, ' ', word, (word==1?'':'s') ].join('');
+			return [ i.toStringWithCommas(), ' ', word, (i==1?'':'s') ].join('');
 		},
 
 		peerStatus: function( flagStr ) 

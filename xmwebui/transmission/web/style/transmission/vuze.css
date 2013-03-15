@@ -203,9 +203,11 @@ div#torrent_filter_bar input#torrent_search {
 
 div#toolbar {
 	width: 400px;
-	height: 38px; /*25px*/
+	height: 38px; /*35px*/
 	margin: 0px auto; /*0px*/
-	padding: 9px 0 0 0; /*2px*/
+	padding: 2px 0 0 0; /*2px*/
+	border: none; /*border-bottom: 1px solid #AAA;*/
+	background: none; /*url('images/red-texture.png') repeat; */
 }
 
 div#toolbar-area
@@ -275,7 +277,13 @@ div#toolbar > * {
 }
 
 div.main_container {
+	float: left;
+	margin: 2px 4px;
+	width: 18px;
 	height: 20px;
+	padding: 2px 8px;
+	float: left;
+	border: 1px solid #888;
 }
 
 /***
@@ -283,10 +291,9 @@ div.main_container {
 ****  TORRENT CONTAINER
 ****
 ***/
-
 div#torrent_container {
 	position: fixed;
-	top: 83px; /* 55 */
+	top: 83px; /* 65px */
 }
 
 ul.torrent_list li.torrent {
@@ -294,54 +301,59 @@ ul.torrent_list li.torrent {
 	padding: 4px 80px 5px 10px; /* Make space for buttons on the right */
 }
 
-ul.torrent_list li.torrent div.torrent_progress_details{color:#3e5365}
-ul.torrent_list li.torrent div.torrent_peer_details{color:#4f5b65}
+ul.torrent_list li.torrent div.torrent_progress_details {
+	color: #3e5365
+}
+
+ul.torrent_list li.torrent div.torrent_peer_details {
+	color: #4f5b65
+}
 
 /****
 *****  START / STOP BUTTON
 ****/
 
 /* >> Vuze: buttons changed to add info button */
-li.torrent a {
+ul.torrent_list li.torrent a {
 	float: right;
 	position: relative;
 	right: -78px;
 	top: -1px;
 }
-li.torrent a div {
+ul.torrent_list li.torrent a div {
 	background: url('images/buttons/torrent_buttons_vuze.png');
 	height: 18px;
 	width: 18px;
     margin-right:12px
 }
-li.torrent a div.torrent_pause {
+ul.torrent_list li.torrent a div.torrent_pause {
 	background-position: left top;
 }
-li.torrent a:hover div.torrent_pause {
+ul.torrent_list li.torrent a:hover div.torrent_pause {
 	background-position: 0 -18px;
 }
-li.torrent a:active div.torrent_pause {
+ul.torrent_list li.torrent a:active div.torrent_pause {
 	background-position: 0 -36px;
 }
-li.torrent a div.torrent_resume {
+ul.torrent_list li.torrent a div.torrent_resume {
 	background-position: -18px 0;
 }
-li.torrent a:hover div.torrent_resume {
+ul.torrent_list li.torrent a:hover div.torrent_resume {
 	background-position: -18px -18px;
 }
-li.torrent a:active div.torrent_resume {
+ul.torrent_list li.torrent a:active div.torrent_resume {
 	background-position: -18px -36px;
 }
 
-li.torrent a div.torrent_info {
+ul.torrent_list li.torrent a div.torrent_info {
 	background-position: -36px top;
 }
 
-li.torrent a:hover div.torrent_info {
+ul.torrent_list li.torrent a:hover div.torrent_info {
 	background-position: -36px -18px;
 }
 
-li.torrent a:active div.torrent_info {
+ul.torrent_list li.torrent a:active div.torrent_info {
 	background-position: -36px -36px;
 }
 /* << Vuze: buttons changed to add info button */
@@ -370,6 +382,7 @@ div.torrent_footer {
 	display:none;
 }
 
+#prefs-button,
 #turtle-button {
 	display:none;
 }

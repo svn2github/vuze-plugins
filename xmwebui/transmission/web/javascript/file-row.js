@@ -1,4 +1,4 @@
-/* Transmission Revision 13020 */
+/* Transmission Revision 13086 */
 /**
  * Copyright © Mnemosyne LLC
  *
@@ -57,6 +57,7 @@ function FileRow(torrent, i)
 		var e = $(elements.root);
 		e.toggleClass('skip', !fields.isWanted);
 		e.toggleClass('complete', isDone());
+		$(e[0].checkbox).prop('checked', fields.isWanted);
 	},
 	refreshPriorityHTML = function()
 	{
@@ -100,9 +101,12 @@ function FileRow(torrent, i)
 		root.className = 'inspector_torrent_file_list_entry ' + ((i%2)?'odd':'even');
 		elements.root = root;
 
-		e = document.createElement('div');
+		e = document.createElement('input');
+		e.type = 'checkbox';
 		e.className = "file_wanted_control";
-		$(e).click(function(){ fireWantedChanged(!fields.isWanted); });
+		e.title = 'Download file';
+		$(e).change(function(ev){ fireWantedChanged( $(ev.currentTarget).prop('checked')); });
+		root.checkbox = e;
 		root.appendChild(e);
 
 		e = document.createElement('div');

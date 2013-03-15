@@ -1,4 +1,4 @@
-/* Transmission Revision 12984 */
+/* Transmission Revision 13086 */
 /**
  * Copyright © Dave Perrett and Malcolm Jarvis
  *
@@ -35,6 +35,14 @@ $.fn.tabbedDialog = function (dialog_opts) {
 }
 
 $(document).ready(function() {
+
+	// IE8 and below donât support ES5 Date.now()
+	if (!Date.now) {
+		Date.now = function() {
+			return +new Date();
+		};
+	}
+
 	// Initialise the dialog controller
 	dialog = new Dialog();
 
