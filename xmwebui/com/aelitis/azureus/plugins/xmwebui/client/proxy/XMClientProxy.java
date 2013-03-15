@@ -106,7 +106,7 @@ XMClientProxy
 
 			System.out.println( url_path );
 			
-			System.out.println( input_header );
+			//System.out.println( input_header );
 			
 			String[] lines = input_header.split( "\n" );
 			
@@ -194,7 +194,8 @@ XMClientProxy
 	{
 		try{
 			//XMRPCClient	rpc = XMRPCClientFactory.createDirect( false, "127.0.0.1", 9091, args[0], args[1] );
-			XMRPCClient	rpc = XMRPCClientFactory.createIndirect( args[0] );
+			//XMRPCClient	rpc = XMRPCClientFactory.createIndirect( args[0] );
+			XMRPCClient	rpc = XMRPCClientFactory.createTunnel( args[0], "vuze", args[1] );
 
 			new XMClientProxy( rpc );
 			

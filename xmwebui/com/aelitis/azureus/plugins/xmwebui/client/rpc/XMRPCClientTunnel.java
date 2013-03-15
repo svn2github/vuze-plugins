@@ -21,6 +21,8 @@
 
 package com.aelitis.azureus.plugins.xmwebui.client.rpc;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.AlgorithmParameters;
@@ -187,7 +189,7 @@ XMRPCClientTunnel
 					JSONObject activate = new JSONObject();
 					
 					activate.put( "url", url );
-					activate.put( "endpoint", "/transmission/rpc" );
+					activate.put( "endpoint", "/transmission/rpc?tunnel_format=h" );
 					activate.put( "rnd", rand.nextLong());
 			
 					byte[] activate_bytes = JSONUtils.encodeToJSON( activate ).getBytes( "UTF-8" );
@@ -238,20 +240,62 @@ XMRPCClientTunnel
 		JSONObject		request )
 	
 		throws XMRPCClientException
+	{		
+		String json = JSONUtils.encodeToJSON( request );
+		
+		System.out.println( "Sending request: " + json );
+		
+		try{
+			byte[] req_bytes = json.getBytes( "UTF-8" );
+	
+			CallResult temp = call( new JSONObject(), req_bytes );
+			
+			JSONObject	reply_headers		= temp.getHeaders();
+			byte[]		reply_bytes			= temp.getBytes();
+			int			reply_bytes_offset	= temp.getBytesOffset();
+			int			reply_bytes_length	= temp.getBytesLength();
+			
+			
+			JSONObject reply = new JSONObject();
+			
+			reply.putAll( JSONUtils.decodeJSON( new String( reply_bytes, reply_bytes_offset,reply_bytes_length , "UTF-8" )));
+			
+			System.out.println( "Received reply: " + reply);
+		
+			return( reply );
+			
+		}catch( XMRPCClientException e ){
+			
+			throw( e );
+			
+		}catch( Throwable e ){
+			
+			throw( new XMRPCClientException( "Failed to use tunnel", e ));
+		}
+	}
+	
+	private CallResult
+	call(
+		JSONObject	request_headers,
+		byte[]		request )
+	
+		throws XMRPCClientException
 	{
 		Object[] tunnel = getCurrentTunnel( false );
 		
 		String			url		= (String)tunnel[0];
 		SecretKeySpec	secret 	= (SecretKeySpec)tunnel[1];
-		
-		String json = JSONUtils.encodeToJSON( request );
-		
-		try{
-			System.out.println( "Sending request: " + json );
+				
+		try{	
+			String header_json = JSONUtils.encodeToJSON( request_headers );
+
+			byte[] header_bytes = header_json.getBytes( "UTF-8" );
 			
-			byte[] plain_bytes = json.getBytes( "UTF-8"  );
+			int	header_len = header_bytes.length;
 			
-			byte[]	encrypted;
+			byte[] header_len_bytes = new byte[]{ (byte)(header_len>>8), (byte)header_len };
+			
+			byte[] encrypted;
 			
 			{
 				Cipher encipher = Cipher.getInstance ("AES/CBC/PKCS5Padding");
@@ -262,12 +306,32 @@ XMRPCClientTunnel
 					
 				byte[] IV = params.getParameterSpec(IvParameterSpec.class).getIV();
 					
-				byte[] enc = encipher.doFinal( plain_bytes );
+				byte[][] enc_buffers = {
+					encipher.update( header_len_bytes ),
+					encipher.update( header_bytes ),
+					encipher.doFinal( request )};
 
-				encrypted = new byte[ IV.length + enc.length ];
+				int	enc_len = 0;
+				
+				for ( byte[] b: enc_buffers ){
+					if ( b != null ){
+						enc_len += b.length;
+					}
+				}
+				
+				encrypted = new byte[ IV.length + enc_len ];
 				
 				System.arraycopy( IV, 0, encrypted, 0, IV.length );
-				System.arraycopy( enc, 0, encrypted, IV.length, enc.length );
+				
+				int	enc_pos = IV.length;
+				
+				for ( byte[] b: enc_buffers ){
+					if ( b != null ){
+						System.arraycopy( b, 0, encrypted, enc_pos, b.length );
+						
+						enc_pos += b.length;
+					}
+				}
 			}
 		
 			byte[]	reply_bytes = XMRPCClientUtils.postToURL( url + "?client=true", encrypted );
@@ -294,15 +358,17 @@ XMRPCClientTunnel
 				throw( error );
 			}
 			
-			JSONObject reply = new JSONObject();
-			
-			reply.putAll( JSONUtils.decodeJSON( new String( decrypted, "UTF-8" )));
-			
-			System.out.println( "Received reply: " + reply);
-
 			calls_ok++;
 			
-			return( reply );
+			int	reply_header_len = ((decrypted[0]<<8)&0x0000ff00) | (decrypted[1]&0x000000ff);
+			
+			String	reply_json_str = new String( decrypted, 2, reply_header_len, "UTF-8" );
+			
+			JSONObject	reply_headers = new JSONObject();
+			
+			reply_headers.putAll( JSONUtils.decodeJSON( reply_json_str ));
+			
+			return( new CallResult( reply_headers, decrypted, reply_header_len + 2 ));
 			
 		}catch( XMRPCClientException e ){
 			
@@ -337,6 +403,49 @@ XMRPCClientTunnel
 				XMRPCClientUtils.postToURL( (String)tunnel[1] + "?client=true&close=true", new byte[0]);
 			}		
 		}catch( Throwable e ){	
+		}
+	}
+	
+	private static class
+	CallResult
+	{
+		private JSONObject		headers;
+		private byte[]			buffer;
+		private int				offset;
+		
+		private
+		CallResult(
+			JSONObject		_headers,
+			byte[]			_bytes,
+			int				_offset )
+		{
+			headers	= _headers;
+			buffer	= _bytes;
+			offset	= _offset;
+		}
+		
+		private JSONObject
+		getHeaders()
+		{
+			return( headers );
+		}
+		
+		private byte[]
+		getBytes()
+		{
+			return( buffer );
+		}
+		
+		private int
+		getBytesOffset()
+		{
+			return( offset );
+		}
+		
+		private int
+		getBytesLength()
+		{
+			return( buffer.length - offset );
 		}
 	}
 }
