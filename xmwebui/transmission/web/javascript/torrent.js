@@ -1,4 +1,4 @@
-/* Transmission Revision 13276 */
+/* Transmission Revision 14025 */
 /**
  * Copyright © Mnemosyne LLC
  *
@@ -78,8 +78,10 @@ Torrent.Fields.Stats = [
 	'sizeWhenDone',
 	'status',
 	'trackers',
+	'downloadDir',
 	'uploadedEver',
-	'uploadRatio'
+	'uploadRatio',
+	'webseedsSendingToUs'
 ];
 
 // fields used by the inspector which only need to be loaded once
@@ -99,15 +101,13 @@ Torrent.Fields.StatsExtra = [
 	'activityDate',
 	'corruptEver',
 	'desiredAvailable',
-	'downloadDir',
 	'downloadedEver',
 	'fileStats',
 	'haveUnchecked',
 	'haveValid',
 	'peers',
 	'startDate',
-	'trackerStats',
-	'webseedsSendingToUs'
+	'trackerStats'
 ];
 
 /***
@@ -121,13 +121,26 @@ Torrent.prototype =
 	initialize: function(data)
 	{
 		this.fields = {};
+		this.fieldObservers = {};
 		this.refresh (data);
+	},
+
+	notifyOnFieldChange: function(field, callback) {
+		this.fieldObservers[field] = this.fieldObservers[field] || [];
+		this.fieldObservers[field].push(callback);
 	},
 
 	setField: function(o, name, value)
 	{
+		var i, observer;
+		
 		if (o[name] === value)
 			return false;
+		if (o == this.fields && this.fieldObservers[name] && this.fieldObservers[name].length) {
+			for (i=0; observer=this.fieldObservers[name][i]; ++i) {
+				observer.call(this, value, o[name], name);
+			}
+		}
 		o[name] = value;
 		return true;
 	},

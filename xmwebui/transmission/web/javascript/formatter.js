@@ -1,4 +1,4 @@
-/* Transmission Revision 13276 */
+/* Transmission Revision 14025 */
 /**
  * Copyright © Mnemosyne LLC
  *
@@ -271,9 +271,15 @@ Transmission.fmt = (function()
 			return [date, time, period].join(' ');
 		},
 
-		plural: function(i, word)
+		ngettext: function(msgid, msgid_plural, n)
 		{
-			return [ i.toStringWithCommas(), ' ', word, (i==1?'':'s') ].join('');
+			// TODO(i18n): http://doc.qt.digia.com/4.6/i18n-plural-rules.html
+			return n === 1 ? msgid : msgid_plural;
+		},
+
+		countString: function(msgid, msgid_plural, n)
+		{
+			return [ n.toStringWithCommas(), this.ngettext(msgid,msgid_plural,n) ].join(' ');
 		},
 
 		peerStatus: function( flagStr ) 

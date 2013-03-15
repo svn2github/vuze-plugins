@@ -1,4 +1,4 @@
-/* Transmission Revision 13020 */
+/* Transmission Revision 14025 */
 /**
  * Copyright © Mnemosyne LLC
  *
@@ -95,12 +95,12 @@ TorrentRendererHelper.renderProgressbar = function(controller, t, progressbar)
 
 TorrentRendererHelper.formatUL = function(t)
 {
-	return '&uarr; ' + Transmission.fmt.speedBps(t.getUploadSpeed());
+	return '↑ ' + Transmission.fmt.speedBps(t.getUploadSpeed());
 };
 
 TorrentRendererHelper.formatDL = function(t)
 {
-	return '&darr; ' + Transmission.fmt.speedBps(t.getDownloadSpeed());
+	return '↓ ' + Transmission.fmt.speedBps(t.getDownloadSpeed());
 };
 
 /****
@@ -168,26 +168,59 @@ TorrentRendererFull.prototype =
 
 	getPeerDetails: function(t)
 	{
-		var err;
+		var err,
+		    peer_count,
+		    webseed_count,
+		    fmt = Transmission.fmt;
+
 		if ((err = t.getErrorMessage()))
 			return err;
 
 		if (t.isDownloading())
-			return [ 'Downloading from',
-			         t.getPeersSendingToUs(),
-			         'of',
-			         t.getPeersConnected(),
-			         'peers',
-			         '-',
-			         TorrentRendererHelper.formatDL(t),
-			         TorrentRendererHelper.formatUL(t) ].join(' ');
+		{
+			peer_count = t.getPeersConnected();
+			webseed_count = t.getWebseedsSendingToUs();
+
+			if (webseed_count && peer_count)
+			{
+				// Downloading from 2 of 3 peer(s) and 2 webseed(s)
+				return [ 'Downloading from',
+				         t.getPeersSendingToUs(),
+				         'of',
+				         fmt.countString('peer','peers',peer_count),
+				         'and',
+				         fmt.countString('web seed','web seeds',webseed_count),
+				         '-',
+				         TorrentRendererHelper.formatDL(t),
+				         TorrentRendererHelper.formatUL(t) ].join(' ');
+			}
+			else if (webseed_count)
+			{
+				// Downloading from 2 webseed(s)
+				return [ 'Downloading from',
+				         fmt.countString('web seed','web seeds',webseed_count),
+				         '-',
+				         TorrentRendererHelper.formatDL(t),
+				         TorrentRendererHelper.formatUL(t) ].join(' ');
+			}
+			else
+			{
+				// Downloading from 2 of 3 peer(s)
+				return [ 'Downloading from',
+				         t.getPeersSendingToUs(),
+				         'of',
+				         fmt.countString('peer','peers',peer_count),
+				         '-',
+				         TorrentRendererHelper.formatDL(t),
+				         TorrentRendererHelper.formatUL(t) ].join(' ');
+			}
+		}
 
 		if (t.isSeeding())
 			return [ 'Seeding to',
 			         t.getPeersGettingFromUs(),
 			         'of',
-			         t.getPeersConnected(),
-			         'peers',
+			         fmt.countString ('peer','peers',t.getPeersConnected()),
 			         '-',
 			         TorrentRendererHelper.formatUL(t) ].join(' ');
 
@@ -250,7 +283,7 @@ TorrentRendererFull.prototype =
 	render: function(controller, t, root)
 	{
 		// name
-		setInnerHTML(root._name_container, t.getName());
+		setTextContent(root._name_container, t.getName());
 
 		// progressbar
 		TorrentRendererHelper.renderProgressbar(controller, t, root._progressbar);
@@ -259,11 +292,11 @@ TorrentRendererFull.prototype =
 		var has_error = t.getError() !== Torrent._ErrNone;
 		var e = root._peer_details_container;
 		$(e).toggleClass('error',has_error);
-		setInnerHTML(e, this.getPeerDetails(t));
+		setTextContent(e, this.getPeerDetails(t));
 
 		// progress details
 		e = root._progress_details_container;
-		setInnerHTML(e, this.getProgressDetails(controller, t));
+		setTextContent(e, this.getProgressDetails(controller, t));
 
 		// pause/resume button
 		var is_stopped = t.isStopped();
@@ -340,13 +373,13 @@ TorrentRendererCompact.prototype =
 		var is_stopped = t.isStopped();
 		var e = root._name_container;
 		$(e).toggleClass('paused', is_stopped);
-		setInnerHTML(e, t.getName());
+		setTextContent(e, t.getName());
 
 		// peer details
 		var has_error = t.getError() !== Torrent._ErrNone;
 		e = root._details_container;
 		$(e).toggleClass('error', has_error);
-		setInnerHTML(e, this.getPeerDetails(t));
+		setTextContent(e, this.getPeerDetails(t));
 
 		// progressbar
 		TorrentRendererHelper.renderProgressbar(controller, t, root._progressbar);
@@ -383,13 +416,6 @@ TorrentRow.prototype =
 	},
 	isSelected: function() {
 		return this.getElement().className.indexOf('selected') !== -1;
-	},
-	setSelected: function(flag) {
-		$(this.getElement()).toggleClass('selected', flag);
-	},
-
-	getToggleRunningButton: function() {
-		return this.getElement()._toggle_running_button;
 	},
 
 	getTorrent: function() {

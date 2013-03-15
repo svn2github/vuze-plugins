@@ -123,6 +123,12 @@ $toolbar-gradient-top: #ddd;
 $toolbar-gradient-bottom: #bbb;
 $toolbar-height: 36px;
 
+div#toolbar-area
+{
+	@include verticalGradient($toolbar-gradient-top, $toolbar-gradient-bottom);
+	border-bottom: 1px solid #AAA;
+}
+
 div#toolbar
 {
 	$separator-spacing: 20px;
@@ -186,8 +192,9 @@ div#toolbar
 	}
 	> div#toolbar-remote-search {
 		@include roundedBox(10px);
-		@include buttonImage('images/toolbar-remove-search.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
+		@include buttonImage('images/toolbar-remote-search.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 		margin-left: $separator-spacing;
+		margin-right: $separator-spacing;
 	}
 	> div#toolbar-remote {
 		@include roundedBox(10px);
@@ -279,7 +286,6 @@ $statusbar-height: 26px;
 ***/
 
 $torrent-container-top: $toolbar-height + $statusbar-height + 6px;
-$torrent-list-button-width: 14px;
 
 div#torrent_container {
 	position: fixed;
@@ -290,6 +296,7 @@ div#torrent_container {
 	padding: 0px;
 	margin: 0px;
 	overflow: auto;
+	-webkit-overflow-scrolling: touch;
 }
 
 ul.torrent_list
@@ -303,7 +310,7 @@ ul.torrent_list
 	li.torrent
 	{
 		border-bottom: 1px solid #ccc;
-		padding: 4px 30px 5px $torrent-list-button-width;
+		padding: 4px 30px 5px 14px;
 		color: #666;
 		background-color: white;
 
@@ -502,6 +509,7 @@ $inspector-width: 570px;
 div#torrent_inspector
 {
 	overflow: auto;
+	-webkit-overflow-scrolling: touch;
 	text-align: left;
 	padding: 15px;
 	top: $torrent-container-top;
@@ -624,17 +632,6 @@ div#torrent_inspector
 
 	/* Files Inspector Tab */
 
-	#file-list-header {
-		float: right;
-		> * {
-			@include roundedButton(5px);
-			@include verticalGradient($idle-color-top, $idle-color-bottom);
-			&:active {
-				@include verticalGradient($active-color-top, $active-color-bottom);
-			}
-		}
-	}
-
 	#inspector_file_list {
 		padding: 0 0 0 0;
 		margin: 0 0 0 0;
@@ -644,7 +641,6 @@ div#torrent_inspector
 	}
 
 	#inspector_file_list {
-		border-top: 1px solid #888;
 		width: 100%;
 		margin: 6px 0 0 0;
 		padding-top: 6px;
@@ -678,17 +674,8 @@ div#torrent_inspector
 		margin-left: 20px;
 	}
 
-	li.inspector_torrent_file_list_entry.skip>.file_wanted_control {
-		background-position: left top;
-	}
-
-	li.inspector_torrent_file_list_entry.complete>.file_wanted_control {
-		background-position: left -19px;
-	}
-
 	ul.single_file li.inspector_torrent_file_list_entry>.file_wanted_control,
 	li.inspector_torrent_file_list_entry.complete>.file_wanted_control {
-		background-position: left -38px;
 		cursor: default;
 	}
 }
@@ -841,6 +828,13 @@ div.torrent_footer
 		@include buttonImage('images/compact.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 	}
 
+	#freespace-info	{
+		float: right;
+                text-align: right;
+                border: 0px;
+                width: 100px;
+	}
+
 
 /****
 *****
@@ -958,6 +952,12 @@ div.dialog_container div.dialog_window form {
 	margin: 0;
 	padding: 0px;
 }
+
+div#move_container input#torrent_path {
+	width: 286px;
+	padding: 2px;
+}
+
 
 iframe#torrent_upload_frame {
 	display: block; /* Don't change this : safari forms won't target hidden frames (they open a new window) */
