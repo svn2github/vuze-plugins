@@ -74,6 +74,18 @@ $(document).ready(function() {
 		$('.trans_menu div.outerbox').css('border', 'none');
 	}
 
+	if ($(window).width() > 900) {
+    	$("#torrent_logo").show();
+	} else {
+    	$("#torrent_logo").hide();
+	}
+	$(window).resize(function() {
+		if ($(window).width() > 900) {
+        	$("#torrent_logo").show();
+		} else {
+        	$("#torrent_logo").hide();
+		}
+	});
 	// Initialise the dialog controller
 	dialog = new Dialog();
 
