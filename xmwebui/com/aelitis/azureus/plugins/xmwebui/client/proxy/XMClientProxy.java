@@ -53,7 +53,7 @@ XMClientProxy
 		
 	private XMRPCClient	rpc;
 	
-	private
+	public
 	XMClientProxy(
 		XMRPCClient		_rpc )
 	{
