@@ -283,9 +283,15 @@ public class KBucket implements Externalizable {
 	        return false;
         }
 
+		RPCServer server = node.getDHT().getRandomServer();
+		
+		if ( server == null ){
+			return( false );
+		}
+		
 		PingRequest p = new PingRequest();
 		p.setDestination(entry.getAddress());
-		RPCCall c = node.getDHT().getRandomServer().doCall(p);
+		RPCCall c = server.doCall(p);
 		c.setExpectedID(entry.getID());
 		if (c != null) {
 			pendingPings.put(entry.getID(),entry);

@@ -23,6 +23,8 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.gudy.azureus2.core3.util.SystemTime;
+
 import lbms.plugins.mldht.DHTConfiguration;
 import lbms.plugins.mldht.kad.Node.RoutingTableEntry;
 import lbms.plugins.mldht.kad.messages.*;
@@ -329,7 +331,11 @@ public class DHT implements DHTBase {
 		if (!addr.isUnresolved() && !AddressUtils.isBogon(addr)) {
 			if(!type.PREFERRED_ADDRESS_TYPE.isInstance(addr.getAddress()) || node.getNumEntriesInRoutingTable() > DHTConstants.BOOTSTRAP_IF_LESS_THAN_X_PEERS)
 				return;
-			getRandomServer().ping(addr);
+			RPCServer server = getRandomServer();
+			
+			if ( server != null ){
+				server.ping(addr);
+			}
 		}
 
 	}
@@ -343,9 +349,14 @@ public class DHT implements DHTBase {
 		if (!isRunning()) {
 			return null;
 		}
+		RPCServer server = getRandomServer();
+		if ( server == null ){
+			return( null );
+		}
+		
 		Key id = new Key(info_hash);
 
-		PeerLookupTask lookupTask = new PeerLookupTask(getRandomServer(), node, id);
+		PeerLookupTask lookupTask = new PeerLookupTask(server, node, id);
 
 		return lookupTask;
 	}
@@ -372,7 +383,11 @@ public class DHT implements DHTBase {
 
 	public PingRefreshTask refreshBuckets (List<RoutingTableEntry> buckets,
 			boolean cleanOnTimeout) {
-		PingRefreshTask prt = new PingRefreshTask(getRandomServer(), node, buckets,
+		RPCServer server = getRandomServer();
+		if ( server == null ){
+			return( null );
+		}
+		PingRefreshTask prt = new PingRefreshTask(server, node, buckets,
 				cleanOnTimeout);
 
 		tman.addTask(prt, true);
@@ -463,10 +478,13 @@ public class DHT implements DHTBase {
 		if (!isRunning()) {
 			return;
 		}
-
+		RPCServer server = getRandomServer();
+		if ( server == null ){
+			return;
+		}
 		PingRequest r = new PingRequest();
 		r.setOrigin(new InetSocketAddress(ip, port));
-		getRandomServer().doCall(r);
+		server.doCall(r);
 
 	}
 	
@@ -760,22 +778,79 @@ public class DHT implements DHTBase {
 		
 	}
 	
+		// getting complaints from owner of IPv6 bootstrap node that they're getting a large spike in DNS
+		// traffic if their servers encounter issues....
+		// can't understand it myself (parg) as the code appears to limit resolves to once per 4 mins and
+		// only then for poorly integrated nodes, and there ain't that many mldht plugins out there
+	
+	private static final Map<String,Object[]>	bn_resolver_history = new HashMap<String, Object[]>();
 	
 	private void resolveBootstrapAddresses() {
 		List<InetSocketAddress> nodeAddresses =  new ArrayList<InetSocketAddress>();
 		for(int i = 0;i<DHTConstants.BOOTSTRAP_NODES.length;i++)
 		{
-			try {
-				String hostname = DHTConstants.BOOTSTRAP_NODES[i];
-				int port = DHTConstants.BOOTSTRAP_PORTS[i];
-			
+			String 	hostname 	= DHTConstants.BOOTSTRAP_NODES[i];
+			int 	port 		= DHTConstants.BOOTSTRAP_PORTS[i];
 
-				 for(InetAddress addr : InetAddress.getAllByName(hostname))
-				 {
-					 nodeAddresses.add(new InetSocketAddress(addr, port));
-				 }
-			} catch (Exception e) {
-				// do nothing
+			String		cache_key = hostname + ":" + port;
+			Object[]	cache;
+			
+			synchronized( bn_resolver_history ){
+				
+				cache = bn_resolver_history.get( cache_key );
+			}
+			
+			long	now = SystemTime.getMonotonousTime();
+			
+			if ( cache != null ){
+				
+				long last_lookup 	= (Long)cache[0];
+				long consec_fails 	= (Long)cache[1]; 
+				
+				InetAddress[] last_result = (InetAddress[])cache[2];
+				
+				if ( consec_fails > 0 ){
+					
+					long	next_lookup = last_lookup + Math.min( 2*60*60*1000, 5*60*1000L << ( consec_fails -1 ));
+					
+					if ( next_lookup > now ){
+						
+						if ( last_result != null ){
+							
+							for(InetAddress addr : last_result ){
+								
+								nodeAddresses.add(new InetSocketAddress(addr, port));
+							}
+						}
+						
+						continue;
+					}
+				}
+			}else{
+				
+				cache = new Object[]{ now, 0L, null };
+			}
+			
+			try{ 
+				InetAddress[] result = InetAddress.getAllByName(hostname);
+				
+				for ( InetAddress addr : result ){
+				
+					nodeAddresses.add(new InetSocketAddress(addr, port));
+				}
+				
+				cache[0]	= now;
+				cache[1]	= 0L;
+				cache[2] 	= result;
+				
+			} catch ( Throwable e) {
+			
+				cache[1] = ((Long)cache[1]) + 1;
+			}
+			
+			synchronized( bn_resolver_history ){
+				
+				bn_resolver_history.put( cache_key, cache );
 			}
 		}
 		
@@ -875,7 +950,11 @@ public class DHT implements DHTBase {
 	 * @param id The id of the key to search
 	 */
 	public NodeLookup findNode (Key id) {
-		return findNode(id, false, false, true, getRandomServer());
+		RPCServer server = getRandomServer();
+		if ( server == null ){
+			return( null );
+		}
+		return findNode(id, false, false, true, server);
 	}
 
 	/*
@@ -884,16 +963,23 @@ public class DHT implements DHTBase {
 	 * @see lbms.plugins.mldht.kad.DHTBase#fillBucket(lbms.plugins.mldht.kad.KBucket)
 	 */
 	public NodeLookup fillBucket (Key id, KBucket bucket) {
+		RPCServer server = getRandomServer();
+		if ( server == null ){
+			return( null );
+		}
 		bucket.updateRefreshTimer();
-		return findNode(id, false, true, true, getRandomServer());
+		return findNode(id, false, true, true, server);
 	}
 
 	public PingRefreshTask refreshBucket (KBucket bucket) {
 		if (!isRunning()) {
 			return null;
 		}
-
-		PingRefreshTask prt = new PingRefreshTask(getRandomServer(), node, bucket, false);
+		RPCServer server = getRandomServer();
+		if ( server == null ){
+			return( null );
+		}
+		PingRefreshTask prt = new PingRefreshTask(server, node, bucket, false);
 		if (canStartTask(prt)) {
 			prt.start();
 		}
