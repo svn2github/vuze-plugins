@@ -27,6 +27,10 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+
+import org.gudy.azureus2.core3.download.DownloadManagerState;
+import org.gudy.azureus2.core3.util.*;
+
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabase;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabaseEvent;
@@ -34,324 +38,743 @@ import org.gudy.azureus2.plugins.ddb.DistributedDatabaseKey;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabaseListener;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabaseValue;
 import org.gudy.azureus2.plugins.download.Download;
+import org.gudy.azureus2.plugins.download.DownloadManager;
 import org.gudy.azureus2.plugins.download.DownloadManagerListener;
 import org.gudy.azureus2.plugins.torrent.TorrentAttribute;
-import org.gudy.azureus2.plugins.utils.AggregatedList;
-import org.gudy.azureus2.plugins.utils.AggregatedListAcceptor;
-import org.gudy.azureus2.plugins.utils.UTTimer;
-import org.gudy.azureus2.plugins.utils.UTTimerEvent;
-import org.gudy.azureus2.plugins.utils.UTTimerEventPerformer;
+import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
+
 import com.aelitis.azureus.plugins.rating.RatingPlugin;
 
-public class RatingsUpdater implements DownloadManagerListener,AggregatedListAcceptor {
-  
-  //1 min time out on ratings read
-  private static final int READ_TIMEOUT = 60000;
-  
-  
-  //1 hour update for ratings
-  private static final int UPDATE_TIME  = 60 * 60 * 1000;
-  UTTimer timer;
-  
-  
-  List downloads;
-  Map torrentRatings;
-  
-  RatingPlugin plugin;
-  DistributedDatabase database;  
-  
-  TorrentAttribute attributeRating;
-  TorrentAttribute attributeComment;
-  TorrentAttribute attributeGlobalRating;
-  
-  private AggregatedList listToHandle;
-  
-  
-  
-  public RatingsUpdater(RatingPlugin plugin) {    
-    this.plugin = plugin;
-    this.downloads = new ArrayList();
-    this.torrentRatings = new HashMap();
+public class 
+RatingsUpdater 	
+	implements DownloadManagerListener
+{
+	private static final int READ_TIMEOUT 	= 20*1000;
+    private static final int WRITE_DELAY	= 10*1000;
+    private static final int READ_DELAY		= 20*1000;
     
-    listToHandle = plugin.getPluginInterface().getUtilities().createAggregatedList(this,20 * 1000,100);
+    private static final int COMPLETE_DOWNLOAD_LOOKUP_PERIOD 		= 8*60*60*1000;
+    private static final int INCOMPLETE_OLD_DOWNLOAD_LOOKUP_PERIOD	= 4*60*60*1000;
+    private static final int INCOMPLETE_DOWNLOAD_LOOKUP_PERIOD 		= 1*60*60*1000;
     
+    	
+	private RatingPlugin 			plugin;
+	private DistributedDatabase 	database;  
+  
+	private TorrentAttribute attributeRating;
+	private TorrentAttribute attributeComment;
+	private TorrentAttribute attributeGlobalRating;
     
-    attributeRating  = this.plugin.getPluginInterface().getTorrentManager().getPluginAttribute("rating");
-    attributeComment = this.plugin.getPluginInterface().getTorrentManager().getPluginAttribute("comment");    
-    attributeGlobalRating  = this.plugin.getPluginInterface().getTorrentManager().getPluginAttribute("globalRating");
-  }
   
-  public void initialize() {
-    this.plugin.getPluginInterface().getUtilities().createThread("Initializer", new Runnable() {
-      public void run() {
-       pInitialize(); 
-      }
-    });  
-  }
-  
-  
-  private void pInitialize() {
-    PluginInterface pluginInterface = plugin.getPluginInterface();
-        
-    
-    database = pluginInterface.getDistributedDatabase();
-    if(database.isAvailable()) {
-      //No need to add a listener if the DHT isn't avail
-      pluginInterface.getDownloadManager().addListener(this);
-         
-      //Program the Timer update for updates every 1 hour
-      timer = pluginInterface.getUtilities().createTimer("Ratings Update");
-      timer.addPeriodicEvent(UPDATE_TIME,new UTTimerEventPerformer() {
-        public void perform(UTTimerEvent event) {
-          updateRatings();
-        }
-      });
-    }
-    
-    
-  }
-  
-  public void downloadAdded(Download download) {    
-    if(download.getTorrent() != null) {
-      final String torrentName = download.getTorrent().getName();
-      plugin.logInfo(torrentName + " : downloaded added");
-      downloads.add(download);
-      listToHandle.add(download);
-    }
-  }
-  
-  public void downloadRemoved(Download download) {
-    final String torrentName = download.getTorrent().getName();
-    plugin.logInfo(torrentName + " : downloaded removed");
-    downloads.remove(download);
-    torrentRatings.remove(download);
-  }
-  
-  public RatingResults getRatingsForDownload(Download d) {
-    
-    RatingResults result = null;
-    synchronized (torrentRatings) {
-      result = (RatingResults) torrentRatings.get(d);       
-    }
-    
-    if(result != null) return result;
-    result = new RatingResults();
-    try {
-      String str = d.getAttribute(attributeGlobalRating);
-      if(str != null) {
-        float f = Float.parseFloat(str);
-        result.setAverage(f);
-        return result;
-      }
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
-    
-    return new RatingResults();
-  }
-  
-  public void accept(final List l) {
-    plugin.getPluginInterface().
-    getUtilities().
-    createThread("Ratings Updater", new Runnable() {
-      public void run() {
-        //Use a queue not to spam the DHT too fast,
-        //ie process all updates one by one :
-        List downloads = new LinkedList(l);
-        updateRatings(downloads);
-        
-        downloads = new LinkedList(l);
-        publishAllRatings(downloads);
-      }        
-    }); 
-  }
-  
-  public void updateRatings() {       
-    plugin.getPluginInterface().
-      getUtilities().
-      createThread("Ratings Updater", new Runnable() {
-        public void run() {
-          //Use a queue not to spam the DHT too fast,
-          //ie process all updates one by one :
-          List downloads = new LinkedList(RatingsUpdater.this.downloads);
-          updateRatings(downloads);              
-        }        
-      });    
-  }
-  
-  private void updateRatings(final List downloads) {
-    if(downloads.size() == 0) return;
-    final Download download = (Download) downloads.remove(0);   
-    final String torrentName = download.getTorrent().getName();
-    try {
-      plugin.logInfo(torrentName + " : getting rating");
-      DistributedDatabaseKey ddKey = database.createKey(KeyGenUtils.buildRatingKey(download),"Looking-up ratings for " + torrentName);
-      database.read(new DistributedDatabaseListener() {
-       
-        List results = new ArrayList();
-       
-        public void event(DistributedDatabaseEvent event) {
-          
-          if(event.getType() == DistributedDatabaseEvent.ET_VALUE_READ) {
-            results.add(event.getValue());
-          }
-         
-          if(event.getType() == DistributedDatabaseEvent.ET_OPERATION_COMPLETE 
-               || event.getType() == DistributedDatabaseEvent.ET_OPERATION_TIMEOUT) {
-            plugin.logInfo(torrentName + " : Rating received");
-            RatingResults ratings = new RatingResults();
-            
-            for(int i = 0 ; i < results.size() ; i++) {
-              
-              DistributedDatabaseValue value = (DistributedDatabaseValue) results.get(i);
-              
-              try {
-                
-                byte[] bValue = (byte[]) value.getValue(byte[].class);
-                
-                RatingData data = new RatingData(bValue);
-                
-                plugin.logInfo("        " + data.getScore() + ", " + value.getContact().getName() + ", " +  data.getNick() + " : " + data.getComment());
-                
-                ratings.addRating(data);
-                
-              } catch(Exception e) {
-                
-                e.printStackTrace();
-                
-              }                            
-            }
-            
-            synchronized (torrentRatings) {
-              torrentRatings.put(download,ratings);
-              download.setAttribute(attributeGlobalRating,"" + ratings.getRealAverageScore());
-            }
-            
-            updateRatings(downloads);
-          }
-        }
-      },ddKey,READ_TIMEOUT);      
-    } catch(Exception e) {
-      e.printStackTrace();
-      updateRatings(downloads);
-    }
-  }
-  
-  public RatingData loadRatingsFromDownload(Download download) {
-   String strRating = download.getAttribute(attributeRating);
-   String comment   = download.getAttribute(attributeComment);
-   int rating = 0;
-   if(strRating != null) {
-     try {
-       rating = Integer.parseInt(strRating);
-     } catch(Exception e) {
-       e.printStackTrace();
-     }
-   }
-   if(comment == null) comment = "";
-   String nick = plugin.getNick();
-   return new RatingData(rating,nick,comment);   
-  }
-  
-  /*
-   * Stores and updates the DB if needed
-   */
-  public void storeRatingsToDownload(Download download,RatingData data) {
-    RatingData oldData = loadRatingsFromDownload(download);
-    boolean updateNeeded = false;
-    updateNeeded |= oldData.getScore() != data.getScore();
-    updateNeeded |= ! oldData.getComment().equals(data.getComment());
-    
+	private Map<Download,RatingResults> 	torrentRatings	= new HashMap<Download, RatingResults>();
 
-    // without considering the nick, if we need to update, then
-    // it's locally
-    if(updateNeeded) {
-      download.setAttribute(attributeRating,"" + data.getScore());
-      download.setAttribute(attributeComment, data.getComment());
-    }
-    
-    updateNeeded |= ! oldData.getNick().equals(data.getNick());
-    //Now, with the nick, it's remotely
-    if(updateNeeded && database != null && database.isAvailable()) {
-      publishDownloadRating(download,data);
-    }
-  }
-  
-  private void publishDownloadRating(Download download) {
-    publishDownloadRating(download,loadRatingsFromDownload(download));
-  }
-  
-  private void publishDownloadRating(Download download,CompletionListener listener) {
-    publishDownloadRating(download,loadRatingsFromDownload(download),listener);
-  }
+	private LinkedList<Download>	downloads_to_publish 	= new LinkedList<Download>();
+	private Map<Download,Long>		downloads_to_lookup		= new HashMap<Download,Long>();
+	
+	private AsyncDispatcher		write_dispatcher 	= new AsyncDispatcher( "rating:write" );
+	private AsyncDispatcher		read_dispatcher 	= new AsyncDispatcher( "read" );
+	
+	private boolean	write_in_progress;
+	private boolean	read_in_progress;
+	
+	private volatile boolean	destroyed;
+	
+	public 
+	RatingsUpdater(
+		RatingPlugin _plugin ) 
+	{    
+		plugin = _plugin; 
+	    
+	    attributeRating  		= plugin.getPluginInterface().getTorrentManager().getPluginAttribute("rating");
+	    attributeComment		= plugin.getPluginInterface().getTorrentManager().getPluginAttribute("comment");    
+	    attributeGlobalRating  	= plugin.getPluginInterface().getTorrentManager().getPluginAttribute("globalRating");
+	}
+	  
+	public void 
+	initialize() 
+	{
+		plugin.getPluginInterface().getUtilities().createThread(
+				"Initializer", 
+				new Runnable() 
+				{
+					public void 
+					run() 
+					{
+						PluginInterface pluginInterface = plugin.getPluginInterface();
 
-  private void publishDownloadRating(Download download,RatingData data) {
-    publishDownloadRating(download,data,new CompletionAdapter());
-  }
-  
-  private void publishDownloadRating(      
-      final Download download,
-      final RatingData data,
-      final CompletionListener listener) {
-    
-    int score = data.getScore();
-    //Non scored torrent aren't published,
-    //Comments require score
-    if(score == 0) return;
-    
-    final String torrentName = download.getTorrent().getName();
-    
-    byte[] value = data.encodes();
-    try {
-      plugin.logInfo(torrentName + " : publishing rating");
-      DistributedDatabaseKey ddKey = database.createKey(KeyGenUtils.buildRatingKey(download),"Registering ratings for " + torrentName);
-      DistributedDatabaseValue ddValue = database.createValue(value);
-      
-      	// handle missing method as new @4901_b08
-      
-      try{
-    	  ddKey.setFlags( 0x00000001 );
-      }catch( Throwable e ){
-    	  
-      }
-      
-      database.write(new DistributedDatabaseListener() {
-        public void event(DistributedDatabaseEvent event) {
-          if(event.getType() == DistributedDatabaseEvent.ET_OPERATION_COMPLETE) {
-            plugin.logInfo(torrentName + " : rating registeration successfull");
-            listener.operationComplete();
-            //In case of success, update the rating for that download
-            //(as our rating might impact the global rating)
-            List dls = new ArrayList();
-            dls.add(download);
-            updateRatings(dls);
-          }
-          if(event.getType() == DistributedDatabaseEvent.ET_OPERATION_TIMEOUT) {
-            plugin.logInfo(torrentName + " : rating registeration failed");
-            listener.operationComplete();
-          }
-        }
-      },ddKey,ddValue);
-    } catch(Exception e) {
-      e.printStackTrace();
-    }
-  } 
-  
-  private void publishAllRatings() {
-    //  Use a queue not to spam the DHT too fast,
-    //ie process all updates one by one :
-    List downloads = new LinkedList(this.downloads);
-    publishAllRatings(downloads);  
-  }
-  
-  private void publishAllRatings(final List downloads) {
-    if(downloads.size() == 0) return;
-    final Download download = (Download) downloads.remove(0);    
-    publishDownloadRating(download,new CompletionListener() {
-      public void operationComplete() {
-        publishAllRatings(downloads);
-      }
-    });
-  }
+						database = pluginInterface.getDistributedDatabase();
 
+						if ( database.isAvailable()){
+
+							if ( !destroyed ){
+								
+								DownloadManager download_manager = pluginInterface.getDownloadManager();
+								
+								download_manager.addListener( RatingsUpdater.this, false );
+								
+								Download[] existing = download_manager.getDownloads();
+								
+								for ( Download d: existing ){
+									
+									downloadAdded( d, false );
+								}
+							}
+						}
+					}
+				});  
+	}
+
+	public void
+	destroy()
+	{
+		destroyed = true;
+		
+		DownloadManager download_manager = plugin.getPluginInterface().getDownloadManager();
+		
+		download_manager.removeListener( this );
+
+	}
+	
+	public void 
+	downloadAdded(
+		Download download )
+	{   
+		downloadAdded( download, true );
+	}
+	
+	private void 
+	downloadAdded(
+		Download 	download,
+		boolean		is_new )
+	{    
+		if ( destroyed ){
+			
+			return;
+		}
+		
+		if ( download.getTorrent() != null && !download.getFlag( Download.FLAG_METADATA_DOWNLOAD )){
+			
+			if ( loadRatingsFromDownload( download ).needPublishing()){
+				
+				addForPublish( download, false );
+				
+			}else{
+				
+				addForLookup( download, is_new );
+			}
+		}
+	}
+
+	public void 
+	downloadRemoved(
+		Download download ) 
+	{
+		synchronized( torrentRatings ){
+		
+			torrentRatings.remove( download );
+			
+			downloads_to_publish.remove( download );
+			
+			downloads_to_lookup.remove( download );
+		}
+	}
+
+	private void
+	addForLookup(
+		Download	download,
+		boolean		is_priority )
+	{
+		if ( download.isRemoved()){
+			
+			downloadRemoved( download );
+			
+			return;
+		}
+		
+		synchronized( torrentRatings ){
+			
+			Long data = downloads_to_lookup.get( download );
+			
+			if ( data == null || is_priority ){
+				
+				downloads_to_lookup.put( download, is_priority?-1L:0L );
+			}
+		}
+		
+		read_dispatcher.dispatch(
+			new AERunnable()
+			{
+				private AERunnable dispatcher = this;
+
+				public void
+				runSupport()
+				{
+					if ( destroyed ){
+						
+						return;
+					}
+					
+					if ( read_dispatcher.getQueueSize() > 0 ){
+						
+						return;
+					}
+					
+					Download 	next_download 	= null;
+					
+					long	now = SystemTime.getCurrentTime();
+					
+					int	num_ready = 0;
+					
+					synchronized( torrentRatings ){
+						
+						if ( read_in_progress || downloads_to_lookup.size() == 0 ){
+							
+							return;
+						}
+						
+						long		next_lookup		= 0;
+						Download	priority_dl		= null;
+						
+						for ( Map.Entry<Download, Long> entry: downloads_to_lookup.entrySet()){
+							
+							Download 	dl 			= (Download)entry.getKey();
+							long		last_lookup = (Long)entry.getValue();
+							
+							if ( last_lookup == -1 ){
+								
+									// priority
+								
+								num_ready++;
+								
+								next_download 	= dl;
+								next_lookup		= now;
+								
+								priority_dl = dl;
+																
+							}else if ( last_lookup == 0 ){
+								
+									// first time
+								
+								num_ready++;
+								
+								if ( next_download == null || next_lookup > now ){
+									
+									next_download 	= dl;
+																		
+								}else{
+									
+									if ( !dl.isComplete( false )){
+										
+										next_download = dl;
+									}
+								}
+								
+								next_lookup		= now;
+
+							}else{
+								
+								long	next = last_lookup;
+								
+								if ( dl.isComplete( false )){
+									
+									next += COMPLETE_DOWNLOAD_LOOKUP_PERIOD;
+									
+								}else{
+									
+									org.gudy.azureus2.core3.download.DownloadManager	core_download = PluginCoreUtils.unwrap( dl );
+									
+									long added = core_download.getDownloadState().getLongParameter(DownloadManagerState.PARAM_DOWNLOAD_ADDED_TIME);
+
+									if ( added > 0 && now - added > 24*60*60*1000 ){
+										
+										next += INCOMPLETE_OLD_DOWNLOAD_LOOKUP_PERIOD;
+										
+									}else{
+									
+										next += INCOMPLETE_DOWNLOAD_LOOKUP_PERIOD;
+									}
+								}
+								
+								if ( next <= now ){
+									
+									num_ready++;
+								}
+								
+								if ( next_lookup == 0 || next < next_lookup ){
+									
+									next_lookup 	= next;
+									next_download	= dl;
+								}
+							}
+						}
+						
+						if ( priority_dl != null ){
+							
+							next_download 	= priority_dl;
+							next_lookup		= now;
+						}
+						
+						if ( next_lookup > now ){
+							
+							log( "Lookup sleeping for " + ( next_lookup - now ));
+							
+							SimpleTimer.addEvent(
+									"Rating:read:next",
+									next_lookup,
+									new TimerEventPerformer()
+									{
+										public void 
+										perform(
+											TimerEvent event )
+										{														
+											read_dispatcher.dispatch( dispatcher );
+										}
+									});
+							
+							next_download = null;
+							
+						}else{
+							
+							if ( next_download != null ){
+								
+								downloads_to_lookup.put( next_download, now );
+							
+								read_in_progress = true;
+							}
+						}
+					}
+					
+					log( "Lookup queue size: " + num_ready );
+
+					if ( next_download != null ){
+																
+						readRating(
+							next_download,
+							new CompletionListener()
+							{
+								public void 
+								operationComplete()
+								{
+									synchronized( torrentRatings ){
+										
+										read_in_progress = false;
+																					
+										SimpleTimer.addEvent(
+											"Rating:read:delay",
+											SystemTime.getCurrentTime() + READ_DELAY,
+											new TimerEventPerformer()
+											{
+												public void 
+												perform(
+													TimerEvent event )
+												{														
+													read_dispatcher.dispatch( dispatcher );
+												}
+											});
+										
+									}
+								}
+							});
+					}
+				}
+			});
+	}
+	
+	private void
+	addForPublish(
+		Download	download,
+		boolean		is_priority )
+	{
+		if ( download.isRemoved()){
+			
+			downloadRemoved( download );
+			
+			return;
+		}
+		
+		synchronized( torrentRatings ){
+			
+			downloads_to_publish.remove( download );
+			
+			if ( is_priority || downloads_to_publish.size() == 0 ){
+				
+				downloads_to_publish.addFirst( download );
+				
+			}else{
+				
+				downloads_to_publish.add( RandomUtils.nextInt( downloads_to_publish.size()), download );
+			}
+		}
+		
+		write_dispatcher.dispatch(
+			new AERunnable()
+			{
+				public void
+				runSupport()
+				{
+					if ( destroyed ){
+						
+						return;
+					}
+
+					if ( write_dispatcher.getQueueSize() > 0 ){
+						
+						return;
+					}
+					
+					Download download;
+					
+					synchronized( torrentRatings ){
+						
+						if ( write_in_progress ){
+							
+							return;
+						}
+						
+						if ( downloads_to_publish.size() > 0 ){
+							
+							download = downloads_to_publish.removeFirst();
+							
+							write_in_progress = true;
+							
+						}else{
+							
+							download = null;
+						}
+					}
+					
+					log( "Publish queue size: " + downloads_to_publish.size());
+					
+					if ( download != null ){
+												
+						final AERunnable dispatcher = this;
+						
+						writeRating(
+							download,
+							new CompletionListener()
+							{
+								public void 
+								operationComplete()
+								{
+									synchronized( torrentRatings ){
+										
+										write_in_progress = false;
+										
+										if ( downloads_to_publish.size() > 0 ){
+											
+											SimpleTimer.addEvent(
+												"Rating:write:delay",
+												SystemTime.getCurrentTime() + WRITE_DELAY,
+												new TimerEventPerformer()
+												{
+													public void 
+													perform(
+														TimerEvent event )
+													{														
+														write_dispatcher.dispatch( dispatcher );
+													}
+												});
+										}
+									}
+								}
+							});
+					}
+				}
+			});
+	}
+	
+	public RatingResults 
+	getRatingsForDownload(
+		Download d )
+	{
+		RatingResults result = null;
+
+		synchronized( torrentRatings ){
+
+			result = torrentRatings.get( d );       
+		}
+
+		if ( result != null ){
+
+			return result;
+		}
+
+		result = new RatingResults();
+
+		try{
+			String str = d.getAttribute( attributeGlobalRating );
+
+			if ( str != null ){
+
+				float f = Float.parseFloat(str);
+
+				result.setAverage(f);
+				
+			}else{
+				
+				RatingData rd = loadRatingsFromDownload( d );
+				
+				int score = rd.getScore();
+				
+				if ( score > 0 ){
+					
+					result.setAverage( score );
+				}
+			}
+		}catch( Throwable e ){
+
+			Debug.out( e );
+		}
+
+		synchronized( torrentRatings ){
+			
+			if ( !torrentRatings.containsKey( d )){
+				
+				torrentRatings.put( d, result );
+			}
+		}
+		
+		return( result );
+	}
+
+
+	public RatingData 
+	loadRatingsFromDownload(
+		Download download ) 
+	{
+		String strRating = download.getAttribute(attributeRating);	
+		String comment   = download.getAttribute(attributeComment);		
+
+		int rating = 0;
+		
+		if ( strRating != null ){
+			
+			try{
+				rating = Integer.parseInt(strRating);
+
+			}catch( Throwable e ){
+
+				e.printStackTrace();
+			}
+		}
+		
+		if (comment == null ){
+			
+			comment = "";
+		}
+		
+		String nick = plugin.getNick();
+		
+		return( new RatingData( rating,nick,comment ));   
+	}
+
+	
+	public void 
+	storeRatingsToDownload(
+		Download 	download,
+		RatingData 	data ) 
+	{
+		RatingData oldData = loadRatingsFromDownload(download);
+		
+		boolean updateNeeded = false;
+		
+		updateNeeded |= oldData.getScore() != data.getScore();
+		updateNeeded |= !oldData.getComment().equals(data.getComment());
+
+		if (updateNeeded ){
+			
+			download.setAttribute(attributeRating,"" + data.getScore());
+			download.setAttribute(attributeComment, data.getComment());
+		}
+
+		updateNeeded |= !oldData.getNick().equals(data.getNick());
+				
+		if ( updateNeeded ){
+			
+			addForPublish( download, true );
+		}
+	}
+
+	private void 
+	readRating(
+		final Download 				download,
+		final CompletionListener 	listener )
+	{	
+		if ( database == null || !database.isAvailable()){
+			
+			listener.operationComplete();
+			
+			return;
+		}
+		
+		final String torrentName = download.getTorrent().getName();
+		
+		try{
+			log( torrentName + " : getting rating" );
+			
+			DistributedDatabaseKey ddKey = database.createKey(KeyGenUtils.buildRatingKey(download),"Ratings read: " + torrentName);
+			
+			database.read(
+				new DistributedDatabaseListener() 
+				{
+					List<DistributedDatabaseValue> results = new ArrayList<DistributedDatabaseValue>();
+	
+					public void 
+					event(
+						DistributedDatabaseEvent event) 
+					{
+						if (event.getType() == DistributedDatabaseEvent.ET_VALUE_READ ){
+							
+							results.add(event.getValue());
+							
+						}else if (	event.getType() == DistributedDatabaseEvent.ET_OPERATION_COMPLETE || 
+									event.getType() == DistributedDatabaseEvent.ET_OPERATION_TIMEOUT ){
+							
+							try{
+								log( torrentName + " : Rating read complete - results=" + results.size());
+								
+								RatingResults ratings = new RatingResults();
+		
+								if ( results.size() == 0 ){
+									
+										// missed our own data it seems
+									
+									RatingData my_data = loadRatingsFromDownload( download );
+									
+									if ( my_data.needPublishing()){
+									
+										ratings.addRating( my_data );
+									}
+									
+								}else{
+									for ( int i = 0 ; i < results.size() ; i++ ){
+			
+										DistributedDatabaseValue value = results.get(i);
+			
+										try{
+											byte[] bValue = (byte[]) value.getValue(byte[].class);
+			
+											RatingData data = new RatingData(bValue);
+			
+											log("        " + data.getScore() + ", " + value.getContact().getName() + ", " +  data.getNick() + " : " + data.getComment());
+			
+											ratings.addRating(data);
+			
+										}catch( Throwable e ){
+			
+											Debug.out( e );
+										}                            
+									}
+								}
+								
+								synchronized( torrentRatings ){
+		
+									torrentRatings.put( download, ratings );
+		
+									download.setAttribute( attributeGlobalRating, "" + ratings.getRealAverageScore());
+								}			
+							}finally{
+							
+								listener.operationComplete();
+							}
+						}
+				}
+			}, ddKey, READ_TIMEOUT );   
+
+		}catch( Throwable e ){
+
+			Debug.out( e );
+			
+			listener.operationComplete();
+		}
+	}
+
+
+	private void 
+	writeRating(      
+		final Download 				download,
+		final CompletionListener 	listener ) 
+	{
+		if ( database == null || !database.isAvailable()){
+			
+			listener.operationComplete();
+			
+			return;
+		}
+		
+		RatingData data = loadRatingsFromDownload( download );
+		
+		int score = data.getScore();
+		
+			//Non scored torrent aren't published,
+			//Comments require score
+		
+		if ( score == 0 ){
+			
+			listener.operationComplete();
+			
+			return;
+		}
+		
+		try{
+			final String torrentName = download.getTorrent().getName();
+
+			byte[] value = data.encodes();
+
+			log( torrentName + " : publishing rating" );
+			
+			DistributedDatabaseKey ddKey = database.createKey(KeyGenUtils.buildRatingKey(download),"Ratings write: " + torrentName);
+			
+			DistributedDatabaseValue ddValue = database.createValue(value);
+
+			// handle missing method as new @4901_b08
+
+			try{
+				ddKey.setFlags( 0x00000001 );
+				
+			}catch( Throwable e ){
+
+			}
+
+			database.write(
+				new DistributedDatabaseListener() 
+				{
+					public void 
+					event(
+						DistributedDatabaseEvent event) 
+					{
+						if( event.getType() == DistributedDatabaseEvent.ET_OPERATION_COMPLETE) {
+						
+							log(torrentName + " : rating write ok");
+							
+							listener.operationComplete();
+							
+							addForLookup( download, true );
+													
+						}else if( event.getType() == DistributedDatabaseEvent.ET_OPERATION_TIMEOUT ){
+							
+							log( torrentName + " : rating write failed" );
+							
+							listener.operationComplete();
+							
+							addForLookup( download, true );
+						}
+					}
+				}, ddKey, ddValue );
+			
+		}catch( Throwable e ){
+			
+			Debug.out( e );
+			
+			listener.operationComplete();
+		}
+	} 
+
+
+	private void
+	log(
+		String	str )
+	{
+		plugin.logInfo( str );
+	}
 }

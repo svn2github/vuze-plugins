@@ -1,3 +1,4 @@
+1.4.1: DHT logic rewritten; made unloadable
 1.3 : Smaller stars, middle click on table cell sets personal rating, double 
       click on table cell opens rating window.  More tooltip information 
       (# of comments, personal rating).  Line under stars to indicate personal

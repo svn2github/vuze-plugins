@@ -90,4 +90,10 @@ public class RatingData {
   public String getComment() {
     return this.comment;
   }
+  
+  public boolean
+  needPublishing()
+  {
+	  return( score > 0 );
+  }
 }
