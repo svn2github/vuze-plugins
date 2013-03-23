@@ -156,6 +156,7 @@ TransmissionRemote.prototype =
 		};
 		if (torrentIds)
 			o['arguments'].ids = torrentIds;
+		o['math'] = Math.random();
 		this.sendRequest(o, function(response) {
 			var args = response['arguments'];
 			callback.call(context,args.torrents,args.removed);
