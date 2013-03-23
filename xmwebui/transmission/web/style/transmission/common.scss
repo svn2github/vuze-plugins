@@ -67,7 +67,6 @@ $selected-gradient-bottom: white;
 	@include roundedBox($radius);
 }
 
-
 /*--------------------------------------
  *
  * G L O B A L
@@ -131,7 +130,7 @@ div#toolbar-area
 
 div#toolbar
 {
-	$separator-spacing: 20px;
+	$separator-spacing: 10px;
 
 	width: 100%;
 	height: $toolbar-height;
@@ -154,11 +153,11 @@ div#toolbar
 	}
 
 	>div#toolbar-separator {
-	        height: 25px;
-	        margin-top: 8px;
-	        margin-bottom: 5px;
-	        border-left: 1px solid #aaa;
-	        width: 3px;
+		height: 25px;
+		margin-top: 8px;
+		margin-bottom: 8px;
+		border-left: 1px solid #aaa;
+		width: 3px;
 	}
 
 	div#toolbar-open {
@@ -169,7 +168,7 @@ div#toolbar
 	> div#toolbar-remove {
 		@include rightRoundedBox(10px);
 		@include buttonImage('images/toolbar-remove.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
-		margin-right: 8px;
+		margin-right: 4px;
 	}
 	> div#toolbar-start {
 		@include buttonImage('images/toolbar-start.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
@@ -208,7 +207,7 @@ div#toolbar
 		@include roundedBox(10px);
 		@include buttonImage('images/toolbar-info.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 		float: right;
-		margin-right: 8px;
+		margin-right: 4px;
 	}
 
 	> *.disabled {
@@ -233,7 +232,7 @@ $statusbar-height: 26px;
 	border-bottom: 1px solid #AAA;
 	overflow: hidden;
 	position: relative;
-	background-color: #CCC;
+	@include verticalGradient($statusbar-gradient-top, $statusbar-gradient-bottom);
 
 	#filter
 	{
@@ -249,6 +248,7 @@ $statusbar-height: 26px;
 
 		#filter-count { margin-left: 8px; }
 	}
+}
 
 	#speed-info
 	{
@@ -277,7 +277,6 @@ $statusbar-height: 26px;
 			display: inline;
 		}
 	}
-}
 
 /***
 ****
@@ -805,7 +804,7 @@ div.torrent_footer
 	$active-color-top: $selected-gradient-top;
 	$active-color-bottom: $selected-gradient-bottom;
 
-	div.main_container {
+	#settings_menu {
 		@include roundedBox(5px);
 		@include buttonImage('images/settings.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 	}

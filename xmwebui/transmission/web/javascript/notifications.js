@@ -6,7 +6,7 @@ $(document).ready(function () {
   }
 
   var notificationsEnabled = (window.webkitNotifications.checkPermission() === 0),
-      toggle = $('#toggle_notifications');
+      toggle = $('#toggle_notifications > a');
 
   toggle.show();
   updateMenuTitle();

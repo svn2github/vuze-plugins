@@ -163,15 +163,6 @@ function PrefsDialog(remote) {
         }
     },
 
-    getDefaultMobileOptions = function()
-    {
-        return {
-            width: $(window).width(),
-            height: $(window).height(),
-            position: [ 'left', 'top' ]
-        };
-    },
-
     initialize = function (remote)
     {
         var i, key, e, o;
@@ -184,9 +175,9 @@ function PrefsDialog(remote) {
         initTimeDropDown(e.find('#alt-speed-time-begin')[0]);
         initTimeDropDown(e.find('#alt-speed-time-end')[0]);
 
-        o = isMobileDevice
-          ? getDefaultMobileOptions()
-          : { width: 350, height: 400 };
+        o = {};
+        o.width = Math.min($(window).width(), 350);
+        o.height = Math.min($(window).height(), 400);
         o.autoOpen = false;
         o.show = o.hide = 'fade';
         o.close = onDialogClosed;

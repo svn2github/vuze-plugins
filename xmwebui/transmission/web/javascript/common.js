@@ -8,7 +8,10 @@
 
 var transmission,
     dialog,
+    /* Vuze: Force never isMobileDevice!
     isMobileDevice = RegExp("(iPhone|iPod|Android)").test(navigator.userAgent),
+    */
+    isMobileDevice = false,
     scroll_timeout;
 
 if (!Array.indexOf){

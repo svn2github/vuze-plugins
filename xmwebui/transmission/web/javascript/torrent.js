@@ -7,9 +7,9 @@
  */
 
 
-function Torrent(data)
+function Torrent(data, onDataChangeCB)
 {
-	this.initialize(data);
+	this.initialize(data, onDataChangeCB);
 }
 
 /***
@@ -118,8 +118,12 @@ Torrent.Fields.StatsExtra = [
 
 Torrent.prototype =
 {
-	initialize: function(data)
+	initialize: function(data, onDataChangeCB)
 	{
+		if (onDataChangeCB !== undefined) {
+			$(this).bind('dataChanged',onDataChangeCB);
+		}
+
 		this.fields = {};
 		this.fieldObservers = {};
 		this.refresh (data);

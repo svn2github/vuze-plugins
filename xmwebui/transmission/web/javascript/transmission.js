@@ -29,7 +29,7 @@ Transmission.prototype =
 		this.prefsDialog = new PrefsDialog(this.remote);
 		$(this.prefsDialog).bind('closed', $.proxy(this.onPrefsDialogClosed,this));
 
-		this.isMenuEnabled = !isMobileDevice;
+		this.isMenuEnabled = true; //!isMobileDevice;
 
 		// Initialize the implementation fields
 		this.filterText    = '';
@@ -88,9 +88,9 @@ Transmission.prototype =
 			$('#torrent_container').bind('drop', $.proxy(this.drop,this));
 			$('#inspector_link').click( $.proxy(this.toggleInspector,this) );
 
-			this.setupSearchBox();
 			this.createContextMenu();
 		}
+		this.setupSearchBox();
 
 		if (this.isMenuEnabled)
 			this.createSettingsMenu();
@@ -140,10 +140,16 @@ Transmission.prototype =
 
 		if (this.isMenuEnabled)
 		{
+			$('#sort_by_' + this[Prefs._SortMethod]).addClass('menu-item-selected');
+			/* Vuze: Replaced
 			$('#sort_by_' + this[Prefs._SortMethod]).selectMenuItem();
+			*/
 
 			if (this[Prefs._SortDirection] === Prefs._SortDescending)
+				$('#reverse_sort_order').addClass('menu-item-selected');
+			/* Vuze: Replaced
 				$('#reverse_sort_order').selectMenuItem();
+			*/
 		}
 
 		this.initCompactMode();
@@ -236,18 +242,31 @@ Transmission.prototype =
 	},
 
 	createSettingsMenu: function() {
+		$('#settings_menu').click($.proxy(this.settingsMenuClicked,this));
+		$('#footer_super_menu').menu();
+		$('#footer_super_menu').hide();
+		$("#footer_super_menu" ).on( "menuselect", $.proxy(this.onMenuClicked,this));
+
+		$('#unlimited_download_rate').addClass('menu-item-selected');
+		$('#unlimited_upload_rate').addClass('menu-item-selected');
+		/* Vuze: Replaced transMenu with jQueryUI.menu
 		$('#settings_menu').transMenu({
 			selected_char: '&#x2714;',
 			/* >> Vuze
 			direction: 'up',
-			*/
+			/**
 			direction: 'down',
-			/* << Vuze */
+			/* << Vuze *
 			onClick: $.proxy(this.onMenuClicked,this)
 		});
 
 		$('#unlimited_download_rate').selectMenuItem();
 		$('#unlimited_upload_rate').selectMenuItem();
+		*/
+	},
+	
+	settingsMenuClicked: function(ev) {
+		$('#footer_super_menu').toggle();
 	},
 
 	/****
@@ -680,32 +699,48 @@ Transmission.prototype =
 		this.refilter(true);
 	},
 
-	onMenuClicked: function(ev)
+	onMenuClicked: function(ev, ui)
 	{
 		var o, dir,
-		    id = ev.target.id,
+		    id = ui.item[0].id,
 		    remote = this.remote,
-		    element = $(ev.target);
+		    element = $(ui.item[0]);
+
+		elementA = element.find('a');
+
+		// >> Vuze: Submenu? exit early. No Submenu? Hide the menu.
+		if ( element.children( "a[aria-haspopup='true']" ).length ) {
+			return false;
+		} else {
+			$(ev.target).hide();
+		}
+		// << Vuze
 
 		if (element.hasClass('sort-mode'))
 		{
 			element.parent().find('.sort-mode').each(function() {
+				/* Vuze: Removed
 				element.parent().deselectMenuItem();
+				*/
+				$(this).removeClass('menu-item-selected');
 			});
+			/* Vuze: Removed
 			element.selectMenuItem();
+			*/
+			element.addClass('menu-item-selected');
 			this.setSortMethod(id.replace(/sort_by_/, ''));
 		}
 		else if (element.hasClass('upload-speed'))
 		{
 			o = {};
-			o[RPC._UpSpeedLimit] = parseInt(ev.target.innerHTML);
+			o[RPC._UpSpeedLimit] = parseInt(elementA.html());
 			o[RPC._UpSpeedLimited] = true;
 			remote.savePrefs(o);
 		}
 		else if (element.hasClass('download-speed'))
 		{
 			o = {};
-			o[RPC._DownSpeedLimit] = parseInt(ev.target.innerHTML);
+			o[RPC._DownSpeedLimit] = parseInt(elementA.html());
 			o[RPC._DownSpeedLimited] = true;
 			remote.savePrefs(o);
 		}
@@ -768,12 +803,21 @@ Transmission.prototype =
 				break;
 
 			case 'reverse_sort_order':
+				/* Vuze: Removed
 				if (element.menuItemIsSelected()) {
+				 */
+				if (element.hasClass('menu-item-selected')) {
 					dir = Prefs._SortAscending;
+					/* Vuze: Removed
 					element.deselectMenuItem();
+					 */
+					element.removeClass('menu-item-selected');
 				} else {
 					dir = Prefs._SortDescending;
+					/* Vuze: Removed
 					element.selectMenuItem();
+					*/
+					element.addClass('menu-item-selected');
 				}
 				this.setSortDirection(dir);
 				break;
@@ -803,6 +847,7 @@ Transmission.prototype =
 
 	updateFromTorrentGet: function(updates, removed_ids)
 	{
+		//console.log(">updateFromTorrentGet " + updates.length);
 		var i, o, t, id, needed, needinfo = [],
 		    callback, fields;
 
@@ -817,11 +862,12 @@ Transmission.prototype =
 					needinfo.push(id);
 			}
 			else {
-				t = this._torrents[id] = new Torrent(o);
-				this.dirtyTorrents[id] = true;
 				callback = $.proxy(this.onTorrentChanged,this);
-				$(t).bind('dataChanged',callback);
+
+				t = this._torrents[id] = new Torrent(o, callback);
+				this.dirtyTorrents[id] = true;
 				// do we need more info for this torrent?
+				//console.log("-updateFromTorrentGet:" + i + " name= " + ('name' in t.fields) + ";status=" + ('status' in t.fields));
 				if(!('name' in t.fields) || !('status' in t.fields))
 					needinfo.push(id);
 
@@ -837,6 +883,7 @@ Transmission.prototype =
 			}
 		}
 
+		//console.log("needinfo " + needinfo.length);
 		if (needinfo.length) {
 			// whee, new torrents! get their initial information.
 			fields = ['id'].concat(Torrent.Fields.Metadata,
@@ -849,10 +896,12 @@ Transmission.prototype =
 			this.deleteTorrents(removed_ids);
 			this.refilterSoon();
 		}
+		//console.log("<updateFromTorrentGet");
 	},
 
 	updateTorrents: function(ids, fields)
 	{
+		//console.log("updateTorrents");
 		this.remote.updateTorrents(ids, fields,
 		                           this.updateFromTorrentGet, this);
 	},
@@ -1220,12 +1269,17 @@ Transmission.prototype =
 			limit = o[RPC._DownSpeedLimit];
 			limited = o[RPC._DownSpeedLimited];
 
-			e = menu.find('#limited_download_rate');
+			e = menu.find('#limited_download_rate > a');
                         e.html('Limit (' + fmt.speed(limit) + ')');
 
                         if (!limited)
                         	e = menu.find('#unlimited_download_rate');
+                        else
+                        	e = e.parent();
+                        /* Vuze: Not sure what deselectMenuSiblings does
                         e.deselectMenuSiblings().selectMenuItem();
+                        */
+        				e.addClass('menu-item-selected');
 		}
 
 		if (this.isMenuEnabled && (RPC._UpSpeedLimited in o)
@@ -1234,12 +1288,17 @@ Transmission.prototype =
 			limit = o[RPC._UpSpeedLimit];
 			limited = o[RPC._UpSpeedLimited];
 
-			e = menu.find('#limited_upload_rate');
+			e = menu.find('#limited_upload_rate > a');
                         e.html('Limit (' + fmt.speed(limit) + ')');
 
                         if (!limited)
                         	e = menu.find('#unlimited_upload_rate');
+                        else
+                        	e = e.parent();
+                        /* Vuze: Not sure what deselectMenuSiblings does
                         e.deselectMenuSiblings().selectMenuItem();
+                        */
+        				e.addClass('menu-item-selected');
 		}
 		
 		vz.updatePrefs(o);
@@ -1379,6 +1438,8 @@ Transmission.prototype =
 
 	refilterSoon: function()
 	{
+		//console.log("refiltersoon");
+		//console.trace();
 		if (!this.refilterTimer) {
 			var tr = this,
 			    callback = function(){tr.refilter(false);},
@@ -1408,6 +1469,8 @@ Transmission.prototype =
 
 	refilter: function(rebuildEverything)
 	{
+		//console.log('refilter' + rebuildEverything);
+		//console.trace();
 		var i, e, id, t, row, tmp, rows, clean_rows, dirty_rows, frag,
 		    sort_mode = this[Prefs._SortMethod],
 		    sort_direction = this[Prefs._SortDirection],
@@ -1533,6 +1596,8 @@ Transmission.prototype =
 		// set the state
 		this.setPref(Prefs._FilterMode, mode);
 
+		$('#filter-mode').val(this[Prefs._FilterMode]);
+
 		// refilter
 		this.refilter(true);
 	},
@@ -1646,11 +1711,17 @@ Transmission.prototype =
 		// update the ui: context menu
 		// (disabled in iphone mode...)
 		if (!isMobileDevice) {
-			var e = $('#settings_menu #compact_view');
+			var e = $('#compact_view');
 			if (compact)
+				e.addClass('menu-item-selected');
+			/* Vuze: Replaced
 				e.selectMenuItem();
+			*/
 			else
+				e.removeClass('menu-item-selected');
+			/* Vuze: Replaced
 				e.deselectMenuItem();
+			*/
 		}
 
 		// update the ui: footer button
