@@ -98,8 +98,8 @@
 				</div>
 						<ul id="footer_super_menu">
 							<li id="preferences"><a href="#">Preferences</a></li>
-							<li class="separator"></li>
-							<li><a href="#">Total Download Rate</a>
+							<li style="display:none" class="separator"></li>
+							<li style="display:none"><a href="#">Total Download Rate</a>
 								<ul id="footer_download_rate_menu">
 									<li id="unlimited_download_rate"><a href="#">Unlimited</a></li>
 									<li id="limited_download_rate"><a href="#">Limit (10 KB/s)</a></li>
@@ -119,7 +119,7 @@
 									<li class='download-speed'><a href="#">750 KB/s</a></li>
 								</ul>
 							</li>
-							<li><a href="#">Total Upload Rate</a>
+							<li><a style="display:none" href="#">Total Upload Rate</a>
 								<ul id="footer_upload_rate_menu">
 									<li id="unlimited_upload_rate"><a href="#">Unlimited</a></li>
 									<li id="limited_upload_rate"><a href="#">Limit (10 KB/s)</a></li>
@@ -156,8 +156,6 @@
 							</li>
 							<li class="separator"></li>
 							<li id="compact_view"><a href="#">Compact View</a></li>
-							<li id="statistics"><a href="#">Statistics</a></li>
-							<li id="toggle_notifications"><a href="#">Notifications</a></li>
 							<li id="tipjar"><a href="#">Transmission Tip Jar</a></li>
 						</ul>
 				<div id="turtle-button" title="Alternative Speed Limits">&nbsp;</div> 
@@ -169,10 +167,9 @@
 				<select id="filter-mode">
 					<option value="all">All</option>
 					<option value="active">Active</option>
-					<option value="downloading">Downloading</option>
-					<option value="seeding">Seeding</option>
-					<option value="paused">Paused</option>
-					<option value="finished">Finished</option>
+					<option value="complete">Complete</option>
+					<option value="incomplete">Incomplete </option>
+					<option value="paused">Stopped</option>
 				</select>
 				<select id="filter-tracker"></select>
 				<input type="search" id="torrent_search" placeholder="Filter" />
@@ -194,7 +191,7 @@
 						<div class="title">Downloading</div>
 						<div class="row"><div class="key">Download to:</div><div class="value"><input type="text" id="download-dir"/></div></div>
 						<div class="checkbox-row"><input type="checkbox" id="start-added-torrents"/><label for="start-added-torrents">Start when added</label></div>
-						<div class="checkbox-row"><input type="checkbox" id="rename-partial-files"/><label for="rename-partial-files">Append &quot;.part&quot; to incomplete files' names</label></div>
+						<div class="checkbox-row"><input type="checkbox" id="rename-partial-files"/><label for="rename-partial-files">Append &quot;.az!&quot; to incomplete files' names</label></div>
 					</div>
 					<div class="prefs-section" id="prefs-section-seeding">
 						<div class="title">Seeding</div>
@@ -275,8 +272,8 @@
 						                 <div class="value"><input type="text" class="numberinput" id="peer-port"/></div></div>
 						<div class="row"><div class="key">&nbsp;</div>
 						                 <div class="value"><span id="port-label">Status: Unknown</span></div></div>
-						<div class="checkbox-row"><input type="checkbox" id="peer-port-random-on-start"/><label for="peer-port-random-on-start">Randomize port on launch</label></div>
-						<div class="checkbox-row"><input type="checkbox" id="port-forwarding-enabled"/><label for="port-forwarding-enabled">Use port forwarding from my router</label></div>
+						<div id="prefs-section-peer-port-random-on-start" class="checkbox-row"><input type="checkbox" id="peer-port-random-on-start"/><label for="peer-port-random-on-start">Randomize port on launch</label></div>
+						<div id="prefs-section-port-forwarding-enabled" class="checkbox-row"><input type="checkbox" id="port-forwarding-enabled"/><label for="port-forwarding-enabled">Use port forwarding from my router</label></div>
 					</div>
 					<div class="prefs-section">
 						<div class="title">Options</div>

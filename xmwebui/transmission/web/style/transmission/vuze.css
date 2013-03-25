@@ -185,14 +185,17 @@ div#torrent_filter_bar ul#t_filters li.selected a {
 	background-position: right top;
 }
 
-div#torrent_filter_bar input#torrent_search {
-	float: right;
+#statusbar #filter input#torrent_search {
 	height: 18px;
-	width: 90px;
-	border: solid 0 #fff;
-	padding: 1px 2px;
-	margin: 8px 8px 0 0;
+	width: 110px;
+	margin-left: 20px
 }
+
+#statusbar #filter #filter-count {
+	float: right;
+	margin-top: 5px;
+}
+
 /* Safari-look filter input for Firefox */
 @-moz-document url-prefix() {
 	div#statusbar input#torrent_search {
@@ -214,20 +217,6 @@ div#torrent_filter_bar input#torrent_search {
 }
 
 /********************/
-div#torrent_inspector #inspector-close {
-	top: 0px;
-	left: 0px;
-	postion: absolute;
-	margin-right: 10px;
-	margin-top: 12px;
-  cursor: pointer;
-	width: 20px;
-	height: 20px;
-	background: transparent url('images/buttons/cancel.png') no-repeat;
-	display: block;
-}
-
-
 /***************/
 
 div#toolbar {
@@ -327,6 +316,14 @@ div.main_container {
 	width: 180px;
 }
 
+.ui-menu .ui-menu-item a {
+	line-height: 3;
+}
+
+.ui-menu .ui-icon {
+	margin-top: 0.8em;
+}
+
 .ui-menu .menu-item-selected a {
 	display: list-item;
 	list-style: disc outside;
@@ -386,13 +383,13 @@ ul.torrent_list li.torrent a {
 	float: right;
 	position: relative;
 	right: -78px;
-	top: -1px;
+	top: -9px;
+  margin:8px;
 }
 ul.torrent_list li.torrent a div {
 	background: url('images/buttons/torrent_buttons_vuze.png');
 	height: 18px;
 	width: 18px;
-    margin-right:12px
 }
 ul.torrent_list li.torrent a div.torrent_pause {
 	background-position: left top;
@@ -437,7 +434,23 @@ div#torrent_inspector {
 	top: 80px; /*55;*/
 	/* Vuze: No bottom bar, so inspector can go to bottom */
 	bottom: 0; /*22px;*/
+	background-color: #fff; /* Otherwise torrent list bleeds in on orientation change */
 }
+
+div#torrent_inspector #inspector-close {
+	top: 0px;
+	right: 0px;
+	position: absolute;
+	margin-right: 10px;
+	margin-top: 12px;
+  cursor: pointer;
+	width: 20px;
+	height: 20px;
+	background: transparent url('images/buttons/cancel.png') no-repeat;
+	display: block;
+}
+
+
 
 /****
 *****
@@ -506,7 +519,15 @@ div#torrent_pref ul#settings_menu {
 
 #prefs-section-seeding,
 #prefs-section-blocklist,
-#prefs-section-alternative-speed-limits
+#prefs-section-alternative-speed-limits,
+#port-label,
+#prefs-section-peer-port-random-on-start,
+#prefs-section-port-forwarding-enabled
 {
 	display: none;
 }
+
+.prefs-section .row .value {
+	word-wrap: break-word; /* otherwise long value strings will create horizontal scroll */
+}
+

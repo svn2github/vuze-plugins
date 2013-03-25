@@ -71,7 +71,7 @@ Transmission.prototype =
 		jQuery.event.props.push("dataTransfer");
 
 		$('#torrent_upload_form').submit(function() { $('#upload_confirm_button').click(); return false; });
-		$('#inspector_close').click($.proxy(this.toggleInspector,this));
+		$('#inspector-close').click($.proxy(this.toggleInspector,this));
 		$('#toolbar-inspector').click($.proxy(this.toggleInspector,this));
 
 		e = $('#filter-mode');
@@ -1041,6 +1041,9 @@ Transmission.prototype =
 			    destination = folderInput.val(),
 			    remote = this.remote;
 
+			 if ('' != $('#torrent_upload_url').val()) {
+				 remote.addTorrentByUrl($('#torrent_upload_url').val(), { paused: paused });
+			 }
 			jQuery.each (fileInput[0].files, function(i,file) {
 				var reader = new FileReader();
 				reader.onload = function(e) { 
@@ -1306,6 +1309,8 @@ Transmission.prototype =
 
 	updateStatusbar: function()
 	{
+		//console.log("updateStatusBar");
+		//console.trace();
 		var u=0, d=0,
 		    i, row,
 		    fmt = Transmission.fmt,

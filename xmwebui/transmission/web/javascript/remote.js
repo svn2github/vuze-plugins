@@ -112,6 +112,10 @@ TransmissionRemote.prototype =
 		remote._request_count += 1
    		/* >> Vuze Added */
 
+		// >> Vuze: iPod caches without this
+		data['math'] = Math.random();
+		// << Vuze
+
 		var ajaxSettings = {
 			url: RPC._Root,
 			type: 'POST',

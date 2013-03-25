@@ -200,6 +200,7 @@ Torrent.prototype =
 			}
 		}
 
+		//console.log("refreshFields: " + changed);
 		return changed;
 	},
 
@@ -234,6 +235,10 @@ Torrent.prototype =
 				return this.isStopped();
 			case Prefs._FilterFinished:
 				return this.isFinished();
+			case Prefs._FilterComplete:
+				return this.isDone();
+			case Prefs._FilterIncomplete:
+				return !this.isDone();
 			default:
 				return true;
 		}

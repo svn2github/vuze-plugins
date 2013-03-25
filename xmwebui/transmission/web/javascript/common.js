@@ -180,6 +180,10 @@ Prefs._FilterSeeding      = 'seeding';
 Prefs._FilterDownloading  = 'downloading';
 Prefs._FilterPaused       = 'paused';
 Prefs._FilterFinished     = 'finished';
+// >> Vuze
+Prefs._FilterComplete     = 'complete';
+Prefs._FilterIncomplete   = 'incomplete';
+// << Vuze
 
 Prefs._SortDirection      = 'sort_direction';
 Prefs._SortAscending      = 'ascending';
@@ -203,7 +207,7 @@ Prefs._Defaults =
 	'auto-start-torrents': true,
 	/* << Vuze */
 	'filter': 'all',
-	'refresh_rate' : 5,
+	'refresh_rate' : 10,
 	'sort_direction': 'ascending',
 	'sort_method': 'name',
 	'turtle-state' : false,

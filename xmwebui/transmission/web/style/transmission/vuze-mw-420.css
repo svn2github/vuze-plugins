@@ -20,3 +20,18 @@ div.dialog_container div.dialog_window h2.dialog_heading {
 div.dialog_container div.dialog_window {
 	padding-left: 2px;
 }
+
+#statusbar #filter input#torrent_search {
+	width: 90px;
+	margin-left: 0
+}
+
+#statusbar #filter #filter-count {
+	float: none;
+	margin-top: 0;
+}
+
+div#torrent_inspector {
+	width: 100%;
+	padding: 15px 0;
+}
