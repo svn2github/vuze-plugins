@@ -979,7 +979,14 @@ XMWebUIPlugin
 	    result.put(TransmissionVars.TR_PREFS_KEY_UPLOAD_SLOTS_PER_TORRENT, 14 ); //TODO
 	    //result.put(TransmissionVars.TR_PREFS_KEY_BIND_ADDRESS_IPV4, TR_DEFAULT_BIND_ADDRESS_IPV4 ); //TODO
 	    //result.put(TransmissionVars.TR_PREFS_KEY_BIND_ADDRESS_IPV6, TR_DEFAULT_BIND_ADDRESS_IPV6 ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_START, true ); //TODO
+	    
+	    boolean startStopped = COConfigurationManager.getBooleanParameter("Default Start Torrents Stopped");
+	    result.put(TransmissionVars.TR_PREFS_KEY_START, !startStopped ); //TODO
+	    
+			boolean renamePartial = COConfigurationManager.getBooleanParameter("Rename Incomplete Files");
+	    result.put(TransmissionVars.TR_PREFS_KEY_RENAME_PARTIAL_FILES, renamePartial); 
+			
+
 	    result.put(TransmissionVars.TR_PREFS_KEY_TRASH_ORIGINAL, false ); //TODO
 
 
@@ -1164,7 +1171,14 @@ XMWebUIPlugin
 				} else if (key.equals("")) {
 				} else if (key.equals("")) {
 				} else if (key.equals("")) {
-				} else if (key.equals("")) {
+				} else if (key.equals(TransmissionVars.TR_PREFS_KEY_START)) {
+
+					COConfigurationManager.setParameter("Default Start Torrents Stopped", !getBoolean(val));
+					
+				} else if (key.equals(TransmissionVars.TR_PREFS_KEY_RENAME_PARTIAL_FILES)) {
+					
+					COConfigurationManager.setParameter("Rename Incomplete Files", getBoolean(val));
+
 				} else if (key.equals("speed-limit-down-enabled")
 						|| key.equals("downloadLimited")) {
 
@@ -1179,6 +1193,10 @@ XMWebUIPlugin
 						pc.setCoreIntParameter(
 								PluginConfig.CORE_PARAM_INT_MAX_DOWNLOAD_SPEED_KBYTES_PER_SEC,
 								down_limit);
+					} else if (enable && down_limit == 0) {
+						pc.setCoreIntParameter(
+								PluginConfig.CORE_PARAM_INT_MAX_DOWNLOAD_SPEED_KBYTES_PER_SEC,
+								10);
 					}
 				} else if (key.equals("speed-limit-down")
 						|| key.equals("downloadLimit")) {
@@ -1212,6 +1230,12 @@ XMWebUIPlugin
 						pc.setCoreIntParameter(
 								PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_SEEDING_KBYTES_PER_SEC,
 								0);
+					} else {
+						pc.setCoreIntParameter(
+								PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_KBYTES_PER_SEC, 10);
+						pc.setCoreIntParameter(
+								PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_SEEDING_KBYTES_PER_SEC,
+								10);
 					}
 				} else if (key.equals("speed-limit-up") || key.equals("uploadLimit")) {
 
@@ -2309,7 +2333,7 @@ XMWebUIPlugin
            * Range is [0..1]
            */
 					// TODO: getRemaining only excludes DND when diskmanager exists..
-  				value = 1.0f - (stats.getRemaining() / t.getSize());
+  				value = 1.0f - ((float) stats.getRemaining() / t.getSize());
 
 				} else if ( field.equals( "pieces")) {
 					// RPC v5
