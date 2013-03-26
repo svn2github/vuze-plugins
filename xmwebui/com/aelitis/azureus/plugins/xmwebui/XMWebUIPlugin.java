@@ -3224,7 +3224,8 @@ XMWebUIPlugin
 	 */
 	private Object torrentGet_activityDate(DownloadManager download) {
 		int state = download.getState();
-		if (state == Download.ST_SEEDING || state == Download.ST_DOWNLOADING) {
+		if (state == DownloadManager.STATE_SEEDING || state == DownloadManager.STATE_DOWNLOADING) {
+			// XXX THIS IS STUPID!  Time on this machine won't be the same as the client..
 			return (SystemTime.getCurrentTime() / 1000)
 					- Math.min(
 							download.getStats().getTimeSinceLastDataReceivedInSeconds(),
