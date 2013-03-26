@@ -391,7 +391,7 @@ XMWebUIPlugin
 		
 		try{
 			// Set cookie just in case client is looking for one..
-			response.setHeader( "Set-Cookie", "X-Transmission-Session-Id=" + getSessionID(request) + "; HttpOnly" );
+			response.setHeader( "Set-Cookie", "X-Transmission-Session-Id=" + getSessionID(request) + "; path=/; HttpOnly" );
 			// This is the actual spec for massing session-id
 			response.setHeader("X-Transmission-Session-Id", getSessionID(request));
 			
