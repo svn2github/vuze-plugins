@@ -33,5 +33,11 @@ div.dialog_container div.dialog_window {
 
 div#torrent_inspector {
 	width: 100%;
-	padding: 15px 0;
+	padding: 90px 0 0 10px;
+}
+
+#menu_sep_rates,
+#menu_total_download_rate,
+#menu_total_upload_rate {
+	display: none;
 }

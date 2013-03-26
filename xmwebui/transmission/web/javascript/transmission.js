@@ -1430,8 +1430,10 @@ Transmission.prototype =
 		if (isMobileDevice) {
 			$('body').toggleClass('inspector_showing',visible);
 		} else {
+			/* Vuze: Not needed now that layout isn't a scrollable div
 			var w = visible ? $('#torrent_inspector').outerWidth() + 1 + 'px' : '0px';
 			$('#torrent_container')[0].style.right = w;
+			*/
 		}
 	},
 

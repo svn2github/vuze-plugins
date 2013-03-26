@@ -48,6 +48,7 @@
 	</head>
 	<body id="transmission_body">
 
+	<div id="header">
 		<div id="toolbar-area">
 		<div id="toolbar" class="toolbar-main">
 			<div id="toolbar-open" title="Add Torrent"></div>
@@ -89,75 +90,9 @@
 			<img src="style/transmission/images/graphics/vuze_remote_logo.png" alt="Vuze Remote">
 		</div>
 
-		<div id="remotesearch_container" style="display:none" class="scrollable">
-			<!-- iframe id="remotesearch" src="about:blank"></iframe-->
-		</div>
-
 		<div id="statusbar">
 				<div id="settings_menu" title="Settings Menu">
 				</div>
-						<ul id="footer_super_menu">
-							<li id="preferences"><a href="#">Preferences</a></li>
-							<li style="display:none" class="separator"></li>
-							<li style="display:none"><a href="#">Total Download Rate</a>
-								<ul id="footer_download_rate_menu">
-									<li id="unlimited_download_rate"><a href="#">Unlimited</a></li>
-									<li id="limited_download_rate"><a href="#">Limit (10 KB/s)</a></li>
-									<li class="separator"></li>
-									<li class='download-speed'><a href="#">5 KB/s</a></li>
-									<li class='download-speed'><a href="#">10 KB/s</a></li>
-									<li class='download-speed'><a href="#">20 KB/s</a></li>
-									<li class='download-speed'><a href="#">30 KB/s</a></li>
-									<li class='download-speed'><a href="#">40 KB/s</a></li>
-									<li class='download-speed'><a href="#">50 KB/s</a></li>
-									<li class='download-speed'><a href="#">75 KB/s</a></li>
-									<li class='download-speed'><a href="#">100 KB/s</a></li>
-									<li class='download-speed'><a href="#">150 KB/s</a></li>
-									<li class='download-speed'><a href="#">200 KB/s</a></li>
-									<li class='download-speed'><a href="#">250 KB/s</a></li>
-									<li class='download-speed'><a href="#">500 KB/s</a></li>
-									<li class='download-speed'><a href="#">750 KB/s</a></li>
-								</ul>
-							</li>
-							<li><a style="display:none" href="#">Total Upload Rate</a>
-								<ul id="footer_upload_rate_menu">
-									<li id="unlimited_upload_rate"><a href="#">Unlimited</a></li>
-									<li id="limited_upload_rate"><a href="#">Limit (10 KB/s)</a></li>
-									<li class="separator"></li>
-									<li class='upload-speed'><a href="#">5 KB/s</a></li>
-									<li class='upload-speed'><a href="#">10 KB/s</a></li>
-									<li class='upload-speed'><a href="#">20 KB/s</a></li>
-									<li class='upload-speed'><a href="#">30 KB/s</a></li>
-									<li class='upload-speed'><a href="#">40 KB/s</a></li>
-									<li class='upload-speed'><a href="#">50 KB/s</a></li>
-									<li class='upload-speed'><a href="#">75 KB/s</a></li>
-									<li class='upload-speed'><a href="#">100 KB/s</a></li>
-									<li class='upload-speed'><a href="#">150 KB/s</a></li>
-									<li class='upload-speed'><a href="#">200 KB/s</a></li>
-									<li class='upload-speed'><a href="#">250 KB/s</a></li>
-									<li class='upload-speed'><a href="#">500 KB/s</a></li>
-									<li class='upload-speed'><a href="#">750 KB/s</a></li>
-								</ul>
-							</li>
-							<li class="separator"></li>
-							<li><a href="#">Sort Transfers By</a>
-								<ul id="footer_sort_menu">
-									<li class='sort-mode' id="sort_by_queue_order"><a href="#">Queue Order</a></li>
-									<li class='sort-mode' id="sort_by_activity"><a href="#">Activity</a></li>
-									<li class='sort-mode' id="sort_by_age"><a href="#">Age</a></li>
-									<li class='sort-mode' id="sort_by_name"><a href="#">Name</a></li>
-									<li class='sort-mode' id="sort_by_percent_completed"><a href="#">Progress</a></li>
-									<li class='sort-mode' id="sort_by_ratio"><a href="#">Ratio</a></li>
-									<li class='sort-mode' id="sort_by_size"><a href="#">Size</a></li>
-									<li class='sort-mode' id="sort_by_state"><a href="#">State</a></li>
-									<li class="separator"></li>
-									<li id="reverse_sort_order"><a href="#">Reverse Sort Order</a></li>
-								</ul>
-							</li>
-							<li class="separator"></li>
-							<li id="compact_view"><a href="#">Compact View</a></li>
-							<li id="tipjar"><a href="#">Transmission Tip Jar</a></li>
-						</ul>
 				<div id="turtle-button" title="Alternative Speed Limits">&nbsp;</div> 
 				<div id="compact-button" title="Compact View">&nbsp;</div>
 				<div id="prefs-button" title="Edit Preferences...">&nbsp;</div>
@@ -176,6 +111,7 @@
 				<span id="filter-count">&nbsp;</span>
 			</div>
 		</div>
+	</div>
 
 		<div id="prefs-dialog" style="display:none;">
 			<ul>
@@ -282,6 +218,73 @@
 					</div>
 				</div>
 			</div>
+		</div>
+
+		<ul id="footer_super_menu">
+			<li id="preferences"><a href="#">Preferences</a></li>
+			<li id="menu_sep_rates" class="separator"></li>
+			<li id="menu_total_download_rate"><a href="#">Total Download Rate</a>
+				<ul id="footer_download_rate_menu">
+					<li id="unlimited_download_rate"><a href="#">Unlimited</a></li>
+					<li id="limited_download_rate"><a href="#">Limit (10 KB/s)</a></li>
+					<li class="separator"></li>
+					<li class='download-speed'><a href="#">5 KB/s</a></li>
+					<li class='download-speed'><a href="#">10 KB/s</a></li>
+					<li class='download-speed'><a href="#">20 KB/s</a></li>
+					<li class='download-speed'><a href="#">30 KB/s</a></li>
+					<li class='download-speed'><a href="#">40 KB/s</a></li>
+					<li class='download-speed'><a href="#">50 KB/s</a></li>
+					<li class='download-speed'><a href="#">75 KB/s</a></li>
+					<li class='download-speed'><a href="#">100 KB/s</a></li>
+					<li class='download-speed'><a href="#">150 KB/s</a></li>
+					<li class='download-speed'><a href="#">200 KB/s</a></li>
+					<li class='download-speed'><a href="#">250 KB/s</a></li>
+					<li class='download-speed'><a href="#">500 KB/s</a></li>
+					<li class='download-speed'><a href="#">750 KB/s</a></li>
+				</ul>
+			</li>
+			<li id="menu_total_upload_rate"><a href="#">Total Upload Rate</a>
+				<ul id="footer_upload_rate_menu">
+					<li id="unlimited_upload_rate"><a href="#">Unlimited</a></li>
+					<li id="limited_upload_rate"><a href="#">Limit (10 KB/s)</a></li>
+					<li class="separator"></li>
+					<li class='upload-speed'><a href="#">5 KB/s</a></li>
+					<li class='upload-speed'><a href="#">10 KB/s</a></li>
+					<li class='upload-speed'><a href="#">20 KB/s</a></li>
+					<li class='upload-speed'><a href="#">30 KB/s</a></li>
+					<li class='upload-speed'><a href="#">40 KB/s</a></li>
+					<li class='upload-speed'><a href="#">50 KB/s</a></li>
+					<li class='upload-speed'><a href="#">75 KB/s</a></li>
+					<li class='upload-speed'><a href="#">100 KB/s</a></li>
+					<li class='upload-speed'><a href="#">150 KB/s</a></li>
+					<li class='upload-speed'><a href="#">200 KB/s</a></li>
+					<li class='upload-speed'><a href="#">250 KB/s</a></li>
+					<li class='upload-speed'><a href="#">500 KB/s</a></li>
+					<li class='upload-speed'><a href="#">750 KB/s</a></li>
+				</ul>
+			</li>
+			<li class="separator"></li>
+			<li><a href="#">Sort Transfers By</a>
+				<ul id="footer_sort_menu">
+					<li class='sort-mode' id="sort_by_queue_order"><a href="#">Queue Order</a></li>
+					<li class='sort-mode' id="sort_by_activity"><a href="#">Activity</a></li>
+					<li class='sort-mode' id="sort_by_age"><a href="#">Age</a></li>
+					<li class='sort-mode' id="sort_by_name"><a href="#">Name</a></li>
+					<li class='sort-mode' id="sort_by_percent_completed"><a href="#">Progress</a></li>
+					<li class='sort-mode' id="sort_by_ratio"><a href="#">Ratio</a></li>
+					<li class='sort-mode' id="sort_by_size"><a href="#">Size</a></li>
+					<li class='sort-mode' id="sort_by_state"><a href="#">State</a></li>
+					<li class="separator"></li>
+					<li id="reverse_sort_order"><a href="#">Reverse Sort Order</a></li>
+				</ul>
+			</li>
+			<li class="separator"></li>
+			<li id="compact_view"><a href="#">Compact View</a></li>
+			<li id="tipjar"><a href="#">Transmission Tip Jar</a></li>
+		</ul>
+
+		<div id="remotesearch_container" style="display:none" class="scrollable">
+			<!-- iframe id="remotesearch" src="about:blank"></iframe-->
 		</div>
 
 		<div id="torrent_inspector" style="display:none;" class="scrollable">

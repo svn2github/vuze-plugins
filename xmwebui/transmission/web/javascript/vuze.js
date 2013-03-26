@@ -34,7 +34,7 @@ vz.executeSearch = function(){
     $("#torrent_filter_bar").hide();
     if( !isMobileDevice && transmission[Prefs._ShowInspector] ) $("#torrent_inspector").hide();
     $("#torrent_container").hide();
-    $("#remotesearch_container").show()
+    $("#remotesearch_container").show();
 }
 vz.backFromSearch = function(){
     $("#torrent_filter_bar").show();
@@ -148,8 +148,20 @@ function touchScroll(selector) {
     }
 }
 
+function vuzeOnResize() {
+    var h = ($(window).height() - 80);
+	$('#remotesearch_container').height(h);
+	if ($(window).width() > 900) {
+    	$("#torrent_logo").show();
+	} else {
+    	$("#torrent_logo").hide();
+	}
+}
 
 $(document).ready( function(){
+	
+	$(window).resize(vuzeOnResize);
+
     vz.utils.selectOnFocus();
     // WebKit 533.1  (Android 2.3.3) needs scrollable divs hack
     // WebKit 533.17.9  (iPhone OS 4_2_1) needs scrollable divs hack
@@ -162,5 +174,11 @@ $(document).ready( function(){
 		if (parseInt($.browser.version, 10) < 534) {
 		    touchScroll(".scrollable");
 		}
+	}
+	
+	var ua = navigator.userAgent;
+	if (ua.indexOf("iPhone OS 4_") !== -1 || ua.indexOf("iPhone OS 3_") !== -1) {
+		// older iPods crash on search results
+		$("#toolbar-search").hide();
 	}
 })

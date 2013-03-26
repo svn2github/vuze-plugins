@@ -126,7 +126,7 @@ TransmissionRemote.prototype =
 			beforeSend: function(XHR){ remote.appendSessionId(XHR); },
 			error: function(request, error_string, exception){ 
 				remote.ajaxError(request, error_string, exception, ajaxSettings);
-				console.log("Error " + error_string);
+				//console.log("Error " + error_string);
 				},
 			success: callback,
 			context: context,

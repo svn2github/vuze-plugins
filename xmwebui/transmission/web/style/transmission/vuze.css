@@ -1,12 +1,28 @@
-#remotesearch_container {
-	position: fixed;
-	-webkit-overflow-scrolling: touch;
+
+body {
 	overflow: auto;
-	left: 0;
-	top: 80px;
-	bottom: 0;
-	width: 100%;
+}
+
+#header {
+	margin: 0;
 	padding: 0;
+	position: fixed;
+	top: 0;
+	width: 100%;
+	z-index: 99;
+}
+
+
+#remotesearch_container {
+	-webkit-overflow-scrolling: scroll;
+	bottom: auto;
+	top: auto;
+	left: auto;
+	right: auto;
+	position: relative;
+	padding: 80px 0 0 0;
+	height: 100%;
+
 	margin: 0;
 	border: 0;
 	border-top: 1px solid #667A8A
@@ -64,7 +80,6 @@ div#torrent_logo {
 	position: absolute;
 	top: 0;
 	left: 0;
-	z-index: 3;
 	margin-top: 4px;
 	margin-left: 4px;
 }
@@ -287,7 +302,6 @@ div#toolbar > * {
 	overflow: hidden;
 	*/
 	overflow: visible;
-	z-index: 3;
 	height: 28px;
 	/* might need position: none
 	position: relative;
@@ -305,9 +319,11 @@ div.main_container {
 }
 
 #footer_super_menu {
+	display:none;
+	z-index: 6;
 	position: absolute;
-	top: 25px;
-	left: 10px;
+	top: 79px;
+	left: 12px;
 	width: 200px;
 	text-align: left;
 }
@@ -357,8 +373,13 @@ div.main_container {
 ****
 ***/
 div#torrent_container {
-	position: fixed;
-	top: 80px; /* 65px */
+	-webkit-overflow-scrolling: auto;
+	bottom: auto;
+	top: auto;
+	left: auto;
+	right: auto;
+	position: relative;
+	padding: 80px 0 0 0;
 }
 
 ul.torrent_list li.torrent {
@@ -431,18 +452,22 @@ ul.torrent_list li.torrent a:active div.torrent_info {
 
 
 div#torrent_inspector {
-	top: 80px; /*55;*/
-	/* Vuze: No bottom bar, so inspector can go to bottom */
-	bottom: 0; /*22px;*/
+	-webkit-overflow-scrolling: auto;
+	bottom: auto;
+	top: auto;
+	left: auto;
+	right: auto;
+	position: relative;
+	padding: 90px 0 0 10px;
+
+	float: right;
 	background-color: #fff; /* Otherwise torrent list bleeds in on orientation change */
 }
 
 div#torrent_inspector #inspector-close {
-	top: 0px;
 	right: 0px;
 	position: absolute;
 	margin-right: 10px;
-	margin-top: 12px;
   cursor: pointer;
 	width: 20px;
 	height: 20px;
@@ -474,7 +499,6 @@ div.torrent_footer {
 }
 
 /* >> Vuze: Misc stuff, no idea if needed */
-div#torrent_container {bottom:0}
 
 div#torrent_pref {
 	float:left;
