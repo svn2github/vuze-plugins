@@ -2065,7 +2065,12 @@ XMWebUIPlugin
 				if ( field.equals( "activityDate" )){
 					// RPC v0
 					// activityDate                | number                      | tr_stat
-					value = torrentGet_activityDate(core_download);
+					value = torrentGet_activityDate(core_download, false);
+
+				} else if ( field.equals( "activityDateRelative" )){
+						// RPC v0
+						// activityDate                | number                      | tr_stat
+						value = torrentGet_activityDate(core_download, true);
 
 				}else if ( field.equals( "addedDate" )){
 					// RPC v0
@@ -3222,14 +3227,24 @@ XMWebUIPlugin
 	/** 
 	 * The last time we uploaded or downloaded piece data on this torrent. 
 	 */
-	private Object torrentGet_activityDate(DownloadManager download) {
+	private Object torrentGet_activityDate(DownloadManager download, boolean relative) {
 		int state = download.getState();
 		if (state == DownloadManager.STATE_SEEDING || state == DownloadManager.STATE_DOWNLOADING) {
+			int r = download.getStats().getTimeSinceLastDataReceivedInSeconds();
+			int s = download.getStats().getTimeSinceLastDataSentInSeconds();
+			long l;
+			if (r > 0 && s > 0) {
+				l = Math.min(r, s);
+			} else if (r < 0) {
+				l = s;
+			} else {
+				l = r;
+			}
+			if (relative) {
+				return -l;
+			}
 			// XXX THIS IS STUPID!  Time on this machine won't be the same as the client..
-			return (SystemTime.getCurrentTime() / 1000)
-					- Math.min(
-							download.getStats().getTimeSinceLastDataReceivedInSeconds(),
-							download.getStats().getTimeSinceLastDataSentInSeconds());
+			return (SystemTime.getCurrentTime() / 1000) - l;
 		}
 		
 		return 0;
