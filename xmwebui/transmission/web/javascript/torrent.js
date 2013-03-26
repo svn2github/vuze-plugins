@@ -99,6 +99,7 @@ Torrent.Fields.InfoExtra = [
 // fields used in the inspector which need to be periodically refreshed
 Torrent.Fields.StatsExtra = [
 	'activityDate',
+	'activityDateRelative', // Vuze: relative time!
 	'corruptEver',
 	'desiredAvailable',
 	'downloadedEver',
@@ -264,7 +265,8 @@ Torrent.prototype =
 	getHaveUnchecked: function() { return this.fields.haveUnchecked; },
 	getHaveValid: function() { return this.fields.haveValid; },
 	getId: function() { return this.fields.id; },
-	getLastActivity: function() { return this.fields.activityDate; },
+	/** Vuze: Use activityDateRelative if exists */
+	getLastActivity: function() { return ("activityDateRelative" in this.fields) ? (Date.now() / 1000) + this.fields.activityDateRelative : this.fields.activityDate; },
 	getLeftUntilDone: function() { return this.fields.leftUntilDone; },
 	getMetadataPercentComplete: function() { return this.fields.metadataPercentComplete; },
 	getName: function() { return this.fields.name || 'Unknown'; },
