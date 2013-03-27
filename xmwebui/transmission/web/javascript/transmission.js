@@ -1,6 +1,6 @@
 /* Transmission Revision 14025 */
 /**
- * Copyright © Dave Perrett, Malcolm Jarvis and Bruno Bierbaumer
+ * Copyright © Jordan Lee, Dave Perrett, Malcolm Jarvis and Bruno Bierbaumer
  *
  * This file is licensed under the GPLv2.
  * http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
@@ -29,7 +29,9 @@ Transmission.prototype =
 		this.prefsDialog = new PrefsDialog(this.remote);
 		$(this.prefsDialog).bind('closed', $.proxy(this.onPrefsDialogClosed,this));
 
+		// >> Vuze: Always show menu!
 		this.isMenuEnabled = true; //!isMobileDevice;
+		// << Vuze
 
 		// Initialize the implementation fields
 		this.filterText    = '';
@@ -71,7 +73,9 @@ Transmission.prototype =
 		jQuery.event.props.push("dataTransfer");
 
 		$('#torrent_upload_form').submit(function() { $('#upload_confirm_button').click(); return false; });
+		// >> Vuze
 		$('#inspector-close').click($.proxy(this.toggleInspector,this));
+		// << Vuze
 		$('#toolbar-inspector').click($.proxy(this.toggleInspector,this));
 
 		e = $('#filter-mode');
@@ -88,9 +92,9 @@ Transmission.prototype =
 			$('#torrent_container').bind('drop', $.proxy(this.drop,this));
 			$('#inspector_link').click( $.proxy(this.toggleInspector,this) );
 
+			this.setupSearchBox();
 			this.createContextMenu();
 		}
-		this.setupSearchBox();
 
 		if (this.isMenuEnabled)
 			this.createSettingsMenu();
@@ -862,6 +866,8 @@ Transmission.prototype =
 					needinfo.push(id);
 			}
 			else {
+				// Vuze: We had issues where the callback was being registered after the first call to the callback
+				//       The "fix" was to pass the callback into the initialization and have it bind 'dataChanged'
 				callback = $.proxy(this.onTorrentChanged,this);
 
 				t = this._torrents[id] = new Torrent(o, callback);
@@ -1005,7 +1011,8 @@ Transmission.prototype =
 		}
 	},
 
-	shouldAddedTorrentsStart : function() {
+	shouldAddedTorrentsStart : function()
+	{
 		return this.prefsDialog.shouldAddedTorrentsStart();
 	},
 	
@@ -1603,7 +1610,9 @@ Transmission.prototype =
 		// set the state
 		this.setPref(Prefs._FilterMode, mode);
 
+		// >> Vuze: Make sure filter mode widgeth has correct value
 		$('#filter-mode').val(this[Prefs._FilterMode]);
+		// << Vuze
 
 		// refilter
 		this.refilter(true);
