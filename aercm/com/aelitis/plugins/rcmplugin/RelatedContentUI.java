@@ -120,11 +120,13 @@ RelatedContentUI
 	private RelatedContentManagerListener	rcm_listener;
 	
 	private boolean			ui_setup;
+	
 	private boolean			root_menus_added;
+	private MenuItem		root_menu;
 	
 	private Image			swarm_image;
 	
-	private List<MenuItem>	menus = new ArrayList<MenuItem>();
+	private List<MenuItem>	torrent_menus = new ArrayList<MenuItem>();
 		
 	private ByteArrayHashMap<RCMItem>	rcm_item_map = new ByteArrayHashMap<RCMItem>();
 	
@@ -190,13 +192,20 @@ RelatedContentUI
 					}
 					
 					try{
-						for ( MenuItem menu: menus ){
+						for ( MenuItem menu: torrent_menus ){
 							
 							menu.remove();
 						}
 					}catch( Throwable e ){
 						
 						Debug.out( e );
+					}
+					
+					if ( root_menu != null ){
+						
+						root_menu.remove();
+						
+						root_menu = null;
 					}
 					
 					try{
@@ -545,18 +554,22 @@ RelatedContentUI
 	}
 	
 	protected void
-	hookMyTorrentMenus(boolean enable)
+	hookMyTorrentMenus(
+		boolean enable )
 	{
-		if (enable && menus.size() > 0) {
+		if ( enable && torrent_menus.size() > 0 ) {
 			return;
 		}
 		
-		if (!enable) {
-			if ( menus.size() > 0 ){ 
-				for (MenuItem menuitem : menus) {
+		if ( !enable ){
+			
+			if ( torrent_menus.size() > 0 ){
+				
+				for (MenuItem menuitem : torrent_menus) {
 					menuitem.remove();
 				}
-				menus.clear();
+				
+				torrent_menus.clear();
 			}
 			return;
 		}
@@ -579,7 +592,7 @@ RelatedContentUI
 			
 			TableContextMenuItem mi_rel = table_manager.addContextMenuItem( table_id, "rcm.contextmenu.lookupassoc");
 		
-			menus.add( mi_rel );
+			torrent_menus.add( mi_rel );
 			
 			mi_rel.setStyle( TableContextMenuItem.STYLE_PUSH );
 
@@ -613,7 +626,7 @@ RelatedContentUI
 						
 			TableContextMenuItem mi_size = table_manager.addContextMenuItem( table_id, "rcm.contextmenu.lookupsize");
 			
-			menus.add( mi_size );
+			torrent_menus.add( mi_size );
 			
 			mi_size.setStyle( TableContextMenuItem.STYLE_PUSH );
 
@@ -691,7 +704,7 @@ RelatedContentUI
 			
 			TableContextMenuItem mi = table_manager.addContextMenuItem( table_id, "rcm.contextmenu.lookupsize");
 		
-			menus.add( mi );
+			torrent_menus.add( mi );
 			
 			mi.setStyle( TableContextMenuItem.STYLE_PUSH );
 
@@ -979,7 +992,8 @@ RelatedContentUI
 			MenuItem menu_item;
 			
 			menu_item = menu_manager.addMenuItem( MenuManager.MENU_MENUBAR, "rcm.view.heading" );
-			menus.add(menu_item);
+			
+			root_menu = menu_item;
 
 			menu_item.addListener( 
 					new MenuItemListener() 

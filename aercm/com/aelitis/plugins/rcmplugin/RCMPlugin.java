@@ -21,7 +21,6 @@
 
 package com.aelitis.plugins.rcmplugin;
 
-import java.io.File;
 import java.util.*;
 
 import org.gudy.azureus2.core3.config.COConfigurationManager;
@@ -315,6 +314,7 @@ RCMPlugin
 	getSourcesList()
 	{
 		List original_list = COConfigurationManager.getListParameter( PARAM_SOURCES_LIST, source_map_defaults );
+		
 		List<String>	list = BDecoder.decodeStrings( BEncoder.cloneList(original_list) );
 
 		return( list );
