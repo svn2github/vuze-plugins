@@ -1,3 +1,7 @@
 div#torrent_logo {
 	display: none;
 }
+
+div#torrent_inspector {
+	width: 100%;
+}

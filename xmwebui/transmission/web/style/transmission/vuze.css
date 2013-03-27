@@ -8,6 +8,7 @@ body {
 	padding: 0;
 	position: fixed;
 	top: 0;
+	left: 0;
 	width: 100%;
 	z-index: 99;
 }
@@ -384,7 +385,7 @@ div#torrent_container {
 
 ul.torrent_list li.torrent {
 	/* Vuze: More right padding for info button */
-	padding: 4px 80px 5px 10px; /* Make space for buttons on the right */
+	padding: 4px 5px 5px 10px; /* Make space for buttons on the right */
 }
 
 ul.torrent_list li.torrent div.torrent_progress_details {
@@ -395,6 +396,10 @@ ul.torrent_list li.torrent div.torrent_peer_details {
 	color: #4f5b65
 }
 
+ul.torrent_list div.torrent_progress_bar_container.full {
+	margin-right: 80px;
+}
+
 /****
 *****  START / STOP BUTTON
 ****/
@@ -403,7 +408,7 @@ ul.torrent_list li.torrent div.torrent_peer_details {
 ul.torrent_list li.torrent a {
 	float: right;
 	position: relative;
-	right: -78px;
+	right: auto;
 	top: -9px;
   margin:8px;
 }
