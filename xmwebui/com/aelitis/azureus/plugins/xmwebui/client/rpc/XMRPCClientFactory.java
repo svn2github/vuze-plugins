@@ -102,6 +102,6 @@ XMRPCClientFactory
 		String	tunnel_user,
 		String	tunnel_password )
 	{
-		return( new XMRPCClientTunnel( access_code, tunnel_user, tunnel_password ));
+		return( new XMRPCClientTunnelHandler( access_code, tunnel_user, tunnel_password ));
 	}
 }

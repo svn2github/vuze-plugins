@@ -503,7 +503,8 @@ XMRPCClientTunnel
 		}catch( Throwable e ){
 			
 			throw( new XMRPCClientException( "Failed to use tunnel", e ));
-		}	}
+		}	
+	}
 	
 	public void
 	destroy()

@@ -13,8 +13,9 @@
     <selectedElements exportClassFiles="true" exportJavaFiles="true" exportOutputFolder="false">
         <javaElement handleIdentifier="=xmwebui/&lt;com.aelitis.azureus.plugins.xmwebui"/>
         <javaElement handleIdentifier="=aeremsearchplugin/&lt;com.aelitis.azureus.plugins.remsearch{RemSearchPluginSearch.java"/>
-        <javaElement handleIdentifier="=xmwebui/&lt;com.aelitis.azureus.plugins.xmwebui.client.rpc"/>
+        <javaElement handleIdentifier="=xmwebui/&lt;com.aelitis.azureus.plugins.xmwebui.client.proxy"/>
         <javaElement handleIdentifier="=xmwebui/&lt;com.aelitis.azureus.plugins.xmwebui.client"/>
+        <javaElement handleIdentifier="=xmwebui/&lt;com.aelitis.azureus.plugins.xmwebui.client.rpc"/>
         <javaElement handleIdentifier="=xmwebui/&lt;com.aelitis.azureus.plugins.xmwebui.internat"/>
         <javaElement handleIdentifier="=aeremsearchplugin/&lt;com.aelitis.azureus.plugins.remsearch{RemSearchPluginPageGeneratorAdaptor.java"/>
         <javaElement handleIdentifier="=aeremsearchplugin/&lt;com.aelitis.azureus.plugins.remsearch{RemSearchPluginEngine.java"/>
