@@ -278,34 +278,6 @@ div#toolbar > * {
 	display: none;
 }
 
-#toolbar ul {
-	padding: 0;
-	background:url(images/graphics/vuze_remote_nav_bg.png) 0 -58px no-repeat;
-	width:390px;
-	margin:0 auto;
-	position: relative;
-	left:50%;
-	margin-left:-195px;
-}
-
-#toolbar ul li > div {
-	color: #3c5e79;
-	font-size: 9px;
-}
-
-#toolbar ul li {
-	padding: 0;
-	width:53px;
-}
-
-#toolbar ul li div.toolbar_image {
-	background-image: url('images/buttons/toolbar_buttons_vuze.png');
-}
-
-#toolbar ul li.divider {
-	display:none
-}
-
 /***
 ****
 ****  STATUSBAR
