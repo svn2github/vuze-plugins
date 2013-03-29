@@ -1,6 +1,7 @@
 
 body {
 	overflow: auto;
+	height: 100%;
 }
 
 #header {
@@ -72,8 +73,25 @@ form #search_input {
 	height: 26px;
 }
 
-#log_out {float:right;height:33px;line-height:33px;margin-right:8px; margin-top:-5px}
-#log_out a {background: transparent url(images/graphics/reset_link_btn.png) top left no-repeat;float:left;width:60px;height:17px;text-align:center;margin-top:9px;line-height:17px;color:#264356;text-decoration:none;font-weight:bold}
+#log_out {
+	position: fixed;
+	float: right;
+	right: 0;
+	margin-right: 3px;
+}
+
+#log_out a {
+	background: transparent url(images/graphics/reset_link_btn.png) top left  no-repeat;
+	float: left;
+	width: 60px;
+	height: 17px;
+	text-align: center;
+	line-height: 17px;
+	color: #264356;
+	text-decoration: none;
+	font-weight: bold;
+}
+
 #log_out a:active {background-position:left bottom}
 #log_out a:hover {background-position:left center}
 
@@ -239,7 +257,7 @@ div#toolbar {
 	width: 315px;
 	height: 32px;
 	margin: 0px auto; /*0px*/
-	padding: 2px 0 0 0; /*2px*/
+	padding: 1px 0 0 0; /*2px*/
 	border: none; /*border-bottom: 1px solid #AAA;*/
 	background: none; /*url('images/red-texture.png') repeat; */
 }
@@ -313,6 +331,8 @@ div#speed-info {
 	margin: 0px;
 	float: none;
 	padding-top: 0px;
+	line-height: 18px;
+	height: 18px;
 }
 
 div.main_container {

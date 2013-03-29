@@ -272,8 +272,12 @@ function PrefsDialog(remote) {
                 case 'search':
                     // don't change the text if the user's editing it.
                     // it's very annoying when that happens!
-                    if (e[0] !== document.activeElement)
-                        e.val(val);
+                	try {
+                		//document.activeElement.focus();
+                		if (e[0] === document.activeElement)
+                			break;
+                	} catch (e) {}
+                    e.val(val);
                     break;
                 case 'select-one':
                     e.val(val);

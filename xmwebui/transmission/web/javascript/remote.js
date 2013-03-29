@@ -115,7 +115,7 @@ TransmissionRemote.prototype =
 		// >> Vuze: iPod caches without this
 		data['math'] = Math.random();
 		// << Vuze
-
+		
 		var ajaxSettings = {
 			url: RPC._Root,
 			type: 'POST',
