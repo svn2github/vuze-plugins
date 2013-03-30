@@ -32,8 +32,14 @@ div.dialog_container div.dialog_window {
 }
 
 div#torrent_inspector {
+	float: none;
+	border: 0;
+	padding:2px;
 	width: 100%;
-	padding: 90px 0 0 10px;
+}
+
+div#torrent_inspector #inspector-close {
+	display: none;
 }
 
 #menu_sep_rates,

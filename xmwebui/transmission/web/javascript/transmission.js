@@ -161,9 +161,12 @@ Transmission.prototype =
 		/* >> Vuze: Pairing Logout, hide turtle mode, 'Add' for isMobileDevice (Why?) */
 		// determine whether to display logout button
 		$.get("/isServicePaired", {}, function(responseText) {
-			var json = eval('(' + responseText + ')')
-			if (json.servicepaired)
-				$("#log_out").show()
+			var json = eval('(' + responseText + ')');
+			if (json['servicepaired']) {
+				$("#log_out").show();
+			} else {
+				$("#log_out").hide();
+			}
 		});
 
 		$("div.limit_turtle").hide()
@@ -1427,20 +1430,27 @@ Transmission.prototype =
 	},
 	setInspectorVisible: function(visible)
 	{
-		if (visible)
-			this.inspector.setTorrents(this.getSelectedTorrents());
+		if ($('#inspector-close').css('display') === "block") {
+			if (visible)
+				this.inspector.setTorrents(this.getSelectedTorrents());
+	
+			// update the ui widgetry
+			$('#torrent_inspector').toggle(visible);
+			$('#toolbar-inspector').toggleClass('selected',visible);
+			this.hideMobileAddressbar();
+			if (isMobileDevice) {
+				$('body').toggleClass('inspector_showing',visible);
+			} else {
+				var y = $('body').scrollTop() + 82;
+				$('#torrent_inspector').css('padding-top', y + 'px');
 
-		// update the ui widgetry
-		$('#torrent_inspector').toggle(visible);
-		$('#toolbar-inspector').toggleClass('selected',visible);
-		this.hideMobileAddressbar();
-		if (isMobileDevice) {
-			$('body').toggleClass('inspector_showing',visible);
+				/* Vuze: Not needed now that layout isn't a scrollable div
+				var w = visible ? $('#torrent_inspector').outerWidth() + 1 + 'px' : '0px';
+				$('#torrent_container')[0].style.right = w;
+				*/
+			}
 		} else {
-			/* Vuze: Not needed now that layout isn't a scrollable div
-			var w = visible ? $('#torrent_inspector').outerWidth() + 1 + 'px' : '0px';
-			$('#torrent_container')[0].style.right = w;
-			*/
+			$('#torrent_inspector').dialog({'title': 'Torrent Inspector'});
 		}
 	},
 
