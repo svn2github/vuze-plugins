@@ -21,6 +21,7 @@ package com.aelitis.plugins.rcmplugin;
 
 import java.lang.reflect.Field;
 import java.util.*;
+import java.util.List;
 import java.util.regex.Pattern;
 
 import org.eclipse.swt.SWT;
@@ -115,6 +116,8 @@ SBC_RCMView
 	private Object ds;
 
 	private ParameterListener paramSourceListener;
+	
+	private List<RelatedContent>	last_selected_content = new ArrayList<RelatedContent>();
 	
 	public
 	SBC_RCMView()
@@ -611,13 +614,45 @@ SBC_RCMView
 
 			public void 
 			selected(
-				TableRowCore[] rows) 
+				TableRowCore[] _rows) 
 			{
+				updateSelectedContent();
+			}
+
+			public void mouseExit(TableRowCore row) {
+			}
+
+			public void mouseEnter(TableRowCore row) {
+			}
+
+			public void focusChanged(TableRowCore focus) {
+				UIFunctions uiFunctions = UIFunctionsManager.getUIFunctions();
+				if (uiFunctions != null) {
+					uiFunctions.refreshIconBar();
+				}
+			}
+
+			public void deselected(TableRowCore[] rows) {
+				updateSelectedContent();
+			}
+
+			public void defaultSelected(TableRowCore[] rows, int stateMask) {
+			}
+			
+			private void
+			updateSelectedContent()
+			{
+				TableRowCore[] rows = tv_related_content.getSelectedRows();
+				
 				ArrayList<ISelectedContent>	valid = new ArrayList<ISelectedContent>();
 
+				last_selected_content.clear();
+				
 				for (int i=0;i<rows.length;i++){
 					
 					final RelatedContent rc = (RelatedContent)rows[i].getDataSource();
+					
+					last_selected_content.add( rc );
 					
 					if ( rc.getHash() != null ){
 						SelectedContent sc = new SelectedContent(Base32.encode(rc.getHash()), rc.getTitle());
@@ -636,29 +671,6 @@ SBC_RCMView
 					uiFunctions.refreshIconBar();
 				}
 			}
-
-			public void mouseExit(TableRowCore row) {
-			}
-
-			public void mouseEnter(TableRowCore row) {
-			}
-
-			public void focusChanged(TableRowCore focus) {
-				UIFunctions uiFunctions = UIFunctionsManager.getUIFunctions();
-				if (uiFunctions != null) {
-					uiFunctions.refreshIconBar();
-				}
-			}
-
-			public void deselected(TableRowCore[] rows) {
-				UIFunctions uiFunctions = UIFunctionsManager.getUIFunctions();
-				if (uiFunctions != null) {
-					uiFunctions.refreshIconBar();
-				}
-			}
-
-			public void defaultSelected(TableRowCore[] rows, int stateMask) {
-			}
 		}, false);
 
 		tv_related_content.addLifeCycleListener(
@@ -667,6 +679,8 @@ SBC_RCMView
 				private Set<RelatedContent>	content_set = new HashSet<RelatedContent>();
 				
 				private int liveness_marker;
+				
+				private boolean	initial_selection_handled = false;
 				
 				public void 
 				tableViewInitialized() 
@@ -710,9 +724,12 @@ SBC_RCMView
 								
 								if ( hits.size() > 0 ){
 									
-									for (RelatedContent rc : hits) {
+									for ( RelatedContent rc : hits ){
+										
 										TableRowCore row = tv_related_content.getRow(rc);
-										if (row != null) {
+										
+										if ( row != null ){
+											
 											row.refresh(true);
 										}
 									}
@@ -816,7 +833,8 @@ SBC_RCMView
 															break;
 														}
 														
-														if (isOurContent(c2)) {
+														if ( isOurContent(c2)){
+															
 															new_content.add( c2 );
 														}
 													}
@@ -824,9 +842,10 @@ SBC_RCMView
 											}else{
 												
 												if ( new_content != null ){
+													
 													if (isOurContent(c)) {
   													
-  													new_content.add( c );
+														new_content.add( c );
 													}
 												}
 											}
@@ -861,6 +880,47 @@ SBC_RCMView
 														}
 														
 														f_table.addDataSources( f_content );
+														
+														if ( !initial_selection_handled ){
+															
+																// get user's last selection back, if any
+															
+															initial_selection_handled = true;
+														
+															final List<TableRowCore>	selected_rows = new ArrayList<TableRowCore>();
+															
+															if ( last_selected_content.size() > 0 ){
+																
+																f_table.processDataSourceQueueSync();
+															}
+															
+															for ( RelatedContent rc: last_selected_content ){
+															
+																TableRowCore row = f_table.getRow( rc );
+																
+																if ( row != null ){
+																	
+																	selected_rows.add( row );
+																}
+															}
+															
+															if ( selected_rows.size() > 0 ){
+																	
+																Utils.execSWTThreadLater(
+																	1,
+																	new Runnable()
+																	{
+																		public void
+																		run()
+																		{
+																				// selection visible logic requires viewport to be initialised before it can scroll
+																				// properly so we need to defer this action
+																			
+																			f_table.setSelectedRows( selected_rows.toArray( new TableRowCore[selected_rows.size()] ));
+																		}
+																	});
+															}
+														}
 													}
 												}
 											});
