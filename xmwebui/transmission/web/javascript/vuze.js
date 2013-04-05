@@ -66,7 +66,7 @@ vz.createRemote = function(remote_url){
                     /*make sure call isn't made several times*/
                     if( vz.dls[url] != null && (new Date().getTime() - vz.dls[url].ts < 2000) ) return
                     vz.ui.toggleRemoteSearch()
-                    transmission.setFilterMode('downloading');
+                    transmission.setFilterMode(Prefs._FilterIncomplete);
                     transmission.setSortMethod( 'age' )
                     transmission.setSortDirection( 'descending' )
                     transmission.remote.addTorrentByUrl( url, {} );
