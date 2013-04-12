@@ -1,3 +1,4 @@
+1.4.2: Fixed middle-click rating setting in library views and noted this feature in tooltip for column
 1.4.1: DHT logic rewritten; made unloadable
 1.3 : Smaller stars, middle click on table cell sets personal rating, double 
       click on table cell opens rating window.  More tooltip information 

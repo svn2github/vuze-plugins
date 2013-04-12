@@ -149,8 +149,28 @@ public class RatingColumn implements TableCellRefreshListener,
 		if (event.eventType == TableCellMouseEvent.EVENT_MOUSEDOWN
 				&& event.button == 2) {
 			try {
-				int score = event.x / RatingImageUtil.starWidth + 1;
+				int cell_width = event.cell.getWidth();
 				
+				int	all_stars = RatingImageUtil.starWidth*5;
+				
+				int padding;
+				int	star_width;
+				
+				if ( cell_width >= all_stars ){
+					
+					padding = (event.cell.getWidth() - all_stars)/2;
+					
+					star_width = RatingImageUtil.starWidth;
+					
+				}else{
+					
+					padding = 0;
+					
+					star_width = cell_width/5;
+				}
+				
+				int score = ( event.x - padding )/ star_width + 1;
+
 				if (updater == null)
 					updater = plugin.getUpdater();
 	

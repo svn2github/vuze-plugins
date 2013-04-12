@@ -41,11 +41,13 @@ import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.gudy.azureus2.ui.swt.ImageRepository;
 import org.gudy.azureus2.ui.swt.Utils;
+import org.gudy.azureus2.ui.swt.mainwindow.Colors;
 
 import com.aelitis.azureus.plugins.rating.RatingPlugin;
 import com.aelitis.azureus.plugins.rating.updater.RatingData;
 import com.aelitis.azureus.plugins.rating.updater.RatingResults;
 import com.aelitis.azureus.plugins.rating.updater.RatingsUpdater;
+
 
 public class RatingWindow {
 	private static String MSG_PREFIX = "RatingPlugin.RatingWindow.";
@@ -57,6 +59,7 @@ public class RatingWindow {
 	private static String MSG_COMMENTS = MSG_PREFIX + "comments";
 	private static String MSG_YOUR_COMMENT = MSG_PREFIX + "yourComment";
 	private static String MSG_WARNING = MSG_PREFIX + "rateBeforeComment";
+	private static String MSG_EDIT_TOOLTIP = MSG_PREFIX + "editTooltip";
   
   RatingPlugin    plugin;
   RatingsUpdater  updater;
@@ -123,8 +126,8 @@ public class RatingWindow {
       }
     });
     
-    personalRating.setToolTipText("Click the image to change your rating");
-    personalRatingIcon.setToolTipText("Click the image to change your rating");
+    personalRating.setToolTipText( MSG_EDIT_TOOLTIP );
+    personalRatingIcon.setToolTipText( MSG_EDIT_TOOLTIP );
     
     Label lblComments = new Label(shell,SWT.NONE);
     lblComments.setText(localeTxt.getLocalisedMessageText(MSG_COMMENTS));
@@ -132,6 +135,7 @@ public class RatingWindow {
     StyledText txtComments = new StyledText(shell,SWT.V_SCROLL | SWT.BORDER | SWT.READ_ONLY);
     txtComments.setText(results.getComments());
     txtComments.setWordWrap(true);
+    txtComments.setBackground( Colors.light_grey );
     data = new GridData(GridData.FILL_BOTH);
     data.horizontalSpan = 3;
     txtComments.setLayoutData(data);
