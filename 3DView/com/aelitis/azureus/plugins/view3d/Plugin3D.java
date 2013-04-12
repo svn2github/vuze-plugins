@@ -35,6 +35,7 @@ import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
 import org.gudy.azureus2.plugins.ui.config.BooleanParameter;
 import org.gudy.azureus2.plugins.ui.config.Parameter;
+import org.gudy.azureus2.plugins.ui.config.ParameterListener;
 import org.gudy.azureus2.plugins.ui.config.StringListParameter;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
@@ -111,16 +112,30 @@ public class Plugin3D implements Plugin {
 					};
 	final StringListParameter slPDisplayRotationSpeed = config_model.addStringListParameter2(ROTATION_SPEED, "view3d.options.display.rotation", values, labels, "1");
 	
+	final BooleanParameter b_accum = config_model.addBooleanParameter2( "view3d.options.use_accum", "view3d.options.use_accum", true );
+
+	
 	config_model.createGroup( "view3d.options.display.title", 
 			new Parameter[] {
-				slPDisplayRotationSpeed
+				slPDisplayRotationSpeed, b_accum
 	});
     
     bLaunchOnStart = pluginConfig.getPluginBooleanParameter(LAUNCH_ON_START);
     
     Params.put(new Integer(0), bLaunchOnStart?"1":"0");
     Params.put(new Integer(1), slPDisplayRotationSpeed.getValue());
+    Params.put(new Integer(2), b_accum.getValue());
     
+    b_accum.addListener(
+    	new ParameterListener()
+    	{
+    		public void 
+    		parameterChanged(
+    			Parameter param)
+    		{
+    			Params.put(new Integer(2), b_accum.getValue());
+    		}
+    	});
     
 	pluginInterface.getUIManager().addUIListener(
 			new UIManagerListener()
