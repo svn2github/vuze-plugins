@@ -205,6 +205,8 @@ public class ZoomedScrolledMap extends Composite {
 		gc.drawImage(mapImage, 0, 0, mapImage.getBounds().width, mapImage.getBounds().height, 
 				0, 0, canvas.getSize().x, canvas.getSize().y);
 		
+		gc.setAdvanced( true );
+		gc.setAntialias( SWT.ON );
 		/* get country informations */
 		Map selectedStats = mapView.getSelectedStats();
 		if (selectedStats == null) return;

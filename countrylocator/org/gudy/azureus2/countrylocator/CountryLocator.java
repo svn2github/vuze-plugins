@@ -439,65 +439,85 @@ public class CountryLocator
 			// get the time of the internal GeoIP 
 			// 1) Get the URL
 			URL url = classLoader.getResource("GeoIP.dat");
-			// 2) Change it to an URI
-			String sInternalPath = url.toExternalForm();
-			sInternalPath = sInternalPath.replaceAll(" ", "%20");
-			if (sInternalPath.startsWith("jar:file:")
-					&& sInternalPath.charAt(9) != '/')
-				sInternalPath = "jar:file:/" + sInternalPath.substring(9);
-			int posPling = sInternalPath.lastIndexOf('!');
-			sInternalPath = sInternalPath.substring(4, posPling);
-			URI uri = URI.create(sInternalPath);
-			// 3) Create File
-			File fInternalGeoIP = new File(uri);
-			// 4) Open the JarFile
-			JarFile jarFile = new JarFile(fInternalGeoIP);
-			// 5) get the JarEntry
-			JarEntry entry = jarFile.getJarEntry("GeoIP.dat");
-			// 6) get the time
-			long lInternalTime = entry.getTime();
-			// 7) gasp for fresh air and wish you knew of an easier way!
-
-			// get the file we want to create
-			String sDir = pluginInterface.getPluginDirectoryName();
-			if (!sDir.endsWith(File.separator))
-				sDir += File.separator;
-			fGeoIP = new File(sDir + "GeoIP.dat");
-
-			boolean bCopyFromJar = (!fGeoIP.exists() || lInternalTime > fGeoIP.lastModified());
-			if (!bCopyFromJar) {
-				// make sure it's valid
-				try {
-					cl = new LookupService(fGeoIP);
-
-					// force error by looking up whitehouse.gov
-					bCopyFromJar = cl.getCountry("63.161.169.137") == LookupService.UNKNOWN_COUNTRY;
-					cl.close();
-				} catch (IOException e) {
-					bCopyFromJar = true;
+			
+			long lInternalTime;
+			
+			if ( url.getProtocol().equalsIgnoreCase( "file" )){
+				
+				// resolved to a file (most likely we're running some test code here...
+				
+				try{
+					fGeoIP = new File( url.toURI());
+					
+				}catch( Throwable e ){
+					
+					throw( new IOException( "Can't handle url: " + url ));
 				}
+				
+				lInternalTime = fGeoIP.lastModified();
+				
+			}else{
+				// 2) Change it to an URI
+				String sInternalPath = url.toExternalForm();
+				sInternalPath = sInternalPath.replaceAll(" ", "%20");
+				if (sInternalPath.startsWith("jar:file:")
+						&& sInternalPath.charAt(9) != '/')
+					sInternalPath = "jar:file:/" + sInternalPath.substring(9);
+				int posPling = sInternalPath.lastIndexOf('!');
+				sInternalPath = sInternalPath.substring(4, posPling);
+				URI uri = URI.create(sInternalPath);
+				// 3) Create File
+				File fInternalGeoIP = new File(uri);
+				// 4) Open the JarFile
+				JarFile jarFile = new JarFile(fInternalGeoIP);
+				// 5) get the JarEntry
+				JarEntry entry = jarFile.getJarEntry("GeoIP.dat");
+				// 6) get the time
+				lInternalTime = entry.getTime();
+				// 7) gasp for fresh air and wish you knew of an easier way!
 
-				if (bCopyFromJar)
-					logger.log(LoggerChannel.LT_WARNING,
-							"Local GeoIP.dat invalid, using internal");
-			}
-
-			if (bCopyFromJar) {
-				InputStream is = classLoader.getResourceAsStream("GeoIP.dat");
-
-				// If we can't write to plugin dir, use a temp file
-				if (!copyFile(is, fGeoIP)) {
-					logger.log(LoggerChannel.LT_ERROR, "Can't Write to " + sDir);
-					fGeoIP = File.createTempFile("Geo", null);
-					fGeoIP.deleteOnExit();
-					if (!copyFile(is, fGeoIP))
-						return false;
-					bTempFile = true;
+				// get the file we want to create
+				String sDir = pluginInterface.getPluginDirectoryName();
+				if (!sDir.endsWith(File.separator))
+					sDir += File.separator;
+				fGeoIP = new File(sDir + "GeoIP.dat");
+	
+				boolean bCopyFromJar = (!fGeoIP.exists() || lInternalTime > fGeoIP.lastModified());
+				if (!bCopyFromJar) {
+					// make sure it's valid
+					try {
+						cl = new LookupService(fGeoIP);
+	
+						// force error by looking up whitehouse.gov
+						bCopyFromJar = cl.getCountry("63.161.169.137") == LookupService.UNKNOWN_COUNTRY;
+						cl.close();
+					} catch (IOException e) {
+						bCopyFromJar = true;
+					}
+	
+					if (bCopyFromJar)
+						logger.log(LoggerChannel.LT_WARNING,
+								"Local GeoIP.dat invalid, using internal");
 				}
-
-				is.close();
-				fGeoIP.setLastModified(lInternalTime);
+	
+				if (bCopyFromJar) {
+					InputStream is = classLoader.getResourceAsStream("GeoIP.dat");
+	
+					// If we can't write to plugin dir, use a temp file
+					if (!copyFile(is, fGeoIP)) {
+						logger.log(LoggerChannel.LT_ERROR, "Can't Write to " + sDir);
+						fGeoIP = File.createTempFile("Geo", null);
+						fGeoIP.deleteOnExit();
+						if (!copyFile(is, fGeoIP))
+							return false;
+						bTempFile = true;
+					}
+	
+					is.close();
+					fGeoIP.setLastModified(lInternalTime);
+				}
 			}
+			
 			lGeoIPTime = Math.max(lInternalTime, fGeoIP.lastModified());
 
 			cl = new LookupService(fGeoIP);
