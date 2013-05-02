@@ -798,7 +798,7 @@ RelatedContentUI
 				}
 				
 				MdiEntry mdiEntry = mdi.createEntryFromSkinRef(
-						null,
+						MultipleDocumentInterface.SIDEBAR_HEADER_DISCOVERY,
 						SIDEBAR_SECTION_RELATED_CONTENT, "rcmview",
 						main_view_info.getTitle(),
 						main_view_info, null, true, null  );
