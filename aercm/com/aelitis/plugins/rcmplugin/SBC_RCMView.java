@@ -466,6 +466,16 @@ SBC_RCMView
 							new ColumnRC_RelatedTo(column);
 						}
 					});
+		
+		tableManager.registerColumn(
+				RelatedContent.class, 
+				ColumnRC_Tags.COLUMN_ID,
+					new TableColumnCreationListener() {
+						public void tableColumnCreated(TableColumn column) {
+							new ColumnRC_Tags(column);
+						}
+					});
+
 	}
 
 	public Object 
@@ -603,6 +613,7 @@ SBC_RCMView
 					ColumnRC_Created.COLUMN_ID,
 					ColumnRC_Seeds.COLUMN_ID,
 					ColumnRC_Peers.COLUMN_ID,
+					ColumnRC_Tags.COLUMN_ID,
 		});
 		table_parent = new Composite(control, SWT.NONE);
 		table_parent.setLayoutData(Utils.getFilledFormData());
