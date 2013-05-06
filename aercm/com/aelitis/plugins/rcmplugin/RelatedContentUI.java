@@ -543,7 +543,7 @@ RelatedContentUI
 	{
 		final MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
 		if (plugin.isRCMEnabled() && enable_ui.getValue()) {
-			mdi.loadEntryByID(SIDEBAR_SECTION_RELATED_CONTENT, false);
+			mdi.loadEntryByID(SIDEBAR_SECTION_RELATED_CONTENT, false, true, null);
 			hookMyTorrentMenus(true);
 		} else {
 			mdi.closeEntry(SIDEBAR_SECTION_RELATED_CONTENT);
