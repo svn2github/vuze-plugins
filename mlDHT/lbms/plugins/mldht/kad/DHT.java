@@ -408,18 +408,21 @@ public class DHT implements DHTBase {
 	
 	public RPCServer getRandomServer() {
 		RPCServer srv = null;
-		while(true)
-		{
-			int s = servers.size();
-			if(s < 1)
-				break;
-			try
+		
+		if ( servers != null ){
+			while(true)
 			{
-				srv = servers.get(ThreadLocalUtils.getThreadLocalRandom().nextInt(s));
-				break;
-			} catch (IndexOutOfBoundsException e)
-			{
-				// ignore and retry as array was concurrently modified
+				int s = servers.size();
+				if(s < 1)
+					break;
+				try
+				{
+					srv = servers.get(ThreadLocalUtils.getThreadLocalRandom().nextInt(s));
+					break;
+				} catch (IndexOutOfBoundsException e)
+				{
+					// ignore and retry as array was concurrently modified
+				}
 			}
 		}
 		

@@ -585,17 +585,19 @@ public class Node {
 			rebuildAddressCache();
 
 			if (entriesLoaded > 0) {
-				runDeferred = true;
 				PingRefreshTask prt = dht.refreshBuckets(routingTable, true);
-				prt.setInfo("Pinging cached entries.");
-				TaskListener bootstrapListener = new TaskListener() {
-					public void finished (Task t) {
-						if (runWhenLoaded != null) {
-							runWhenLoaded.run();
+				if ( prt != null ){
+					runDeferred = true;
+					prt.setInfo("Pinging cached entries.");
+					TaskListener bootstrapListener = new TaskListener() {
+						public void finished (Task t) {
+							if (runWhenLoaded != null) {
+								runWhenLoaded.run();
+							}
 						}
-					}
-				};
-				prt.addListener(bootstrapListener);
+					};
+					prt.addListener(bootstrapListener);
+				}
 			}
 
 			DHT.logInfo("Loaded " + entriesLoaded + " from cache. Cache was "
