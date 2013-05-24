@@ -26,7 +26,10 @@ import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.graphics.Image;
+import org.eclipse.swt.layout.FormLayout;
+import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.widgets.Button;
+import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.MessageBox;
 import org.eclipse.swt.widgets.TreeItem;
 import org.eclipse.swt.widgets.Shell;
@@ -55,6 +58,9 @@ import org.gudy.azureus2.plugins.ui.tables.TableRow;
 import org.gudy.azureus2.ui.swt.SimpleTextEntryWindow;
 import org.gudy.azureus2.ui.swt.Utils;
 import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
+import org.gudy.azureus2.ui.swt.plugins.UISWTView;
+import org.gudy.azureus2.ui.swt.plugins.UISWTViewEvent;
+import org.gudy.azureus2.ui.swt.plugins.UISWTViewEventListener;
 import org.gudy.azureus2.ui.swt.shells.CoreWaiterSWT;
 import org.gudy.azureus2.ui.swt.shells.MessageBoxShell;
 
@@ -207,6 +213,8 @@ RelatedContentUI
 						
 						root_menu = null;
 					}
+					
+					Debug.out( "TODO: views" );
 					
 					try{
 						MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
@@ -545,12 +553,132 @@ RelatedContentUI
 		if (plugin.isRCMEnabled() && enable_ui.getValue()) {
 			mdi.loadEntryByID(SIDEBAR_SECTION_RELATED_CONTENT, false, true, null);
 			hookMyTorrentMenus(true);
+			hookSubViews(true);
 		} else {
 			mdi.closeEntry(SIDEBAR_SECTION_RELATED_CONTENT);
 			hookMyTorrentMenus(false);
+			hookSubViews(false);
 		}
 
 		plugin.hookSearch();
+	}
+	
+	private void
+	hookSubViews(
+		boolean	enable )
+	{
+		swt_ui.addView(
+			UISWTInstance.VIEW_TORRENT_DETAILS, 
+			"rcm.subview.torrentdetails.name",
+			new UISWTViewEventListener()
+			{
+				private HashMap<UISWTView,SubViewHolder> rcm_views = new HashMap<UISWTView,SubViewHolder>();
+
+				public boolean 
+				eventOccurred(
+					UISWTViewEvent event ) 
+				{
+					UISWTView 	currentView = event.getView();
+					
+					switch (event.getType()) {
+						case UISWTViewEvent.TYPE_CREATE:{
+							
+							SWTSkin skin = SWTSkinFactory.getNonPersistentInstance(
+									getClass().getClassLoader(),
+									"com/aelitis/plugins/rcmplugin/skins",
+									"skin3_rcm.properties" );
+							
+							rcm_views.put(currentView, new SubViewHolder( skin ));
+							
+							break;
+						}
+						case UISWTViewEvent.TYPE_INITIALIZE:{
+						
+							SubViewHolder subview = rcm_views.get(currentView);
+							
+							SWTSkin	skin = subview.skin;
+							
+							Composite parent = (Composite)event.getData();
+						
+							Composite skin_area = new Composite( parent, SWT.NULL );
+							
+							skin_area.setLayout( new FormLayout());
+							
+							skin_area.setLayoutData( new GridData( GridData.FILL_BOTH ));
+							
+							skin.initialize( skin_area, "subskin" );
+							
+							SWTSkinObject so = skin.getSkinObjectByID( "rcmview" );
+							
+							if ( subview.data_source != null ){
+								
+								so.triggerListeners( SWTSkinObjectListener.EVENT_DATASOURCE_CHANGED, subview.data_source );
+							}
+							
+							so.setVisible( true );
+	
+							skin.layout();
+	
+							break;
+						}
+						case UISWTViewEvent.TYPE_DATASOURCE_CHANGED:{
+							
+							SubViewHolder subview = rcm_views.get(currentView);
+							
+							SWTSkin	skin = subview.skin;
+							
+							SWTSkinObject so = skin.getSkinObjectByID( "rcmview" );
+							
+							RCMItemSubView data_source = new RCMItemSubView(((Download)event.getData()).getTorrent().getHash());
+							
+							data_source.setMdiEntry( null );	// trigger search start
+							
+							if ( so != null ){
+								
+								so.triggerListeners(UISWTViewEvent.TYPE_DATASOURCE_CHANGED, data_source );
+							}
+							
+							subview.data_source = data_source;
+							
+							break;
+						}
+						case UISWTViewEvent.TYPE_DESTROY:{
+							
+							SubViewHolder subview = rcm_views.remove(currentView);
+						
+							if ( subview != null ){
+								
+								SWTSkin	skin = subview.skin;
+								
+								SWTSkinObject so = skin.getSkinObjectByID( "rcmview" );
+								
+								skin.removeSkinObject( so );
+								
+								if ( subview.data_source != null ){
+									
+									subview.data_source.destroy( false );
+								}
+							}
+							break;
+						}
+					}
+					return true;
+				}
+			});
+	}
+	
+	private class
+	SubViewHolder
+	{
+		private SWTSkin				skin;
+		private RCMItemSubView		data_source;
+		
+		private
+		SubViewHolder(
+			SWTSkin	_skin  )
+		{
+			skin	= _skin;
+		}
 	}
 	
 	protected void
@@ -1689,12 +1817,15 @@ RelatedContentUI
 		{
 			sb_entry	= _sb_entry;
 			
-			sb_entry.setDatasource( this );
+			if ( sb_entry != null ){
+				
+				sb_entry.setDatasource( this );
+				
+				sb_entry.addListener( this );
+				
+				spinner = sb_entry.addVitalityImage( SPINNER_IMAGE_ID );
+			}
 			
-			sb_entry.addListener( this );
-			
-			spinner = sb_entry.addVitalityImage( SPINNER_IMAGE_ID );
-
 			try{
 				showIcon( spinner, null );
 				
@@ -1825,22 +1956,25 @@ RelatedContentUI
 					
 					num_unread = num;
 					
-					final int f_num = num;
-										
-					async_dispatcher.dispatch(
-						new AERunnable()
-						{
-							public void
-							runSupport()
+					if ( view != null ){
+						
+						final int f_num = num;
+											
+						async_dispatcher.dispatch(
+							new AERunnable()
 							{
-								if ( async_dispatcher.getQueueSize() > 0 ){
+								public void
+								runSupport()
+								{
+									if ( async_dispatcher.getQueueSize() > 0 ){
+										
+										return;
+									}
 									
-									return;
+									view.setNumUnread( f_num );
 								}
-								
-								view.setNumUnread( f_num );
-							}
-						});
+							});
+					}
 				}
 			}
 		}
@@ -1903,11 +2037,12 @@ RelatedContentUI
 			MdiEntry entry,
 			boolean userClosed )
 		{
-			destroy();
+			destroy( true );
 		}
 		
 		protected void
-		destroy()
+		destroy(
+			boolean	remove_from_item_map )
 		{
 			synchronized( this ){
 			
@@ -1916,9 +2051,12 @@ RelatedContentUI
 				destroyed = true;
 			}
 			
-			synchronized( RelatedContentUI.this ){
+			if ( remove_from_item_map ){
+			
+				synchronized( RelatedContentUI.this ){
 					
-				rcm_item_map.remove( hash );
+					rcm_item_map.remove( hash );
+				}
 			}
 		}
 		
@@ -1934,7 +2072,18 @@ RelatedContentUI
 		}
 	}
 	
-	
+	public class
+	RCMItemSubView
+		extends RCMItemContent
+	{
+		protected
+		RCMItemSubView(
+			byte[]		_hash )
+		{
+			super( _hash );
+		}
+	}
+
 	public class
 	RCMItemSubscriptions
 		implements RCMItem

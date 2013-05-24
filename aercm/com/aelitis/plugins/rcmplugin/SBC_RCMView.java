@@ -67,6 +67,7 @@ import com.aelitis.azureus.ui.swt.skin.*;
 import com.aelitis.azureus.ui.swt.views.skin.InfoBarUtil;
 import com.aelitis.azureus.ui.swt.views.skin.SkinView;
 import com.aelitis.plugins.rcmplugin.RelatedContentUI.RCMItemContent;
+import com.aelitis.plugins.rcmplugin.RelatedContentUI.RCMItemSubView;
 import com.aelitis.plugins.rcmplugin.RelatedContentUI.RCMItemSubscriptions;
 import com.aelitis.plugins.rcmplugin.columns.*;
 
@@ -94,7 +95,7 @@ SBC_RCMView
 	
 	private TableViewSWT<RelatedContent> tv_related_content;
 
-	private MdiEntry 	mdi_entry;
+	private MdiEntry 			mdi_entry;
 	private Composite			table_parent;
 	private boolean				space_reserved;
 	
@@ -155,12 +156,20 @@ SBC_RCMView
 				manager.reserveTemporarySpace();
 				
 				space_reserved = true;
+				
+			}else if ( ds instanceof RCMItemSubView ){
+
+				manager.reserveTemporarySpace();
+				
+				space_reserved = true;
 			} else {
 				mdi_entry = mdi.getEntry( RelatedContentUI.SIDEBAR_SECTION_RELATED_CONTENT );
 			}
 			
-			mdi_entry.addToolbarEnabler(this);
-
+			if ( mdi_entry != null ){
+			
+				mdi_entry.addToolbarEnabler(this);
+			}
 		}
 
 		SWTSkinObjectTextbox soFilterBox = (SWTSkinObjectTextbox) getSkinObject("filterbox");
@@ -807,7 +816,7 @@ SBC_RCMView
 						
 					manager.addListener( current_rcm_listener );
 				
-					Object data_source = mdi_entry.getDatasource();
+					Object data_source = mdi_entry==null?ds:mdi_entry.getDatasource();
 					
 					if ( data_source instanceof RelatedContentEnumerator ){
 						
