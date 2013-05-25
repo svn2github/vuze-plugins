@@ -242,7 +242,7 @@ public class TorrentDownloader {
       }
     });
 
-    downloader.init(url, "application/x-bittorrent, application/x-httpd-php", (urlBean.getLocRef()?urlBean.getLocation():urlBean.getReferer()),
+    downloader.init(url, Plugin.getBooleanParameter( "ForceNoProxy"), "application/x-bittorrent, application/x-httpd-php", (urlBean.getLocRef()?urlBean.getLocation():urlBean.getReferer()),
         (urlBean.getUseCookie()?urlBean.getCookie():null), 0, null);
     listBean.downloader = downloader;
 

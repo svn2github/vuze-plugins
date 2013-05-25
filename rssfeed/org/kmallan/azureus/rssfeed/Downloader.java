@@ -22,6 +22,9 @@ package org.kmallan.azureus.rssfeed;
 
 import org.gudy.azureus2.core3.util.Constants;
 
+import com.aelitis.azureus.core.proxy.AEProxySelector;
+import com.aelitis.azureus.core.proxy.AEProxySelectorFactory;
+
 import javax.net.ssl.*;
 import java.io.*;
 import java.net.*;
@@ -128,7 +131,7 @@ public class Downloader extends InputStream {
     testDownload(url);
   }
 */
-  public void init(String urlStr, String accept, String referer, String cookie, long lastModSince, String oldEtag) {
+  public void init(String urlStr, boolean forceNoProxy, String accept, String referer, String cookie, long lastModSince, String oldEtag) {
 
     Pattern exprHost = Pattern.compile(".*(https?://.*?)", Pattern.CASE_INSENSITIVE);
     Matcher m = exprHost.matcher(urlStr);
@@ -136,6 +139,10 @@ public class Downloader extends InputStream {
     urlStr = urlStr.replaceAll(" ", "%20");
 
     try {
+    	if ( forceNoProxy ){
+    		
+    		AEProxySelectorFactory.getSelector().startNoProxy();
+    	}
       synchronized(listeners) {
         url = new URL(urlStr);
 
@@ -144,12 +151,14 @@ public class Downloader extends InputStream {
         
 	        if(url.getProtocol().equalsIgnoreCase("https")) {
 	          HttpsURLConnection sslCon = (HttpsURLConnection)url.openConnection();
+	          
 	          // allow for certs that contain IP addresses rather than dns names
 	          sslCon.setHostnameVerifier(new HostnameVerifier() {
 	            public boolean verify(String host, SSLSession session) {return true;}
 	          });
 	          con = sslCon;
 	        } else {
+	        
 	          con = url.openConnection();
 	        }
 	
@@ -180,7 +189,7 @@ public class Downloader extends InputStream {
 	          if(response == -1) { // HttpURLConnection in undefined state? weird stuff... occurs sporadically
 	            Thread.sleep(10000); // waiting and trying again seems to do the trick
 	            if(refCount++ < 5) {
-	              init(urlStr, accept, referer, cookie, lastModSince, oldEtag);
+	              init(urlStr, forceNoProxy,accept, referer, cookie, lastModSince, oldEtag);
 	              return;
 	            }
 	          }
@@ -195,7 +204,7 @@ public class Downloader extends InputStream {
 	              ((HttpURLConnection)con).disconnect();
 	              if(refresh.indexOf("://") == -1) refresh = HtmlAnalyzer.resolveRelativeURL(urlStr, refresh);
 	              Plugin.debugOut("new url: " + refresh);
-	              if(refCount++ < 3) init(refresh, accept, referer, cookie, lastModSince, oldEtag);
+	              if(refCount++ < 3) init(refresh, forceNoProxy,accept, referer, cookie, lastModSince, oldEtag);
 	            }
 	          }
 	
@@ -256,6 +265,12 @@ public class Downloader extends InputStream {
     } catch(Throwable e) {
       e.printStackTrace();
       error("Failed: " + e.toString());
+    }finally{
+    	
+    	if ( forceNoProxy ){
+    		
+    		AEProxySelectorFactory.getSelector().endNoProxy();
+    	}
     }
 
     if(state != DOWNLOADER_ERROR) {

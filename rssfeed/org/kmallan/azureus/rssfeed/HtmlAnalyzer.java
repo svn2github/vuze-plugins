@@ -21,6 +21,9 @@ package org.kmallan.azureus.rssfeed;
 
 import javax.swing.text.html.*;
 import javax.swing.text.MutableAttributeSet;
+
+import com.aelitis.azureus.core.proxy.AEProxySelectorFactory;
+
 import java.util.*;
 import java.net.*;
 import java.io.IOException;
@@ -149,7 +152,7 @@ public class HtmlAnalyzer extends HTMLEditorKit.ParserCallback implements Runnab
       int count = 1;
       for(Iterator iter = hrefs.iterator(); iter.hasNext(); ) {
         href = (String)iter.next();
-        if(isHrefTorrent(href)) {
+        if(isHrefTorrent(href, Plugin.getBooleanParameter( "ForceNoProxy"))) {
           torrentUrl = href;
           Plugin.debugOut("found torrent: " + href);
           break;
@@ -175,9 +178,15 @@ public class HtmlAnalyzer extends HTMLEditorKit.ParserCallback implements Runnab
    * @param href
    * @return
    */
-  private boolean isHrefTorrent(String href) {
+  private boolean isHrefTorrent(String href, boolean forceNoProxy) {
     try {
+      if ( forceNoProxy ){
+    		
+    	AEProxySelectorFactory.getSelector().startNoProxy();
+      }
+      
       URLConnection conn = new URL(href).openConnection();
+      
       if(conn instanceof HttpURLConnection) {
         ((HttpURLConnection)conn).setRequestMethod("HEAD");
         String cookie = listBean.getFeed().getCookie();
@@ -192,6 +201,12 @@ public class HtmlAnalyzer extends HTMLEditorKit.ParserCallback implements Runnab
       }
     } catch(IOException e) {
       e.printStackTrace();
+    }finally{
+    	
+      if ( forceNoProxy ){
+    		
+    	AEProxySelectorFactory.getSelector().endNoProxy();
+      }
     }
     return false;
   }

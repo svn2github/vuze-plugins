@@ -45,6 +45,7 @@ import org.gudy.azureus2.plugins.config.ConfigParameterListener;
 import org.gudy.azureus2.plugins.disk.DiskManagerFileInfo;
 import org.gudy.azureus2.plugins.download.*;
 
+import com.aelitis.azureus.core.proxy.AEProxySelectorFactory;
 import com.sun.mail.smtp.SMTPTransport;
 
 
@@ -111,6 +112,9 @@ StatusMailerPlugin
 	
 	public static final String	CONFIG_INCLUDE_FILES				= "include_files";
 	public static final boolean	CONFIG_INCLUDE_FILES_DEFAULT		= false;
+	
+	public static final String 	CONFIG_NO_PROXY						= "no_proxy";
+	public static final boolean	CONFIG_NO_PROXY_DEFAULT				= false;
 
 	
 	public static final String 	CONFIG_DEBUG_ON				= "debug_on";
@@ -157,6 +161,8 @@ StatusMailerPlugin
 	protected StringParameter		msg_content_add_remove;
 
 	protected StringParameter		ratios;
+	
+	protected BooleanParameter		force_no_proxy;
 	
 	protected BooleanParameter		debug_on;
 
@@ -225,6 +231,8 @@ StatusMailerPlugin
 		smtp_password 	= config_model.addPasswordParameter2( CONFIG_SMTP_PASSWORD, "statusmailer.smtp_password", PasswordParameter.ET_PLAIN, new byte[0] );
 		
 		local_host	 	= config_model.addStringParameter2( CONFIG_LOCAL_HOST, "statusmailer.local_host", "" );
+
+		force_no_proxy	= config_model.addBooleanParameter2( CONFIG_NO_PROXY, "statusmailer.force_no_proxy", CONFIG_NO_PROXY_DEFAULT );
 
 		ActionParameter action = config_model.addActionParameter2( "statusmailer.send_test_email", "statusmailer.send" );
 		
@@ -818,7 +826,14 @@ StatusMailerPlugin
     {
     	ClassLoader original = Thread.currentThread().getContextClassLoader();
     	
-    	try{   		
+    	boolean no_proxy = force_no_proxy.getValue();
+    	
+    	try{
+    		if ( no_proxy ){
+    			
+    			AEProxySelectorFactory.getSelector().startNoProxy();
+    		}
+    		
     		Thread.currentThread().setContextClassLoader( StatusMailerPlugin.class.getClassLoader());
     		
     	    Properties props = System.getProperties();
@@ -940,6 +955,11 @@ StatusMailerPlugin
     	}finally{
     		
        		Thread.currentThread().setContextClassLoader( original );
+       		
+       		if ( no_proxy ){
+    			
+    			AEProxySelectorFactory.getSelector().endNoProxy();
+    		}
     	}
     }
 

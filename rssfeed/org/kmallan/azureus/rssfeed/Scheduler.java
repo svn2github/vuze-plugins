@@ -204,7 +204,7 @@ public class Scheduler extends TimerTask {
             });
         }
       });
-      downloader.init(url, "text/xml, text/html, text/plain, application/x-httpd-php", null,
+      downloader.init(url, Plugin.getBooleanParameter( "ForceNoProxy"), "text/xml, text/html, text/plain, application/x-httpd-php", null,
           (urlBean.getUseCookie()?urlBean.getCookie():null), urlBean.getLastModifed(), urlBean.getLastEtag());
 
       if(downloader.getState() == Downloader.DOWNLOADER_ERROR) return;
