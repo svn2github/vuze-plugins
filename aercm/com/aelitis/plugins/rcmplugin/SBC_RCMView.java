@@ -142,10 +142,22 @@ SBC_RCMView
 
 		MultipleDocumentInterfaceSWT mdi = UIFunctionsManagerSWT.getUIFunctionsSWT().getMDISWT();
 		
+		boolean	show_info_bar = true;
+		
 		if ( mdi != null ){
 
-			if ( ds instanceof RCMItemContent ){
+			if ( ds instanceof RCMItemSubView ){
+				
+				manager.reserveTemporarySpace();
+			
+				space_reserved = true;
+			
+				show_info_bar = false;
+				
+			}else if ( ds instanceof RCMItemContent ){
+				
 				mdi_entry = ((RCMItemContent) ds).getSideBarEntry();
+				
 				manager.reserveTemporarySpace();
 				
 				space_reserved = true;
@@ -157,11 +169,6 @@ SBC_RCMView
 				
 				space_reserved = true;
 				
-			}else if ( ds instanceof RCMItemSubView ){
-
-				manager.reserveTemporarySpace();
-				
-				space_reserved = true;
 			} else {
 				mdi_entry = mdi.getEntry( RelatedContentUI.SIDEBAR_SECTION_RELATED_CONTENT );
 			}
@@ -302,13 +309,15 @@ SBC_RCMView
 			parent.layout(true);
 		}
 
-		new InfoBarUtil(skinObject, "rcmview.infobar", false,
-				"rcm.infobar", "rcm.view.infobar") {
-			public boolean allowShow() {
-				return true;
-			}
-		};
-
+		if ( true || show_info_bar ){
+			new InfoBarUtil(skinObject, "rcmview.infobar", false,
+					"rcm.infobar", "rcm.view.infobar") {
+				public boolean allowShow() {
+					return true;
+				}
+			};
+		}
+		
 		return null;
 	}
 

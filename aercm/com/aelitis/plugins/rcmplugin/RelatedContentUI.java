@@ -214,7 +214,7 @@ RelatedContentUI
 						root_menu = null;
 					}
 					
-					Debug.out( "TODO: views" );
+					hookSubViews( false );
 					
 					try{
 						MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
@@ -567,104 +567,155 @@ RelatedContentUI
 	hookSubViews(
 		boolean	enable )
 	{
-		swt_ui.addView(
-			UISWTInstance.VIEW_TORRENT_DETAILS, 
-			"rcm.subview.torrentdetails.name",
-			new UISWTViewEventListener()
-			{
-				private HashMap<UISWTView,SubViewHolder> rcm_views = new HashMap<UISWTView,SubViewHolder>();
-
-				public boolean 
-				eventOccurred(
-					UISWTViewEvent event ) 
+		String[] views = {
+			TableManager.TABLE_MYTORRENTS_ALL_BIG,
+			TableManager.TABLE_MYTORRENTS_INCOMPLETE,
+			TableManager.TABLE_MYTORRENTS_INCOMPLETE_BIG,
+			TableManager.TABLE_MYTORRENTS_COMPLETE,
+		};
+		
+		if ( enable ){
+				
+			UISWTViewEventListener listener = 
+				new UISWTViewEventListener()
 				{
-					UISWTView 	currentView = event.getView();
-					
-					switch (event.getType()) {
-						case UISWTViewEvent.TYPE_CREATE:{
-							
-							SWTSkin skin = SWTSkinFactory.getNonPersistentInstance(
-									getClass().getClassLoader(),
-									"com/aelitis/plugins/rcmplugin/skins",
-									"skin3_rcm.properties" );
-							
-							rcm_views.put(currentView, new SubViewHolder( skin ));
-							
-							break;
-						}
-						case UISWTViewEvent.TYPE_INITIALIZE:{
-						
-							SubViewHolder subview = rcm_views.get(currentView);
-							
-							SWTSkin	skin = subview.skin;
-							
-							Composite parent = (Composite)event.getData();
-						
-							Composite skin_area = new Composite( parent, SWT.NULL );
-							
-							skin_area.setLayout( new FormLayout());
-							
-							skin_area.setLayoutData( new GridData( GridData.FILL_BOTH ));
-							
-							skin.initialize( skin_area, "subskin" );
-							
-							SWTSkinObject so = skin.getSkinObjectByID( "rcmview" );
-							
-							if ( subview.data_source != null ){
-								
-								so.triggerListeners( SWTSkinObjectListener.EVENT_DATASOURCE_CHANGED, subview.data_source );
-							}
-							
-							so.setVisible( true );
+					private HashMap<UISWTView,SubViewHolder> rcm_views = new HashMap<UISWTView,SubViewHolder>();
 	
-							skin.layout();
-	
-							break;
-						}
-						case UISWTViewEvent.TYPE_DATASOURCE_CHANGED:{
-							
-							SubViewHolder subview = rcm_views.get(currentView);
-							
-							SWTSkin	skin = subview.skin;
-							
-							SWTSkinObject so = skin.getSkinObjectByID( "rcmview" );
-							
-							RCMItemSubView data_source = new RCMItemSubView(((Download)event.getData()).getTorrent().getHash());
-							
-							data_source.setMdiEntry( null );	// trigger search start
-							
-							if ( so != null ){
-								
-								so.triggerListeners(UISWTViewEvent.TYPE_DATASOURCE_CHANGED, data_source );
-							}
-							
-							subview.data_source = data_source;
-							
-							break;
-						}
-						case UISWTViewEvent.TYPE_DESTROY:{
-							
-							SubViewHolder subview = rcm_views.remove(currentView);
+					public boolean 
+					eventOccurred(
+						UISWTViewEvent event ) 
+					{
+						UISWTView 	currentView = event.getView();
 						
-							if ( subview != null ){
+						switch (event.getType()) {
+							case UISWTViewEvent.TYPE_CREATE:{
+								
+								SWTSkin skin = SWTSkinFactory.getNonPersistentInstance(
+										getClass().getClassLoader(),
+										"com/aelitis/plugins/rcmplugin/skins",
+										"skin3_rcm.properties" );
+								
+								rcm_views.put(currentView, new SubViewHolder( skin ));
+								
+								break;
+							}
+							case UISWTViewEvent.TYPE_INITIALIZE:{
+							
+								SubViewHolder subview = rcm_views.get(currentView);
 								
 								SWTSkin	skin = subview.skin;
 								
-								SWTSkinObject so = skin.getSkinObjectByID( "rcmview" );
+								Composite parent = (Composite)event.getData();
+							
+								Composite skin_area = new Composite( parent, SWT.NULL );
 								
-								skin.removeSkinObject( so );
+								skin_area.setLayout( new FormLayout());
 								
-								if ( subview.data_source != null ){
+								skin_area.setLayoutData( new GridData( GridData.FILL_BOTH ));
+								
+								skin.initialize( skin_area, "subskin" );
+								
+								SWTSkinObject so = skin.getSkinObjectByID( "rcmsubskinview" );
+								
+								RCMItemSubView	ds = subview.data_source;
+								
+								if ( ds == null ){
 									
-									subview.data_source.destroy( false );
+									ds = new RCMItemSubViewEmpty();
 								}
+								
+								so.triggerListeners( SWTSkinObjectListener.EVENT_DATASOURCE_CHANGED, ds );
+				
+								
+								so.setVisible( true );
+		
+								skin.layout();
+		
+								break;
 							}
-							break;
+							case UISWTViewEvent.TYPE_DATASOURCE_CHANGED:{
+								
+								SubViewHolder subview = rcm_views.get(currentView);
+								
+								SWTSkin	skin = subview.skin;
+								
+								SWTSkinObject so = skin.getSkinObjectByID( "rcmsubskinview" );
+								
+								Object obj = event.getData();
+								
+								Download	dl = null;
+								
+								if ( obj instanceof Object[]){
+									
+									Object[] ds = (Object[])obj;
+									
+									if ( ds.length > 0 && ds[0] instanceof Download ){
+										
+										dl = (Download)ds[0];
+									}
+								}else{
+									
+									if ( obj instanceof Download ){
+										
+										dl = (Download)obj;
+									}
+								}
+								
+								if ( dl != null ){
+									
+									RCMItemSubView data_source = new RCMItemSubView(dl.getTorrent().getHash());
+									
+									data_source.setMdiEntry( null );	// trigger search start
+									
+									if ( so != null ){
+										
+										so.setVisible( false );
+										
+										so.triggerListeners( SWTSkinObjectListener.EVENT_DATASOURCE_CHANGED, data_source );
+										
+										so.setVisible( true );
+									}
+									
+									subview.data_source = data_source;
+								}
+								
+								break;
+							}
+							case UISWTViewEvent.TYPE_DESTROY:{
+								
+								SubViewHolder subview = rcm_views.remove(currentView);
+							
+								if ( subview != null ){
+									
+									SWTSkin	skin = subview.skin;
+									
+									SWTSkinObject so = skin.getSkinObjectByID( "rcmsubskinview" );
+									
+									skin.removeSkinObject( so );
+									
+									if ( subview.data_source != null ){
+										
+										subview.data_source.destroy( false );
+									}
+								}
+								break;
+							}
 						}
+						return true;
 					}
-					return true;
-				}
-			});
+				};
+				
+			for ( String table_id: views ){
+				
+				swt_ui.addView(table_id, "rcm.subview.torrentdetails.name",	listener );
+			}
+		}else{
+			
+			for ( String table_id: views ){
+				
+				swt_ui.removeViews( table_id, "rcm.subview.torrentdetails.name" );
+			}
+		}
 	}
 	
 	private class
@@ -2084,6 +2135,17 @@ RelatedContentUI
 		}
 	}
 
+	public class
+	RCMItemSubViewEmpty
+		extends RCMItemSubView
+	{
+		private
+		RCMItemSubViewEmpty()
+		{
+			super( new byte[0]);
+		}
+	}
+	
 	public class
 	RCMItemSubscriptions
 		implements RCMItem
