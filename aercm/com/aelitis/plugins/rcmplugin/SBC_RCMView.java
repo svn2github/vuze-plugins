@@ -169,7 +169,8 @@ SBC_RCMView
 				
 				space_reserved = true;
 				
-			} else {
+			}else{
+				
 				mdi_entry = mdi.getEntry( RelatedContentUI.SIDEBAR_SECTION_RELATED_CONTENT );
 			}
 			
@@ -319,12 +320,6 @@ SBC_RCMView
 		}
 		
 		return null;
-	}
-
-	// @see com.aelitis.azureus.ui.swt.skin.SWTSkinObjectAdapter#dataSourceChanged(com.aelitis.azureus.ui.swt.skin.SWTSkinObject, java.lang.Object)
-	public Object dataSourceChanged(SWTSkinObject skinObject, Object params) {
-		ds = params;
-		return super.dataSourceChanged(skinObject, params);
 	}
 	
 	private boolean isOurContent(RelatedContent c) {
@@ -497,19 +492,33 @@ SBC_RCMView
 	}
 
 	public Object 
-	skinObjectShown(
-		SWTSkinObject 	skinObject, 
-		Object 			params ) 
+	dataSourceChanged(
+		SWTSkinObject skinObject, Object params) 
 	{
-		super.skinObjectShown(skinObject, params);
+		//hideView();
+		
+		ds = params;
+		
+		//showView();
+		
+		return( super.dataSourceChanged(skinObject, params));
+	}
 
+	
+	private void
+	showView()
+	{
 		RelatedContentUI ui = RelatedContentUI.getSingleton();
-		if (ui != null && !ui.getPlugin().hasFTUXBeenShown()) {
+		
+		if ( ui != null && !ui.getPlugin().hasFTUXBeenShown()){
+			
 			 RelatedContentUI.showFTUX(getSkinObject("rcm-list"));
-		} else {
+		}else{
+			
 			SWTSkinObject so_list = getSkinObject("rcm-list");
 
 			if ( so_list != null ){
+				
 				so_list.setVisible(true);
 			}
 		}
@@ -528,14 +537,10 @@ SBC_RCMView
 			}
 		};
 		COConfigurationManager.addParameterListener(RCMPlugin.PARAM_SOURCES_LIST, paramSourceListener);
-
-		return null;
 	}
-
-	public Object 
-	skinObjectHidden(
-		SWTSkinObject 	skinObject, 
-		Object 			params ) 
+	
+	private void
+	hideView()
 	{
 		synchronized( this ){
 			
@@ -559,7 +564,27 @@ SBC_RCMView
 		});
 
 		COConfigurationManager.removeParameterListener(RCMPlugin.PARAM_SOURCES_LIST, paramSourceListener);
+	}
+	
+	public Object 
+	skinObjectShown(
+		SWTSkinObject 	skinObject, 
+		Object 			params ) 
+	{
+		super.skinObjectShown(skinObject, params);
 
+		showView();
+		
+		return null;
+	}
+
+	public Object 
+	skinObjectHidden(
+		SWTSkinObject 	skinObject, 
+		Object 			params ) 
+	{
+		hideView();
+		
 		return( super.skinObjectHidden(skinObject, params));
 	}
 
