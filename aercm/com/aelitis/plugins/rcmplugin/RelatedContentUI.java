@@ -23,16 +23,20 @@ package com.aelitis.plugins.rcmplugin;
 import java.util.*;
 
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.events.PaintEvent;
+import org.eclipse.swt.events.PaintListener;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.graphics.Image;
+import org.eclipse.swt.graphics.Point;
+import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.FormLayout;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.RowLayout;
 import org.eclipse.swt.widgets.Button;
+import org.eclipse.swt.widgets.Canvas;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Event;
-import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.MessageBox;
 import org.eclipse.swt.widgets.TreeItem;
@@ -61,6 +65,7 @@ import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.plugins.ui.tables.TableRow;
 import org.gudy.azureus2.ui.swt.SimpleTextEntryWindow;
 import org.gudy.azureus2.ui.swt.Utils;
+import org.gudy.azureus2.ui.swt.mainwindow.Colors;
 import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 import org.gudy.azureus2.ui.swt.plugins.UISWTView;
 import org.gudy.azureus2.ui.swt.plugins.UISWTViewEvent;
@@ -80,6 +85,7 @@ import com.aelitis.azureus.ui.UserPrompterResultListener;
 import com.aelitis.azureus.ui.common.viewtitleinfo.ViewTitleInfo;
 import com.aelitis.azureus.ui.common.viewtitleinfo.ViewTitleInfoManager;
 import com.aelitis.azureus.ui.mdi.*;
+import com.aelitis.azureus.ui.swt.imageloader.ImageLoader;
 import com.aelitis.azureus.ui.swt.skin.*;
 import com.aelitis.azureus.ui.swt.views.skin.*;
 import com.aelitis.azureus.ui.swt.views.skin.SkinViewManager.SkinViewManagerListener;
@@ -91,6 +97,8 @@ RelatedContentUI
 {		
 	public static final String SIDEBAR_SECTION_RELATED_CONTENT = "RelatedContent";
 	
+	private static final String SPINNER_IMAGE_ID 	= "image.sidebar.vitality.dl";
+
 	private static RelatedContentUI		singleton;
 	
 	public synchronized static RelatedContentUI
@@ -135,6 +143,7 @@ RelatedContentUI
 	private MenuItem		root_menu;
 	
 	private Image			swarm_image;
+	private Image[]			vitality_images;
 	
 	private List<MenuItem>	torrent_menus = new ArrayList<MenuItem>();
 		
@@ -278,6 +287,8 @@ RelatedContentUI
 		
 		swarm_image = swt_ui.loadImage( "org/gudy/azureus2/ui/icons/rcm.png" );
 	
+		vitality_images = ImageLoader.getInstance().getImages( SPINNER_IMAGE_ID );
+
 		MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
 		
 		if ( mdi != null ){
@@ -673,7 +684,7 @@ RelatedContentUI
 
 		private boolean				related_mode = true;
 
-		private Label				status_label;
+		private ImageLabel			status_img_label;
 		private Button[]			buttons;
 		
 		private boolean 			current_rm;
@@ -694,20 +705,23 @@ RelatedContentUI
 		{		
 			Composite header = new Composite( parent, SWT.NULL );
 			
-			header.setLayout( new RowLayout( ));
+			RowLayout header_layout = new RowLayout();
+			
+			header_layout.center = true;
+			header_layout.spacing = 10;
+			
+			header.setLayout( header_layout );
 						
 			header.setLayoutData( new GridData( GridData.FILL_HORIZONTAL));
 			
-			status_label = new Label( header, SWT.NULL );
-			
-			status_label.setText( "..." );
-			
+			status_img_label = new ImageLabel( header, swarm_image );
+									
 			final Button button_related = new Button( header, SWT.RADIO );
 			
 			button_related.setText( MessageText.getString( "rcm.subview.relto" ));
 			
 			button_related.setSelection( true );
-			
+						
 			final Button button_size = new Button( header, SWT.RADIO );
 			
 			button_size.setText( MessageText.getString( "rcm.subview.filesize" ));
@@ -729,6 +743,9 @@ RelatedContentUI
 			button_size.addListener( SWT.Selection, but_list );
 			
 			buttons = new Button[]{ button_related, button_size };
+			
+			buttons[0].setEnabled( dl != null );
+			buttons[1].setEnabled( dl_file != null );
 			
 			Composite skin_area = new Composite( parent, SWT.NULL );
 			
@@ -892,11 +909,13 @@ RelatedContentUI
 				new_subview.setListener(
 					new RCMItemSubViewListener()
 					{
+						private int vi_index;
+						
 						public boolean
 						searching()
 						{
 							if ( 	current_data_source != new_subview ||
-									( status_label != null && status_label.isDisposed())){
+									( status_img_label != null && status_img_label.isDisposed())){
 								
 								return( false );
 							}
@@ -907,9 +926,9 @@ RelatedContentUI
 										public void 
 										run() 
 										{
-											if ( status_label != null && !status_label.isDisposed()){
+											if ( status_img_label != null && !status_img_label.isDisposed()){
 												
-												status_label.setText( status_label.getText().equals( "*" )?"+":"*" );
+												status_img_label.setImage( vitality_images[vi_index++%vitality_images.length]);
 											}
 										}
 									});
@@ -921,7 +940,7 @@ RelatedContentUI
 						complete()
 						{
 							if ( 	current_data_source != new_subview ||
-									( status_label != null && status_label.isDisposed())){
+									( status_img_label != null && status_img_label.isDisposed())){
 																
 								return;
 							}
@@ -932,9 +951,9 @@ RelatedContentUI
 										public void 
 										run() 
 										{
-											if ( status_label != null && !status_label.isDisposed()){
+											if ( status_img_label != null && !status_img_label.isDisposed()){
 												
-												status_label.setText( "OK" );
+												status_img_label.setImage( swarm_image );	
 											}
 										}
 									});
@@ -2013,8 +2032,6 @@ RelatedContentUI
 		}
 	}
 	
-	private static final String SPINNER_IMAGE_ID 	= "image.sidebar.vitality.dl";
-
 	protected static void
 	hideIcon(
 		MdiEntryVitalityImage	x )
@@ -2916,6 +2933,53 @@ RelatedContentUI
 		}
 	}
 
+	private class 
+	ImageLabel 
+		extends Canvas implements PaintListener
+	{
+		private Image		image;
+		
+		public 
+		ImageLabel(
+			Composite 	parent,
+			Image		_image )
+		{
+			super( parent, SWT.DOUBLE_BUFFERED );
+		
+			image	= _image;
+			
+			addPaintListener(this);
+		}
+		
+		public void 
+		paintControl(
+			PaintEvent e) 
+		{
+			e.gc.drawImage( image, 0, 0 );
+		}
+
+
+		public Point 
+		computeSize(
+			int 	wHint, 
+			int 	hHint, 
+			boolean changed ) 
+		{
+			Rectangle rect = image.getBounds();
+			
+			return( new Point( rect.width, rect.height ));
+		}
+
+		private void
+		setImage(
+			Image	_image )
+		{
+			image	= _image;
+						
+			redraw();
+		}
+	}
+	
 	public void setSearchEnabled(boolean b) {
 		enable_search.setValue(b);
 	}
