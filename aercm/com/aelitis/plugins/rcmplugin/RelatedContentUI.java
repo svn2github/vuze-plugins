@@ -65,7 +65,6 @@ import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.plugins.ui.tables.TableRow;
 import org.gudy.azureus2.ui.swt.SimpleTextEntryWindow;
 import org.gudy.azureus2.ui.swt.Utils;
-import org.gudy.azureus2.ui.swt.mainwindow.Colors;
 import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 import org.gudy.azureus2.ui.swt.plugins.UISWTView;
 import org.gudy.azureus2.ui.swt.plugins.UISWTViewEvent;
@@ -1247,11 +1246,15 @@ RelatedContentUI
 					return null;
 				}
 				
+				// place before the Subscriptions entry as there may be a lot of subs and we'd prefer
+				// not to be pushed right down
+				
 				MdiEntry mdiEntry = mdi.createEntryFromSkinRef(
 						MultipleDocumentInterface.SIDEBAR_HEADER_DISCOVERY,
 						SIDEBAR_SECTION_RELATED_CONTENT, "rcmview",
 						main_view_info.getTitle(),
-						main_view_info, null, true, null  );
+						main_view_info, null, true, 
+						"~" + MultipleDocumentInterface.SIDEBAR_SECTION_SUBSCRIPTIONS );
 
 				mdiEntry.setImageLeftID( "image.sidebar.rcm" );
 				

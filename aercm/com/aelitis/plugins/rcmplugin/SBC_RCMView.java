@@ -1211,9 +1211,18 @@ SBC_RCMView
 	public void filterSet(String filter) {
 	}
 
-	public boolean toolBarItemActivated(ToolBarItem item, long activationType,
-			Object datasource) {
+	public boolean 
+	toolBarItemActivated(
+		ToolBarItem item, 
+		long activationType,
+		Object datasource ) 
+	{
+		if ( tv_related_content == null ){
+			
+			return( false );
+		}
 		if (item.getID().equals("remove")) {
+			
 			Object[] _related_content = tv_related_content.getSelectedDataSources().toArray();
 			
 			if ( _related_content.length > 0 ){
@@ -1223,9 +1232,11 @@ SBC_RCMView
 				System.arraycopy( _related_content, 0, related_content, 0, related_content.length );
 				
 				manager.delete( related_content );
+			
+				return true;
 			}
-			return true;
 		}
+		
 		return false;
 	}
 
