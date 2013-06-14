@@ -72,6 +72,7 @@ XMRPCClientTunnel
 	    
     private static SecureRandom rand = new SecureRandom();
 
+    private String		basic_user = "vuze";
     private String		access_code;
     private String		username;
     private String		password;
@@ -199,7 +200,8 @@ XMRPCClientTunnel
 						XMRPCClientUtils.getFromURL( url + 
 							"?srp_a=" + Base32.encode( A.toByteArray()) + 
 							"&enc_data=" + Base32.encode( enc )+ 
-							"&enc_iv=" + Base32.encode( IV ));
+							"&enc_iv=" + Base32.encode( IV ) + 
+							"&ac=" + access_code );
 			
 					JSONObject map2 = (JSONObject)JSONUtils.decodeJSON( str2 );
 			
@@ -378,7 +380,7 @@ XMRPCClientTunnel
 				}
 			}
 		
-			byte[]	reply_bytes = XMRPCClientUtils.postToURL( url + "?client=true", encrypted );
+			byte[]	reply_bytes = XMRPCClientUtils.postToURL( url + "?client=true", encrypted, basic_user, access_code );
 						
 			byte[]	decrypted;
 			

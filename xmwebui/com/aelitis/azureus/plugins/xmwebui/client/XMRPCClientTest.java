@@ -35,8 +35,9 @@ import com.aelitis.azureus.util.JSONUtils;
 public class 
 XMRPCClientTest 
 {
-	private void
-	test1()
+	private static void
+	test1(
+		String	access_code )
 	
 		throws Exception
 	{
@@ -118,17 +119,36 @@ XMRPCClientTest
 			pw.println( JSONUtils.encodeToJSON( request ));
 			
 			pw.flush();
-		}else{
+		}else if ( false ){
 			Map request = new JSONObject();
 
 			request.put( "method", "torrent-start-all" );
 
-			String url = "http://vuze:vuze@127.0.0.1:9091/vuze/rpc?json=" + UrlUtils.encode( JSONUtils.encodeToJSON( request ));
+			String url = "http://vuze:" + access_code + "@127.0.0.1:9091/vuze/rpc?json=" + UrlUtils.encode( JSONUtils.encodeToJSON( request ));
 			
 			System.out.println( url );
 			
 			connection = (HttpURLConnection)new URL( url).openConnection();
 
+		}else{
+			Map request = new JSONObject();
+
+			request.put( "method", "session-set" );
+
+			Map	arg_map = new HashMap();
+			
+			request.put( "arguments", arg_map );
+
+			arg_map.put( "peer-port", 4444 );
+			
+			String json = JSONUtils.encodeToJSON( request );
+			
+			String url = "http://vuze:" + access_code + "@127.0.0.1:9091/vuze/rpc?json=" + UrlUtils.encode( json );
+			
+			System.out.println( json + " -> " + url );
+			
+			connection = (HttpURLConnection)new URL( url).openConnection();
+	
 		}
 		
 		LineNumberReader lnr = new LineNumberReader( new InputStreamReader( connection.getInputStream(), "UTF-8" ));
@@ -157,10 +177,10 @@ XMRPCClientTest
 	
 		throws Exception
 	{
-		XMRPCClient client = XMRPCClientFactory.createDirect( false, "127.0.0.1", 9091, "vuze", password );
+		//XMRPCClient client = XMRPCClientFactory.createDirect( false, "127.0.0.1", 9091, "vuze", password );
 		
 		//XMRPCClient client = XMRPCClientFactory.createIndirect( code );
-		//XMRPCClient client = XMRPCClientFactory.createTunnel( code, "vuze", password );
+		XMRPCClient client = XMRPCClientFactory.createTunnel( code, "vuze", password );
 		
 		try{
 			JSONObject	request = new JSONObject();
@@ -183,6 +203,8 @@ XMRPCClientTest
 	{
 		try{
 	
+			//test1(args[0]);
+			
 			test2(args[0], args[1]);
 			
 		}catch( Throwable e ){
