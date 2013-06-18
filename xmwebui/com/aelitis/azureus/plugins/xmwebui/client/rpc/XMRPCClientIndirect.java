@@ -32,15 +32,18 @@ public class
 XMRPCClientIndirect 
 	implements XMRPCClient
 {
-	private String access_code;
+	private String	pair_server;
+	private String 	access_code;
 	
 	private String binding_url;
 	
 	public
 	XMRPCClientIndirect(
+		String		ps,
 		String		ac )
 	{
-		access_code	= ac;
+		pair_server		= ps;
+		access_code		= ac;
 	}
 	
 	private String
@@ -50,7 +53,7 @@ XMRPCClientIndirect
 	{
 		if ( binding_url == null ){
 			
-			String str = XMRPCClientUtils.getFromURL( PAIRING_URL + "pairing/remote/getBinding?ac=" + access_code + "&sid=" + SID );
+			String str = XMRPCClientUtils.getFromURL( pair_server + "pairing/remote/getBinding?ac=" + access_code + "&sid=" + SID );
 			
 			System.out.println( "Binding result: " + str );
 			

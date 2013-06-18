@@ -66,12 +66,13 @@ import org.gudy.azureus2.plugins.torrent.TorrentDownloader;
 import org.gudy.azureus2.plugins.torrent.TorrentManager;
 import org.gudy.azureus2.plugins.tracker.web.TrackerWebPageRequest;
 import org.gudy.azureus2.plugins.tracker.web.TrackerWebPageResponse;
+import org.gudy.azureus2.plugins.ui.UIInstance;
+import org.gudy.azureus2.plugins.ui.UIManagerListener;
 import org.gudy.azureus2.plugins.ui.config.BooleanParameter;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.gudy.azureus2.ui.webplugin.WebPlugin;
 
-import com.aelitis.azureus.core.AzureusCore;
 import com.aelitis.azureus.core.AzureusCoreFactory;
 import com.aelitis.azureus.core.tracker.TrackerPeerSource;
 import com.aelitis.azureus.core.util.MultiPartDecoder;
@@ -93,7 +94,8 @@ XMWebUIPlugin
     private static Properties defaults = new Properties();
 
     static{
-
+    	System.setProperty( "az.xmwebui.skip.ssl.hack", "true" );
+    	
         defaults.put( WebPlugin.PR_DISABLABLE, new Boolean( true ));
         defaults.put( WebPlugin.PR_ENABLE, new Boolean( true ));
         defaults.put( WebPlugin.PR_PORT, new Integer( DEFAULT_PORT ));
@@ -249,6 +251,33 @@ XMWebUIPlugin
 							search.destroy();
 						}
 					}
+				}
+			});
+		
+		plugin_interface.getUIManager().addUIListener(
+			new UIManagerListener()
+			{
+				public void
+				UIAttached(
+					UIInstance		instance )
+				{
+					if ( instance.getUIType() == UIInstance.UIT_SWT ){
+						
+						try{
+							Class.forName( "com.aelitis.azureus.plugins.xmwebui.swt.XMWebUIPluginView").getConstructor(
+								new Class[]{ XMWebUIPlugin.class, UIInstance.class }).newInstance(
+									new Object[]{ XMWebUIPlugin.this, instance } );
+														
+						}catch( Throwable e ){
+							e.printStackTrace();
+						}
+					}
+				}
+				
+				public void
+				UIDetached(
+					UIInstance		instance )
+				{
 				}
 			});
 	}

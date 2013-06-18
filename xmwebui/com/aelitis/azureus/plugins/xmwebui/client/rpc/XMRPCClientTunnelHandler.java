@@ -32,6 +32,7 @@ public class
 XMRPCClientTunnelHandler
 	implements XMRPCClient
 {
+	private String	tunnel_server;
 	private String	access_code;
 	private String	tunnel_user;
 	private String	tunnel_password;
@@ -47,10 +48,12 @@ XMRPCClientTunnelHandler
 	
 	public
 	XMRPCClientTunnelHandler(
+		String	_tunnel_server,
 		String	_access_code,
 		String	_tunnel_user,
 		String	_tunnel_password )
 	{
+		tunnel_server	= _tunnel_server;
 		access_code		= _access_code;
 		tunnel_user		= _tunnel_user;
 		tunnel_password	= _tunnel_password;
@@ -68,7 +71,7 @@ XMRPCClientTunnelHandler
 		
 		last_create = SystemTime.getMonotonousTime();
 		
-		current_tunnel = new XMRPCClientTunnel( access_code, tunnel_user, tunnel_password );
+		current_tunnel = new XMRPCClientTunnel( tunnel_server, access_code, tunnel_user, tunnel_password );
 	}
 	
 	private synchronized void

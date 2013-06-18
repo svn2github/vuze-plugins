@@ -170,6 +170,10 @@ XMRPCClientTest
 		System.out.println( request_json_str.toString());		
 	}
 	
+	//public static final String PAIRING_URL 	= "https://pair.vuze.com/";
+	//public static final String PAIRING_URL 	= "http://127.0.0.1:9091/";
+
+	
 	private static void
 	test2(
 		String	code,
@@ -180,7 +184,8 @@ XMRPCClientTest
 		//XMRPCClient client = XMRPCClientFactory.createDirect( false, "127.0.0.1", 9091, "vuze", password );
 		
 		//XMRPCClient client = XMRPCClientFactory.createIndirect( code );
-		XMRPCClient client = XMRPCClientFactory.createTunnel( code, "vuze", password );
+		XMRPCClient client = XMRPCClientFactory.createTunnel( "http://127.0.0.1:9091/", code, "vuze", password );
+		//XMRPCClient client = XMRPCClientFactory.createTunnel( "https://pair.vuze.com/", code, "vuze", password );
 		
 		try{
 			JSONObject	request = new JSONObject();

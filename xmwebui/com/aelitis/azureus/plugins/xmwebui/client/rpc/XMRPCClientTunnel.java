@@ -72,6 +72,8 @@ XMRPCClientTunnel
 	    
     private static SecureRandom rand = new SecureRandom();
 
+    private String		tunnel_server;
+    
     private String		basic_user = "vuze";
     private String		access_code;
     private String		username;
@@ -85,10 +87,12 @@ XMRPCClientTunnel
     
 	public
 	XMRPCClientTunnel(
+		String		ts,
 		String		ac,
 		String		tunnel_user,
 		String		tunnel_password )
 	{
+		tunnel_server	= ts;
 		access_code		= ac;
 		username		= tunnel_user;
 		password		= tunnel_password;
@@ -129,7 +133,7 @@ XMRPCClientTunnel
 				    byte[] I = username.getBytes( "UTF-8" );
 				    byte[] P = password.getBytes( "UTF-8" );
 
-					String str = XMRPCClientUtils.getFromURL( PAIRING_URL + "pairing/tunnel/create?ac=" + access_code + "&sid=" + SID );
+					String str = XMRPCClientUtils.getFromURL( tunnel_server + "pairing/tunnel/create?ac=" + access_code + "&sid=" + SID );
 					
 					System.out.println( "create result: " + str );
 
@@ -516,7 +520,7 @@ XMRPCClientTunnel
 
 			if ( tunnel != null ){
 		
-				XMRPCClientUtils.postToURL( (String)tunnel[1] + "?client=true&close=true", new byte[0]);
+				XMRPCClientUtils.postToURL( (String)tunnel[0] + "?client=true&close=true", new byte[0]);
 			}		
 		}catch( Throwable e ){	
 		}

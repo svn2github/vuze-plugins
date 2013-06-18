@@ -36,42 +36,46 @@ XMRPCClientFactory
 {
     static{
     	try{
-    			//general hacks to support self-signed SSL certs
+    		if ( System.getProperty( "az.xmwebui.skip.ssl.hack", "false" ).equals( "false" )){
     		
-			TrustManager[] trustAllCerts = new TrustManager[]{
-					new X509TrustManager() {
-						public java.security.cert.X509Certificate[] getAcceptedIssuers() {
-							return null;
+    			System.out.println( "XMRPCClientFactory: installing SSL trust manager" );
+    			
+	    			//general hacks to support self-signed SSL certs
+	    		
+				TrustManager[] trustAllCerts = new TrustManager[]{
+						new X509TrustManager() {
+							public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+								return null;
+							}
+							public void checkClientTrusted(
+									java.security.cert.X509Certificate[] certs, String authType) {
+							}
+							public void checkServerTrusted(
+									java.security.cert.X509Certificate[] certs, String authType) {
+							}
 						}
-						public void checkClientTrusted(
-								java.security.cert.X509Certificate[] certs, String authType) {
-						}
-						public void checkServerTrusted(
-								java.security.cert.X509Certificate[] certs, String authType) {
-						}
-					}
-				};
-		
-			SSLContext sc = SSLContext.getInstance("SSL");
+					};
 			
-			sc.init( null, trustAllCerts, new SecureRandom());
-			
-			SSLSocketFactory factory = sc.getSocketFactory();
-			
-			HttpsURLConnection.setDefaultSSLSocketFactory( factory );
-			
-			HttpsURLConnection.setDefaultHostnameVerifier(
-				new HostnameVerifier()
-				{
-					public boolean
-					verify(
-							String		host,
-							SSLSession	session )
+				SSLContext sc = SSLContext.getInstance("SSL");
+				
+				sc.init( null, trustAllCerts, new SecureRandom());
+				
+				SSLSocketFactory factory = sc.getSocketFactory();
+				
+				HttpsURLConnection.setDefaultSSLSocketFactory( factory );
+				
+				HttpsURLConnection.setDefaultHostnameVerifier(
+					new HostnameVerifier()
 					{
-						return( true );
-					}
-				});
-			
+						public boolean
+						verify(
+								String		host,
+								SSLSession	session )
+						{
+							return( true );
+						}
+					});
+    		}
     	}catch( Throwable e ){
     		
     		e.printStackTrace();
@@ -91,17 +95,19 @@ XMRPCClientFactory
 	
 	public static XMRPCClient
 	createIndirect(
+		String	pair_server,
 		String	access_code )
 	{
-		return( new XMRPCClientIndirect( access_code ));
+		return( new XMRPCClientIndirect( pair_server, access_code ));
 	}
 	
 	public static XMRPCClient
 	createTunnel(
+		String	tunnel_server,
 		String	access_code,
 		String	tunnel_user,
 		String	tunnel_password )
 	{
-		return( new XMRPCClientTunnelHandler( access_code, tunnel_user, tunnel_password ));
+		return( new XMRPCClientTunnelHandler( tunnel_server, access_code, tunnel_user, tunnel_password ));
 	}
 }
