@@ -27,6 +27,7 @@ import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.util.*;
 
+import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.utils.LocationProvider;
 
@@ -39,6 +40,7 @@ LocationProviderImpl
 {
 	private static final int[][] FLAG_SIZES = {{18,12},{25,15}};
 	
+	private String	plugin_version;
 	private File	plugin_dir;
 	
 	private volatile boolean is_destroyed;
@@ -50,9 +52,11 @@ LocationProviderImpl
 	
 	protected
 	LocationProviderImpl(
+		String		_plugin_version,
 		File		_plugin_dir )
 	{
-		plugin_dir = _plugin_dir;
+		plugin_version	= _plugin_version==null?"":_plugin_version;
+		plugin_dir 		= _plugin_dir;
 	}
 	
 	@Override
@@ -115,8 +119,16 @@ LocationProviderImpl
 			result = ls_ipv4;
 			
 			if ( result == null ){
+								
+				if ( plugin_version.length() > 0 && Constants.compareVersions( plugin_version, "0.1.1" ) > 0 ){
+					
+					result = ls_ipv4 = getLookupService( "GeoIP_" + plugin_version + ".dat" );
+				}
 				
-				result = ls_ipv4 = getLookupService( "GeoIP.dat" );
+				if ( result == null ){
+				
+					result = ls_ipv4 = getLookupService( "GeoIP.dat" );
+				}
 			}
 		}else{
 			
@@ -124,7 +136,15 @@ LocationProviderImpl
 			
 			if ( result == null ){
 				
-				result = ls_ipv6 = getLookupService( "GeoIPv6.dat" );
+				if ( plugin_version.length() > 0 && Constants.compareVersions( plugin_version, "0.1.1" ) > 0 ){
+					
+					result = ls_ipv6 = getLookupService( "GeoIPv6_" + plugin_version + ".dat" );
+				}
+				
+				if ( result == null ){
+				
+					result = ls_ipv6 = getLookupService( "GeoIPv6.dat" );
+				}
 			}
 		}
 		
@@ -259,7 +279,7 @@ LocationProviderImpl
 		String[]	args )
 	{
 		try{
-			LocationProviderImpl prov = new LocationProviderImpl( new File( "C:\\Projects\\development\\azlocprov" ));
+			LocationProviderImpl prov = new LocationProviderImpl( "", new File( "C:\\Projects\\development\\azlocprov" ));
 			
 			System.out.println( prov.getCountry( InetAddress.getByName( "www.vuze.com" )).getCode());
 			System.out.println( prov.getCountry( InetAddress.getByName( "2001:4860:4001:801::1011" )).getCode());

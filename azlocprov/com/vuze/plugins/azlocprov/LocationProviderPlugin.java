@@ -43,7 +43,7 @@ LocationProviderPlugin
 	{
 		plugin_interface = _pi;
 		
-		provider = new LocationProviderImpl( new File( plugin_interface.getPluginDirectoryName()));
+		provider = new LocationProviderImpl( plugin_interface.getPluginVersion(), new File( plugin_interface.getPluginDirectoryName()));
 		
 		plugin_interface.getUtilities().addLocationProvider( provider );
 	}

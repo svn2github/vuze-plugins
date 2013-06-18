@@ -1,2 +1,3 @@
 Flag images found at http://www.hahn-hotel.com/flags/
 "All sets provided by us are free to use to anyone, for commercial or non-commercial websites."
+18/06/2013: Serbian flag added from http://icondrawer.com/flag-icons.php (link added to plugin page)
