@@ -90,9 +90,13 @@ XMRPCClientTunnelHandler
 		long	now = SystemTime.getCurrentTime();
 		
 		int type = exception.getType();
-				
-		if ( 	type == XMRPCClientException.ET_BAD_ACCESS_CODE || 
-				type == XMRPCClientException.ET_NO_BINDING ){
+			
+		if ( type == XMRPCClientException.ET_FEATURE_DISABLED ){
+			
+			return( false );
+			
+		}else if ( 	type == XMRPCClientException.ET_BAD_ACCESS_CODE || 
+					type == XMRPCClientException.ET_NO_BINDING ){
 			
 			int delay = consecutive_fails * 30*1000;
 			
@@ -165,7 +169,6 @@ XMRPCClientTunnelHandler
 			if ( active_calls.get() > 0 ){
 				
 				throw( new XMRPCClientException( "Tunnel under construction - request refused" ));
-
 			}
 		}
 	}
@@ -247,6 +250,11 @@ XMRPCClientTunnelHandler
 		
 		destroyed = true;
 		
-		current_tunnel.destroy();
+		if ( current_tunnel != null ){
+		
+			current_tunnel.destroy();
+			
+			current_tunnel = null;
+		}
 	}
 }

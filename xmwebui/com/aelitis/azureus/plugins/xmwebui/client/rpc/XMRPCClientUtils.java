@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.List;
 import java.util.Map;
 
 import org.bouncycastle.util.encoders.Base64;
@@ -44,7 +45,7 @@ XMRPCClientUtils
 		throws XMRPCClientException
 	{
 		try{
-			byte[] bytes = getFromURL( url, null, null, null );
+			byte[] bytes = getFromURL( url, null, null, null, null );
 			
 			String	result = new String(bytes, "UTF-8" );
 			
@@ -61,7 +62,8 @@ XMRPCClientUtils
 	protected static byte[]
 	getFromURL(
 		String					url,
-		Map<String,String>		headers,
+		Map<String,String>		headers_in,
+		Map<String,String>		headers_out,
 		String					username,
 		String					password )
 	
@@ -74,9 +76,9 @@ XMRPCClientUtils
 				
 				connection.setRequestProperty( "Connection", "Keep-Alive" );
 				
-				if ( headers != null ){
+				if ( headers_in != null ){
 					
-					for ( Map.Entry<String, String> entry: headers.entrySet()){
+					for ( Map.Entry<String, String> entry: headers_in.entrySet()){
 						
 						connection.setRequestProperty( entry.getKey(), entry.getValue());
 					}
@@ -101,6 +103,22 @@ XMRPCClientUtils
 
 				try{
 					InputStream is = connection.getInputStream();
+					
+					if ( headers_out != null ){
+						
+						Map<String,List<String>> temp = connection.getHeaderFields();
+						
+						for ( Map.Entry<String,List<String>> entry: temp.entrySet()){
+							
+							String			key 	= entry.getKey();
+							List<String>	values 	= entry.getValue();
+							
+							if ( values.size() > 0 ){
+								
+								headers_out.put( key, values.get(0));
+							}
+						}
+					}
 					
 					ByteArrayOutputStream baos = new ByteArrayOutputStream( 10000 );
 					

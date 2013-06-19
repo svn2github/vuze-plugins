@@ -22,6 +22,7 @@
 package com.aelitis.azureus.plugins.xmwebui.client.rpc;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.json.simple.JSONObject;
@@ -125,7 +126,7 @@ XMRPCClientIndirect
 	call(
 		String 					method, 
 		String 					url_suffix,
-		Map<String, String> 	headers, 
+		Map<String, String> 	headers_in, 
 		byte[] 					data)
 	
 		throws XMRPCClientException 
@@ -136,9 +137,11 @@ XMRPCClientIndirect
 			
 			url += url_suffix;
 	
-			byte[] output_data = XMRPCClientUtils.getFromURL( url, headers, "vuze", access_code );
+			Map<String,String>	headers_out = new HashMap<String, String>();
 			
-			return( XMRPCClientUtils.createHTTPResponse( null, output_data, 0 ));
+			byte[] output_data = XMRPCClientUtils.getFromURL( url, headers_in, headers_out, "vuze", access_code );
+			
+			return( XMRPCClientUtils.createHTTPResponse( headers_out, output_data, 0 ));
 			
 		}else{
 			

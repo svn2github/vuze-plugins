@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -37,6 +38,7 @@ import org.gudy.azureus2.core3.tracker.server.impl.tcp.nonblocking.TRNonBlocking
 import org.gudy.azureus2.core3.tracker.server.impl.tcp.nonblocking.TRNonBlockingServerProcessor;
 import org.gudy.azureus2.core3.tracker.server.impl.tcp.nonblocking.TRNonBlockingServerProcessorFactory;
 import org.gudy.azureus2.core3.util.AsyncController;
+import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.FileUtil;
 import org.gudy.azureus2.core3.util.TimeFormatter;
 import org.json.simple.JSONObject;
@@ -49,20 +51,44 @@ import com.aelitis.azureus.util.JSONUtils;
 public class 
 XMClientProxy 
 {
-	private File	resource_dir = new File( "C:\\Projects\\Development\\xmwebui\\transmission\\web" );
-		
-	private XMRPCClient	rpc;
+	private final File				resource_dir;
+	private final XMRPCClient		rpc;
 	
+	private TRNonBlockingServer 	server;
+
 	public
 	XMClientProxy(
+		File			_resource_dir,
 		XMRPCClient		_rpc )
+	
+		throws IOException
 	{
-		rpc 	= _rpc;
+		resource_dir	= _resource_dir.getCanonicalFile();
+		rpc 			= _rpc;
+		
+		int	port = 0;
+					
+		try{
+			ServerSocketChannel ssc = ServerSocketChannel.open();
+			
+			ssc.socket().bind( new InetSocketAddress( "127.0.0.1", 0 ), 4 );
+			
+			port = ssc.socket().getLocalPort();
+			
+			ssc.close();
+			
+		}catch( Throwable e ){
+		}
+		
+		if ( port == 0 ){
+			
+			throw( new IOException( "Failed to allocate a local port" ));
+		}
 		
 		try{
-			new TRNonBlockingServer( 
-					"VersionServer", 
-					5666, 
+			server = new TRNonBlockingServer( 
+					"XMClientProxy", 
+					port, 
 					InetAddress.getByName( "127.0.0.1" ), 
 					false,
 					new TRNonBlockingServerProcessorFactory()
@@ -75,10 +101,29 @@ XMClientProxy
 							return( new NonBlockingProcessor( _server, _socket ));
 						}
 					});
+			
 		}catch( Throwable e ){
 			
-			e.printStackTrace();
+			throw( new IOException( "Failed to create proxy server: " + Debug.getNestedExceptionMessage(e)));
 		}
+	}
+	
+	public String
+	getHostName()
+	{
+		return( "127.0.0.1" );
+	}
+	
+	public int
+	getPort()
+	{
+		return( server.getPort());
+	}
+	
+	public void
+	destroy()
+	{
+		server.close();
 	}
 	
 	private class
@@ -168,27 +213,42 @@ XMClientProxy
 						url_path = "/index.html";
 					}
 					
-					File file = new File( resource_dir, url_path.substring(1).replace( "/", File.separator ));
-					
-					file = file.getCanonicalFile();
-					
-					System.out.println( file + " -> " + file.exists());
-					
-					data.write( FileUtil.readFileAsByteArray( file ));
-					
-					String	formatted_date		 = TimeFormatter.getHTTPDate( file.lastModified());
-
-					output_headers.put( "Last-Modified", formatted_date );
-					
-					String name = file.getName();
-					
-					int	pos = name.lastIndexOf( "." );
-					
-					if ( pos != -1 ){
-					
-						content_type = HTTPUtils.guessContentTypeFromFileType( name.substring( pos+1 ));
+					if ( url_path.endsWith( "/isServicePaired" )){
+						
+						data.write( "{ 'servicepaired': false }".getBytes( "UTF-8" ));
+							
+						content_type = "application/json; charset=UTF-8";
+						
+					}else{
+						
+						File file = new File( resource_dir, url_path.substring(1).replace( "/", File.separator ));
+						
+						file = file.getCanonicalFile();
+						
+						if ( !file.getAbsolutePath().startsWith( resource_dir.getAbsolutePath())){
+							
+							throw( new IOException( "Invalid resource file location: " + file ));
+						}
+						
+						//System.out.println( file + " -> " + file.exists());
+						
+						data.write( FileUtil.readFileAsByteArray( file ));
+						
+						String	formatted_date		 = TimeFormatter.getHTTPDate( file.lastModified());
+	
+						output_headers.put( "Last-Modified", formatted_date );
+						
+						String name = file.getName();
+						
+						int	pos = name.lastIndexOf( "." );
+						
+						if ( pos != -1 ){
+						
+							content_type = HTTPUtils.guessContentTypeFromFileType( name.substring( pos+1 ));
+						}
 					}
 				}
+				
 				
 				byte[] bytes = data.toByteArray();
 				
@@ -238,13 +298,14 @@ XMClientProxy
 	main(
 		String[]	args )
 	{
+		File rd = new File( "C:\\Projects\\Development\\xmwebui\\transmission\\web" );
 		try{
 			//XMRPCClient	rpc = XMRPCClientFactory.createDirect( false, "127.0.0.1", 9091, args[0], args[1] );
 			//XMRPCClient	rpc = XMRPCClientFactory.createIndirect( args[0] );
 			//XMRPCClient	rpc = XMRPCClientFactory.createTunnel( "https://pair.vuze.com/", args[0], "vuze", args[1] );
 			XMRPCClient	rpc = XMRPCClientFactory.createTunnel( "http://127.0.0.1:9091/", args[0], "vuze", args[1] );
 
-			new XMClientProxy( rpc );
+			new XMClientProxy( rd, rpc );
 			
 			while( true ){
 				

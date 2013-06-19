@@ -30,6 +30,7 @@ XMRPCClientException
 	public static final int	ET_BAD_ACCESS_CODE		= 2;
 	public static final int	ET_NO_BINDING			= 3;
 	public static final int	ET_CRYPTO_FAILED		= 4;
+	public static final int	ET_FEATURE_DISABLED		= 5;
 	
 	private int type = ET_GENERIC;
 	
@@ -41,6 +42,17 @@ XMRPCClientException
 		
 		type	= _type;
 	}
+	
+	public
+	XMRPCClientException(
+		int		_type,
+		String	_message )
+	{
+		super( "Error type " + _type + (_message==null?"":( ": " + _message )));
+		
+		type	= _type;
+	}
+	
 	public
 	XMRPCClientException(
 		String	str )

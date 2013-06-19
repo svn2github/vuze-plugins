@@ -143,17 +143,23 @@ XMRPCClientTunnel
 
 					if ( error != null ){
 						
-						long code = (Long)error.get( "code" );
+						long 	code 	= (Long)error.get( "code" );
+						String	msg 	= (String)error.get( "msg" );
 						
 							// 1, 2, 3 -> bad code/not registered
 						
 						if ( code == 1 ){
 							
-							throw( new XMRPCClientException( XMRPCClientException.ET_BAD_ACCESS_CODE ));
+							throw( new XMRPCClientException( XMRPCClientException.ET_BAD_ACCESS_CODE, msg ));
 							
 						}else if ( code == 2 || code == 3 ){
 							
-							throw( new XMRPCClientException( XMRPCClientException.ET_NO_BINDING ));
+							throw( new XMRPCClientException( XMRPCClientException.ET_NO_BINDING, msg ));
+							
+						}else if ( code == 5 ){
+							
+							throw( new XMRPCClientException( XMRPCClientException.ET_FEATURE_DISABLED, msg ));
+
 						}else{
 							
 							throw( new XMRPCClientException( "Uknown error creating tunnel: " + str ));

@@ -22,6 +22,7 @@
 package com.aelitis.azureus.plugins.xmwebui.client.rpc;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.json.simple.JSONObject;
@@ -85,7 +86,7 @@ XMRPCClientDirect
 	call(
 		String 					method, 
 		String 					url,
-		Map<String, String> 	headers, 
+		Map<String, String> 	headers_in, 
 		byte[] 					input_data)
 	
 		throws XMRPCClientException 
@@ -94,9 +95,11 @@ XMRPCClientDirect
 			
 			url = (http?"http":"https") + "://" + host + ":" + port + url;
 	
-			byte[] output_data = XMRPCClientUtils.getFromURL( url, headers, username, password );
+			Map<String,String>	headers_out = new HashMap<String, String>();
+
+			byte[] output_data = XMRPCClientUtils.getFromURL( url, headers_in, headers_out, username, password );
 			
-			return( XMRPCClientUtils.createHTTPResponse( null, output_data, 0 ));
+			return( XMRPCClientUtils.createHTTPResponse( headers_out, output_data, 0 ));
 			
 		}else{
 			

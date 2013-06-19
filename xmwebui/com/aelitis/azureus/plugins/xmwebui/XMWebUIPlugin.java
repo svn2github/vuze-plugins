@@ -387,6 +387,12 @@ XMWebUIPlugin
 		checkViewMode();
 	}
 	   
+	public File
+	getResourceDir()
+	{
+		return( new File( plugin_interface.getPluginDirectoryName(), "transmission" + File.separator + "web" ));
+	}
+	
 	public void
 	downloadAdded(
 		Download	download )
