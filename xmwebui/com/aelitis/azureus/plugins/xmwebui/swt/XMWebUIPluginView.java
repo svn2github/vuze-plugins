@@ -53,6 +53,7 @@ import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 
+import org.gudy.azureus2.ui.swt.Messages;
 import org.gudy.azureus2.ui.swt.Utils;
 import org.gudy.azureus2.ui.swt.mainwindow.Colors;
 import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
@@ -245,7 +246,7 @@ XMWebUIPluginView
 		
 		private AccountConfig	current_account;
 		
-		private Group 			account_group;
+		private Group 			options_group;
 		private Button 			do_basic;
 		private Button			do_basic_def;
 		private Text			basic_username;
@@ -272,15 +273,19 @@ XMWebUIPluginView
 			GridData grid_data = new GridData(GridData.FILL_BOTH );
 			main.setLayoutData(grid_data);
 
-			Label add_label = new Label( main, SWT.NULL );
+			Label info_label = new Label( main, SWT.NULL );
+			grid_data = new GridData();
+			grid_data.horizontalSpan = 4;
+			info_label.setLayoutData( grid_data );
+			Messages.setLanguageText( info_label, "xmwebui.rpc.info" );
 			
-			add_label.setText( "Enter a new remote Vuze access code" );
+			Label add_label = new Label( main, SWT.NULL );
+			Messages.setLanguageText( add_label, "xmwebui.rpc.add.info" );
 			
 			final Text	ac_text = new Text( main, SWT.BORDER );
 						
 			final Button 	add_button = new Button( main, SWT.PUSH );
-			
-			add_button.setText( "Add" );
+			Messages.setLanguageText( add_button, "xmwebui.rpc.add" );
 
 			add_button.setEnabled( false );
 
@@ -317,15 +322,13 @@ XMWebUIPluginView
 			new Label( main, SWT.NULL );
 			
 			Label sel_label = new Label( main, SWT.NULL );
-			
-			sel_label.setText( "Select an existing access code" );
+			Messages.setLanguageText( sel_label, "xmwebui.rpc.select" );
 			
 			ac_list = new Combo( main, SWT.SINGLE | SWT.READ_ONLY );
 						
 			connect_button = new Button( main, SWT.PUSH );
-			
-			connect_button.setText( "Connect" );
-			
+			Messages.setLanguageText( connect_button, "xmwebui.rpc.connect" );
+		
 			connect_button.addSelectionListener(
 				new SelectionAdapter()
 				{
@@ -369,8 +372,7 @@ XMWebUIPluginView
 			connect_button.setEnabled( false );
 			
 			remove_button = new Button( main, SWT.PUSH );
-			
-			remove_button.setText( "Remove" );
+			Messages.setLanguageText( remove_button, "xmwebui.rpc.remove" );
 
 			remove_button.addSelectionListener(
 					new SelectionAdapter()
@@ -404,18 +406,18 @@ XMWebUIPluginView
 						}
 					});
 			
-			account_group = new Group( main, SWT.NULL );
-			account_group.setText( "Options" );
+			options_group = new Group( main, SWT.NULL );
+			Messages.setLanguageText( options_group, "xmwebui.rpc.options" );
 			layout = new GridLayout();
 			layout.numColumns = 6;
 
-			account_group.setLayout(layout);
+			options_group.setLayout(layout);
 			grid_data = new GridData(GridData.FILL_HORIZONTAL);
 			grid_data.horizontalSpan = 4;
-			account_group.setLayoutData(grid_data);
+			options_group.setLayoutData(grid_data);
 
-			do_basic = new Button( account_group, SWT.CHECK );
-			do_basic.setText( "Enable basic connection" );
+			do_basic = new Button( options_group, SWT.CHECK );
+			Messages.setLanguageText( do_basic, "xmwebui.rpc.options.enable.basic" );
 			
 			do_basic.addSelectionListener(
 				new SelectionAdapter()
@@ -435,8 +437,8 @@ XMWebUIPluginView
 					}
 				});
 			
-			do_basic_def = new Button( account_group, SWT.CHECK );
-			do_basic_def.setText( "Use default authentication" );
+			do_basic_def = new Button( options_group, SWT.CHECK );
+			Messages.setLanguageText( do_basic_def, "xmwebui.rpc.options.basic.def.auth" );
 
 			do_basic_def.addSelectionListener(
 				new SelectionAdapter()
@@ -456,11 +458,11 @@ XMWebUIPluginView
 					}
 				});
 			
-			Label label = new Label( account_group, SWT.NULL );
+			Label label = new Label( options_group, SWT.NULL );
+			Messages.setLanguageText( label, "xmwebui.rpc.options.user" );
+
 			
-			label.setText( "Username" );
-			
-			basic_username = new Text( account_group, SWT.BORDER );
+			basic_username = new Text( options_group, SWT.BORDER );
 			
 			basic_username.addListener(
 				SWT.FocusOut, 
@@ -479,11 +481,11 @@ XMWebUIPluginView
 			    });
 			
 			
-			label = new Label( account_group, SWT.NULL );
+			label = new Label( options_group, SWT.NULL );
+			Messages.setLanguageText( label, "xmwebui.rpc.options.pw" );
+
 			
-			label.setText( "Password" );
-			
-			basic_password = new Text( account_group, SWT.BORDER );
+			basic_password = new Text( options_group, SWT.BORDER );
 			basic_password.setEchoChar( '*' );
 			basic_password.addListener(
 				SWT.FocusOut, 
@@ -501,14 +503,13 @@ XMWebUIPluginView
 			        }
 			    });
 				
-			label = new Label( account_group, SWT.NULL );
+			label = new Label( options_group, SWT.NULL );
 			grid_data = new GridData();
 			grid_data.horizontalSpan = 5;
 			label.setLayoutData(grid_data);
-
-			label.setText( "Secure password - this requires secure pairing to be enabled on the remote Vuze" );
+			Messages.setLanguageText( label, "xmwebui.rpc.options.secure.pw" );
 			
-			secure_password = new Text( account_group, SWT.BORDER );
+			secure_password = new Text( options_group, SWT.BORDER );
 			secure_password.setEchoChar( '*' );
 			secure_password.addListener(
 				SWT.FocusOut, 
@@ -552,7 +553,7 @@ XMWebUIPluginView
 				// operations
 			
 			operation_group = new Group( main, SWT.NULL );
-			operation_group.setText( "Operations" );
+			Messages.setLanguageText( operation_group, "xmwebui.rpc.operations" );
 			layout = new GridLayout();
 			layout.numColumns = 6;
 
@@ -562,8 +563,7 @@ XMWebUIPluginView
 			operation_group.setLayoutData(grid_data);
 			
 			Button disconnect_button = new Button( operation_group, SWT.PUSH );
-			
-			disconnect_button.setText( "Disconnect" );
+			Messages.setLanguageText( disconnect_button, "xmwebui.rpc.disconnect" );
 
 			disconnect_button.addSelectionListener(
 					new SelectionAdapter()
@@ -582,8 +582,8 @@ XMWebUIPluginView
 					});
 			
 			Button launch_ui_button = new Button( operation_group, SWT.PUSH );
-			
-			launch_ui_button.setText( "Launch UI" );
+			Messages.setLanguageText( launch_ui_button, "xmwebui.rpc.launch.ui" );
+
 
 			launch_ui_button.addSelectionListener(
 					new SelectionAdapter()
@@ -634,7 +634,7 @@ XMWebUIPluginView
 				
 				connect_button.setEnabled( false );
 				remove_button.setEnabled( false );
-				setEnabled( account_group, false );
+				setEnabled( options_group, false );
 				setEnabled( operation_group, false );
 				
 				if ( ac_list.getSelectionIndex() != -1 ){
@@ -647,7 +647,7 @@ XMWebUIPluginView
 				
 				connect_button.setEnabled( true );
 				remove_button.setEnabled( true );
-				setEnabled( account_group, true );
+				setEnabled( options_group, true );
 	
 				RemoteConnection rc = remote_connections.get( current_account.getAccessCode());
 				

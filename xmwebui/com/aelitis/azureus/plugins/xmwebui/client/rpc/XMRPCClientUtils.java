@@ -36,9 +36,9 @@ import com.aelitis.azureus.plugins.xmwebui.client.rpc.XMRPCClient.HTTPResponse;
 public class 
 XMRPCClientUtils 
 {
-	private static String session_id;
+	private String session_id;
 	
-	protected static String
+	protected String
 	getFromURL(
 		String					url ) 
 	
@@ -59,7 +59,7 @@ XMRPCClientUtils
 		}
 	}
 	
-	protected static byte[]
+	protected byte[]
 	getFromURL(
 		String					url,
 		Map<String,String>		headers_in,
@@ -164,7 +164,7 @@ XMRPCClientUtils
 		}
 	}
 	
-	protected static byte[]
+	protected byte[]
   	postToURL(
   		String		url,
   		byte[]		payload )
@@ -174,7 +174,7 @@ XMRPCClientUtils
 		return( postToURL( url, payload, null, null ));
   	}
 	
-	protected static byte[]
+	protected byte[]
 	postToURL(
 		String		url,
 		byte[]		payload,
@@ -260,7 +260,7 @@ XMRPCClientUtils
 		}
 	}
 	
-	protected static HTTPResponse
+	protected HTTPResponse
 	createHTTPResponse(
 		final Map<String,String>	headers,
 		final byte[]				data,

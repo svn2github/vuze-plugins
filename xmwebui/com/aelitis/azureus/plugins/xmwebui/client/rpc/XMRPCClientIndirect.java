@@ -33,6 +33,8 @@ public class
 XMRPCClientIndirect 
 	implements XMRPCClient
 {
+	private XMRPCClientUtils	utils = new XMRPCClientUtils();
+
 	private String	pair_server;
 	private String 	access_code;
 	
@@ -54,7 +56,7 @@ XMRPCClientIndirect
 	{
 		if ( binding_url == null ){
 			
-			String str = XMRPCClientUtils.getFromURL( pair_server + "pairing/remote/getBinding?ac=" + access_code + "&sid=" + SID );
+			String str = utils.getFromURL( pair_server + "pairing/remote/getBinding?ac=" + access_code + "&sid=" + SID );
 			
 			System.out.println( "Binding result: " + str );
 			
@@ -106,7 +108,7 @@ XMRPCClientIndirect
 			
 			String json = JSONUtils.encodeToJSON( request );
 			
-			byte[] reply = XMRPCClientUtils.postToURL( url , json.getBytes( "UTF-8" ), "vuze", access_code );
+			byte[] reply = utils.postToURL( url , json.getBytes( "UTF-8" ), "vuze", access_code );
 			
 			Map m = JSONUtils.decodeJSON( new String( reply, "UTF-8" ));
 			
@@ -139,9 +141,9 @@ XMRPCClientIndirect
 	
 			Map<String,String>	headers_out = new HashMap<String, String>();
 			
-			byte[] output_data = XMRPCClientUtils.getFromURL( url, headers_in, headers_out, "vuze", access_code );
+			byte[] output_data = utils.getFromURL( url, headers_in, headers_out, "vuze", access_code );
 			
-			return( XMRPCClientUtils.createHTTPResponse( headers_out, output_data, 0 ));
+			return( utils.createHTTPResponse( headers_out, output_data, 0 ));
 			
 		}else{
 			

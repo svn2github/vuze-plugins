@@ -72,6 +72,8 @@ XMRPCClientTunnel
 	    
     private static SecureRandom rand = new SecureRandom();
 
+	private XMRPCClientUtils	utils = new XMRPCClientUtils();
+
     private String		tunnel_server;
     
     private String		basic_user = "vuze";
@@ -133,7 +135,7 @@ XMRPCClientTunnel
 				    byte[] I = username.getBytes( "UTF-8" );
 				    byte[] P = password.getBytes( "UTF-8" );
 
-					String str = XMRPCClientUtils.getFromURL( tunnel_server + "pairing/tunnel/create?ac=" + access_code + "&sid=" + SID );
+					String str = utils.getFromURL( tunnel_server + "pairing/tunnel/create?ac=" + access_code + "&sid=" + SID );
 					
 					System.out.println( "create result: " + str );
 
@@ -207,7 +209,7 @@ XMRPCClientTunnel
 					byte[] enc = encipher.doFinal( activate_bytes );
 					
 					String str2 = 
-						XMRPCClientUtils.getFromURL( url + 
+						utils.getFromURL( url + 
 							"?srp_a=" + Base32.encode( A.toByteArray()) + 
 							"&enc_data=" + Base32.encode( enc )+ 
 							"&enc_iv=" + Base32.encode( IV ) + 
@@ -390,7 +392,7 @@ XMRPCClientTunnel
 				}
 			}
 		
-			byte[]	reply_bytes = XMRPCClientUtils.postToURL( url + "?client=true", encrypted, basic_user, access_code );
+			byte[]	reply_bytes = utils.postToURL( url + "?client=true", encrypted, basic_user, access_code );
 						
 			byte[]	decrypted;
 			
@@ -506,7 +508,7 @@ XMRPCClientTunnel
 			
 			System.out.println( "Received reply: " + reply_headers );
 		
-			return( XMRPCClientUtils.createHTTPResponse( reply_headers, reply_data, reply_data_offset ));
+			return( utils.createHTTPResponse( reply_headers, reply_data, reply_data_offset ));
 			
 		}catch( XMRPCClientException e ){
 			
@@ -526,7 +528,7 @@ XMRPCClientTunnel
 
 			if ( tunnel != null ){
 		
-				XMRPCClientUtils.postToURL( (String)tunnel[0] + "?client=true&close=true", new byte[0]);
+				utils.postToURL( (String)tunnel[0] + "?client=true&close=true", new byte[0]);
 			}		
 		}catch( Throwable e ){	
 		}

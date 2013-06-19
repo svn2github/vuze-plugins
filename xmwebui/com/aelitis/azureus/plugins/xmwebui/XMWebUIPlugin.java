@@ -1103,7 +1103,7 @@ XMWebUIPlugin
 
 		}else{
 			
-			System.out.println( "unhandled methd: " + method + " - " + args );
+			System.out.println( "unhandled method: " + method + " - " + args );
 		}
 
 		return( result );

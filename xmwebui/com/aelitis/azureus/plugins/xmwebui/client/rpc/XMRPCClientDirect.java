@@ -33,6 +33,8 @@ public class
 XMRPCClientDirect
 	implements XMRPCClient
 {
+	private XMRPCClientUtils	utils = new XMRPCClientUtils();
+	
 	private boolean	http;
 	private String 	host;
 	private int		port;
@@ -66,7 +68,7 @@ XMRPCClientDirect
 			
 			String json = JSONUtils.encodeToJSON( request );
 			
-			byte[] reply = XMRPCClientUtils.postToURL( url , json.getBytes( "UTF-8" ), username, password );
+			byte[] reply = utils.postToURL( url , json.getBytes( "UTF-8" ), username, password );
 			
 			Map m = JSONUtils.decodeJSON( new String( reply, "UTF-8" ));
 			
@@ -97,9 +99,9 @@ XMRPCClientDirect
 	
 			Map<String,String>	headers_out = new HashMap<String, String>();
 
-			byte[] output_data = XMRPCClientUtils.getFromURL( url, headers_in, headers_out, username, password );
+			byte[] output_data = utils.getFromURL( url, headers_in, headers_out, username, password );
 			
-			return( XMRPCClientUtils.createHTTPResponse( headers_out, output_data, 0 ));
+			return( utils.createHTTPResponse( headers_out, output_data, 0 ));
 			
 		}else{
 			
