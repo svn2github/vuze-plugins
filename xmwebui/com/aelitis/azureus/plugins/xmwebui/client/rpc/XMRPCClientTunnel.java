@@ -528,7 +528,7 @@ XMRPCClientTunnel
 
 			if ( tunnel != null ){
 		
-				utils.postToURL( (String)tunnel[0] + "?client=true&close=true", new byte[0]);
+				utils.postToURL( (String)tunnel[0] + "?client=true&close=true", new byte[0], basic_user, access_code );
 			}		
 		}catch( Throwable e ){	
 		}

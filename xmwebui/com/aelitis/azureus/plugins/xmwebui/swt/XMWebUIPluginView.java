@@ -83,6 +83,11 @@ XMWebUIPluginView
 	private static final int LOG_SUCCESS 	= 2;
 	private static final int LOG_ERROR 		= 3;
 
+	private static final String	CS_DISCONNECTED		= "Disconnected";
+	private static final String	CS_BASIC			= "Basic";
+	private static final String	CS_SECURE_DIRECT	= "Secure (Direct)";
+	private static final String	CS_SECURE_PROXIED	= "Secure (Proxied)";
+	
 
 	private XMWebUIPlugin		plugin;
 	private UISWTInstance		ui_instance;
@@ -228,6 +233,16 @@ XMWebUIPluginView
 	
 	private void
 	logError(
+		Throwable e )
+	{
+		if ( current_instance != null ){
+			
+			current_instance.print( Debug.getNestedExceptionMessage( e ), LOG_ERROR, false );
+		}
+	}
+	
+	private void
+	logError(
 		String	str )
 	{
 		if ( current_instance != null ){
@@ -247,14 +262,18 @@ XMWebUIPluginView
 		private AccountConfig	current_account;
 		
 		private Group 			options_group;
+		private Text			description;
 		private Button 			do_basic;
 		private Button			do_basic_def;
 		private Text			basic_username;
 		private Text			basic_password;
+		
+		private Button			force_proxy;
 		private Text			secure_password;
 		
 		private Group 			operation_group;
-
+		private Label			status_label;
+		
 		private StyledText 	log ;
 		
 		private boolean	initialised;
@@ -340,6 +359,8 @@ XMWebUIPluginView
 						
 						String ac = ac_list.getItem( index );
 						
+						ac = trimAccount( ac );
+						
 						synchronized( remote_connections ){
 							
 							RemoteConnection rc = remote_connections.get( ac );
@@ -387,6 +408,8 @@ XMWebUIPluginView
 								
 								String ac = ac_list.getItem( index );
 
+								ac = trimAccount( ac );
+								
 								AccountConfig ac_config = account_config.remove( ac );
 								
 								if ( ac_config != null ){
@@ -416,6 +439,31 @@ XMWebUIPluginView
 			grid_data.horizontalSpan = 4;
 			options_group.setLayoutData(grid_data);
 
+			Label label = new Label( options_group, SWT.NULL );
+			Messages.setLanguageText( label, "xmwebui.rpc.options.desc" );
+
+			description = new Text( options_group, SWT.BORDER );
+			description.addListener(
+				SWT.FocusOut, 
+				new Listener() 
+				{
+			        public void handleEvent(Event event) {
+			        	if ( current_account != null ){
+							
+							current_account.setDescription( description.getText());
+							
+							updateAccountList();
+							
+							saveConfig();
+						}
+			        }
+			    });
+			
+			label = new Label( options_group, SWT.NULL );
+			grid_data = new GridData(GridData.FILL_HORIZONTAL);
+			grid_data.horizontalSpan = 4;
+			label.setLayoutData(grid_data);
+			
 			do_basic = new Button( options_group, SWT.CHECK );
 			Messages.setLanguageText( do_basic, "xmwebui.rpc.options.enable.basic" );
 			
@@ -458,7 +506,10 @@ XMWebUIPluginView
 					}
 				});
 			
-			Label label = new Label( options_group, SWT.NULL );
+			label = new Label( options_group, SWT.NULL );
+			grid_data = new GridData();
+			grid_data.horizontalIndent = 20;
+			label.setLayoutData( grid_data );
 			Messages.setLanguageText( label, "xmwebui.rpc.options.user" );
 
 			
@@ -505,9 +556,30 @@ XMWebUIPluginView
 				
 			label = new Label( options_group, SWT.NULL );
 			grid_data = new GridData();
-			grid_data.horizontalSpan = 5;
+			grid_data.horizontalSpan = 4;
 			label.setLayoutData(grid_data);
 			Messages.setLanguageText( label, "xmwebui.rpc.options.secure.pw" );
+			
+			force_proxy = new Button( options_group, SWT.CHECK );
+			Messages.setLanguageText( force_proxy, "xmwebui.rpc.options.secure.force.proxy" );
+
+			force_proxy.addSelectionListener(
+				new SelectionAdapter()
+				{
+					public void 
+					widgetSelected(
+						SelectionEvent e ) 
+					{
+						if ( current_account != null ){
+							
+							current_account.setForceProxy( force_proxy.getSelection());
+							
+							updateSelectedAccount( current_account );
+							
+							saveConfig();
+						}
+					}
+				});
 			
 			secure_password = new Text( options_group, SWT.BORDER );
 			secure_password.setEchoChar( '*' );
@@ -545,6 +617,8 @@ XMWebUIPluginView
 							
 							String ac = ac_list.getItem( index );
 
+							ac = trimAccount( ac );
+							
 							setSelectedAccount( account_config.get( ac ));
 						}
 					}
@@ -562,24 +636,16 @@ XMWebUIPluginView
 			grid_data.horizontalSpan = 4;
 			operation_group.setLayoutData(grid_data);
 			
-			Button disconnect_button = new Button( operation_group, SWT.PUSH );
-			Messages.setLanguageText( disconnect_button, "xmwebui.rpc.disconnect" );
+				// status
+			
+			status_label = new Label( operation_group, SWT.NULL );
+			grid_data = new GridData(GridData.FILL_HORIZONTAL);
+			grid_data.horizontalSpan = 6;
+			status_label.setLayoutData(grid_data);
+			Messages.setLanguageText( status_label, "xmwebui.rpc.constatus", new String[]{ CS_DISCONNECTED } );
 
-			disconnect_button.addSelectionListener(
-					new SelectionAdapter()
-					{
-						public void 
-						widgetSelected(
-							SelectionEvent e ) 
-						{
-							RemoteConnection rc = getCurrentRemoteConnection();
-							
-							if ( rc != null ){
-								
-								rc.destroy();
-							}
-						}
-					});
+			
+				// launch ui
 			
 			Button launch_ui_button = new Button( operation_group, SWT.PUSH );
 			Messages.setLanguageText( launch_ui_button, "xmwebui.rpc.launch.ui" );
@@ -602,7 +668,58 @@ XMWebUIPluginView
 							}
 						}
 					});
+
+				// status
 			
+			Button status_button = new Button( operation_group, SWT.PUSH );
+			Messages.setLanguageText( status_button, "xmwebui.rpc.status" );
+
+
+			status_button.addSelectionListener(
+					new SelectionAdapter()
+					{
+						public void 
+						widgetSelected(
+							SelectionEvent event ) 
+						{
+							RemoteConnection rc = getCurrentRemoteConnection();
+							
+							if ( rc != null ){
+								
+								try{
+									Map map = rc.getRPCStatus();
+									
+									log( map.toString());
+									
+								}catch( Throwable e ){
+									
+									logError( e );
+								}
+							}
+						}
+					});
+			
+				// disconnect
+			
+			Button disconnect_button = new Button( operation_group, SWT.PUSH );
+			Messages.setLanguageText( disconnect_button, "xmwebui.rpc.disconnect" );
+
+			disconnect_button.addSelectionListener(
+					new SelectionAdapter()
+					{
+						public void 
+						widgetSelected(
+							SelectionEvent e ) 
+						{
+							RemoteConnection rc = getCurrentRemoteConnection();
+							
+							if ( rc != null ){
+								
+								rc.destroy();
+							}
+						}
+					});
+
 				// log
 			
 			log = new StyledText( main,SWT.READ_ONLY | SWT.V_SCROLL | SWT.H_SCROLL | SWT.BORDER);
@@ -659,7 +776,9 @@ XMWebUIPluginView
 				
 				for ( int i=0;i<items.length;i++ ){
 					
-					if ( items[i].equals( current_account.getAccessCode())){
+					String ac = trimAccount( items[i] );
+					
+					if ( ac.equals( current_account.getAccessCode())){
 						
 						if ( ac_list.getSelectionIndex() != i ){
 						
@@ -683,15 +802,17 @@ XMWebUIPluginView
 		updateSelectedAccount(
 			AccountConfig	ac )
 		{
-			boolean	basic_enable 	= ac.isBasicEnabled();
-			boolean	basic_defs 		= ac.isBasicDefaults();
+			boolean	basic_enable 		= ac.isBasicEnabled();
+			boolean	basic_defs 			= ac.isBasicDefaults();
 			String	basic_user_str		= ac.getBasicUser();
 			String	basic_pw_str		= ac.getBasicPassword();
 			
+			description.setText( ac.getDescription());
 			do_basic.setSelection( basic_enable );
 			do_basic_def.setSelection( basic_defs );
 			basic_username.setText( basic_user_str );
 			basic_password.setText( basic_pw_str );
+			force_proxy.setSelection( ac.isForceProxy());
 			
 			if ( basic_enable ){
 				
@@ -707,21 +828,71 @@ XMWebUIPluginView
 			}
 		}
 		
+		private String
+		trimAccount(
+			String	ac )
+		{
+			int	pos = ac.indexOf( '-' );
+			
+			if ( pos != -1 ){
+				
+				ac = ac.substring( 0, pos ).trim();
+			}
+			
+			return( ac );
+		}
+		
 		private void
 		updateAccountList()
 		{
+			int index = ac_list.getSelectionIndex();
+
+			String selected_account;
+			
+			if ( index == -1 ){
+				
+				selected_account = null;
+				
+			}else{
+				
+				selected_account = trimAccount( ac_list.getItems()[ index ]);
+			}
+			
 			ac_list.removeAll();
 			
-			List<String> acs = new ArrayList<String>( account_config.keySet());
-			 
-			Collections.sort( acs );
+			List<String> acs = new ArrayList<String>();
+			
+			for ( AccountConfig c: account_config.values()){
+				
+				String ac = c.getAccessCode();
+				
+				String desc = c.getDescription();
+				
+				if ( desc.length() > 0 ){
 					
-			for ( String ac: acs ){
+					ac += " - " + desc;
+				}
+				
+				acs.add( ac );
+			}
+			
+			Collections.sort( acs );
+				
+			index = -1;
+			
+			for ( int i=0; i<acs.size(); i++){
+				
+				String ac = acs.get(i);
+			
+				if ( selected_account != null && selected_account.equals( trimAccount( ac ))){
+					
+					index = i;
+				}
 				
 				ac_list.add( ac );
 			}
 			
-			int index = ac_list.getSelectionIndex();
+			ac_list.getParent().layout( true );
 			
 			if ( index == -1 ){
 				
@@ -729,7 +900,9 @@ XMWebUIPluginView
 				
 			}else{
 				
-				setSelectedAccount( account_config.get( ac_list.getItems()[ index ]));
+				ac_list.select( index );
+				
+				setSelectedAccount( account_config.get( selected_account ));
 			}
 		}
 		
@@ -749,6 +922,19 @@ XMWebUIPluginView
 							if ( current_account.getAccessCode().equals( rc.getAccessCode())){
 								
 								setEnabled( operation_group, is_connected );
+								
+								String	text = "";
+								
+								if ( is_connected ){
+									
+									text = rc.getConnectionStatus();
+									
+								}else{
+									
+									text = CS_DISCONNECTED;
+								}
+								
+								Messages.setLanguageText( status_label, "xmwebui.rpc.constatus", new String[]{ text } );
 							}
 						}
 					}
@@ -890,10 +1076,12 @@ XMWebUIPluginView
 	AccountConfig
 	{
 		private String		access_code;
+		private String		description;
 		private boolean		basic_enabled;
 		private boolean		basic_defs;
 		private String		basic_user;
 		private String		basic_password;
+		private boolean		force_proxy;
 		private String		secure_password;
 		
 		private
@@ -915,10 +1103,12 @@ XMWebUIPluginView
 			throws IOException
 		{
 			access_code 	= ImportExportUtils.importString( map, "ac" );
+			description 	= ImportExportUtils.importString( map, "desc", "" );
 			basic_enabled 	= ImportExportUtils.importBoolean( map, "basic_enable", true );
 			basic_defs 		= ImportExportUtils.importBoolean( map, "basic_defs", true );
 			basic_user 		= ImportExportUtils.importString( map, "basic_user", "vuze" );
 			basic_password 	= ImportExportUtils.importString( map, "basic_password", "" );
+			force_proxy 	= ImportExportUtils.importBoolean( map, "force_proxy", false );
 			secure_password = ImportExportUtils.importString( map, "secure_password", "" );
 		}
 		
@@ -930,10 +1120,12 @@ XMWebUIPluginView
 			Map	map = new HashMap();
 			
 			ImportExportUtils.exportString( map, "ac", access_code );
+			ImportExportUtils.exportString( map, "desc", description );
 			ImportExportUtils.exportBoolean( map, "basic_enable", basic_enabled );
 			ImportExportUtils.exportBoolean( map, "basic_defs", basic_defs );
 			ImportExportUtils.exportString( map, "basic_user", basic_user );
 			ImportExportUtils.exportString( map, "basic_password", basic_password );
+			ImportExportUtils.exportBoolean( map, "force_proxy", force_proxy );
 			ImportExportUtils.exportString( map, "secure_password", secure_password );
 
 			return( map );
@@ -943,6 +1135,19 @@ XMWebUIPluginView
 		getAccessCode()
 		{
 			return( access_code );
+		}
+		
+		public void
+		setDescription(
+			String	str )
+		{
+			description = str;
+		}
+		
+		public String
+		getDescription()
+		{
+			return( description );
 		}
 		
 		public void
@@ -997,6 +1202,19 @@ XMWebUIPluginView
 			return( basic_password );
 		}
 		
+		public void
+		setForceProxy(
+			boolean	b )
+		{
+			force_proxy = b;
+		}
+		
+		public boolean
+		isForceProxy()
+		{
+			return( force_proxy );
+		}
+		
 		public String
 		getSecureUser()
 		{
@@ -1025,6 +1243,8 @@ XMWebUIPluginView
 		private XMRPCClient			rpc;
 		private XMClientProxy		proxy;
 		
+		private String				connection_state = CS_DISCONNECTED;
+		
 		private
 		RemoteConnection(
 			AccountConfig	_ac )
@@ -1046,19 +1266,33 @@ XMWebUIPluginView
 			try{
 				List<PairedService> services = PairingManagerFactory.getSingleton().lookupServices( account.getAccessCode());
 				
+				PairedService	target_service 	= null;
+				boolean			has_tunnel		= false;
+				
 				for ( PairedService service: services ){
 					
-					if ( service.getSID().equals( "xmwebui" )){
+					String sid = service.getSID();
+					
+					if ( sid.equals( "tunnel" )){
 						
-						log( "Pairing details obtained for '" + ac + "'" );
-
-						connect( service );
+						has_tunnel = true;
 						
-						return;
+					}else if ( sid.equals(  "xmwebui" )){
+						
+						target_service = service;
 					}
 				}
 				
-				logError( "No binding found for Vuze Web Remote, '" + ac + "'" );
+				if ( target_service != null ){
+						
+					log( "Pairing details obtained for '" + ac + "', supports secure connections=" + has_tunnel );
+
+					connect( target_service, has_tunnel );
+					
+				}else{
+				
+					logError( "No binding found for Vuze Web Remote, '" + ac + "'" );
+				}
 				
 			}catch( Throwable e ){
 				
@@ -1068,7 +1302,8 @@ XMWebUIPluginView
 		
 		private void
 		connect(
-			PairedService	service )
+			PairedService	service,
+			boolean			has_tunnel )
 		{
 			String	ac = account.getAccessCode();
 			
@@ -1097,11 +1332,9 @@ XMWebUIPluginView
 						
 						rpc_direct = XMRPCClientFactory.createDirect( http, host, port, user, password );
 				
-						getRPCStatus( rpc_direct );
+						logConnect( CS_BASIC, getRPCStatus( rpc_direct ));
 						
 						rpc = rpc_direct;
-						
-						log( "    success" );
 											
 					}catch( Throwable e ){
 						
@@ -1110,76 +1343,83 @@ XMWebUIPluginView
 							rpc_direct.destroy();
 						}
 						
-						logError( "    failed: " + Debug.getNestedExceptionMessage( e ));
+						logError( "    Failed: " + Debug.getNestedExceptionMessage( e ));
 					}
 				}
 				
 				if ( rpc == null ){
 					
-					String	tunnel_server = (http?"http":"https") + "://" + host + ":" + port + "/";
-	
-					log( "Attempting direct secured connection: " + tunnel_server );
-				
-					XMRPCClient rpc_tunnel = null;
-					
-					try{
+					if ( has_tunnel ){
 						
-						String user 		= account.getSecureUser();
-						String password		= account.getSecurePassword();
+						if ( rpc == null && !account.isForceProxy()){
+
+							String	tunnel_server = (http?"http":"https") + "://" + host + ":" + port + "/";
+
+							log( "Attempting direct secured connection: " + tunnel_server );
 						
-						rpc_tunnel = XMRPCClientFactory.createTunnel( tunnel_server, ac, user, password );
-				
-						getRPCStatus( rpc_tunnel );
-						
-						rpc = rpc_tunnel;
-						
-						log( "    success" );
-											
-					}catch( Throwable e ){
-						
-						if ( rpc_tunnel != null ){
+							XMRPCClient rpc_tunnel = null;
 							
-							rpc_tunnel.destroy();
-						}
-					
-						logError( "    failed: " + Debug.getNestedExceptionMessage( e ));
-					}
-				}
-				
-				if ( rpc == null ){
-					
-					String	tunnel_server = "https://pair.vuze.com/";
-	
-					log( "Attempting indirect secured connection: " + tunnel_server );
-				
-					XMRPCClient rpc_tunnel = null;
-					
-					try{
-						String user 		= account.getSecureUser();
-						String password		= account.getSecurePassword();
-	
-						rpc_tunnel = XMRPCClientFactory.createTunnel( tunnel_server, ac, user, password );
-				
-						getRPCStatus( rpc_tunnel );
+							try{
+								
+								String user 		= account.getSecureUser();
+								String password		= account.getSecurePassword();
+								
+								rpc_tunnel = XMRPCClientFactory.createTunnel( tunnel_server, ac, user, password );
 						
-						rpc = rpc_tunnel;
-						
-						log( "    success" );
-											
-					}catch( Throwable e ){
-						
-						if ( rpc_tunnel != null ){
+								logConnect( CS_SECURE_DIRECT, getRPCStatus( rpc_tunnel ));
+								
+								rpc = rpc_tunnel;
+																			
+							}catch( Throwable e ){
+								
+								if ( rpc_tunnel != null ){
+									
+									rpc_tunnel.destroy();
+								}
 							
-							rpc_tunnel.destroy();
+								logError( "    Failed: " + Debug.getNestedExceptionMessage( e ));
+							}
 						}
-					
-						logError( "    failed: " + Debug.getNestedExceptionMessage( e ));
+						
+						if ( rpc == null ){
+							
+							String	tunnel_server = "https://pair.vuze.com/";
+			
+							log( "Attempting proxy secured connection: " + tunnel_server );
+						
+							XMRPCClient rpc_tunnel = null;
+							
+							try{
+								String user 		= account.getSecureUser();
+								String password		= account.getSecurePassword();
+			
+								rpc_tunnel = XMRPCClientFactory.createTunnel( tunnel_server, ac, user, password );
+						
+								logConnect( CS_SECURE_PROXIED, getRPCStatus( rpc_tunnel ));
+								
+								rpc = rpc_tunnel;
+																			
+							}catch( Throwable e ){
+								
+								if ( rpc_tunnel != null ){
+									
+									rpc_tunnel.destroy();
+								}
+							
+								logError( "    Failed: " + Debug.getNestedExceptionMessage( e ));
+							}
+						}
+					}else{
+						
+						logError( "    Failed - secure connections not enabled in remote Vuze or client is still initialising" );
 					}
 				}
 			}finally{
 			
 				if ( rpc == null ){
 			
+					connection_state = CS_DISCONNECTED;
+
 					setConnected( this, false );
 				
 				}else{
@@ -1189,6 +1429,25 @@ XMWebUIPluginView
 			}
 		}
 		
+		private String
+		getConnectionStatus()
+		{
+			return( connection_state );
+		}
+		
+		private void
+		logConnect(
+			String	type,
+			Map		args )
+		{
+			connection_state = type;
+			
+			String	rem_az_version 		= (String)args.get( "az-version" );
+			String	rem_plug_version 	= (String)args.get( "version" );
+			
+			log( "    Connected: Remote Vuze version=" + rem_az_version + ", plugin=" + rem_plug_version );
+
+		}
 		private URL
 		getProxyURL()
 		{
@@ -1230,6 +1489,19 @@ XMWebUIPluginView
 		}
 		
 		private Map
+		getRPCStatus()
+		
+			throws XMRPCClientException
+		{
+			if ( rpc == null ){
+				
+				throw( new XMRPCClientException( "RPC not connected" ));
+			}
+			
+			return( getRPCStatus( rpc ));
+		}
+		
+		private Map
 		getRPCStatus(
 			XMRPCClient		rpc )
 		
@@ -1246,12 +1518,7 @@ XMWebUIPluginView
 			if ( result.equals( "success" )){
 				
 				Map	args = (Map)reply.get( "arguments" );
-			
-				String	rem_az_version 		= (String)args.get( "az-version" );
-				String	rem_plug_version 	= (String)args.get( "version" );
-				
-				log( "RPC OK: " + rem_az_version + "/" + rem_plug_version );
-				
+							
 				return( args );
 				
 			}else{
@@ -1267,18 +1534,20 @@ XMWebUIPluginView
 		
 				String	ac = account.getAccessCode();
 
-				log( "Disconnected '" + ac + "'" );
-				
-				rpc.destroy();
-				
-				rpc = null;
-			
 				if ( proxy != null ){
 					
 					proxy.destroy();
 					
 					proxy = null;
 				}
+							
+				rpc.destroy();
+				
+				rpc = null;
+			
+				log( "Disconnected '" + ac + "'" );
+
+				connection_state = CS_DISCONNECTED;
 				
 				setConnected( this, false );
 			}

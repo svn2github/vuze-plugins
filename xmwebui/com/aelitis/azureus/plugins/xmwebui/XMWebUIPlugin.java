@@ -1024,6 +1024,15 @@ XMWebUIPlugin
 
 	    result.put(TransmissionVars.TR_PREFS_KEY_TRASH_ORIGINAL, false ); //TODO
 
+	    String az_version = Constants.AZUREUS_VERSION;
+	    
+	    try{
+	    		// get the actual version instead of cached constant; since 5001
+	    	
+	    	az_version = Constants.getCurrentVersion();
+	    	
+	    }catch( Throwable e ){
+	    }
 
 			result.put( "port", new Long( tcp_port ) );                	// number     port number
 			result.put( "rpc-version", new Long( 14 ));              	// number     the current RPC API version
@@ -1033,7 +1042,7 @@ XMWebUIPlugin
 
 			String version = plugin_interface.getPluginVersion();
 			result.put( "version",  version == null ? "Source" : version);           // string     
-			result.put( "az-version", Constants.AZUREUS_VERSION );                  // string     
+			result.put( "az-version", az_version );                  // string     
 			result.put( "az-mode", az_mode );										// string
 			
 		}else if ( method.equals( "session-stats" )){
