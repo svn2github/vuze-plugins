@@ -41,10 +41,11 @@ XMRPCClientTunnelHandler
 	
 	private AtomicInteger	active_calls = new AtomicInteger();
 	
-	private boolean		destroyed;
-	private long		wait_until;
-	private int			consecutive_fails;
-	private long		last_create;
+	private boolean					destroyed;
+	private long					wait_until;
+	private int						consecutive_fails;
+	private XMRPCClientException	last_error;
+	private long					last_create;
 	
 	public
 	XMRPCClientTunnelHandler(
@@ -74,64 +75,43 @@ XMRPCClientTunnelHandler
 		current_tunnel = new XMRPCClientTunnel( tunnel_server, access_code, tunnel_user, tunnel_password );
 	}
 	
-	private synchronized void
+	private void
 	callOK()
 	{
-		wait_until			= 0;
-		consecutive_fails	= 0;
+		synchronized( this ){
+			
+			wait_until			= 0;
+			consecutive_fails	= 0;
+			last_error			= null;
+		}
 	}
 	
-	private synchronized boolean
+	private boolean
 	callFailed(
 		XMRPCClientException		exception )
 	{		
-		consecutive_fails++;
-
-		long	now = SystemTime.getCurrentTime();
-		
-		int type = exception.getType();
+		synchronized( this ){
 			
-		if ( type == XMRPCClientException.ET_FEATURE_DISABLED ){
+			consecutive_fails++;
 			
-			return( false );
+			last_error = exception;
 			
-		}else if ( 	type == XMRPCClientException.ET_BAD_ACCESS_CODE || 
-					type == XMRPCClientException.ET_NO_BINDING ){
+			long	now = SystemTime.getCurrentTime();
 			
-			int delay = consecutive_fails * 30*1000;
-			
-			if ( delay > 2*60*1000 ){
+			int type = exception.getType();
 				
-				delay =  2*60*1000;
-			}
-			
-			wait_until = now + delay;
-			
-			createTunnel();
-			
-			return( false );
-			
-		}else{
-			
-			if ( consecutive_fails < 3 ){
+			if ( type == XMRPCClientException.ET_FEATURE_DISABLED ){
 				
-				return( true );
+				return( false );
 				
-			}else{
+			}else if ( 	type == XMRPCClientException.ET_BAD_ACCESS_CODE || 
+						type == XMRPCClientException.ET_NO_BINDING ){
 				
+				int delay = consecutive_fails * 30*1000;
 				
-				int delay = 1000;
-				
-				for ( int i=1;i<consecutive_fails; i++ ){
-				
-					delay <<= 2;
-				
-					if ( delay > 2*60*1000 ){
-						
-						delay = 2*60*1000;
-						
-						break;
-					}
+				if ( delay > 2*60*1000 ){
+					
+					delay =  2*60*1000;
 				}
 				
 				wait_until = now + delay;
@@ -139,36 +119,79 @@ XMRPCClientTunnelHandler
 				createTunnel();
 				
 				return( false );
+				
+			}else{
+				
+				if ( consecutive_fails < 2 ){
+					
+						// retry the message in case transient issue
+					
+					return( true );
+					
+				}else if ( consecutive_fails == 2 ){
+					
+						// try re-establising the tunnel
+					
+					createTunnel();
+					
+					return( true );
+					
+				}else{
+					
+					
+					int delay = 1000;
+					
+					for ( int i=1;i<consecutive_fails; i++ ){
+					
+						delay <<= 2;
+					
+						if ( delay > 2*60*1000 ){
+							
+							delay = 2*60*1000;
+							
+							break;
+						}
+					}
+					
+					wait_until = now + delay;
+					
+					createTunnel();
+					
+					return( consecutive_fails == 3 );
+				}
 			}
 		}
 	}
 	
-	private synchronized void
+	private void
 	isCallPermitted()
 	
 		throws XMRPCClientException
 	{
-		long	now = SystemTime.getCurrentTime();
-		
-		long	rem = wait_until - now;
-		
-		if ( rem > 0 ){
+		synchronized( this ){
 			
-			rem = rem/1000;
+			long	now = SystemTime.getCurrentTime();
 			
-			if ( rem == 0 ){
+			long	rem = wait_until - now;
+			
+			if ( rem > 0 ){
 				
-				rem = 1;
+				rem = rem/1000;
+				
+				if ( rem == 0 ){
+					
+					rem = 1;
+				}
+				
+				throw( new XMRPCClientException( "Tunnel unavailable for a further " + rem + "s due to failure", last_error ));
 			}
 			
-			throw( new XMRPCClientException( "Tunnel unavailable for a further " + rem + "s due to failure" ));
-		}
-		
-		if ( consecutive_fails > 5 ){
-			
-			if ( active_calls.get() > 0 ){
+			if ( consecutive_fails > 5 ){
 				
-				throw( new XMRPCClientException( "Tunnel under construction - request refused" ));
+				if ( active_calls.get() > 0 ){
+					
+					throw( new XMRPCClientException( "Tunnel under construction - request refused", last_error ));
+				}
 			}
 		}
 	}

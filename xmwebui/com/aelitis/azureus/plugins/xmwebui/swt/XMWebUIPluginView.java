@@ -33,6 +33,8 @@ import java.util.Map;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.StyleRange;
 import org.eclipse.swt.custom.StyledText;
+import org.eclipse.swt.events.KeyEvent;
+import org.eclipse.swt.events.KeyListener;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.graphics.Color;
@@ -49,12 +51,14 @@ import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Text;
 
 import org.gudy.azureus2.core3.config.COConfigurationManager;
+import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 
 import org.gudy.azureus2.ui.swt.Messages;
 import org.gudy.azureus2.ui.swt.Utils;
+import org.gudy.azureus2.ui.swt.components.LinkLabel;
 import org.gudy.azureus2.ui.swt.mainwindow.Colors;
 import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 import org.gudy.azureus2.ui.swt.plugins.UISWTViewEvent;
@@ -294,9 +298,11 @@ XMWebUIPluginView
 
 			Label info_label = new Label( main, SWT.NULL );
 			grid_data = new GridData();
-			grid_data.horizontalSpan = 4;
+			grid_data.horizontalSpan = 3;
 			info_label.setLayoutData( grid_data );
 			Messages.setLanguageText( info_label, "xmwebui.rpc.info" );
+			
+			new LinkLabel( main, "xmwebui.link", MessageText.getString(  "xmwebui.control.wiki.link" ));
 			
 			Label add_label = new Label( main, SWT.NULL );
 			Messages.setLanguageText( add_label, "xmwebui.rpc.add.info" );
@@ -720,6 +726,103 @@ XMWebUIPluginView
 						}
 					});
 
+			label = new Label( operation_group, SWT.NULL );
+			grid_data = new GridData(GridData.FILL_HORIZONTAL);
+			grid_data.horizontalSpan = 3;
+			label.setLayoutData(grid_data);
+			
+				// command prompt
+			
+			label = new Label( operation_group, SWT.NULL );
+			Messages.setLanguageText( label, "xmwebui.rpc.command" );
+
+			final Text command = new Text( operation_group, SWT.BORDER );
+			grid_data = new GridData(GridData.FILL_HORIZONTAL);
+			grid_data.horizontalSpan = 4;
+			command.setLayoutData(grid_data);
+			
+			command.addKeyListener(
+				new KeyListener()
+				{
+					private List<String> history = new ArrayList<String>();
+					
+					private int	history_index = 0;
+					
+					public void 
+					keyPressed(
+						KeyEvent e )
+					{
+					}
+					
+					public void 
+					keyReleased(
+						KeyEvent e )
+					{
+						int	code = e.keyCode;
+						
+						if ( code == SWT.ARROW_UP ){
+						
+							history_index--;
+							
+							if ( history_index < 0 ){
+								
+								history_index = 0;
+							}
+							
+							if ( history_index < history.size()){
+								
+								command.setText( history.get(history_index));
+								
+								e.doit = false;
+							}
+						}else if ( code == SWT.ARROW_DOWN ){
+						
+							history_index++;
+							
+							if ( history_index > history.size()){
+								
+								history_index = history.size();
+							}
+							
+							if ( history_index < history.size()){
+								
+								command.setText( history.get(history_index));
+								
+								e.doit = false;
+							}
+						}else if ( code == '\r' ){
+						
+							String str = command.getText().trim();
+							
+							command.setText( "" );
+							
+							if ( str.length() > 0 ){
+								
+								history.remove( str );
+								
+								history.add( str );
+								
+								if ( history.size() > 100 ){
+									
+									history.remove(0);
+								}
+								
+								history_index = history.size();
+								
+								RemoteConnection rc = getCurrentRemoteConnection();
+								
+								if ( rc != null ){
+								
+									executeCommand( rc, str );
+								}
+							}
+						}
+					}
+			    });
+			
+			new LinkLabel( operation_group, "xmwebui.link", MessageText.getString(  "xmwebui.commands.wiki.link" ));
+
+			
 				// log
 			
 			log = new StyledText( main,SWT.READ_ONLY | SWT.V_SCROLL | SWT.H_SCROLL | SWT.BORDER);
@@ -732,6 +835,38 @@ XMWebUIPluginView
 			updateAccountList();
 			
 			initialised = true;
+		}
+		
+		private void
+		executeCommand(
+			RemoteConnection		rc,
+			String					str )
+		{
+			log( "> " + str );
+			
+			try{
+				if ( str.equalsIgnoreCase( "status" )){
+				
+					log( "" + rc.getRPCStatus());
+					
+				}else if ( str.equalsIgnoreCase( "torrents" )){
+					
+					List<RemoteTorrent>	torrents = rc.getTorrents();
+					
+					int	pos = 1;
+					
+					for ( RemoteTorrent t: torrents ){
+						
+						log( (pos++) + ") " + t.getName());
+					}
+				}else{
+					
+					logError( "Unrecognized command '" + str + "'" );
+				}
+			}catch( Throwable e ){
+				
+				logError( e );
+			}
 		}
 		
 		private void
@@ -805,14 +940,14 @@ XMWebUIPluginView
 			boolean	basic_enable 		= ac.isBasicEnabled();
 			boolean	basic_defs 			= ac.isBasicDefaults();
 			String	basic_user_str		= ac.getBasicUser();
-			String	basic_pw_str		= ac.getBasicPassword();
 			
 			description.setText( ac.getDescription());
 			do_basic.setSelection( basic_enable );
 			do_basic_def.setSelection( basic_defs );
 			basic_username.setText( basic_user_str );
-			basic_password.setText( basic_pw_str );
+			basic_password.setText( "xxx" );
 			force_proxy.setSelection( ac.isForceProxy());
+			secure_password.setText( "xxx" );
 			
 			if ( basic_enable ){
 				
@@ -1245,6 +1380,8 @@ XMWebUIPluginView
 		
 		private String				connection_state = CS_DISCONNECTED;
 		
+		private List<RemoteTorrent>	last_torrents;
+		
 		private
 		RemoteConnection(
 			AccountConfig	_ac )
@@ -1527,6 +1664,58 @@ XMWebUIPluginView
 			}
 		}
 		
+		private List<RemoteTorrent>
+		getTorrents()
+		
+			throws XMRPCClientException
+		{
+			JSONObject	request = new JSONObject();
+			
+			request.put( "method", "torrent-get" );
+			
+			Map request_args = new HashMap();
+			
+			request.put( "arguments", request_args );
+			
+			List fields = new ArrayList();
+			
+			request_args.put( "fields", fields );
+			
+			fields.add( "name" );
+			
+			JSONObject reply = rpc.call( request );
+			
+			String result = (String)reply.get( "result" );
+			
+			if ( result.equals( "success" )){
+				
+				Map	args = (Map)reply.get( "arguments" );
+					
+				List<Map> torrent_maps = (List<Map>)args.get( "torrents" );
+				
+				List<RemoteTorrent> torrents = new ArrayList<RemoteTorrent>();
+				
+				for ( Map m: torrent_maps ){
+					
+					torrents.add( new RemoteTorrent( m ));
+				}
+				
+				last_torrents = torrents;
+				
+				return( torrents );
+				
+			}else{
+				
+				throw( new XMRPCClientException( "RPC call failed: " + result ));
+			}
+		}
+		
+		private List<RemoteTorrent>
+		getLastTorrents()
+		{
+			return( last_torrents );
+		}
+		
 		private void
 		destroy()
 		{
@@ -1551,6 +1740,24 @@ XMWebUIPluginView
 				
 				setConnected( this, false );
 			}
+		}
+	}
+	
+	private class
+	RemoteTorrent
+	{
+		private Map		map;
+		private
+		RemoteTorrent(
+			Map		_m )
+		{
+			map = _m;
+		}
+		
+		private String
+		getName()
+		{
+			return( (String)map.get( "name" ));
 		}
 	}
 }
