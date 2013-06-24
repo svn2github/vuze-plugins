@@ -51,6 +51,7 @@ import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Text;
 
 import org.gudy.azureus2.core3.config.COConfigurationManager;
+import org.gudy.azureus2.core3.config.impl.ConfigurationManager;
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
@@ -81,8 +82,9 @@ public class
 XMWebUIPluginView
 	implements UISWTViewEventListener
 {
-	private final String CONFIG_PARAM = "xmwebui.remote.vuze.config";
-
+	private final String CONFIG_PARAM_OLD = "xmwebui.remote.vuze.config";
+	private final String CONFIG_PARAM_NEW = "xmwebui.remote.vuze.config.privx";	// not dumped in generated evidence
+	
 	private static final int LOG_NORMAL 	= 1;
 	private static final int LOG_SUCCESS 	= 2;
 	private static final int LOG_ERROR 		= 3;
@@ -118,7 +120,16 @@ XMWebUIPluginView
 	private void 
 	loadConfig()
 	{
-		Map config = COConfigurationManager.getMapParameter( CONFIG_PARAM, new HashMap());
+		if ( ConfigurationManager.getInstance().doesParameterNonDefaultExist( CONFIG_PARAM_OLD )){
+			
+			Map config = COConfigurationManager.getMapParameter( CONFIG_PARAM_OLD, new HashMap());
+			
+			COConfigurationManager.setParameter( CONFIG_PARAM_NEW, config );
+			
+			COConfigurationManager.removeParameter( CONFIG_PARAM_OLD );
+		}
+		
+		Map config = COConfigurationManager.getMapParameter( CONFIG_PARAM_NEW, new HashMap());
 		
 		List<Map>	acs = (List<Map>)config.get( "acs" );
 		
@@ -159,7 +170,7 @@ XMWebUIPluginView
 			}
 		}
 		
-		COConfigurationManager.setParameter( CONFIG_PARAM,config );
+		COConfigurationManager.setParameter( CONFIG_PARAM_NEW,config );
 		
 		COConfigurationManager.save();
 	}
@@ -1224,6 +1235,7 @@ XMWebUIPluginView
 			String	_ac )
 		{
 			access_code		= _ac;
+			description		= "";
 			basic_enabled	= true;
 			basic_defs		= true;
 			basic_user		= "vuze";
