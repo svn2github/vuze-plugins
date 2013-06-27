@@ -22,21 +22,19 @@
 package com.aelitis.azureus.plugins.xmwebui.client.connect;
 
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.Debug;
 import org.json.simple.JSONObject;
 
-import com.aelitis.azureus.core.pairing.PairedService;
-import com.aelitis.azureus.core.pairing.PairingConnectionData;
-import com.aelitis.azureus.core.pairing.PairingManagerFactory;
 import com.aelitis.azureus.plugins.xmwebui.client.proxy.XMClientProxy;
 import com.aelitis.azureus.plugins.xmwebui.client.rpc.XMRPCClient;
 import com.aelitis.azureus.plugins.xmwebui.client.rpc.XMRPCClientException;
 import com.aelitis.azureus.plugins.xmwebui.client.rpc.XMRPCClientFactory;
+import com.aelitis.azureus.plugins.xmwebui.client.rpc.XMRPCClientUtils;
+import com.aelitis.azureus.util.JSONUtils;
 ;
 
 public class 
@@ -76,14 +74,31 @@ XMClientConnection
 		String	ac = account.getAccessCode();
 		
 		try{
-			List<PairedService> services = PairingManagerFactory.getSingleton().lookupServices( account.getAccessCode());
+			String url = Constants.PAIRING_URL + "/remote/listBindings?ac=" + getAccessCode() + "&jsoncallback=";
 			
-			PairedService	target_service 	= null;
-			boolean			has_tunnel		= false;
+			String reply = new String( XMRPCClientUtils.getFromURLBasic( url ), "UTF-8" );
 			
-			for ( PairedService service: services ){
+				// hack to remove callback
+			
+			reply = reply.substring( 1, reply.length()-1 );
+			
+			Map json = JSONUtils.decodeJSON( reply );
+			
+			Map error = (Map)json.get( "error" );
+			
+			if ( error != null ){
 				
-				String sid = service.getSID();
+				throw( new Exception((String)error.get( "msg" )));
+			}
+			
+			List<Map<String,String>>	service_list = (List<Map<String,String>>)json.get( "result" );
+			
+			Map<String,String>		target_service 	= null;
+			boolean					has_tunnel		= false;
+			
+			for ( Map<String,String> m: service_list ){
+				
+				String sid = (String)m.get( "sid" );
 				
 				if ( sid.equals( "tunnel" )){
 					
@@ -91,7 +106,7 @@ XMClientConnection
 					
 				}else if ( sid.equals(  "xmwebui" )){
 					
-					target_service = service;
+					target_service = m;
 				}
 			}
 			
@@ -114,17 +129,15 @@ XMClientConnection
 	
 	private void
 	connect(
-		PairedService	service,
-		boolean			has_tunnel )
+		Map<String,String>		service_map,
+		boolean					has_tunnel )
 	{
 		String	ac = account.getAccessCode();
 		
-		try{
-			PairingConnectionData cd = service.getConnectionData();
-			
-			boolean http 	= cd.getAttribute( "protocol" ).equals( "http" );
-			String	host	= cd.getAttribute( "ip" );
-			int		port	= Integer.parseInt( cd.getAttribute( "port" ));
+		try{			
+			boolean http 	= service_map.get( "protocol" ).equals( "http" );
+			String	host	= service_map.get( "ip" );
+			int		port	= Integer.parseInt( service_map.get( "port" ));
 			
 			if ( account.isBasicEnabled() ){
 				

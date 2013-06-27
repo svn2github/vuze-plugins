@@ -36,6 +36,44 @@ import com.aelitis.azureus.plugins.xmwebui.client.rpc.XMRPCClient.HTTPResponse;
 public class 
 XMRPCClientUtils 
 {
+	public static byte[]
+   	getFromURLBasic(
+   		String					url )
+	
+   		throws XMRPCClientException
+   	{
+   		try{
+			HttpURLConnection connection = (HttpURLConnection)new URL( url ).openConnection();
+						       				
+			connection.setConnectTimeout( 30*1000 );
+			connection.setReadTimeout( 30*1000 );
+
+			InputStream is = connection.getInputStream();
+				
+			ByteArrayOutputStream baos = new ByteArrayOutputStream( 10000 );
+			
+			byte[]	buffer = new byte[8*1024];
+			
+			while( true ){
+			
+				int len = is.read( buffer );
+				
+				if ( len <= 0  ){
+					
+					break;
+				}
+				
+				baos.write( buffer, 0, len );
+			}
+			
+			return( baos.toByteArray());
+				   			
+   		}catch( IOException e ){
+   			
+   			throw( new XMRPCClientException( "HTTP GET for " + url + " failed", e ));
+   		}
+   	}
+
 	private String session_id;
 	
 	protected String
