@@ -22,6 +22,7 @@
 package com.aelitis.azureus.plugins.xmwebui.swt;
 
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -70,6 +71,9 @@ import com.aelitis.azureus.core.pairing.PairedService;
 import com.aelitis.azureus.core.pairing.PairingConnectionData;
 import com.aelitis.azureus.core.pairing.PairingManagerFactory;
 import com.aelitis.azureus.plugins.xmwebui.XMWebUIPlugin;
+import com.aelitis.azureus.plugins.xmwebui.client.connect.XMClientAccount;
+import com.aelitis.azureus.plugins.xmwebui.client.connect.XMClientConnection;
+import com.aelitis.azureus.plugins.xmwebui.client.connect.XMClientConnectionAdapter;
 import com.aelitis.azureus.plugins.xmwebui.client.proxy.XMClientProxy;
 import com.aelitis.azureus.plugins.xmwebui.client.rpc.XMRPCClient;
 import com.aelitis.azureus.plugins.xmwebui.client.rpc.XMRPCClientException;
@@ -1220,6 +1224,7 @@ XMWebUIPluginView
 	
 	private class
 	AccountConfig
+		implements XMClientAccount
 	{
 		private String		access_code;
 		private String		description;
@@ -1380,302 +1385,53 @@ XMWebUIPluginView
 		{
 			return( secure_password );
 		}
+		
+		public File 
+		getResourceDir() 
+		{
+			return( plugin.getResourceDir());
+		}
 	}
 	
 	private class
 	RemoteConnection
-	{
-		private AccountConfig		account;
-		 
-		private XMRPCClient			rpc;
-		private XMClientProxy		proxy;
-		
-		private String				connection_state = CS_DISCONNECTED;
-		
+		extends XMClientConnection
+	{		
 		private List<RemoteTorrent>	last_torrents;
 		
 		private
 		RemoteConnection(
-			AccountConfig	_ac )
+			XMClientAccount		ac )
 		{
-			account = _ac;
-		}
-		
-		private String
-		getAccessCode()
-		{
-			return( account.getAccessCode());
-		}
-		
-		private void
-		connect()
-		{
-			String	ac = account.getAccessCode();
-			
-			try{
-				List<PairedService> services = PairingManagerFactory.getSingleton().lookupServices( account.getAccessCode());
-				
-				PairedService	target_service 	= null;
-				boolean			has_tunnel		= false;
-				
-				for ( PairedService service: services ){
-					
-					String sid = service.getSID();
-					
-					if ( sid.equals( "tunnel" )){
-						
-						has_tunnel = true;
-						
-					}else if ( sid.equals(  "xmwebui" )){
-						
-						target_service = service;
+			super(
+				ac, 
+				new XMClientConnectionAdapter()
+				{
+					public void
+					setConnected(
+						XMClientConnection	connection,
+						boolean				is_connected )
+					{
+						XMWebUIPluginView.this.setConnected( (RemoteConnection)connection, is_connected );
 					}
-				}
-				
-				if ( target_service != null ){
-						
-					log( "Pairing details obtained for '" + ac + "', supports secure connections=" + has_tunnel );
-
-					connect( target_service, has_tunnel );
 					
-				}else{
-				
-					logError( "No binding found for Vuze Web Remote, '" + ac + "'" );
-				}
-				
-			}catch( Throwable e ){
-				
-				logError( "Pairing details unavailable for '" + ac + "': " + Debug.getNestedExceptionMessage( e ));
-			}
-		}
-		
-		private void
-		connect(
-			PairedService	service,
-			boolean			has_tunnel )
-		{
-			String	ac = account.getAccessCode();
-			
-			try{
-				PairingConnectionData cd = service.getConnectionData();
-				
-				boolean http 	= cd.getAttribute( "protocol" ).equals( "http" );
-				String	host	= cd.getAttribute( "ip" );
-				int		port	= Integer.parseInt( cd.getAttribute( "port" ));
-				
-				if ( account.isBasicEnabled() ){
-					
-					log( "Attempting direct basic connection" );
-				
-					XMRPCClient rpc_direct = null;
-					
-					try{
-						String	user 		= "vuze";
-						String	password	= ac;
-						
-						if ( !account.isBasicDefaults()){
-							
-							user 		= account.getBasicUser();
-							password	= account.getBasicPassword();
-						}
-						
-						rpc_direct = XMRPCClientFactory.createDirect( http, host, port, user, password );
-				
-						logConnect( CS_BASIC, getRPCStatus( rpc_direct ));
-						
-						rpc = rpc_direct;
-											
-					}catch( Throwable e ){
-						
-						if ( rpc_direct != null ){
-							
-							rpc_direct.destroy();
-						}
-						
-						logError( "    Failed: " + Debug.getNestedExceptionMessage( e ));
+					public void
+					log(
+						String	str )
+					{
+						XMWebUIPluginView.this.log( str );
 					}
-				}
-				
-				if ( rpc == null ){
 					
-					if ( has_tunnel ){
-						
-						if ( rpc == null && !account.isForceProxy()){
-
-							String	tunnel_server = (http?"http":"https") + "://" + host + ":" + port + "/";
-
-							log( "Attempting direct secured connection: " + tunnel_server );
-						
-							XMRPCClient rpc_tunnel = null;
-							
-							try{
-								
-								String user 		= account.getSecureUser();
-								String password		= account.getSecurePassword();
-								
-								rpc_tunnel = XMRPCClientFactory.createTunnel( tunnel_server, ac, user, password );
-						
-								logConnect( CS_SECURE_DIRECT, getRPCStatus( rpc_tunnel ));
-								
-								rpc = rpc_tunnel;
-																			
-							}catch( Throwable e ){
-								
-								if ( rpc_tunnel != null ){
-									
-									rpc_tunnel.destroy();
-								}
-							
-								logError( "    Failed: " + Debug.getNestedExceptionMessage( e ));
-							}
-						}
-						
-						if ( rpc == null ){
-							
-							String	tunnel_server = "https://pair.vuze.com/";
-			
-							log( "Attempting proxy secured connection: " + tunnel_server );
-						
-							XMRPCClient rpc_tunnel = null;
-							
-							try{
-								String user 		= account.getSecureUser();
-								String password		= account.getSecurePassword();
-			
-								rpc_tunnel = XMRPCClientFactory.createTunnel( tunnel_server, ac, user, password );
-						
-								logConnect( CS_SECURE_PROXIED, getRPCStatus( rpc_tunnel ));
-								
-								rpc = rpc_tunnel;
-																			
-							}catch( Throwable e ){
-								
-								if ( rpc_tunnel != null ){
-									
-									rpc_tunnel.destroy();
-								}
-							
-								logError( "    Failed: " + Debug.getNestedExceptionMessage( e ));
-							}
-						}
-					}else{
-						
-						logError( "    Failed - secure connections not enabled in remote Vuze or client is still initialising" );
+					public void
+					logError(
+						String	str )
+					{
+						XMWebUIPluginView.this.logError( str );
 					}
-				}
-			}finally{
-			
-				if ( rpc == null ){
-			
-					connection_state = CS_DISCONNECTED;
+				});
+		}
+		
 
-					setConnected( this, false );
-				
-				}else{
-					
-					setConnected( this, true );
-				}
-			}
-		}
-		
-		private String
-		getConnectionStatus()
-		{
-			return( connection_state );
-		}
-		
-		private void
-		logConnect(
-			String	type,
-			Map		args )
-		{
-			connection_state = type;
-			
-			String	rem_az_version 		= (String)args.get( "az-version" );
-			String	rem_plug_version 	= (String)args.get( "version" );
-			
-			log( "    Connected: Remote Vuze version=" + rem_az_version + ", plugin=" + rem_plug_version );
-
-		}
-		private URL
-		getProxyURL()
-		{
-			if ( rpc == null ){
-				
-				return( null );
-			}
-			
-			if ( proxy == null ){
-			
-				try{
-					proxy = new XMClientProxy( plugin.getResourceDir(), rpc );
-					
-					log( "Created client proxy on port " + proxy.getPort());
-					
-				}catch( Throwable e ){
-					
-					logError( "Failed to create rpc proxy: " + Debug.getNestedExceptionMessage( e ));
-					
-					return( null );
-				}
-			}
-			
-			try{
-				return( new URL( "http://" + proxy.getHostName() + ":" + proxy.getPort() + "/" ));
-				
-			}catch( Throwable e ){
-				
-				Debug.out( e );
-				
-				return( null );
-			}
-		}
-		
-		private boolean
-		isConnected()
-		{
-			return( rpc != null );
-		}
-		
-		private Map
-		getRPCStatus()
-		
-			throws XMRPCClientException
-		{
-			if ( rpc == null ){
-				
-				throw( new XMRPCClientException( "RPC not connected" ));
-			}
-			
-			return( getRPCStatus( rpc ));
-		}
-		
-		private Map
-		getRPCStatus(
-			XMRPCClient		rpc )
-		
-			throws XMRPCClientException
-		{
-			JSONObject	request = new JSONObject();
-			
-			request.put( "method", "session-get" );
-			
-			JSONObject reply = rpc.call( request );
-			
-			String result = (String)reply.get( "result" );
-			
-			if ( result.equals( "success" )){
-				
-				Map	args = (Map)reply.get( "arguments" );
-							
-				return( args );
-				
-			}else{
-				
-				throw( new XMRPCClientException( "RPC call failed: " + result ));
-			}
-		}
-		
 		private List<RemoteTorrent>
 		getTorrents()
 		
@@ -1695,7 +1451,7 @@ XMWebUIPluginView
 			
 			fields.add( "name" );
 			
-			JSONObject reply = rpc.call( request );
+			JSONObject reply = call( request );
 			
 			String result = (String)reply.get( "result" );
 			
@@ -1726,32 +1482,6 @@ XMWebUIPluginView
 		getLastTorrents()
 		{
 			return( last_torrents );
-		}
-		
-		private void
-		destroy()
-		{
-			if ( rpc != null ){
-		
-				String	ac = account.getAccessCode();
-
-				if ( proxy != null ){
-					
-					proxy.destroy();
-					
-					proxy = null;
-				}
-							
-				rpc.destroy();
-				
-				rpc = null;
-			
-				log( "Disconnected '" + ac + "'" );
-
-				connection_state = CS_DISCONNECTED;
-				
-				setConnected( this, false );
-			}
 		}
 	}
 	
