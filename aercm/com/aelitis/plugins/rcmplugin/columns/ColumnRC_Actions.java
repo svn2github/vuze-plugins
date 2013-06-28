@@ -35,7 +35,6 @@ import org.gudy.azureus2.ui.swt.views.table.TableCellSWTPaintListener;
 import com.aelitis.azureus.core.content.RelatedContent;
 import com.aelitis.azureus.ui.UIFunctionsManager;
 import com.aelitis.azureus.ui.common.table.TableColumnCore;
-import com.aelitis.azureus.ui.swt.shells.main.MainWindow;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinFactory;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinProperties;
 import com.aelitis.plugins.rcmplugin.RelatedContentUI;

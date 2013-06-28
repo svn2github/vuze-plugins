@@ -42,6 +42,7 @@ import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.gudy.azureus2.ui.swt.ImageRepository;
 import org.gudy.azureus2.ui.swt.Utils;
 import org.gudy.azureus2.ui.swt.mainwindow.Colors;
+import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 
 import com.aelitis.azureus.plugins.rating.RatingPlugin;
 import com.aelitis.azureus.plugins.rating.updater.RatingData;
@@ -61,7 +62,8 @@ public class RatingWindow {
 	private static String MSG_WARNING = MSG_PREFIX + "rateBeforeComment";
 	private static String MSG_EDIT_TOOLTIP = MSG_PREFIX + "editTooltip";
   
-  RatingPlugin    plugin;
+  RatingPlugin   	plugin;
+  UISWTInstance		swtUI;
   RatingsUpdater  updater;
   Download        download;
   
@@ -75,8 +77,9 @@ public class RatingWindow {
   Image lastRatingImage = null;
 	private LocaleUtilities localeTxt;
   
-  public RatingWindow(RatingPlugin plugin, Download download) {
+  public RatingWindow(RatingPlugin plugin, UISWTInstance swtUI, Download download) {
     this.plugin = plugin;
+    this.swtUI = swtUI;
     this.updater = plugin.getUpdater();
     this.download = download;
     localeTxt = plugin.getPluginInterface().getUtilities().getLocaleUtilities();
@@ -212,7 +215,7 @@ public class RatingWindow {
   		img.dispose();
   	
   	img = RatingImageUtil
-				.createRatingImage(rating, plugin.getUI().getDisplay());
+				.createRatingImage(rating, swtUI.getDisplay());
 
     label.setImage(img);
 

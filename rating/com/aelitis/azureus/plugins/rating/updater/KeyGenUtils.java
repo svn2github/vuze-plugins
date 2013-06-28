@@ -31,6 +31,10 @@ public class KeyGenUtils {
   public static byte[] buildRatingKey(Download download) {
     return buildExtendedKey(download,ratingPostFix);
   }
+  
+  public static byte[] buildRatingKey(byte[] hash) {
+	    return buildExtendedKeyFromHash(hash,ratingPostFix);
+	  }
    
   private static byte[] buildExtendedKey(Download download,byte[] extension) {
     return buildExtendedKeyFromHash(download.getTorrent().getHash(),extension);

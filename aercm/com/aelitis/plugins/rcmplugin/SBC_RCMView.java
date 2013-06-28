@@ -488,7 +488,15 @@ SBC_RCMView
 							new ColumnRC_Tags(column);
 						}
 					});
-
+		
+		tableManager.registerColumn(
+				RelatedContent.class, 
+				ColumnRC_Rating.COLUMN_ID,
+					new TableColumnCreationListener() {
+						public void tableColumnCreated(TableColumn column) {
+							new ColumnRC_Rating(column);
+						}
+					});
 	}
 
 	public Object 
@@ -657,7 +665,9 @@ SBC_RCMView
 					ColumnRC_Seeds.COLUMN_ID,
 					ColumnRC_Peers.COLUMN_ID,
 					ColumnRC_Tags.COLUMN_ID,
+					ColumnRC_Rating.COLUMN_ID,
 		});
+		
 		table_parent = new Composite(control, SWT.NONE);
 		table_parent.setLayoutData(Utils.getFilledFormData());
 		GridLayout layout = new GridLayout();
@@ -1217,7 +1227,7 @@ SBC_RCMView
 		long activationType,
 		Object datasource ) 
 	{
-		if ( tv_related_content == null ){
+		if ( tv_related_content == null || !tv_related_content.isVisible()){
 			
 			return( false );
 		}
@@ -1241,9 +1251,22 @@ SBC_RCMView
 	}
 
 	public void refreshToolBarItems(Map<String, Long> list) {
-		if (tv_related_content == null) {
+		if (tv_related_content == null || !tv_related_content.isVisible()) {
 			return;
 		}
+		
+			// make sure we're operating on a selection we understand...
+		
+		ISelectedContent[] content = SelectedContentManager.getCurrentlySelectedContent();
+		
+		for ( ISelectedContent c: content ){
+			
+			if ( c.getDownloadManager() != null ){
+				
+				return;
+			}
+		}
+		
 		list.put("remove", tv_related_content.getSelectedDataSources().size() > 0 ? UIToolBarItem.STATE_ENABLED : 0);
 	}
 

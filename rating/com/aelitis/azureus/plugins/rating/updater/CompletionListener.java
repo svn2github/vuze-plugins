@@ -23,5 +23,5 @@
 package com.aelitis.azureus.plugins.rating.updater;
 
 public interface CompletionListener {
-  public void operationComplete();
+  public void operationComplete( RatingResults ratings );
 }

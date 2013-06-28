@@ -23,6 +23,6 @@
 package com.aelitis.azureus.plugins.rating.updater;
 
 public class CompletionAdapter implements CompletionListener {
-  public void operationComplete() {
+  public void operationComplete( RatingResults results ) {
   }
 }

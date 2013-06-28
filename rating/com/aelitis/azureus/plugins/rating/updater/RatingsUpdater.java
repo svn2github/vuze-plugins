@@ -49,9 +49,10 @@ public class
 RatingsUpdater 	
 	implements DownloadManagerListener
 {
-	private static final int READ_TIMEOUT 	= 20*1000;
-    private static final int WRITE_DELAY	= 10*1000;
-    private static final int READ_DELAY		= 20*1000;
+	private static final int READ_TIMEOUT 			= 20*1000;
+    private static final int WRITE_DELAY			= 10*1000;
+    private static final int READ_DELAY				= 20*1000;
+    private static final int READ_BY_HASH_TIMEOUT	= 10*1000;
     
     private static final int COMPLETE_DOWNLOAD_LOOKUP_PERIOD 		= 8*60*60*1000;
     private static final int INCOMPLETE_OLD_DOWNLOAD_LOOKUP_PERIOD	= 4*60*60*1000;
@@ -353,7 +354,8 @@ RatingsUpdater
 							new CompletionListener()
 							{
 								public void 
-								operationComplete()
+								operationComplete(
+									RatingResults	results )
 								{
 									synchronized( torrentRatings ){
 										
@@ -454,7 +456,8 @@ RatingsUpdater
 							new CompletionListener()
 							{
 								public void 
-								operationComplete()
+								operationComplete(
+									RatingResults	results )
 								{
 									synchronized( torrentRatings ){
 										
@@ -595,6 +598,84 @@ RatingsUpdater
 		}
 	}
 
+	public void 
+	readRating(
+		final byte[]				hash,
+		final CompletionListener 	listener )
+	{	
+		if ( database == null || !database.isAvailable()){
+			
+			listener.operationComplete( null );
+			
+			return;
+		}
+				
+		final String hash_str =  ByteFormatter.encodeString( hash );
+		
+		try{
+			log( hash_str + " : getting rating" );
+			
+			DistributedDatabaseKey ddKey = database.createKey(KeyGenUtils.buildRatingKey( hash ),"Ratings read: " + hash_str);
+			
+			database.read(
+				new DistributedDatabaseListener() 
+				{
+					List<DistributedDatabaseValue> results = new ArrayList<DistributedDatabaseValue>();
+	
+					public void 
+					event(
+						DistributedDatabaseEvent event) 
+					{
+						if (event.getType() == DistributedDatabaseEvent.ET_VALUE_READ ){
+							
+							results.add(event.getValue());
+							
+						}else if (	event.getType() == DistributedDatabaseEvent.ET_OPERATION_COMPLETE || 
+									event.getType() == DistributedDatabaseEvent.ET_OPERATION_TIMEOUT ){
+							
+							RatingResults ratings = new RatingResults();
+
+							try{
+								log( hash_str + " : Rating read complete - results=" + results.size());
+								
+		
+								for ( int i = 0 ; i < results.size() ; i++ ){
+		
+									DistributedDatabaseValue value = results.get(i);
+		
+									try{
+										byte[] bValue = (byte[]) value.getValue(byte[].class);
+		
+										RatingData data = new RatingData(bValue);
+		
+										log("        " + data.getScore() + ", " + value.getContact().getName() + ", " +  data.getNick() + " : " + data.getComment());
+		
+										ratings.addRating( data, true );
+		
+									}catch( Throwable e ){
+		
+										Debug.out( e );
+									}                            
+								}
+								
+							}finally{
+							
+								listener.operationComplete( ratings );
+							}
+						}
+				}
+			}, ddKey, READ_BY_HASH_TIMEOUT );   
+
+		}catch( Throwable e ){
+
+			Debug.out( e );
+			
+			listener.operationComplete( null );
+		}
+	}
+
+	
+	
 	private void 
 	readRating(
 		final Download 				download,
@@ -602,7 +683,7 @@ RatingsUpdater
 	{	
 		if ( database == null || !database.isAvailable()){
 			
-			listener.operationComplete();
+			listener.operationComplete( null );
 			
 			return;
 		}
@@ -630,11 +711,11 @@ RatingsUpdater
 						}else if (	event.getType() == DistributedDatabaseEvent.ET_OPERATION_COMPLETE || 
 									event.getType() == DistributedDatabaseEvent.ET_OPERATION_TIMEOUT ){
 							
+							RatingResults ratings = new RatingResults();
+
 							try{
 								log( torrentName + " : Rating read complete - results=" + results.size());
-								
-								RatingResults ratings = new RatingResults();
-		
+									
 								if ( results.size() == 0 ){
 									
 										// missed our own data it seems
@@ -643,7 +724,7 @@ RatingsUpdater
 									
 									if ( my_data.needPublishing()){
 									
-										ratings.addRating( my_data );
+										ratings.addRating( my_data, false );
 									}
 									
 								}else{
@@ -658,7 +739,7 @@ RatingsUpdater
 			
 											log("        " + data.getScore() + ", " + value.getContact().getName() + ", " +  data.getNick() + " : " + data.getComment());
 			
-											ratings.addRating(data);
+											ratings.addRating( data, false );
 			
 										}catch( Throwable e ){
 			
@@ -675,7 +756,7 @@ RatingsUpdater
 								}			
 							}finally{
 							
-								listener.operationComplete();
+								listener.operationComplete( ratings );
 							}
 						}
 				}
@@ -685,7 +766,7 @@ RatingsUpdater
 
 			Debug.out( e );
 			
-			listener.operationComplete();
+			listener.operationComplete( null );
 		}
 	}
 
@@ -697,7 +778,7 @@ RatingsUpdater
 	{
 		if ( database == null || !database.isAvailable()){
 			
-			listener.operationComplete();
+			listener.operationComplete( null );
 			
 			return;
 		}
@@ -711,7 +792,7 @@ RatingsUpdater
 		
 		if ( score == 0 ){
 			
-			listener.operationComplete();
+			listener.operationComplete( null );
 			
 			return;
 		}
@@ -747,7 +828,7 @@ RatingsUpdater
 						
 							log(torrentName + " : rating write ok");
 							
-							listener.operationComplete();
+							listener.operationComplete( null );
 							
 							addForLookup( download, true );
 													
@@ -755,7 +836,7 @@ RatingsUpdater
 							
 							log( torrentName + " : rating write failed" );
 							
-							listener.operationComplete();
+							listener.operationComplete( null );
 							
 							addForLookup( download, true );
 						}
@@ -766,7 +847,7 @@ RatingsUpdater
 			
 			Debug.out( e );
 			
-			listener.operationComplete();
+			listener.operationComplete( null );
 		}
 	} 
 

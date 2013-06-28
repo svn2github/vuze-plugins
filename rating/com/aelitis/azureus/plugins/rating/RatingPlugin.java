@@ -22,62 +22,49 @@
  */
 package com.aelitis.azureus.plugins.rating;
 
-import java.util.ArrayList;
-import java.util.List;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.gudy.azureus2.core3.util.AESemaphore;
+import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.PluginListener;
 import org.gudy.azureus2.plugins.UnloadablePlugin;
-import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.ui.UIInstance;
-import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
 import org.gudy.azureus2.plugins.ui.config.Parameter;
 import org.gudy.azureus2.plugins.ui.config.ParameterListener;
 import org.gudy.azureus2.plugins.ui.config.StringParameter;
-import org.gudy.azureus2.plugins.ui.menus.MenuItem;
-import org.gudy.azureus2.plugins.ui.menus.MenuItemListener;
-import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
-import org.gudy.azureus2.plugins.ui.tables.TableColumn;
-import org.gudy.azureus2.plugins.ui.tables.TableContextMenuItem;
-import org.gudy.azureus2.plugins.ui.tables.TableManager;
-import org.gudy.azureus2.plugins.ui.tables.TableRow;
-import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 
-import com.aelitis.azureus.plugins.rating.ui.RatingColumn;
-import com.aelitis.azureus.plugins.rating.ui.RatingImageUtil;
-import com.aelitis.azureus.plugins.rating.ui.RatingWindow;
+import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
+
+
+import com.aelitis.azureus.plugins.rating.updater.CompletionListener;
+import com.aelitis.azureus.plugins.rating.updater.RatingData;
+import com.aelitis.azureus.plugins.rating.updater.RatingResults;
 import com.aelitis.azureus.plugins.rating.updater.RatingsUpdater;
 
 public class RatingPlugin implements UnloadablePlugin, PluginListener {
   
-  private static final String COLUMN_ID_RATING = "RatingColumn";  
   
   private PluginInterface pluginInterface;
   
-  private UISWTInstance		swt_ui;
   private LoggerChannel     log;
   
   private UIManagerListener			ui_listener;
   
   private BasicPluginConfigModel		config_model;
-  private List<TableColumn>				table_columns = new ArrayList<TableColumn>();
-  private List<TableContextMenuItem>	table_menus = new ArrayList<TableContextMenuItem>();
   
-  private String nick;
-  private RatingsUpdater updater;
+  private String 			nick;
+  private RatingsUpdater 	updater;
   
-  private static String[] table_names = {
-	  TableManager.TABLE_MYTORRENTS_INCOMPLETE,
-	  TableManager.TABLE_MYTORRENTS_COMPLETE,
-	  TableManager.TABLE_MYTORRENTS_ALL_BIG,
-	  TableManager.TABLE_MYTORRENTS_COMPLETE_BIG,
-	  TableManager.TABLE_MYTORRENTS_INCOMPLETE_BIG,
-	  TableManager.TABLE_MYTORRENTS_UNOPENED,
-	  TableManager.TABLE_MYTORRENTS_UNOPENED_BIG,
-  };
+  private RatingUI			ui;
+ 
   
   public void 
   initialize(
@@ -87,6 +74,8 @@ public class RatingPlugin implements UnloadablePlugin, PluginListener {
     
     log = pluginInterface.getLogger().getChannel("Rating Plugin");
     
+    addPluginConfig();
+
     ui_listener = 
     	new UIManagerListener()
 		{
@@ -94,11 +83,19 @@ public class RatingPlugin implements UnloadablePlugin, PluginListener {
 			UIAttached(
 				UIInstance		instance )
 			{
-				if ( instance instanceof UISWTInstance ){
-					
-					UISWTInstance	swt = (UISWTInstance)instance;
-					
-					initialise( swt );
+				if ( instance.getUIType() == UIInstance.UIT_SWT ){
+										
+					try{
+						ui = (RatingUI)Class.forName( "com.aelitis.azureus.plugins.rating.ui.RatingSWTUI" ).
+								getConstructor( RatingPlugin.class, UIInstance.class ).
+									newInstance( RatingPlugin.this, instance );
+						
+					}catch( ClassNotFoundException e ){
+						
+					}catch( Throwable e ){
+						
+						Debug.out( e );
+					}
 				}
 			}
 			
@@ -110,66 +107,11 @@ public class RatingPlugin implements UnloadablePlugin, PluginListener {
 			}
 		};
 	
-    pluginInterface.getUIManager().addUIListener( ui_listener );
+	updater = new RatingsUpdater(this);
+	    
+	pluginInterface.addListener(this);
 	
-  }
-  
-  public void 
-  unload() 
-  
-  	throws PluginException 
-  {
-		if ( updater != null ){
-			
-			updater.destroy();
-		}
-		
-		if ( config_model != null ){
-			
-			config_model.destroy();
-			
-			config_model = null;
-		}
-		
-		for ( TableColumn c: table_columns ){
-			
-			c.remove();
-		}
-		
-		table_columns.clear();
-		
-		for ( TableContextMenuItem m: table_menus ){
-			
-			m.remove();
-		}
-		
-		table_menus.clear();
-		
-		if ( pluginInterface != null ){
-			
-			pluginInterface.getUIManager().removeUIListener( ui_listener );
-			
-			pluginInterface.removeListener( this );
-		}
-  }
-  
-  protected void
-  initialise(
-	  UISWTInstance	_swt )
-  {  
-	swt_ui	= _swt;
-	  
-	RatingImageUtil.init(_swt.getDisplay());
-        
-    addPluginConfig();
-    
-    updater = new RatingsUpdater(this);
-    
-    pluginInterface.addListener(this);       
-    
-    addMyTorrentsColumn();
-    
-    addMyTorrentsMenu();
+    pluginInterface.getUIManager().addUIListener( ui_listener );
   }
   
   public void closedownComplete() {
@@ -215,67 +157,38 @@ public class RatingPlugin implements UnloadablePlugin, PluginListener {
 		});
   }
   
-  private void addMyTorrentsColumn() {
-    RatingColumn ratingColumn = new RatingColumn(this);
-    for ( String table_name: table_names ){
-    	addRatingColumnToTable(table_name,ratingColumn);
-    }
-  }
+  public void 
+  unload() 
   
-  private void addRatingColumnToTable(String tableID,RatingColumn ratingColumn) {
-    UIManager uiManager = pluginInterface.getUIManager();
-    TableManager tableManager = uiManager.getTableManager();
-    TableColumn activityColumn = tableManager.createColumn(tableID, COLUMN_ID_RATING);
-   
-    activityColumn.setAlignment(TableColumn.ALIGN_LEAD);
-    activityColumn.setPosition(5);
-    activityColumn.setWidth(95);
-    activityColumn.setRefreshInterval(TableColumn.INTERVAL_GRAPHIC);
-    activityColumn.setType(TableColumn.TYPE_GRAPHIC);
-    activityColumn.setVisible( true );
-    activityColumn.addListeners(ratingColumn);
-    
-    tableManager.addColumn(activityColumn);
-    
-    table_columns.add( activityColumn );
-  }
-  
-  private void addMyTorrentsMenu()  {
-    MenuItemListener  listener = 
-      new MenuItemListener()
-      {
-        public void
-        selected(
-          MenuItem    _menu,
-          Object      _target )
-        {
-          Download download = (Download)((TableRow)_target).getDataSource();
-          
-          if ( download == null || download.getTorrent() == null ){
-            
-            return;
-          }
-          
-          if (swt_ui != null)
-          	new RatingWindow(RatingPlugin.this,download);
-        }
-      };
-    
-      for ( String table_name: table_names ){
-    	  TableContextMenuItem menu1 = pluginInterface.getUIManager().getTableManager().addContextMenuItem(table_name, "RatingPlugin.contextmenu.manageRating" );
-      
-    	  menu1.addListener( listener );
-    	  
-    	  table_menus.add( menu1 );
-      }
-   
-  }
-  
-  public UISWTInstance
-  getUI()
+  	throws PluginException 
   {
-	  return( swt_ui );
+		if ( updater != null ){
+			
+			updater.destroy();
+		}
+		
+		if ( config_model != null ){
+			
+			config_model.destroy();
+			
+			config_model = null;
+		}
+		
+		if ( ui != null ){
+			
+			ui.destroy();
+			
+			ui = null;
+		}
+		
+		if ( pluginInterface != null ){
+			
+			pluginInterface.getUIManager().removeUIListener( ui_listener );
+			
+			pluginInterface.removeListener( this );
+		}
   }
+  
   
   public PluginInterface getPluginInterface() {
     return this.pluginInterface;
@@ -301,4 +214,61 @@ public class RatingPlugin implements UnloadablePlugin, PluginListener {
     return updater;
   }
   
+  	// IPC method
+  
+  public Map
+  lookupRatingByHash(
+		byte[]		hash )
+  {
+	  final RatingResults[]	f_result = { null };
+	  final AESemaphore	sem = new AESemaphore( "ratings_waiter" );
+	  
+	  updater.readRating(
+		hash,
+		new CompletionListener()
+		{
+			public void 
+			operationComplete(
+				RatingResults ratings ) 
+			{
+				try{
+					f_result[0] = ratings;
+					
+				}finally{
+					
+					sem.release();
+				}
+			}
+		});
+	  
+	  sem.reserve();
+	  
+	  RatingResults result = f_result[0];
+	  
+	  if ( result == null || result.getNbRatings() == 0 ){
+		  
+		  return( null );
+	  }
+	  
+	  Map map = new HashMap();
+	  
+	  List<RatingData> ratings = result.getRatings();
+	  
+	  List<Map> list = new ArrayList<Map>();
+	  
+	  map.put( "ratings", list );
+	  
+	  for ( RatingData rd: ratings ){
+		  
+		  Map r_m = new HashMap();
+		  
+		  list.add( r_m );
+		  
+		  r_m.put( "nick", rd.getNick());
+		  r_m.put( "score", rd.getScore());
+		  r_m.put( "comment", rd.getComment());
+	  }
+	  
+	  return( map );
+  }
 }

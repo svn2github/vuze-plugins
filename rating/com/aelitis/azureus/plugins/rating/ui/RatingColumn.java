@@ -44,9 +44,9 @@ public class RatingColumn implements TableCellRefreshListener,
   private UISWTInstance	swt_ui;
 	private LocaleUtilities localeTxt;
   
-  public RatingColumn(RatingPlugin plugin) {
-    this.plugin = plugin;
-    swt_ui = plugin.getUI();
+  public RatingColumn(RatingSWTUI ui) {
+    plugin = ui.getPlugin();
+    swt_ui = ui.getSWTUI();
     
     localeTxt = plugin.getPluginInterface().getUtilities().getLocaleUtilities();
   }
@@ -186,7 +186,7 @@ public class RatingColumn implements TableCellRefreshListener,
 		} else if (event.eventType == TableCellMouseEvent.EVENT_MOUSEDOUBLECLICK
 				&& swt_ui != null) {
 			try {
-				new RatingWindow(plugin, download);
+				new RatingWindow(plugin, swt_ui, download);
 				event.skipCoreFunctionality = true;
 			} catch (Exception e) {
 				plugin.logError("Open RatingWidnow via cell click", e);

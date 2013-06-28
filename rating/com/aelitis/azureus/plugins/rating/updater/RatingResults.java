@@ -22,6 +22,9 @@
  */
 package com.aelitis.azureus.plugins.rating.updater;
 
+import java.util.ArrayList;
+import java.util.List;
+
 
 public class RatingResults {
   
@@ -30,13 +33,22 @@ public class RatingResults {
   int   nbComments;
   StringBuffer  comments;
   
+  List<RatingData>	rating_data;
+  
   public RatingResults() {
     this.comments = new StringBuffer();
     nbComments = 0;
   }
   
-  public synchronized void addRating(RatingData rating) {
+  public synchronized void addRating(RatingData rating, boolean retain) {
     if(rating.getScore() > 0) {
+    	
+      if ( retain ){
+    	if ( rating_data == null ){
+    		rating_data = new ArrayList<RatingData>();
+    	}
+    	rating_data.add( rating );
+      }
       averageRating = averageRating * nbRatings + rating.getScore();
       nbRatings++;
       averageRating = averageRating / nbRatings;
@@ -52,6 +64,12 @@ public class RatingResults {
         comments.append("\n====================\n");
       }
     }
+  }
+  
+  public List<RatingData>
+  getRatings()
+  {
+	  return( rating_data );
   }
   
   public String getComments() {
