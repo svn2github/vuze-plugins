@@ -67,17 +67,13 @@ import org.gudy.azureus2.ui.swt.plugins.UISWTViewEvent;
 import org.gudy.azureus2.ui.swt.plugins.UISWTViewEventListener;
 import org.json.simple.JSONObject;
 
-import com.aelitis.azureus.core.pairing.PairedService;
-import com.aelitis.azureus.core.pairing.PairingConnectionData;
-import com.aelitis.azureus.core.pairing.PairingManagerFactory;
+
 import com.aelitis.azureus.plugins.xmwebui.XMWebUIPlugin;
 import com.aelitis.azureus.plugins.xmwebui.client.connect.XMClientAccount;
 import com.aelitis.azureus.plugins.xmwebui.client.connect.XMClientConnection;
 import com.aelitis.azureus.plugins.xmwebui.client.connect.XMClientConnectionAdapter;
-import com.aelitis.azureus.plugins.xmwebui.client.proxy.XMClientProxy;
-import com.aelitis.azureus.plugins.xmwebui.client.rpc.XMRPCClient;
 import com.aelitis.azureus.plugins.xmwebui.client.rpc.XMRPCClientException;
-import com.aelitis.azureus.plugins.xmwebui.client.rpc.XMRPCClientFactory;
+
 import com.aelitis.azureus.util.ImportExportUtils;
 
 

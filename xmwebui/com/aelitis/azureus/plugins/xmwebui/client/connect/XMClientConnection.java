@@ -45,6 +45,10 @@ XMClientConnection
 	private static final String	CS_SECURE_DIRECT	= "Secure (Direct)";
 	private static final String	CS_SECURE_PROXIED	= "Secure (Proxied)";
 
+	private static final int	CACHE_MILLIS_BASIC			= 1*1000;
+	private static final int	CACHE_MILLIS_SECURE_DIRECT	= 4*1000;
+	private static final int	CACHE_MILLIS_SECURE_PROXY	= 9*1000;
+	
 	private XMClientAccount				account;
 	private XMClientConnectionAdapter	adapter;
 	
@@ -132,7 +136,8 @@ XMClientConnection
 		Map<String,String>		service_map,
 		boolean					has_tunnel )
 	{
-		String	ac = account.getAccessCode();
+		String	ac				= account.getAccessCode();
+		int		cache_millis	= 0;
 		
 		try{			
 			boolean http 	= service_map.get( "protocol" ).equals( "http" );
@@ -143,6 +148,8 @@ XMClientConnection
 				
 				log( "Attempting direct basic connection" );
 			
+				cache_millis	= CACHE_MILLIS_BASIC;
+				
 				XMRPCClient rpc_direct = null;
 				
 				try{
@@ -182,6 +189,8 @@ XMClientConnection
 
 						log( "Attempting direct secured connection: " + tunnel_server );
 					
+						cache_millis	= CACHE_MILLIS_SECURE_DIRECT;
+
 						XMRPCClient rpc_tunnel = null;
 						
 						try{
@@ -212,6 +221,8 @@ XMClientConnection
 		
 						log( "Attempting proxy secured connection: " + tunnel_server );
 					
+						cache_millis	= CACHE_MILLIS_SECURE_PROXY;
+
 						XMRPCClient rpc_tunnel = null;
 						
 						try{
@@ -248,6 +259,11 @@ XMClientConnection
 				adapter.setConnected( this, false );
 			
 			}else{
+				
+				if ( cache_millis > 0 ){
+				
+					rpc = XMRPCClientFactory.createCached( rpc, cache_millis );
+				}
 				
 				adapter.setConnected( this, true );
 			}

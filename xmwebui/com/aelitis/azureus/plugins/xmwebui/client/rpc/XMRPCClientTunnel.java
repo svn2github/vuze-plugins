@@ -37,6 +37,9 @@ import org.bouncycastle.crypto.agreement.srp.SRP6Client;
 import org.bouncycastle.crypto.digests.SHA256Digest;
 import org.bouncycastle.util.encoders.Hex;
 import org.gudy.azureus2.core3.util.Base32;
+import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.SystemTime;
+import org.gudy.azureus2.core3.util.TimeFormatter;
 import org.json.simple.JSONObject;
 
 import com.aelitis.azureus.util.JSONUtils;
@@ -81,11 +84,15 @@ XMRPCClientTunnel
     private String		username;
     private String		password;
     
+    private final long				my_tunnel_id	= rand.nextLong();
+    
     private	SecretKeySpec		_secret;
     private String				_tunnel_url;
     
     private int		calls_ok;
     private boolean	destroyed;
+    
+    private int		calls_active;
     
 	public
 	XMRPCClientTunnel(
@@ -253,16 +260,26 @@ XMRPCClientTunnel
 		JSONObject		request )
 	
 		throws XMRPCClientException
-	{		
-		String json = JSONUtils.encodeToJSON( request );
+	{	
+		String	method 	= (String)request.get( "method" );
+		Map		args 	= (Map)request.get( "arguments" );
 		
-		System.out.println( "Sending request: " + json );
-		
-		try{
+		try{			
+			synchronized( this ){
+				
+				calls_active++;
+			}
+
+			String json = JSONUtils.encodeToJSON( request );
+			
+			long	start_time = SystemTime.getMonotonousTime();
+			
+			System.out.println( TimeFormatter.milliStamp() + "-> " + method + (args==null?"":( ": " + args )) + " (len=" + json.length() + ", active=" + calls_active + ")" );
+			
 			byte[] req_bytes = json.getBytes( "UTF-8" );
 	
 			JSONObject request_headers = new JSONObject();
-			
+						
 			request_headers.put( "Accept-Encoding", "gzip" );
 			
 			CallResult temp = call( request_headers, req_bytes );
@@ -280,9 +297,9 @@ XMRPCClientTunnel
 				throw( new XMRPCClientException( "Request failed: HTTP status " + http_status ));
 			}
 			
-			JSONObject reply = new JSONObject();
-
 			String	encoding = (String)reply_headers.get( "Content-Encoding" );
+			
+			String	reply_str;
 			
 			if ( encoding != null && encoding.equals( "gzip" )){
 				
@@ -304,26 +321,45 @@ XMRPCClientTunnel
 					baos.write( buffer, 0, len );
 				}
 				
-				reply.putAll( JSONUtils.decodeJSON( new String( baos.toByteArray(), "UTF-8" )));
-				
+				reply_str = new String( baos.toByteArray(), "UTF-8" );
+								
 			}else{
 						
-				reply.putAll( JSONUtils.decodeJSON( new String( reply_bytes, reply_bytes_offset,reply_bytes_length , "UTF-8" )));
+				reply_str = new String( reply_bytes, reply_bytes_offset,reply_bytes_length , "UTF-8" );
 			}
 			
-			String reply_str = reply.toString();
+			//Thread.sleep( 20000 );
 			
-			System.out.println( "Received reply: " + (reply_str.length()>256?(reply_str.substring(0,256)+"... (" + reply_str.length() + ")"):reply_str) );
+			int reply_len = reply_str.length();
+			
+			JSONObject reply = new JSONObject();
+
+			reply.putAll( JSONUtils.decodeJSON( reply_str ));
+
+			System.out.println( TimeFormatter.milliStamp() + "<- " + method + " (len=" + reply_bytes_length + "/" + reply_len + ", elapsed=" + (SystemTime.getMonotonousTime() - start_time) + ")" );
+			
+			//System.out.println( "Received reply: " + (reply_str.length()>256?(reply_str.substring(0,256)+"... (" + reply_str.length() + ")"):reply_str) );
 		
 			return( reply );
 			
 		}catch( XMRPCClientException e ){
 			
+			System.out.println( "<- " + method + ": " + Debug.getNestedExceptionMessage( e ));
+
 			throw( e );
 			
 		}catch( Throwable e ){
 			
+			System.out.println( "<- " + method + ": " + Debug.getNestedExceptionMessage( e ));
+
 			throw( new XMRPCClientException( "Failed to use tunnel", e ));
+			
+		}finally{
+
+			synchronized( this ){
+				
+				calls_active--;
+			}
 		}
 	}
 	
@@ -345,6 +381,8 @@ XMRPCClientTunnel
 		SecretKeySpec	secret 	= (SecretKeySpec)tunnel[1];
 				
 		try{	
+			request_headers.put( "X-XMRPC-Tunnel-ID", String.valueOf( my_tunnel_id ));
+
 			String header_json = JSONUtils.encodeToJSON( request_headers );
 
 			byte[] header_bytes = header_json.getBytes( "UTF-8" );

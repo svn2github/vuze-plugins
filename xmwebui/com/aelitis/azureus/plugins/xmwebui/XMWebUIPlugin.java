@@ -126,6 +126,8 @@ XMWebUIPlugin
     
     private boolean							check_ids_outstanding = true;
     
+    private Map<String,Map<Long,String>>	session_torrent_info_cache = new HashMap<String,Map<Long,String>>();
+    
     public
     XMWebUIPlugin()
     {
@@ -425,10 +427,12 @@ XMWebUIPlugin
 
 		
 		try{
+			String session_id = getSessionID( request );
+			
 			// Set cookie just in case client is looking for one..
-			response.setHeader( "Set-Cookie", "X-Transmission-Session-Id=" + getSessionID(request) + "; path=/; HttpOnly" );
+			response.setHeader( "Set-Cookie", "X-Transmission-Session-Id=" + session_id + "; path=/; HttpOnly" );
 			// This is the actual spec for massing session-id
-			response.setHeader("X-Transmission-Session-Id", getSessionID(request));
+			response.setHeader("X-Transmission-Session-Id", session_id );
 			
 			if (!isSessionValid(request)) {
 				log(request.getHeader());
@@ -443,6 +447,15 @@ XMWebUIPlugin
 				response.setReplyStatus( 409 );
 				response.getOutputStream().write("You_didn_t_set_the_X-Transmission-Session-Id".getBytes());
 				return true;
+			}
+			
+			String session_id_plus = session_id;
+			
+			String tid = (String)request.getHeaders().get( "X-XMRPC-Tunnel-ID" );
+			
+			if ( tid != null ){
+				
+				session_id_plus += "/" + tid;
 			}
 			
 			String	url = request.getURL();
@@ -474,7 +487,7 @@ XMWebUIPlugin
 
 				Map request_json = JSONUtils.decodeJSON( request_json_str.toString());
 								
-				Map response_json = processRequest( request_json );
+				Map response_json = processRequest( session_id_plus, request_json );
 
 				String response_json_str = JSONUtils.encodeToJSON( response_json );
 				
@@ -509,7 +522,7 @@ XMWebUIPlugin
 				
 				Map request_json = JSONUtils.decodeJSON( request_json_str.toString());
 				
-				Map response_json = processRequest( request_json );
+				Map response_json = processRequest( session_id_plus, request_json );
 					
 				String response_json_str = JSONUtils.encodeToJSON( response_json );
 				
@@ -815,6 +828,7 @@ XMWebUIPlugin
 	
 	protected Map
 	processRequest(
+		String					session_id,
 		Map						request )
 	
 		throws IOException
@@ -836,7 +850,7 @@ XMWebUIPlugin
 		}
 
 		try{
-			Map	result = processRequest( method, args );
+			Map	result = processRequest( session_id, method, args );
 
 			if ( result == null ){
 				
@@ -894,6 +908,7 @@ XMWebUIPlugin
 	@SuppressWarnings("unchecked")
 	protected Map
 	processRequest(
+		String					session_id,
 		String					method,
 		Map						args )
 	
@@ -1093,7 +1108,7 @@ XMWebUIPlugin
 			
 		}else if ( method.equals( "torrent-get" )){
 
-			method_Torrent_Get(args, result);
+			method_Torrent_Get( session_id, args, result);
 
 		}else if ( method.equals( "torrent-reannounce" )){
 			// RPC v5
@@ -1922,10 +1937,14 @@ XMWebUIPlugin
 
 			// hack due to core bug - have to add a bogus arg onto magnet uris else they fail to parse
 
-			if (url.toLowerCase().startsWith("magnet:")) {
+			String lc_url = url.toLowerCase( Locale.US );
+			
+			if ( lc_url.startsWith("magnet:")) {
 
 				url += "&dummy_param=1";
-			} else if (!url.startsWith("http")) {
+				
+			} else if (!lc_url.startsWith("http")) {
+				
 				url = UrlUtils.parseTextForURL(url, true, true);
 			}
 
@@ -2027,8 +2046,9 @@ XMWebUIPlugin
 
 	private Map
 	method_Torrent_Get(
-			Map args,
-			Map result)
+		String		session_id,
+		Map 		args,
+		Map 		result)
 	{
 		List<String>	fields = (List<String>)args.get( "fields" );
 		
@@ -2039,7 +2059,9 @@ XMWebUIPlugin
 		
 		Object	ids = args.get( "ids" );
 		
-		if ( ids != null && ids instanceof String && ((String)ids).equals( "recently-active" )){
+		boolean	is_recently_active = ids != null && ids instanceof String && ((String)ids).equals( "recently-active" );
+		
+		if ( is_recently_active ){
 			
 			synchronized( recently_removed ){
 				
@@ -2055,10 +2077,8 @@ XMWebUIPlugin
 		}
 		
 		List<Download>	downloads = getDownloads( ids );
-		
-		List	torrents = new ArrayList();
-		
-		result.put( "torrents", torrents );
+				
+		Map<Long,Map>	torrent_info = new LinkedHashMap<Long, Map>();
 		
 		for ( Download download: downloads ){
 			
@@ -2069,6 +2089,8 @@ XMWebUIPlugin
 				continue;
 			}
 			
+			long download_id = getID( download, true );
+			
 			DownloadManager	core_download = PluginCoreUtils.unwrap( download );
 			
 			PEPeerManager pm = core_download.getPeerManager();
@@ -2077,7 +2099,7 @@ XMWebUIPlugin
 			
 			Map torrent = new HashMap();
 			
-			torrents.add( torrent );
+			torrent_info.put( download_id, torrent );
 			
 			int	peers_from_us 	= 0;
 			int	peers_to_us		= 0;
@@ -2275,7 +2297,7 @@ XMWebUIPlugin
 
 				}else if ( field.equals( "id" )){
 					// id                          | number                      | tr_torrent
-					value = getID( download, true );
+					value = download_id;
 
 				}else if ( field.equals( "isFinished" )){
 					// RPC v9: TODO
@@ -2615,8 +2637,69 @@ XMWebUIPlugin
 					}
 					torrent.put( field, value );
 				}
-			} // for fields
+			} // for fields			
 		} // for downloads
+		
+		if ( is_recently_active ){
+			
+				// just return the latest diff for this session
+				// we could possibly, in theory, update the cache for all calls to this method, not just the 'recently active' calls
+				// but I don't trust the client enough atm to behave correctly
+			
+			synchronized( session_torrent_info_cache ){
+				
+				if ( session_torrent_info_cache.size() > 8 ){
+					
+					session_torrent_info_cache.clear();
+				}
+				
+				Map<Long,String> torrent_info_cache = session_torrent_info_cache.get( session_id );
+				
+				if ( torrent_info_cache == null ){
+					
+					torrent_info_cache = new HashMap<Long, String>();
+					
+					session_torrent_info_cache.put( session_id, torrent_info_cache );
+				}
+				
+				List<Long>	same = new ArrayList<Long>();
+				
+				for ( Map.Entry<Long,Map> entry: torrent_info.entrySet()){
+					
+					long	id 		= entry.getKey();
+					Map		torrent = entry.getValue();
+					
+					String current = JSONUtils.encodeToJSON( torrent );
+					
+					String prev = torrent_info_cache.get( id );
+					
+					if ( prev != null && prev.equals( current )){
+						
+						same.add( id );
+						
+					}else{
+						
+						torrent_info_cache.put( id, current );
+					}
+				}
+				
+				if ( same.size() > 0 ){
+					
+						// System.out.println( "same info: " + same.size() + " of " + torrent_info.size());
+					
+					for ( long id: same ){
+						
+						torrent_info.remove( id );
+					}
+				}
+			}
+		}
+		
+		List<Map>	torrents = new ArrayList<Map>();
+		
+		result.put( "torrents", torrents );
+
+		torrents.addAll( torrent_info.values());
 		
 		return result;
 	}
@@ -2630,7 +2713,7 @@ XMWebUIPlugin
 		int numWebSeedsConnected = 0;
 		List<PEPeer> peers = peerManager.getPeers();
 		for (PEPeer peer : peers) {
-			if (peer.getProtocol().equals("HTTP")) {
+			if (peer.getProtocol().toLowerCase().startsWith( "http" )){
 				numWebSeedsConnected++;
 			}
 		}

@@ -110,4 +110,12 @@ XMRPCClientFactory
 	{
 		return( new XMRPCClientTunnelHandler( tunnel_server, access_code, tunnel_user, tunnel_password ));
 	}
+	
+	public static XMRPCClient
+	createCached(
+		XMRPCClient		base,
+		int				cache_millis )
+	{
+		return( new XMRPCClientCached( base, cache_millis ));
+	}
 }
