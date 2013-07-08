@@ -21,6 +21,7 @@
 
 package com.vuze.plugins.azlocprov;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.net.Inet4Address;
@@ -29,6 +30,7 @@ import java.util.*;
 
 import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.FileUtil;
 import org.gudy.azureus2.plugins.utils.LocationProvider;
 
 import com.maxmind.geoip.Country;
@@ -40,8 +42,10 @@ LocationProviderImpl
 {
 	private static final int[][] FLAG_SIZES = {{18,12},{25,15}};
 	
-	private String	plugin_version;
-	private File	plugin_dir;
+	private final String	plugin_version;
+	private final File		plugin_dir;
+	
+	private final boolean	has_images_dir;
 	
 	private volatile boolean is_destroyed;
 	
@@ -57,6 +61,8 @@ LocationProviderImpl
 	{
 		plugin_version	= _plugin_version==null?"":_plugin_version;
 		plugin_dir 		= _plugin_dir;
+		
+		has_images_dir = new File( plugin_dir, "images" ).isDirectory();
 	}
 	
 	@Override
@@ -243,7 +249,26 @@ LocationProviderImpl
 			return( null );
 		}
 		
-		return( getClass().getClassLoader().getResourceAsStream( "com/vuze/plugins/azlocprov/images/" + (size_index==0?"18x12":"25x15") + "/" + code.toLowerCase() + ".png" ));
+		String flag_file_dir 	= (size_index==0?"18x12":"25x15");
+		String flag_file_name 	= code.toLowerCase() + ".png";
+		
+		if ( has_images_dir ){
+			
+			File ff = new File( plugin_dir, "images" + File.separator + flag_file_dir + File.separator + flag_file_name );
+			
+			if ( ff.exists()){
+				
+				try{
+					return( new ByteArrayInputStream( FileUtil.readFileAsByteArray( ff )));
+					
+				}catch( Throwable e ){
+					
+					Debug.out( "Failed to load " + ff, e );
+				}
+			}
+		}
+		
+		return( getClass().getClassLoader().getResourceAsStream( "com/vuze/plugins/azlocprov/images/" + flag_file_dir + "/" + flag_file_name ));
 	}
 	
 	
