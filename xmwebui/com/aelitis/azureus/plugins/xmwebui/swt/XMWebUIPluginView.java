@@ -28,8 +28,10 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.StyleRange;
@@ -50,14 +52,12 @@ import org.eclipse.swt.widgets.Group;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Text;
-
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.config.impl.ConfigurationManager;
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.ui.UIInstance;
-
 import org.gudy.azureus2.ui.swt.Messages;
 import org.gudy.azureus2.ui.swt.Utils;
 import org.gudy.azureus2.ui.swt.components.LinkLabel;
@@ -67,13 +67,11 @@ import org.gudy.azureus2.ui.swt.plugins.UISWTViewEvent;
 import org.gudy.azureus2.ui.swt.plugins.UISWTViewEventListener;
 import org.json.simple.JSONObject;
 
-
 import com.aelitis.azureus.plugins.xmwebui.XMWebUIPlugin;
 import com.aelitis.azureus.plugins.xmwebui.client.connect.XMClientAccount;
 import com.aelitis.azureus.plugins.xmwebui.client.connect.XMClientConnection;
 import com.aelitis.azureus.plugins.xmwebui.client.connect.XMClientConnectionAdapter;
 import com.aelitis.azureus.plugins.xmwebui.client.rpc.XMRPCClientException;
-
 import com.aelitis.azureus.util.ImportExportUtils;
 
 
@@ -870,6 +868,26 @@ XMWebUIPluginView
 						
 						log( (pos++) + ") " + t.getName());
 					}
+				}else if ( str.toLowerCase().startsWith( "search" )){
+					
+					int pos = str.indexOf(' ');
+					
+					String expr = "";
+					
+					if ( pos != -1 ){
+						
+						expr = str.substring( pos ).trim();
+					}
+
+					if ( expr.length() == 0 ){
+						
+						logError( "Search expression missing" );
+						
+					}else{
+						
+						rc.search( expr );
+					}
+					
 				}else{
 					
 					logError( "Unrecognized command '" + str + "'" );
@@ -1478,6 +1496,146 @@ XMWebUIPluginView
 		getLastTorrents()
 		{
 			return( last_torrents );
+		}
+		
+		private void
+		search(
+			String	expr )
+		
+			throws XMRPCClientException
+		{
+			JSONObject	request = new JSONObject();
+			
+			request.put( "method", "vuze-search-start" );
+			
+			Map request_args = new HashMap();
+			
+			request.put( "arguments", request_args );
+						
+			request_args.put( "expression", expr );
+						
+			JSONObject reply = call( request );
+
+			//log( String.valueOf(reply ));
+			
+			String result = (String)reply.get( "result" );
+			
+			if ( result.equals( "success" )){
+				
+				Map	args = (Map)reply.get( "arguments" );
+				
+				final String	sid = (String)args.get( "sid" );
+				
+				log( "Search id: " + sid );
+				
+				List<Map>	engines = (List<Map>)args.get( "engines" );
+				
+				final Set<String> engine_ids = new HashSet<String>();
+				
+				for ( Map m: engines ){
+					
+					String eid 		= (String)m.get( "id" );
+					String e_name	= (String)m.get( "name" );
+					
+					engine_ids.add( eid );
+					
+					log( "    " + eid + "/" + e_name );
+				}
+				
+				new AEThread2( "result catcher" )
+				{
+					public void
+					run()
+					{
+						try{
+							while( true ){
+								
+								try{
+									Thread.sleep(500);
+									
+								}catch( Throwable e ){
+								}
+								
+								JSONObject request = new JSONObject();
+								
+								request.put( "method", "vuze-search-get-results" );
+								
+								HashMap request_args = new HashMap();
+								
+								request.put( "arguments", request_args );
+											
+								request_args.put( "sid", sid );
+								
+								JSONObject reply = call( request );
+								
+								String result = (String)reply.get( "result" );
+								
+								if ( result.equals( "success" )){
+									
+									Map args = (Map)reply.get( "arguments" );
+									
+									
+									List<Map> engine_results = (List<Map>)args.get( "engines" );
+									
+									for ( Map e_r: engine_results ){
+										
+										String eid = (String)e_r.get( "id" );
+										
+										if ( !engine_ids.contains( eid )){
+											
+											continue;
+										}
+										
+										List e_results = (List)e_r.get( "results" );
+										
+										if ( e_results != null ){
+											
+											log( "    Engine results: " + eid + " - " + e_results.size());
+										}
+										
+										boolean e_comp = (Boolean)e_r.get( "complete" );
+										
+										if ( e_comp ){
+											
+											String e_error = (String)e_r.get( "error" );
+											
+											if ( e_error == null ){
+												
+												log( "    Engine complete: " + eid );
+												
+											}else{
+												
+												log( "    Engine failed: " + eid + " - " + e_error );
+											}
+											
+											engine_ids.remove( eid );
+										}
+									}
+									
+									boolean	complete = (Boolean)args.get( "complete" );
+									
+									if ( complete ){
+										
+										log( "Search complete" );
+										
+										break;
+									}
+								}else{
+									
+									throw( new XMRPCClientException( "RPC call failed: " + result ));
+								}
+							}
+						}catch( Throwable e ){
+							
+							logError( "Search failed: " + Debug.getNestedExceptionMessage( e ));
+						}
+					}
+				}.start();
+				
+			}else{
+				
+				throw( new XMRPCClientException( "RPC call failed: " + result ));
+			}
 		}
 	}
 	

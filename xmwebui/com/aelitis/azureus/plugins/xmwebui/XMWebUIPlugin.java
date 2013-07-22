@@ -72,8 +72,16 @@ import org.gudy.azureus2.plugins.ui.config.BooleanParameter;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.gudy.azureus2.ui.webplugin.WebPlugin;
+import org.json.simple.JSONObject;
 
 import com.aelitis.azureus.core.AzureusCoreFactory;
+import com.aelitis.azureus.core.metasearch.Engine;
+import com.aelitis.azureus.core.metasearch.MetaSearch;
+import com.aelitis.azureus.core.metasearch.MetaSearchManager;
+import com.aelitis.azureus.core.metasearch.MetaSearchManagerFactory;
+import com.aelitis.azureus.core.metasearch.Result;
+import com.aelitis.azureus.core.metasearch.ResultListener;
+import com.aelitis.azureus.core.metasearch.SearchParameter;
 import com.aelitis.azureus.core.tracker.TrackerPeerSource;
 import com.aelitis.azureus.core.util.MultiPartDecoder;
 import com.aelitis.azureus.plugins.dht.DHTPlugin;
@@ -127,6 +135,9 @@ XMWebUIPlugin
     private boolean							check_ids_outstanding = true;
     
     private Map<String,Map<Long,String>>	session_torrent_info_cache = new HashMap<String,Map<Long,String>>();
+    
+    private Map<String,SearchInstance>	active_searches = new HashMap<String, XMWebUIPlugin.SearchInstance>();
+    
     
     public
     XMWebUIPlugin()
@@ -240,17 +251,34 @@ XMWebUIPlugin
 				{
 					Map<String,RemSearchPluginSearch> searches = search_handler.getSearches();
 					
-					Iterator<RemSearchPluginSearch> it = searches.values().iterator();
+					Iterator<RemSearchPluginSearch> it1 = searches.values().iterator();
 						
-					while( it.hasNext()){
+					while( it1.hasNext()){
 					
-						RemSearchPluginSearch search = it.next();
+						RemSearchPluginSearch search = it1.next();
 						
 						if ( search.getAge() > SEARCH_TIMEOUT ){
 																			
 							log( "Timeout: " + search.getString());
 							
 							search.destroy();
+						}
+					}
+					
+					synchronized( active_searches ){
+						
+						Iterator<SearchInstance> it2 = active_searches.values().iterator();
+						
+						while( it2.hasNext()){
+							
+							SearchInstance search = it2.next();
+							
+							if ( search.getAge() > SEARCH_TIMEOUT ){
+								
+								log( "Timeout: " + search.getString());
+							
+								it2.remove();
+							}	
 						}
 					}
 				}
@@ -294,15 +322,35 @@ XMWebUIPlugin
 		
 		PluginConfig pc = plugin_interface.getPluginconfig();
 		
-		String 	data_dir 	= pc.getCoreStringParameter( PluginConfig.CORE_PARAM_STRING_DEFAULT_SAVE_PATH );
-
-		if ( data_dir == null || data_dir.length() == 0 || !new File( data_dir ).canWrite()){
+		{
+			String 	data_dir 	= pc.getCoreStringParameter( PluginConfig.CORE_PARAM_STRING_DEFAULT_SAVE_PATH );
+	
+			boolean	data_bad = false;
 			
-			Logger.log(
-				new LogAlert(
-					true,
-					LogAlert.AT_ERROR,
-					MessageText.getString( "xmwebui.error.data_path" )));	
+			if ( data_dir == null || data_dir.length() == 0 ){
+				
+				data_bad = true;
+				
+			}else{
+				
+				File dir = new File( data_dir );
+				
+				if ( !dir.exists()){
+					
+					dir.mkdirs();
+				}
+				
+				data_bad = !dir.canWrite();
+			}
+				
+			if ( data_bad ){
+				
+				Logger.log(
+					new LogAlert(
+						true,
+						LogAlert.AT_ERROR,
+						MessageText.getString( "xmwebui.error.data_path" )));	
+			}
 		}
 		
 		if ( !pc.getUnsafeBooleanParameter( "Save Torrent Files" )){
@@ -316,7 +364,25 @@ XMWebUIPlugin
 			
 			String 	torrent_dir 	= pc.getUnsafeStringParameter( "General_sDefaultTorrent_Directory" );
 
-			if ( torrent_dir == null || torrent_dir.length() == 0 || !new File( torrent_dir ).canWrite()){
+			boolean torrent_bad = false;
+			
+			if ( torrent_dir == null || torrent_dir.length() == 0 ){
+				
+				torrent_bad = true;
+				
+			}else{
+				
+				File dir = new File( torrent_dir );
+				
+				if ( !dir.exists()){
+					
+					dir.mkdirs();
+				}
+				
+				torrent_bad = !dir.canWrite();
+			}
+				
+			if ( torrent_bad ){		
 				
 				Logger.log(
 					new LogAlert(
@@ -1124,7 +1190,105 @@ XMWebUIPlugin
 			// RPC v5
 			
 			method_Blocklist_Update(args, result);
+			
+		}else if ( method.equals( "vuze-search-start" )){
+			
+			MetaSearchManager ms_manager = MetaSearchManagerFactory.getSingleton();
+			
+			MetaSearch ms = ms_manager.getMetaSearch();
+			
+			List<SearchParameter>	sps = new ArrayList<SearchParameter>();
+			
+			String expression = (String)args.get( "expression" );
+			
+			if ( expression == null ){
+				
+				throw( new IOException( "Search expression missing" ));
+			}
+			
+			sps.add( new SearchParameter( "s", expression ));
+			
+			SearchParameter[] parameters = sps.toArray( new SearchParameter[ sps.size()]);
 
+			Map<String,String>	context = new HashMap();
+			
+			context.put( Engine.SC_SOURCE, 	"xmwebui" );
+			
+			context.put( Engine.SC_REMOVE_DUP_HASH, "true" );
+			
+	 		Engine[] engines = ms_manager.getMetaSearch().getEngines( true, true );
+
+	 		if ( engines.length == 0 ){
+	 			
+	 			throw( new IOException( "No search templates available" ));
+	 		}
+	 		
+	 		SearchInstance search_instance = new SearchInstance( engines );
+	 		
+	 		engines = 
+	 			ms.search( 
+	 				engines, 
+	 				search_instance,
+	 				parameters, 
+	 				null,
+	 				context, 
+	 				100 );
+	 		
+	 		if ( engines.length == 0 ){
+	 			
+	 			throw( new IOException( "No search templates available" ));
+	 		}
+	 		
+	 		synchronized( active_searches ){
+	 			
+	 			active_searches.put(search_instance.getSID(), search_instance );
+	 		}
+	 		
+	 		search_instance.setEngines( engines );
+	 		
+	 		result.put( "sid", search_instance.getSID());
+	 		
+	 		List<Map>	l_engines = new ArrayList<Map>();
+	 		
+	 		result.put( "engines", l_engines );
+	 		
+	 		for ( Engine engine: engines ){
+	 			
+	 			JSONObject map = new JSONObject();
+	 			
+	 			l_engines.add( map );
+	 			
+	 	 		map.put("name", engine.getName() );			
+	 	 		map.put("id", engine.getUID());
+	 	 		map.put("favicon", engine.getIcon());
+	 	 		map.put("dl_link_css", engine.getDownloadLinkCSS());
+	 	 		map.put("selected", Engine.SEL_STATE_STRINGS[ engine.getSelectionState()]);
+	 	 		map.put("type", Engine.ENGINE_SOURCE_STRS[ engine.getSource()]);
+	 		}
+		}else if ( method.equals( "vuze-search-get-results" )){
+									
+			String sid = (String)args.get( "sid" );
+			
+			if ( sid == null ){
+				
+				throw( new IOException( "SID missing" ));
+			}	
+						
+			synchronized( active_searches ){
+				
+				SearchInstance search_instance = active_searches.get( sid );
+				
+				if ( search_instance != null ){
+					
+					if ( search_instance.getResults( result )){
+						
+						active_searches.remove( sid );
+					}
+				}else{
+					
+					throw( new IOException( "SID not found - already complete?" ));
+				}
+			}
 		}else{
 			
 			System.out.println( "unhandled method: " + method + " - " + args );
@@ -3778,4 +3942,243 @@ XMWebUIPlugin
 		}
 	}
 
+	private class
+	SearchInstance
+		implements ResultListener
+	{
+		private String	sid;
+		private long	start_time = SystemTime.getMonotonousTime();
+		
+		private Map<String,List>	engine_results = new HashMap<String, List>();
+		
+		private 
+		SearchInstance(
+			Engine[]	engines )
+		{
+			byte[]	bytes = new byte[16];
+			
+			RandomUtils.nextSecureBytes( bytes );
+			
+			sid = Base32.encode( bytes );
+			
+			for ( Engine e: engines ){
+				
+				engine_results.put( e.getUID(), new ArrayList());
+			}
+		}
+		
+		private String
+		getSID()
+		{
+			return( sid );
+		}
+		
+		private void
+		setEngines(
+			Engine[]		engines )
+		{
+				// trim back in case active engines changed
+			
+			Set<String>	active_engines = new HashSet<String>();
+			
+			for ( Engine e: engines ){
+				
+				active_engines.add( e.getUID());
+			}
+			
+			synchronized( this ){
+			
+				Iterator<String>	it = engine_results.keySet().iterator();
+				
+				while( it.hasNext()){
+					
+					if ( !active_engines.contains( it.next())){
+						
+						it.remove();
+					}
+				}
+			}
+		}
+		
+		private boolean
+		getResults(
+			Map	result )
+		{
+			result.put( "sid", sid );
+			
+			List<Map>	engines = new ArrayList<Map>();
+			
+			result.put( "engines", engines );
+			
+			synchronized( this ){
+				
+				boolean	all_complete = true;
+				
+				for ( Map.Entry<String, List> entry: engine_results.entrySet()){
+					
+					Map m = new HashMap();
+					
+					engines.add( m );
+					
+					m.put( "id", entry.getKey());
+					
+					List results = entry.getValue();
+					
+					Iterator<Object>	it = results.iterator();
+					
+					boolean	engine_complete = false;
+					
+					while( it.hasNext()){
+						
+						Object obj = it.next();
+						
+						if ( obj instanceof Boolean ){
+							
+							engine_complete = true;
+							
+							break;
+							
+						}else if ( obj instanceof Throwable ){
+														
+							m.put( "error", Debug.getNestedExceptionMessage((Throwable)obj));
+							
+						}else{
+							
+							it.remove();
+							
+							Result[] sr = (Result[])obj;
+							
+							List l_sr = (List)m.get( "results" );
+							
+							if ( l_sr == null ){
+								
+								l_sr = new ArrayList();
+								
+								m.put( "results", l_sr );
+							}
+							
+							for ( Result r: sr ){
+								
+								l_sr.add( r.toJSONMap());
+							}
+						}
+					}
+				
+					m.put( "complete", engine_complete );
+					
+					if ( !engine_complete ){
+						
+						all_complete = false;
+					}
+				}
+				
+				result.put( "complete", all_complete );
+				
+				return( all_complete );
+			}
+		}
+		
+		private long
+		getAge()
+		{
+			return( SystemTime.getMonotonousTime() - start_time );
+		}
+		
+		public void 
+		contentReceived(
+			Engine 		engine, 
+			String 		content )
+		{
+		}
+		
+		public void 
+		matchFound( 
+			Engine 		engine, 
+			String[] 	fields )
+		{
+		}
+		
+		public void 
+		resultsReceived(
+			Engine 		engine,
+			Result[] 	results)
+		{
+			System.out.println( "results: " + engine.getName() + " - " + results.length );
+			
+			synchronized( this ){
+
+				List list = (List)engine_results.get( engine.getUID());
+				
+				if ( list != null ){
+					
+					if ( list.size() > 0 && list.get( list.size()-1) instanceof Boolean ){
+						
+					}else{
+					
+						list.add( results );
+					}
+				}
+			}
+		}
+		
+		public void 
+		resultsComplete(
+			Engine 	engine)
+		{
+			System.out.println( "comp: " + engine.getName()); 
+			
+			synchronized( this ){
+
+				List list = (List)engine_results.get( engine.getUID());
+				
+				if ( list != null ){
+					
+					if ( list.size() > 0 && list.get( list.size()-1) instanceof Boolean ){
+
+					}else{
+						
+						list.add( true );
+					}
+				}
+			}
+		}
+		
+		public void 
+		engineFailed(
+			Engine 		engine, 
+			Throwable 	cause )
+		{
+			System.out.println( "fail: " + engine.getName()); 
+			
+			synchronized( this ){
+
+				List list = (List)engine_results.get( engine.getUID());
+				
+				if ( list != null ){
+					
+					if ( list.size() > 0 && list.get( list.size()-1) instanceof Boolean ){
+
+					}else{
+						
+						list.add( cause );
+						list.add( true );
+					}
+				}
+			}
+		}
+			
+		public void 
+		engineRequiresLogin(
+			Engine 		engine, 
+			Throwable 	cause )
+		{
+			engineFailed( engine, cause );
+		}
+		
+		private String
+		getString()
+		{
+			return( sid );
+		}
+	}
 }
