@@ -34,6 +34,8 @@ import org.gudy.azureus2.core3.disk.DiskManager;
 import org.gudy.azureus2.core3.disk.DiskManagerPiece;
 import org.gudy.azureus2.core3.download.DownloadManager;
 import org.gudy.azureus2.core3.download.DownloadManagerState;
+import org.gudy.azureus2.core3.global.GlobalManager;
+import org.gudy.azureus2.core3.global.GlobalManagerStats;
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.ipfilter.IpFilter;
 import org.gudy.azureus2.core3.ipfilter.IpFilterManagerFactory;
@@ -74,6 +76,7 @@ import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.gudy.azureus2.ui.webplugin.WebPlugin;
 import org.json.simple.JSONObject;
 
+import com.aelitis.azureus.core.AzureusCore;
 import com.aelitis.azureus.core.AzureusCoreFactory;
 import com.aelitis.azureus.core.metasearch.Engine;
 import com.aelitis.azureus.core.metasearch.MetaSearch;
@@ -1591,22 +1594,50 @@ XMWebUIPlugin
 			Map args, 
 			Map result) 
 	{
+		/*
+   string                     | value type
+   ---------------------------+-------------------------------------------------
+   "activeTorrentCount"       | number
+   "downloadSpeed"            | number
+   "pausedTorrentCount"       | number
+   "torrentCount"             | number
+   "uploadSpeed"              | number
+   ---------------------------+-------------------------------+
+   "cumulative-stats"         | object, containing:           |
+                              +------------------+------------+
+                              | uploadedBytes    | number     | tr_session_stats
+                              | downloadedBytes  | number     | tr_session_stats
+                              | filesAdded       | number     | tr_session_stats
+                              | sessionCount     | number     | tr_session_stats
+                              | secondsActive    | number     | tr_session_stats
+   ---------------------------+-------------------------------+
+   "current-stats"            | object, containing:           |
+                              +------------------+------------+
+                              | uploadedBytes    | number     | tr_session_stats
+                              | downloadedBytes  | number     | tr_session_stats
+                              | filesAdded       | number     | tr_session_stats
+                              | sessionCount     | number     | tr_session_stats
+                              | secondsActive    | number     | tr_session_stats
+		 */
+		AzureusCore core = AzureusCoreFactory.getSingleton();
+		GlobalManager gm = core.getGlobalManager();
+		GlobalManagerStats stats = gm.getStats();
 		
 		// < RPC v4
 		result.put("activeTorrentCount", 0); //TODO
-		result.put("downloadSpeed", 0); //TODO
+		result.put("downloadSpeed", stats.getDataAndProtocolReceiveRate());
 		result.put("pausedTorrentCount", 0); //TODO
-		result.put("torrentCount", 0); //TODO
-		result.put("uploadSpeed", 0); //TODO
+		result.put("torrentCount", gm.getDownloadManagers().size());
+		result.put("uploadSpeed", stats.getDataAndProtocolSendRate());
 		
 		// RPC v4
   	Map	current_stats = new HashMap();
   	
   	result.put( "current-stats", current_stats );
   	
-  	current_stats.put( "uploadedBytes", 0 );
-  	current_stats.put( "downloadedBytes", 0 );
-  	current_stats.put( "ratio", 0 );
+  	current_stats.put( "uploadedBytes", stats.getTotalDataBytesSent() );
+  	current_stats.put( "downloadedBytes", stats.getTotalDataBytesReceived() );
+  	current_stats.put( "ratio", (float) stats.getTotalDataBytesSent() / stats.getTotalDataBytesReceived() );
   	current_stats.put( "secondsActive", 0 );
   	
 		// RPC v4
