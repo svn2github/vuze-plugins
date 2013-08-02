@@ -52,6 +52,7 @@ TransmissionRemote.prototype =
 
 	/* >> Vuze Added */
     isPersistentError: function(){
+		var remote = this;
         var max = remote._error_array.length > 0 ? Math.max.apply(null, remote._error_array) : 0;
         return $.grep(remote._error_array, function(n, i){
             return n >= ( max - remote._errors_tolerated )
