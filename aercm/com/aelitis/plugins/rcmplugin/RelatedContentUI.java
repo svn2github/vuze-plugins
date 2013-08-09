@@ -165,16 +165,7 @@ RelatedContentUI
 		swt_ui				= _ui;
 		plugin				= _plugin;
 		
-		CoreWaiterSWT.waitForCoreRunning(
-			new AzureusCoreRunningListener() 
-			{
-				public void 
-				azureusCoreRunning(
-					AzureusCore core ) 
-				{
-					uiAttachedAndCoreRunning( core );
-				}
-			});
+		uiSetup();
 	}
 	
 	protected RCMPlugin
@@ -276,8 +267,7 @@ RelatedContentUI
 	}
 	
 	private void 
-	uiAttachedAndCoreRunning(
-		AzureusCore core ) 
+	uiSetup( ) 
 	{
 		if ( destroyed ){
 			
@@ -925,7 +915,7 @@ RelatedContentUI
 										public void 
 										run() 
 										{
-											if ( status_img_label != null && !status_img_label.isDisposed()){
+											if ( status_img_label != null && !status_img_label.isDisposed() && vitality_images.length > 0){
 												
 												status_img_label.setImage( vitality_images[vi_index++%vitality_images.length]);
 											}
