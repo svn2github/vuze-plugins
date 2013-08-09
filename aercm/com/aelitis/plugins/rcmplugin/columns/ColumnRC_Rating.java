@@ -30,7 +30,6 @@ import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.ByteArrayHashMap;
 import org.gudy.azureus2.core3.util.Debug;
-import org.gudy.azureus2.plugins.PluginAdapter;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.PluginManager;
 import org.gudy.azureus2.plugins.ipc.IPCInterface;
@@ -288,7 +287,7 @@ ColumnRC_Rating
 						
 						float	total_score = 0;
 						
-						text = "";
+						String tt = "";
 						
 						for ( Map m: list ){
 							
@@ -302,16 +301,30 @@ ColumnRC_Rating
 							
 							total_score += score;
 							
-							String	comment = (String)m.get( "comment" );
+							String	comment = ((String)m.get( "comment" )).trim();
 							
-							text += "  " + score + ": " + comment + "\r\n"; 
+							if ( comment.length() == 0 ){
+								
+								comment = MessageText.getString( "rcm.rating.nocomment" );
+							}
+							
+							tt += "  " + score + ": " + comment + "\r\n"; 
 						}
 						
-						float average = total_score / list.size();
+						double average = total_score / list.size();
 						
-						text = average + "\r\n" + text;
+						average = Math.floor( average * 10 )/10;
 						
-						cell.setToolTip( text );
+						text = String.valueOf( average );
+						
+						if ( text.endsWith( ".0")){
+							
+							text = text.substring( 0, text.length()-2 );
+						}
+						
+						tt = MessageText.getString( "rcm.rating.summary", new String[]{ text }) + "\r\n" + tt;
+						
+						cell.setToolTip( tt );
 					}
 				}else{
 					String old = (String)cell.getSortValue();

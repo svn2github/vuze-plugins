@@ -2948,7 +2948,10 @@ RelatedContentUI
 		paintControl(
 			PaintEvent e) 
 		{
-			e.gc.drawImage( image, 0, 0 );
+			if ( !image.isDisposed()){
+			
+				e.gc.drawImage( image, 0, 0 );
+			}
 		}
 
 
@@ -2958,6 +2961,10 @@ RelatedContentUI
 			int 	hHint, 
 			boolean changed ) 
 		{
+			if ( image.isDisposed()){
+				return( new Point(0,0));
+			}
+			
 			Rectangle rect = image.getBounds();
 			
 			return( new Point( rect.width, rect.height ));
