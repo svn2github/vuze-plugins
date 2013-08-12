@@ -165,7 +165,16 @@ RelatedContentUI
 		swt_ui				= _ui;
 		plugin				= _plugin;
 		
-		uiSetup();
+		CoreWaiterSWT.waitForCoreRunning(
+				new AzureusCoreRunningListener() 
+				{
+					public void 
+					azureusCoreRunning(
+						AzureusCore core ) 
+					{
+						uiAttachedAndCoreRunning( core );
+					}
+				});
 	}
 	
 	protected RCMPlugin
@@ -267,7 +276,8 @@ RelatedContentUI
 	}
 	
 	private void 
-	uiSetup( ) 
+	uiAttachedAndCoreRunning(
+			AzureusCore core ) 
 	{
 		if ( destroyed ){
 			
