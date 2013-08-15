@@ -51,6 +51,7 @@ import org.gudy.azureus2.core3.tracker.client.TRTrackerAnnouncerResponse;
 import org.gudy.azureus2.core3.tracker.client.TRTrackerScraper;
 import org.gudy.azureus2.core3.tracker.client.TRTrackerScraperResponse;
 import org.gudy.azureus2.core3.util.*;
+import org.gudy.azureus2.plugins.PluginAdapter;
 import org.gudy.azureus2.plugins.PluginConfig;
 import org.gudy.azureus2.plugins.PluginEvent;
 import org.gudy.azureus2.plugins.PluginEventListener;
@@ -72,6 +73,12 @@ import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
 import org.gudy.azureus2.plugins.ui.config.BooleanParameter;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
+import org.gudy.azureus2.plugins.update.Update;
+import org.gudy.azureus2.plugins.update.UpdateCheckInstance;
+import org.gudy.azureus2.plugins.update.UpdateCheckInstanceListener;
+import org.gudy.azureus2.plugins.update.UpdateManager;
+import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloader;
+import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloaderAdapter;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.gudy.azureus2.ui.webplugin.WebPlugin;
 import org.json.simple.JSONObject;
@@ -141,6 +148,9 @@ XMWebUIPlugin
     
     private Map<String,SearchInstance>	active_searches = new HashMap<String, XMWebUIPlugin.SearchInstance>();
     
+    private Object			lifecycle_lock = new Object();
+    private int 			lifecycle_state = 0;
+    private boolean			update_in_progress;
     
     public
     XMWebUIPlugin()
@@ -282,6 +292,23 @@ XMWebUIPlugin
 							
 								it2.remove();
 							}	
+						}
+					}
+				}
+			});
+		
+		plugin_interface.addListener(
+			new PluginAdapter()
+			{
+				@Override
+				public void 
+				initializationComplete() 
+				{
+					synchronized ( lifecycle_lock ){
+					
+						if ( lifecycle_state == 0 ){
+					
+							lifecycle_state = 1;
 						}
 					}
 				}
@@ -1292,6 +1319,10 @@ XMWebUIPlugin
 					throw( new IOException( "SID not found - already complete?" ));
 				}
 			}
+		}else if ( method.equals( "vuze-lifecycle" )){
+
+			processVuzeLifecycle( args, result );
+			
 		}else{
 			
 			System.out.println( "unhandled method: " + method + " - " + args );
@@ -3902,6 +3933,290 @@ XMWebUIPlugin
 		
 		return( az_mode );
 	}
+	
+	private void
+	processVuzeLifecycle(
+		Map<String,Object>	args,
+		Map<String,Object>	result )
+	
+		throws IOException
+	{
+		checkUpdatePermissions();
+		
+		String	cmd = (String)args.get( "cmd" );
+		
+		if ( cmd == null ){
+			
+			throw( new IOException( "cmd missing" ));
+		}
+		
+		try{
+			if ( cmd.equals( "status" )){
+				
+				synchronized( lifecycle_lock ){
+				
+					result.put( "state", lifecycle_state );
+				}
+				
+			}else if ( cmd.equals( "close" )){
+				
+				synchronized( lifecycle_lock ){
+				
+					if ( lifecycle_state < 2 ){
+					
+						lifecycle_state	= 2;
+						
+					}else{
+						
+						return;
+					}
+				}
+				
+				plugin_interface.getPluginManager().stopAzureus();
+				
+			}else if ( cmd.equals( "restart" )){
+				
+				synchronized( lifecycle_lock ){
+					
+					if ( lifecycle_state < 2 ){
+					
+						lifecycle_state	= 3;
+						
+					}else{
+						
+						return;
+					}
+				}
+								
+				plugin_interface.getPluginManager().restartAzureus();
+				
+			}else if ( cmd.equals( "update-check" )){
+				
+				synchronized( lifecycle_lock ){
+
+					if ( lifecycle_state != 1 ){
+						
+						throw( new IOException( "update check can't currently be performed" ));
+					}
+					
+					if ( update_in_progress ){
+						
+						throw( new IOException( "update operation in progress" ));
+					}
+					
+					update_in_progress = true;
+				}
+				
+				try{
+					UpdateManager update_manager = plugin_interface.getUpdateManager();
+					
+					final UpdateCheckInstance	checker = update_manager.createUpdateCheckInstance();
+					
+					final List<String>	l_updates = new ArrayList<String>();
+					
+					final AESemaphore sem = new AESemaphore( "uc-wait" );
+					
+					checker.addListener(
+						new UpdateCheckInstanceListener()
+						{
+							public void
+							cancelled(
+								UpdateCheckInstance		instance )
+							{
+								sem.release();
+							}
+							
+							public void
+							complete(
+								UpdateCheckInstance		instance )
+							{		
+								try{
+									Update[] 	updates = instance.getUpdates();
+									
+									for (int i=0;i<updates.length;i++){
+										
+										Update	update = updates[i];
+																			
+										l_updates.add( "Update available for '" + update.getName() + "', new version = " + update.getNewVersion());
+												
+										/*
+										String[]	descs = update.getDescription();
+										
+										for (int j=0;j<descs.length;j++){
+											
+											out.println( "\t" + descs[j] );
+										}
+										
+										if ( update.isMandatory()){
+											
+											out.println( "**** This is a mandatory update, other updates can not proceed until this is performed ****" );
+										}
+										*/
+									}
+									
+										// need to cancel this otherwise it sits there blocking other installer operations
+									
+									checker.cancel();
+									
+								}finally{
+									
+									sem.release();
+								}
+							}
+						});
+					
+					checker.start();
+					
+					sem.reserve();
+					
+					result.put( "updates", l_updates );
+				
+				}finally{
+					
+					synchronized( lifecycle_lock ){
+						
+						update_in_progress = false;
+					}
+				}
+			}else if ( cmd.equals( "update-apply" )){
+				
+				synchronized( lifecycle_lock ){
+
+					if ( lifecycle_state != 1 ){
+						
+						throw( new IOException( "update check can't currently be performed" ));
+					}
+					
+					if ( update_in_progress ){
+						
+						throw( new IOException( "update operation in progress" ));
+					}
+					
+					update_in_progress = true;
+				}
+				
+				try{
+					UpdateManager update_manager = plugin_interface.getUpdateManager();
+					
+					final UpdateCheckInstance	checker = update_manager.createUpdateCheckInstance();
+					
+					final AESemaphore sem = new AESemaphore( "uc-wait" );
+	
+					final Throwable[] 	error 		= { null };
+					final boolean[]		restarting 	= { false };
+					
+					checker.addListener(
+						new UpdateCheckInstanceListener()
+						{
+							public void
+							cancelled(
+								UpdateCheckInstance		instance )
+							{
+								sem.release();
+							}
+							
+							public void
+							complete(
+								UpdateCheckInstance		instance )
+							{
+								Update[] 	updates = instance.getUpdates();
+														
+								try{
+			
+									for ( Update update: updates ){
+										
+										for ( ResourceDownloader rd: update.getDownloaders()){
+											
+											rd.addListener(
+				 								new ResourceDownloaderAdapter()
+				 								{
+				 									public void
+				 									reportActivity(
+				 										ResourceDownloader	downloader,
+				 										String				activity )
+				 									{	
+				 									}
+				 									
+				 									public void
+				 									reportPercentComplete(
+				 										ResourceDownloader	downloader,
+				 										int					percentage )
+				 									{			 												
+				 									}
+				 								});
+											
+											rd.download();
+										}
+									}
+									
+									boolean	restart_required = false;
+									
+									for (int i=0;i<updates.length;i++){
+	
+										if ( updates[i].getRestartRequired() == Update.RESTART_REQUIRED_YES ){
+											
+											restart_required = true;
+										}
+									}
+									
+									if ( restart_required ){
+										
+										synchronized( lifecycle_lock ){
+											
+											if ( lifecycle_state < 2 ){
+										
+												lifecycle_state	= 3;
+												
+											}else{
+												
+												return;
+											}
+										}
+										
+										plugin_interface.getPluginManager().restartAzureus();
+										
+										restarting[0] = true;
+									}
+								}catch( Throwable e ){
+									
+									error[0] = e;
+									
+								}finally{
+									
+									sem.release();
+								}
+							}
+						});
+					
+					checker.start();
+					
+					sem.reserve();
+	
+					if ( error[0] != null ){
+						
+						throw( new IOException( "Failed to apply updates: " + Debug.getNestedExceptionMessage( error[0] )));
+					}
+					
+					result.put( "restarting", restarting[0] );
+					
+				}finally{
+					
+					synchronized( lifecycle_lock ){
+						
+						update_in_progress = false;
+					}
+				}
+			}else{
+				
+				throw( new IOException( "Unknown cmd: " + cmd ));
+			}
+		}catch( PluginException e ){
+			
+			throw( new IOException( "Lifecycle command failed: " + Debug.getNestedExceptionMessage(e)));
+		}
+	}
+	
+	
 	protected class
 	PermissionDeniedException
 		extends IOException

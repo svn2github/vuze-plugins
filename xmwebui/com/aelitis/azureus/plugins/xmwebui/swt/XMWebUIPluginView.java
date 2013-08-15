@@ -887,7 +887,22 @@ XMWebUIPluginView
 						
 						rc.search( expr );
 					}
+				}else if ( str.equalsIgnoreCase( "close" )){
 					
+					rc.lifecycle( "close" );
+					
+				}else if ( str.equalsIgnoreCase( "restart" )){
+					
+					rc.lifecycle( "restart" );
+	
+				}else if ( str.equalsIgnoreCase( "update-check" )){
+					
+					rc.lifecycle( "update-check" );
+	
+				}else if ( str.equalsIgnoreCase( "update-apply" )){
+					
+					rc.lifecycle( "update-apply" );
+	
 				}else{
 					
 					logError( "Unrecognized command '" + str + "'" );
@@ -1636,6 +1651,58 @@ XMWebUIPluginView
 				
 				throw( new XMRPCClientException( "RPC call failed: " + result ));
 			}
+		}
+		
+		private void
+		lifecycle(
+			final String	cmd )
+		
+			throws XMRPCClientException
+		{
+			new AEThread2( "lifecycle.async" )
+			{
+				public void
+				run()
+				{
+
+					try{
+						JSONObject	request = new JSONObject();
+						
+						request.put( "method", "vuze-lifecycle" );
+						
+						Map request_args = new HashMap();
+						
+						request.put( "arguments", request_args );
+									
+						request_args.put( "cmd", cmd );
+									
+						JSONObject reply = call( request );
+						
+						String result = (String)reply.get( "result" );
+						
+						if ( result.equals( "success" )){
+														
+							Map reply_args = (Map)reply.get( "arguments" );
+							
+							if ( reply_args != null ){
+								
+								log( "    " + reply_args );
+								
+							}else{
+								
+								log( "    command accepted" );
+							}
+							
+						}else{
+							
+							throw( new XMRPCClientException( "RPC call failed: " + result ));
+						}
+					}catch( Throwable e ){
+						
+						logError( Debug.getNestedExceptionMessage( e ));
+					}
+				}
+			}.start();
 		}
 	}
 	
