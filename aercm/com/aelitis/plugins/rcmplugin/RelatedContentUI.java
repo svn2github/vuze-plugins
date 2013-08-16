@@ -70,6 +70,7 @@ import org.gudy.azureus2.ui.swt.plugins.UISWTView;
 import org.gudy.azureus2.ui.swt.plugins.UISWTViewEvent;
 import org.gudy.azureus2.ui.swt.plugins.UISWTViewEventListener;
 import org.gudy.azureus2.ui.swt.shells.CoreWaiterSWT;
+import org.gudy.azureus2.ui.swt.shells.CoreWaiterSWT.TriggerInThread;
 import org.gudy.azureus2.ui.swt.shells.MessageBoxShell;
 
 import com.aelitis.azureus.core.AzureusCore;
@@ -165,7 +166,7 @@ RelatedContentUI
 		swt_ui				= _ui;
 		plugin				= _plugin;
 		
-		CoreWaiterSWT.waitForCoreRunning(
+		CoreWaiterSWT.waitForCore(TriggerInThread.SWT_THREAD,
 				new AzureusCoreRunningListener() 
 				{
 					public void 
