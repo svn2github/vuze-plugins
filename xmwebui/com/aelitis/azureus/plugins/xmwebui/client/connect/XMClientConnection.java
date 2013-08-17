@@ -22,6 +22,7 @@
 package com.aelitis.azureus.plugins.xmwebui.client.connect;
 
 import java.net.URL;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -77,57 +78,96 @@ XMClientConnection
 	{
 		String	ac = account.getAccessCode();
 		
-		try{
-			String url = Constants.PAIRING_URL + "/remote/listBindings?ac=" + getAccessCode() + "&jsoncallback=";
+		boolean	called_connect = false;
+		
+		if ( ac.contains( "." )){
 			
-			String reply = new String( XMRPCClientUtils.getFromURLBasic( url ), "UTF-8" );
+			int	pos = ac.indexOf( ":" );
 			
-				// hack to remove callback
+			String	host;
+			int		port;
 			
-			reply = reply.substring( 1, reply.length()-1 );
-			
-			Map json = JSONUtils.decodeJSON( reply );
-			
-			Map error = (Map)json.get( "error" );
-			
-			if ( error != null ){
+			if ( pos == -1 ){
 				
-				throw( new Exception((String)error.get( "msg" )));
-			}
-			
-			List<Map<String,String>>	service_list = (List<Map<String,String>>)json.get( "result" );
-			
-			Map<String,String>		target_service 	= null;
-			boolean					has_tunnel		= false;
-			
-			for ( Map<String,String> m: service_list ){
-				
-				String sid = (String)m.get( "sid" );
-				
-				if ( sid.equals( "tunnel" )){
-					
-					has_tunnel = true;
-					
-				}else if ( sid.equals(  "xmwebui" )){
-					
-					target_service = m;
-				}
-			}
-			
-			if ( target_service != null ){
-					
-				log( "Pairing details obtained for '" + ac + "', supports secure connections=" + has_tunnel );
-
-				connect( target_service, has_tunnel );
-				
+				host	= ac;
+				port	= 9091;
 			}else{
-			
-				logError( "No binding found for Vuze Web Remote, '" + ac + "'" );
+				host	= ac.substring( 0, pos );
+				port	= Integer.parseInt( ac.substring( pos+1 ).trim());
 			}
 			
-		}catch( Throwable e ){
+			Map<String,String>	service_map = new HashMap<String,String>();
 			
-			logError( "Pairing details unavailable for '" + ac + "': " + Debug.getNestedExceptionMessage( e ));
+			service_map.put( "protocol", "http" );
+			service_map.put( "ip", host );
+			service_map.put( "port", String.valueOf( port ));
+			
+			log( "Explicit target - " + host + ":" + port );
+			
+			connect( service_map, false );
+
+			called_connect = true;
+			
+		}else{
+			try{
+				String url = Constants.PAIRING_URL + "/remote/listBindings?ac=" + getAccessCode() + "&jsoncallback=";
+				
+				String reply = new String( XMRPCClientUtils.getFromURLBasic( url ), "UTF-8" );
+				
+					// hack to remove callback
+				
+				reply = reply.substring( 1, reply.length()-1 );
+				
+				Map json = JSONUtils.decodeJSON( reply );
+				
+				Map error = (Map)json.get( "error" );
+				
+				if ( error != null ){
+					
+					throw( new Exception((String)error.get( "msg" )));
+				}
+				
+				List<Map<String,String>>	service_list = (List<Map<String,String>>)json.get( "result" );
+				
+				Map<String,String>		target_service 	= null;
+				boolean					has_tunnel		= false;
+				
+				for ( Map<String,String> m: service_list ){
+					
+					String sid = (String)m.get( "sid" );
+					
+					if ( sid.equals( "tunnel" )){
+						
+						has_tunnel = true;
+						
+					}else if ( sid.equals(  "xmwebui" )){
+						
+						target_service = m;
+					}
+				}
+				
+				if ( target_service != null ){
+						
+					log( "Pairing details obtained for '" + ac + "', supports secure connections=" + has_tunnel );
+	
+					connect( target_service, has_tunnel );
+					
+					called_connect = true;
+					
+				}else{
+				
+					logError( "No binding found for Vuze Web Remote, '" + ac + "'" );
+				}
+				
+			}catch( Throwable e ){
+				
+				logError( "Pairing details unavailable for '" + ac + "': " + Debug.getNestedExceptionMessage( e ));
+			}
+		}
+		
+		if ( !called_connect ){
+			
+			adapter.setConnected( this, false );
 		}
 	}
 	

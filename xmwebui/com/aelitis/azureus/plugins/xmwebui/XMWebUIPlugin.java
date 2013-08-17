@@ -92,6 +92,8 @@ import com.aelitis.azureus.core.metasearch.MetaSearchManagerFactory;
 import com.aelitis.azureus.core.metasearch.Result;
 import com.aelitis.azureus.core.metasearch.ResultListener;
 import com.aelitis.azureus.core.metasearch.SearchParameter;
+import com.aelitis.azureus.core.pairing.PairingManager;
+import com.aelitis.azureus.core.pairing.PairingManagerFactory;
 import com.aelitis.azureus.core.tracker.TrackerPeerSource;
 import com.aelitis.azureus.core.util.MultiPartDecoder;
 import com.aelitis.azureus.plugins.dht.DHTPlugin;
@@ -1322,6 +1324,10 @@ XMWebUIPlugin
 		}else if ( method.equals( "vuze-lifecycle" )){
 
 			processVuzeLifecycle( args, result );
+			
+		}else if ( method.equals( "vuze-pairing" )){
+
+			processVuzePairing( args, result );
 			
 		}else{
 			
@@ -4216,6 +4222,87 @@ XMWebUIPlugin
 		}
 	}
 	
+	private void
+	processVuzePairing(
+		Map<String,Object>	args,
+		Map<String,Object>	result )
+	
+		throws IOException
+	{
+		checkUpdatePermissions();
+				
+		try{
+			String	cmd = (String)args.get( "cmd" );
+			
+			if ( cmd == null ){
+				
+				throw( new IOException( "cmd missing" ));
+			}
+			
+			PairingManager pm = PairingManagerFactory.getSingleton();
+
+			if ( cmd.equals( "status" )){
+				
+				result.put( "status",  pm.getStatus());
+				
+				boolean enabled = pm.isEnabled();
+				
+				result.put( "enabled", enabled );
+				
+				if ( enabled ){
+				
+					result.put( "access_code", pm.peekAccessCode());
+				}
+				
+				boolean srp_enabled = pm.isSRPEnabled();
+				
+				result.put( "srp_enabled", srp_enabled );
+				
+				if ( srp_enabled ){
+					
+					result.put( "srp_status", pm.getSRPStatus());
+				}
+			}else if ( cmd.equals( "set-enabled" )){
+				
+				boolean	enabled = (Boolean)args.get( "enabled" );
+				
+				if ( enabled != pm.isEnabled()){
+					
+					pm.setEnabled( enabled );
+				}
+			}else if ( cmd.equals( "set-srp-enabled" )){
+				
+				boolean	enabled = (Boolean)args.get( "enabled" );
+				
+				if ( enabled != pm.isSRPEnabled()){
+					
+					if ( enabled ){
+						
+						String	pw = (String)args.get( "password" );
+						
+						if ( pw == null ){
+							
+							throw( new IOException( "Password required when enabling SRP" ));
+						}
+						
+						pm.setSRPEnabled( true );
+						
+						pm.setSRPPassword( pw.toCharArray());
+						
+					}else{
+					
+						pm.setSRPEnabled( false );
+					}
+				}
+			}else{
+				
+				throw( new IOException( "Unknown cmd: " + cmd ));
+			}
+		}catch( IOException e ){
+			
+			throw( e );
+		}
+	}
 	
 	protected class
 	PermissionDeniedException

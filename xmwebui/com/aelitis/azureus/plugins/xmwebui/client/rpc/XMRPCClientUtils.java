@@ -25,11 +25,13 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.net.ProtocolException;
 import java.net.URL;
 import java.util.List;
 import java.util.Map;
 
 import org.bouncycastle.util.encoders.Base64;
+import org.gudy.azureus2.core3.util.Debug;
 
 import com.aelitis.azureus.plugins.xmwebui.client.rpc.XMRPCClient.HTTPResponse;
 
@@ -283,6 +285,16 @@ XMRPCClientUtils
 							session_id = str;
 							
 							continue;
+						}
+					}else if ( e instanceof ProtocolException ){
+						
+						String msg = connection.getResponseMessage();
+						
+						String e_msg = Debug.getNestedExceptionMessage( e );
+						
+						if ( !e_msg.contains( msg )){
+							
+							throw( new IOException( msg + ": " + e_msg ));
 						}
 					}
 					

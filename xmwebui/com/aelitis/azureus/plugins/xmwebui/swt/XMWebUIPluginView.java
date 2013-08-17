@@ -902,7 +902,11 @@ XMWebUIPluginView
 				}else if ( str.equalsIgnoreCase( "update-apply" )){
 					
 					rc.lifecycle( "update-apply" );
-	
+					
+				}else if ( str.toLowerCase().startsWith( "pairing" )){
+					
+					rc.pairing( str.substring( 7 ).trim());
+
 				}else{
 					
 					logError( "Unrecognized command '" + str + "'" );
@@ -1704,6 +1708,82 @@ XMWebUIPluginView
 				}
 			}.start();
 		}
+	
+		private void
+		pairing(
+			String	cmd_line )
+		
+			throws XMRPCClientException
+		{
+			String[] bits = cmd_line.split( " " );
+			
+			String cmd = bits[0];
+			
+			JSONObject	request = new JSONObject();
+						
+			request.put( "method", "vuze-pairing" );
+					
+			Map request_args = new HashMap();
+			
+			request.put( "arguments", request_args );
+						
+			
+			if ( cmd.equals( "enable" )){
+				
+				cmd = "set-enabled";
+				
+				request_args.put( "enabled", true );
+				
+			}else if ( cmd.equals( "disable" )){
+				
+				cmd = "set-enabled";
+				
+				request_args.put( "enabled", false );
+			}
+			
+			if ( cmd.equals( "srp-enable" )){
+				
+				if ( bits.length < 2 ){
+					
+					throw( new XMRPCClientException( "Password required" ));
+				}
+				
+				cmd = "set-srp-enabled";
+				
+				request_args.put( "enabled", true );
+				request_args.put( "password", bits[1] );
+				
+			}else if ( cmd.equals( "srp-disable" )){
+				
+				cmd = "set-sro-enabled";
+				
+				request_args.put( "enabled", false );
+			}
+
+			request_args.put( "cmd", cmd );
+
+			JSONObject reply = call( request );
+			
+			String result = (String)reply.get( "result" );
+			
+			if ( result.equals( "success" )){
+											
+				Map reply_args = (Map)reply.get( "arguments" );
+				
+				if ( reply_args != null ){
+					
+					log( "    " + reply_args );
+					
+				}else{
+					
+					log( "    command accepted" );
+				}
+				
+			}else{
+				
+				throw( new XMRPCClientException( "RPC call failed: " + result ));
+			}
+		}					
 	}
 	
 	private class
