@@ -51,8 +51,8 @@ import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.torrent.TorrentAttribute;
 import org.gudy.azureus2.plugins.ui.config.ConfigSection;
-import org.gudy.azureus2.plugins.ui.config.ConfigSectionSWT;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
+import org.gudy.azureus2.ui.swt.plugins.UISWTConfigSection;
 
 import com.aimedia.autocat.AutoCatPlugin;
 import com.aimedia.autocat2.matching.AdvancedRuleSet;
@@ -64,7 +64,7 @@ import com.aimedia.autocat2.matching.TorrentMatcher;
 /**
  * @author Chris Rose
  */
-public class ConfigUI implements ConfigSectionSWT, IRuleSetListener {
+public class ConfigUI implements UISWTConfigSection, IRuleSetListener {
 
     private Label                 lblEnabled                   = null;
 
@@ -111,6 +111,9 @@ public class ConfigUI implements ConfigSectionSWT, IRuleSetListener {
         this.config = config;
     }
 
+    public int maxUserMode() {
+    	return 0;
+    }
     /*
      * (non-Javadoc)
      *
