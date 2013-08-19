@@ -372,14 +372,19 @@ Transmission.prototype =
 		return this.getTorrentIds(this.getSelectedTorrents());
 	},
 
-	setSelectedRow: function(row) {
+	// Vuze: Added immediate
+	setSelectedRow: function(row, immediate) {
 		$(this.elements.torrent_list).children('.selected').removeClass('selected');
 		this.selectRow(row);
 	},
 
-	selectRow: function(row) {
+	// Vuze: Added immediate
+	selectRow: function(row, immediate) {
 		$(row.getElement()).addClass('selected');
-		this.callSelectionChangedSoon();
+		immediate = typeof immediate !== 'undefined' ? immediate : false;
+		if (immediate) {
+			this.callSelectionChangedSoon();
+		}
 	},
 
 	deselectRow: function(row) {
@@ -963,7 +968,7 @@ Transmission.prototype =
 		// handle the per-row "torrent_info" button
 		if (ev.target.className === 'torrent_info') {
 			if (!row.isSelected()) {
-				this.setSelectedRow(row);
+				this.setSelectedRow(row, true);
 			}
 			this.setInspectorVisible(true);
 			return;
