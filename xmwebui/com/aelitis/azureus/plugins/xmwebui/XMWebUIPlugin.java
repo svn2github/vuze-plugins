@@ -1674,7 +1674,22 @@ XMWebUIPlugin
   	
   	current_stats.put( "uploadedBytes", stats.getTotalDataBytesSent() );
   	current_stats.put( "downloadedBytes", stats.getTotalDataBytesReceived() );
-  	current_stats.put( "ratio", (float) stats.getTotalDataBytesSent() / stats.getTotalDataBytesReceived() );
+  	
+  	long sent 		= stats.getTotalDataBytesSent();
+  	long received	= stats.getTotalDataBytesReceived();
+  	
+  	float ratio;
+  	
+  	if ( received == 0 ){
+  	
+  		ratio = (sent==0?1:Float.MAX_VALUE);
+  		
+  	}else{
+  		
+  		ratio = ((float)sent)/received;
+  	}
+  	
+  	current_stats.put( "ratio", ratio );
   	current_stats.put( "secondsActive", 0 );
   	
 		// RPC v4
