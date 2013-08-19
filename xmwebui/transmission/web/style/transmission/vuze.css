@@ -78,9 +78,7 @@ form #search_input {
 	float: right;
 	right: 0;
 	margin-right: 3px;
-}
 
-#log_out a {
 	background: transparent url(images/graphics/reset_link_btn.png) top left  no-repeat;
 	float: left;
 	width: 60px;
@@ -92,8 +90,8 @@ form #search_input {
 	font-weight: bold;
 }
 
-#log_out a:active {background-position:left bottom}
-#log_out a:hover {background-position:left center}
+#log_out active {background-position:left bottom}
+#log_out hover {background-position:left center}
 
 div#torrent_logo {
 	position: absolute;

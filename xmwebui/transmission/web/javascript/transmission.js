@@ -57,6 +57,7 @@ Transmission.prototype =
 		$('#toolbar-search').click($.proxy(this.searchClicked,this));
 		$('#toolbar-remote').click($.proxy(this.returnFromSearchClicked,this));
 		$('#toolbar-remote-search').click($.proxy(this.remoteSearchClicked,this));
+		$('#log_out').click($.proxy(this.vuzeLogOutClicked,this));
 		// << Vuze
 
 
@@ -382,7 +383,7 @@ Transmission.prototype =
 	selectRow: function(row, immediate) {
 		$(row.getElement()).addClass('selected');
 		immediate = typeof immediate !== 'undefined' ? immediate : false;
-		if (immediate) {
+		if (!immediate) {
 			this.callSelectionChangedSoon();
 		}
 	},
@@ -576,6 +577,10 @@ Transmission.prototype =
 
 	remoteSearchClicked: function(ev) {
 		vz.executeSearch();
+	},
+	
+	vuzeLogOutClicked: function(ev) {
+		vz.logout();
 	},
 	/* << Vuze */
 

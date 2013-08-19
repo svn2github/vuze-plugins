@@ -115,6 +115,10 @@ vz.utils = {
     }
 }
 
+vz.logout = function() {
+	window.open('/pairedServiceLogout?redirect_to=http://remote.vuze.com/logout.php');
+}
+
 function isTouchDevice(){
 	try{
 		document.createEvent("TouchEvent");
