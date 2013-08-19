@@ -116,7 +116,15 @@ vz.utils = {
 }
 
 vz.logout = function() {
-	window.open('/pairedServiceLogout?redirect_to=http://remote.vuze.com/logout.php');
+	if (vz.hasExternalOSFunctions()) {
+		externalOSFunctions.logout();
+	} else {
+		window.open('/pairedServiceLogout?redirect_to=http://remote.vuze.com/logout.php');
+	}
+}
+
+vz.hasExternalOSFunctions = function() {
+	return  typeof externalOSFunctions !== 'undefined';
 }
 
 function isTouchDevice(){
