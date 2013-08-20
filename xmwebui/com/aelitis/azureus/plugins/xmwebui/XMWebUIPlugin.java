@@ -63,6 +63,7 @@ import org.gudy.azureus2.plugins.config.ConfigParameter;
 import org.gudy.azureus2.plugins.config.ConfigParameterListener;
 import org.gudy.azureus2.plugins.disk.DiskManagerFileInfo;
 import org.gudy.azureus2.plugins.download.*;
+import org.gudy.azureus2.plugins.download.DownloadStub.DownloadStubFile;
 import org.gudy.azureus2.plugins.torrent.Torrent;
 import org.gudy.azureus2.plugins.torrent.TorrentAttribute;
 import org.gudy.azureus2.plugins.torrent.TorrentDownloader;
@@ -2422,7 +2423,7 @@ XMWebUIPlugin
 				{ "error", "" },
 				{ "errorString", "" },
 				{ "eta", TransmissionVars.TR_ETA_NOT_AVAIL },
-				{ "fileStats", "" },
+				//{ "fileStats", "" },
 				//{ "files", "" },
 				//{ "hashString", "" },
 				{ "haveUnchecked", 0 },
@@ -2479,6 +2480,71 @@ XMWebUIPlugin
 					}else if ( field.equals( "downloadDir" )){
 						
 						value = download_stub.getSavePath();
+					
+					}else if ( field.equals( "files" )){
+
+						DownloadStubFile[] files = download_stub.getStubFiles();
+						
+						List<Map>	l_files = new ArrayList<Map>();
+						
+						for ( DownloadStubFile sf: files ){
+						
+							Map	map = new HashMap();
+							
+							l_files.add( map );
+							
+							long	len = sf.getLength();
+							
+							long	downloaded;
+							
+							if ( len < 0 ){
+								
+								downloaded 	= 0;
+								len			= -len;
+								
+							}else{
+								
+								downloaded	= len;
+							}
+							
+							map.put( "bytesCompleted",downloaded );	// this must be a spec error...
+							map.put( "length",  len);
+							map.put( "name", sf.getFile().getAbsolutePath());
+						}
+						
+						value = l_files;				
+						
+					}else if ( field.equals( "fileStats" )){
+
+						DownloadStubFile[] files = download_stub.getStubFiles();
+						
+						List<Map>	l_files = new ArrayList<Map>();
+						
+						for ( DownloadStubFile sf: files ){
+						
+							Map	map = new HashMap();
+							
+							l_files.add( map );
+							
+							long	len = sf.getLength();
+							
+							long	downloaded;
+							
+							if ( len < 0 ){
+								
+								downloaded 	= 0;
+								
+							}else{
+								
+								downloaded	= len;
+							}
+							
+							map.put( "bytesCompleted", downloaded );
+							map.put( "wanted", len >= 0 );
+							map.put( "priority", TransmissionVars.convertVuzePriority(0));
+						}
+						
+						value = l_files;
 						
 					}else if ( field.equals( "hashString" )){
 						
