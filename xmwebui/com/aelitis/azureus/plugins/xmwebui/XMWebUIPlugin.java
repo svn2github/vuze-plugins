@@ -136,7 +136,8 @@ XMWebUIPlugin
     
     private TorrentAttribute	t_id;
     
-    private List<Long>	recently_removed 	= new ArrayList<Long>();
+    private Map<Long,RecentlyRemovedData>	recently_removed 	= new HashMap<Long,RecentlyRemovedData>();
+    
     private Set<Long>	stubbifying			= new HashSet<Long>();
     
     private Map<String, String> ip_to_session_id = new HashMap<String, String>();
@@ -550,17 +551,81 @@ XMWebUIPlugin
 	downloadRemoved(
 		Download	download )
 	{
+		addRecentlyRemoved( download );
+	}
+	
+	private void
+	addRecentlyRemoved(
+		Download	download )
+	{
 		synchronized( recently_removed ){			
 			
 			long id = getID( download, false );
 			
 			if ( id > 0 && !stubbifying.contains( id )){
 			
-				recently_removed.add( id );
+				if ( !recently_removed.containsKey( id )){
+					
+					recently_removed.put( id, new RecentlyRemovedData( id ));
+				}
 			}
 		}
 	}
 	
+	private boolean
+	handleRecentlyRemoved(
+		String	session_id,
+		Map		args,
+		Map		result )
+	{
+		Object	ids = args.get( "ids" );
+		
+		if ( ids != null && ids instanceof String && ((String)ids).equals( "recently-active" )){
+						
+			synchronized( recently_removed ){
+				
+				if ( recently_removed.size() > 0 ){
+					
+					long now = SystemTime.getMonotonousTime();
+
+					Iterator<RecentlyRemovedData> it = recently_removed.values().iterator();
+					
+					List<Long>	removed = new ArrayList<Long>();
+					
+					while( it.hasNext()){
+					
+						RecentlyRemovedData rrd = it.next();
+							
+						if ( !rrd.hasSession( session_id )){
+							
+							removed.add( rrd.getID());
+						}
+						
+						if ( now - rrd.getCreateTime() > 60*1000 ){
+							
+							it.remove();
+						}
+					}
+					
+					if ( removed.size() > 0 ){
+
+						//System.out.println( "Reporting removed to " + session_id + ": " + removed );
+						
+						result.put( "removed", removed );
+					}
+				}
+			}
+			
+			return( true );
+			
+		}else{
+			
+			return( false );
+		}
+	}
+	
+	
+
 	public boolean
 	generateSupport(
 		TrackerWebPageRequest		request,
@@ -1249,7 +1314,7 @@ XMWebUIPlugin
 
 		}else if ( method.equals( "torrent-set" )){
 			
-			method_Torrent_Set(args, result);
+			method_Torrent_Set( session_id, args, result);
 			
 		}else if ( method.equals( "torrent-get" )){
 
@@ -1756,25 +1821,13 @@ XMWebUIPlugin
 
 	private void 
 	method_Torrent_Set(
-			Map args, 
-			Map result) 
+		String		session_id,
+		Map 		args, 
+		Map 		result) 
 	{
 		Object	ids = args.get( "ids" );
 		
-		if ( ids != null && ids instanceof String && ((String)ids).equals( "recently-active" )){
-			
-			synchronized( recently_removed ){
-				
-				if ( recently_removed.size() > 0 ){
-					
-					List<Long> removed = new ArrayList<Long>( recently_removed );
-					
-					recently_removed.clear();
-					
-					result.put( "removed", removed );
-				}
-			}
-		}
+		handleRecentlyRemoved( session_id, args, result );
 		
 		List<DownloadStub>	downloads = getDownloads( ids );
 		
@@ -2058,15 +2111,8 @@ XMWebUIPlugin
 					download.remove();	
 				}
 				
-				synchronized( recently_removed ){
+				addRecentlyRemoved( download );
 				
-					long id = getID( download, false );
-					
-					if ( id > 0 ){
-					
-						recently_removed.add( id );
-					}
-				}
 			}catch( Throwable e ){
 				
 				Debug.out( "Failed to remove download '" + download_stub.getName() + "'", e );
@@ -2366,7 +2412,7 @@ XMWebUIPlugin
 		String		session_id,
 		Map 		args,
 		Map 		result)
-	{
+	{		
 		List<String>	fields = (List<String>)args.get( "fields" );
 		
 		if ( fields == null ){
@@ -2376,22 +2422,7 @@ XMWebUIPlugin
 		
 		Object	ids = args.get( "ids" );
 		
-		boolean	is_recently_active = ids != null && ids instanceof String && ((String)ids).equals( "recently-active" );
-		
-		if ( is_recently_active ){
-			
-			synchronized( recently_removed ){
-				
-				if ( recently_removed.size() > 0 ){
-					
-					List<Long> removed = new ArrayList<Long>( recently_removed );
-					
-					recently_removed.clear();
-					
-					result.put( "removed", removed );
-				}
-			}
-		}
+		boolean is_recently_active = handleRecentlyRemoved( session_id, args, result );
 		
 		List<DownloadStub>	downloads = getDownloads( ids );
 				
@@ -2435,26 +2466,26 @@ XMWebUIPlugin
 				{ "leftUntilDone", 0 },
 				{ "metadataPercentComplete", 1.0f },
 				//{ "name", "" },
-				//{ "peers", "" },
+				{ "peers", new ArrayList() },
 				{ "peersConnected", 0 },
 				{ "peersGettingFromUs", 0 },
 				{ "peersSendingToUs", "" },
-				{ "percentDone", 100 },
-				{ "pieceCount", 0 },
-				{ "pieceSize", 0 },
+				{ "percentDone", 100.0f },
+				{ "pieceCount", 1 },
+				{ "pieceSize", 1 },
 				{ "queuePosition", 0 },
 				{ "rateDownload", 0 },
 				{ "rateUpload", 0 },
-				{ "recheckProgress", 0 },
+				{ "recheckProgress", 0.0f },
 				{ "seedRatioLimit", 1.0f },
 				{ "seedRatioMode", TransmissionVars.TR_RATIOLIMIT_GLOBAL },
 				//{ "sizeWhenDone", "" },
 				{ "startDate", 0 },
 				{ "status", 0 },
 				//{ "totalSize", "" },
-				{ "trackerStats", "" },
-				//{ "trackers", "" },
-				{ "uploadRatio", 0 },
+				{ "trackerStats", new ArrayList() },
+				{ "trackers", new ArrayList() },
+				{ "uploadRatio", 0.0f },
 				{ "uploadedEver", 0 },
 				{ "webseedsSendingToUs", 0 },
 				};
@@ -2558,18 +2589,6 @@ XMWebUIPlugin
 
 						value = download_stub.getName();
 						
-					}else if ( field.equals( "metadataPercentComplete" )){
-						
-						value = 1.0f;
-						
-					}else if ( field.equals( "peers" )){
-						
-						value = new ArrayList();
-						
-					}else if ( field.equals( "status" )){
-						
-						value = 0;
-						
 					}else if ( field.equals( "sizeWhenDone" )){
 
 						value = size;
@@ -2577,12 +2596,8 @@ XMWebUIPlugin
 					}else if ( field.equals( "totalSize" )){
 
 						value = size;
-						
-					}else if ( field.equals( "trackers" )){
-						
-						value = new ArrayList();
 					}
-				
+					
 					if ( value != null ){
 					
 						if ( value instanceof String ){
@@ -3220,7 +3235,7 @@ XMWebUIPlugin
 		result.put( "torrents", torrents );
 
 		torrents.addAll( torrent_info.values());
-		
+				
 		return result;
 	}
 
@@ -4945,6 +4960,61 @@ XMWebUIPlugin
 		getString()
 		{
 			return( sid );
+		}
+	}
+	
+	private class
+	RecentlyRemovedData
+	{
+		private final long			id;
+		private final long			create_time = SystemTime.getMonotonousTime();
+		//private final Set<String>	sessions = new HashSet<String>();
+		
+		private
+		RecentlyRemovedData(
+			long		_id )
+		{
+			id	= _id;
+		}
+		
+		private long
+		getID()
+		{
+			return( id );
+		}
+		
+		private long
+		getCreateTime()
+		{
+			return( create_time );
+		}
+		
+		private boolean
+		hasSession(
+			String		session )
+		{
+			/*
+			 * Actually it seems the webui doesn't consistently handle the removed-ids so just
+			 * return the ID for a time period to ensure that it is processed.
+			 * Update - might be that multiple clients in the same browser are using the same session id
+			 * so going to go with reporting 'recently-removed' for a time period instead of just once
+			 * per session 
+			 * 
+			synchronized( sessions ){
+				
+				if ( sessions.contains( session )){
+					
+					return( true );
+					
+				}else{
+					
+					sessions.add( session );
+					
+					return( false );
+				}
+			}
+			*/
+			return( false );
 		}
 	}
 }
