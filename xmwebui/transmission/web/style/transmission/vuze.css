@@ -326,9 +326,9 @@ div.main_container {
 
 #footer_super_menu {
 	display:none;
-	z-index: 6;
-	position: absolute;
-	top: 79px;
+	z-index: 99;
+	position: fixed;
+	top: 77px;
 	left: 12px;
 	width: 200px;
 	text-align: left;
