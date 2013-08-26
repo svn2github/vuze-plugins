@@ -561,6 +561,10 @@ div#torrent_pref ul#settings_menu {
 	display: none;
 }
 
+.prefs-section .row .value {
+	margin-left: auto;
+}
+
 .prefs-section .row .value,
 #torrent_inspector_name {
 	word-wrap: break-word; /* otherwise long value strings will create horizontal scroll */
