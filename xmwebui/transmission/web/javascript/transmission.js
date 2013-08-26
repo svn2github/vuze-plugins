@@ -188,7 +188,9 @@ Transmission.prototype =
 		search_box.bind('keyup click', function() {
 			tr.setFilterText(this.value);
 		});
+		/* Vuze: Removed browser logic (jquery no longer has browser)
 		if (!$.browser.safari)
+		*/
 		{
 			search_box.addClass('blur');
 			search_box[0].value = 'Filter';
@@ -212,6 +214,32 @@ Transmission.prototype =
 	 */
 	createContextMenu: function() {
 		var tr = this;
+
+		// Set up the context menu
+		$('#ul_torrent_context_menu').menu();
+		$('#ul_torrent_context_menu').hide();
+		$('ul#torrent_list').bind('contextmenu taphold', function(e) {
+			// taphold doesn't have pageX and others.. try originalEvent
+			if (typeof e.originalEvent != 'undefined') {
+				e = e.originalEvent;
+			}
+			
+			// select current row
+			var element = $(e.target).closest('.torrent')[0];
+			var i = $('#torrent_list > li').index(element);
+			if ((i!==-1) && !tr._rows[i].isSelected())
+				tr.setSelectedRow(tr._rows[i]);
+
+			$('#ul_torrent_context_menu').css({left : e["pageX"], top : e["pageY"]}).show();
+			$(document).one('click', function() {
+				$('#ul_torrent_context_menu').hide();
+			});
+			return false;
+		});
+		$("#ul_torrent_context_menu" ).on( "menuselect", $.proxy(this.onContextMenuClicked,this));
+		
+
+		/* >> Vuze: replaced with jQueryUI.menu
 		var bindings = {
 			context_pause_selected:       function() { tr.stopSelectedTorrents(); },
 			context_resume_selected:      function() { tr.startSelectedTorrents(false); },
@@ -247,6 +275,7 @@ Transmission.prototype =
 				return true;
 			}
 		});
+		*/
 	},
 
 	createSettingsMenu: function() {
@@ -716,6 +745,86 @@ Transmission.prototype =
 		this.refilter(true);
 	},
 
+	// >> Vuze
+	onContextMenuClicked: function(ev, ui) 
+	{
+		var id = ui.item[0].id;
+		var tr = this;
+	    var element = $(ui.item[0]);
+
+		// >> Vuze: Submenu? exit early. No Submenu? Hide the menu.
+		if ( element.children( "a[aria-haspopup='true']" ).length ) {
+			return false;
+		} else {
+			$(ev.target).hide();
+		}
+		// << Vuze
+
+
+		$('#ul_torrent_context_menu').hide();
+
+		switch (id) {
+		case 'context_pause_selected': {
+			tr.stopSelectedTorrents();
+			break;
+		}
+		case 'context_resume_selected': {
+			tr.startSelectedTorrents(false);
+			break;
+		}
+		case 'context_resume_now_selected': {
+			tr.startSelectedTorrents(true);
+			break;
+		}
+		case 'context_move': {
+			tr.moveSelectedTorrents(false);
+			break;
+		}
+		case 'context_remove': {
+			tr.removeSelectedTorrents();
+			break;
+		}
+		case 'context_removedata': {
+			tr.removeSelectedTorrentsAndData();
+			break;
+		}
+		case 'context_verify': {
+			tr.verifySelectedTorrents();
+			break;
+		}
+		case 'context_reannounce': {
+			tr.reannounceSelectedTorrents();
+			break;
+		}
+		case 'context_move_top': {
+			tr.moveTop();
+			break;
+		}
+		case 'context_move_up': {
+			tr.moveUp();
+			break;
+		}
+		case 'context_move_down': {
+			tr.moveDown();
+			break;
+		}
+		case 'context_move_bottom': {
+			tr.moveBottom();
+			break;
+		}
+		case 'context_select_all': {
+			tr.selectAll();
+			break;
+		}
+		case 'context_deselect_all': {
+			tr.deselectAll();
+			break;
+		}
+		}
+		return true;
+	},
+	// << Vuze
+	
 	onMenuClicked: function(ev, ui)
 	{
 		var o, dir,
@@ -967,7 +1076,7 @@ Transmission.prototype =
 		// which deselects all on click
 		ev.stopPropagation();
 		// but still hide the context menu if it is showing
-		$('#jqContextMenu').hide();
+		$('#ul_torrent_context_menu').hide();
 
 		/* >> Vuze */
 		// handle the per-row "torrent_info" button

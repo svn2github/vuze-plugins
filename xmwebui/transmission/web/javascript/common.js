@@ -46,6 +46,7 @@ $(document).ready(function() {
 		};
 	}
 
+	/* Vuze: Removed browser specific calls
 	// IE specific fixes here
 	if ($.browser.msie) {
 		try {
@@ -53,13 +54,14 @@ $(document).ready(function() {
 		} catch(err) {}
 		$('.dialog_container').css('height',$(window).height()+'px');
 	}
+	*/
 
+	/* Vuze Removed (no idea why)
 	if ($.browser.safari) {
 		// Move search field's margin down for the styled input
-		/* Vuze Removed (no idea why)
 		$('#torrent_search').css('margin-top', 3);
-		*/
 	}
+	*/
 	if (isMobileDevice){
 		window.onload = function(){ setTimeout(function() { window.scrollTo(0,1); },500); };
 		window.onorientationchange = function(){ setTimeout(function() { window.scrollTo(0,1); },100); };

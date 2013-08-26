@@ -8,11 +8,13 @@
 		<link href="./images/favicon.ico" rel="icon" />
 		<link href="./images/favicon.png" rel="shortcut icon" />
 		<link rel="apple-touch-icon" href="./images/webclip-icon.png"/>
-		<script type="text/javascript" src="./javascript/jquery/jquery.min.js"></script>
+		<script type="text/javascript" src="./javascript/jquery/jquery-1.10.2.min.js"></script>
+		<script type="text/javascript" src="./javascript/jquery/jquery.mobile.custom.js"></script>
 		
-		<script type="text/javascript" src="./javascript/jquery/jquery-ui-1.10.2.min.js"></script>
-		<link rel="stylesheet" href="./style/jqueryui/jquery-ui-1.10.2.css" type="text/css" media="all" />
+		<script type="text/javascript" src="./javascript/jquery/jquery-ui-1.10.3.min.js"></script>
+		<link rel="stylesheet" href="./style/jqueryui/jquery-ui-1.10.3.css" type="text/css" media="all" />
 <!--
+		<script type="text/javascript" src="./javascript/jquery/jquery.min.js"></script>
 		<script type="text/javascript" src="./javascript/jquery/jqueryui-1.8.16.min.js"></script>
 		<link rel="stylesheet" href="./style/jqueryui/jqueryui-1.8.16.css" type="text/css" media="all" />
 		<link media="screen" href="./style/transmission/mobile.css" type= "text/css" rel="stylesheet" />
@@ -28,8 +30,9 @@
 		<ink media="screen and (min-device-width: 481px)" href="./style/transmission/common.css" type="text/css" rel="stylesheet" />
 		<ink media="only screen and (max-device-width: 480px)" href="./style/transmission/vuze-mobile.css" type= "text/css" rel="stylesheet" />
 		<script type="text/javascript" src="./javascript/jquery/jquery.transmenu.js"></script>
--->
 		<script type="text/javascript" src="./javascript/jquery/jquery.contextmenu.min.js"></script>
+		<script type="text/javascript" src="./javascript/jquery/jquery.ctxtmnu.js"></script>
+-->
 		<script type="text/javascript" src="./javascript/jquery/json2.min.js"></script>
 		<script type="text/javascript" src="./javascript/common.js"></script>
 		<script type="text/javascript" src="./javascript/inspector.js"></script>
@@ -425,29 +428,30 @@
 		<div class="torrent_footer">
 		</div>
 
-		<div class="contextMenu" id="torrent_context_menu" style="display:none">
-			<ul>
-				<li id="context_pause_selected" class="disabled context_pause_selected">Stop Selected</li>
-				<li id="context_resume_selected" class="disabled context_resume_selected">Start Selected</li>
-				<li id="context_resume_now_selected" class="disabled context_resume_selected">Start Now</li>
+			<ul id='ul_torrent_context_menu'>
+				<li id="context_pause_selected" class="disabled context_pause_selected"><a href="#">Stop Selected</a></li>
+				<li id="context_resume_selected" class="disabled context_resume_selected"><a href="#">Start Selected</a></li>
+				<li id="context_resume_now_selected" class="disabled context_resume_selected"><a href="#">Start Now</a></li>
 				<li class="separator"></li>
-				<li id="context_move_top">Move to Top</li>
-				<li id="context_move_up">Move Up</li>
-				<li id="context_move_down">Move Down</li>
-				<li id="context_move_bottom">Move to Bottom</li>
+				<li id="context_move"><a href="#">Move</a>
+				<ul id='context_move_ul'>
+					<li id="context_move_top"><a href="#">Move to Top</a></li>
+					<li id="context_move_up"><a href="#">Move Up</a></li>
+					<li id="context_move_down"><a href="#">Move Down</a></li>
+					<li id="context_move_bottom"><a href="#">Move to Bottom</a></li>
+				</ul></li>
 				<li class="separator"></li>
-				<li id="context_remove">Remove From List...</li>
-				<li id="context_removedata">Delete Data &amp; Remove From List...</li>
+				<li id="context_remove"><a href="#">Remove From List...</a></li>
+				<li id="context_removedata"><a href="#">Delete Data &amp; Remove From List...</a></li>
 				<li class="separator"></li>
-				<li id="context_verify">Verify Local Data</li>
-				<li id="context_move">Set Location...</li>
+				<li id="context_verify"><a href="#">Verify Local Data</a></li>
+				<li id="context_move"><a href="#">Set Location...</a></li>
 				<li class="separator"></li>
-				<li id="context_reannounce">Ask tracker for more peers</li>
+				<li id="context_reannounce"><a href="#">Ask tracker for more peers</a></li>
 				<li class="separator"></li>
-				<li id="context_select_all">Select All</li>
-				<li id="context_deselect_all">Deselect All</li>
+				<li id="context_select_all"><a href="#">Select All</a></li>
+				<li id="context_deselect_all"><a href="#">Deselect All</a></li>
 			</ul>
-		</div>
 
 		<iframe name="torrent_upload_frame" id="torrent_upload_frame" src="about:blank" ></iframe>
 	</body>

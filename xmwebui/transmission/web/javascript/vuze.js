@@ -170,6 +170,14 @@ function vuzeOnResize() {
 	}
 }
 
+function getWebkitVersion() {
+    var result = /AppleWebKit\/([\d.]+)/.exec(navigator.userAgent);
+    if (result) {
+        return parseFloat(result[1]);
+    }
+    return null;
+}
+
 $(document).ready( function(){
 	
 	$(window).resize(vuzeOnResize);
@@ -182,10 +190,9 @@ $(document).ready( function(){
     // WebKit 534.30 (Android 4.1.2) can do scrollable divs
     // WebKit 535.19 (Chrome 18.0.1025.166) can do scrollable divs
     // Assumed: 534 added scrollable Divs!
-	if ($.browser.safari) {
-		if (parseInt($.browser.version, 10) < 534) {
-		    touchScroll(".scrollable");
-		}
+    var webkitVersion = getWebkitVersion();
+	if (webkitVersion != null && webkitVersion < 534) {
+		touchScroll(".scrollable");
 	}
 	
 	var ua = navigator.userAgent;
@@ -193,4 +200,4 @@ $(document).ready( function(){
 		// older iPods crash on search results
 		$("#toolbar-search").hide();
 	}
-})
+});
