@@ -217,6 +217,8 @@ Updater
   				}
   	  		}
   	  
+  	  		int	instance_port = 6880;
+  	  		
   	  		{
   	  				// read the update properties
   	  			
@@ -262,6 +264,19 @@ Updater
   	  						APPLICATION_CMD	= app_cmd.trim();
   	  					}
 
+  	  					String	ip = (String)update_properties.get( "instance_port" );
+  	  					
+  	  					if ( ip != null ){
+  	  						
+  	  						try{
+  	  							instance_port = Integer.parseInt( ip.trim());
+  	  							
+  	  						}catch( Throwable e ){
+  	  							
+  	  							log( "Invalid instance port: " + ip );
+  	  						}
+  	  					}
+
   	  				}else{
   	  					
   	  		 		    log( "No update.properties found" );
@@ -289,7 +304,7 @@ Updater
   	  		
   	  		if ( !update_properties.getProperty( "no_wait", "0" ).equals( "1")){
   	  			
-  	  			server_socket = waitForAzureusClose();
+  	  			server_socket = waitForAzureusClose( instance_port );
   	  		}
 		
   		    File	update_dir = new File( user_path, UPDATE_DIR );
@@ -847,9 +862,10 @@ Updater
   	}
   	
   	private ServerSocket
-	waitForAzureusClose()
+	waitForAzureusClose(
+		int		port )
 	{
-  		log( "Waiting to bind to port 6880" );
+  		log( "Waiting to bind to port " + port );
   	     
   		ServerSocket server = null;
   		
@@ -860,7 +876,7 @@ Updater
 	  	    while( server == null ){
 	  	    	
 	  	    	try{
-	  	    		server = new ServerSocket(6880, 50, InetAddress.getByName("127.0.0.1"));
+	  	    		server = new ServerSocket( port, 50, InetAddress.getByName("127.0.0.1"));
 		  	    	
 	  	    		if ( !do_restart ){
 	  	    			
@@ -910,7 +926,7 @@ Updater
 	  	        	
 	  	    		if ( loop >= 5 ){
 	  	    		
-	  	    			log( "Exception while trying to bind on port 6880 : " + e );
+	  	    			log( "Exception while trying to bind on port " + port + ": " + e );
 	  	    		}
 	  	    		
 	  	    		loop++;
