@@ -1439,7 +1439,10 @@ XMWebUIPlugin
 			
 		}else if ( method.equals( "vuze-pairing" )){
 
-			processVuzePairing( args, result );
+			try {
+				processVuzePairing( args, result );
+			} catch (NoSuchMethodError t) { // 5.1
+			}
 			
 		}else{
 			
@@ -2498,7 +2501,11 @@ XMWebUIPlugin
 					stub_def_map.put( (String)d[0], d[1] );
 				}
 				
-				long	size = download_stub.getTorrentSize();
+				long	size = 0;
+				try {
+					size = download_stub.getTorrentSize();
+				} catch (NoSuchMethodError t) { // 5.1
+				}
 				
 				for ( String field: fields ){
 					
@@ -2510,7 +2517,11 @@ XMWebUIPlugin
 						
 					}else if ( field.equals( "downloadDir" )){
 						
-						value = download_stub.getSavePath();
+						try {
+							value = download_stub.getSavePath();
+						} catch (NoSuchMethodError t) { // 5.1
+							value = "";
+						}
 					
 					}else if ( field.equals( "files" )){
 
