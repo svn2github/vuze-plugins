@@ -109,7 +109,36 @@ public class
 XMWebUIPlugin
 	extends WebPlugin
 	implements UnloadablePlugin, DownloadManagerListener
-{
+{	
+		// following code to make plugin backwards compatible from 5101 to 5100
+	
+	private static final boolean IS_5101_PLUS = Constants.isCurrentVersionGE( "5.1.0.1" );
+	
+	private static Download
+	destubbify(
+		DownloadStub	stub )
+	
+		throws DownloadException
+	{
+		if ( IS_5101_PLUS ){
+			
+				// core was changed to return right thing for non-stubs in 5101
+			
+			return( stub.destubbify());
+		}
+		
+		if ( stub.isStub()){
+			
+			return( stub.destubbify());
+			
+		}else{
+			
+			return( (Download)stub );
+		}
+	}
+	
+		// end stuff
+	
     public static final int DEFAULT_PORT    = 9091;
 
     private static Properties defaults = new Properties();
@@ -278,7 +307,7 @@ XMWebUIPlugin
 							for ( DownloadStub stub: stubs ){
 								
 								try{
-									long id = stub.destubbify().getLongAttribute( t_id );
+									long id = destubbify( stub ).getLongAttribute( t_id );
 									
 									stubbifying.add( id );
 									
@@ -1439,9 +1468,13 @@ XMWebUIPlugin
 			
 		}else if ( method.equals( "vuze-pairing" )){
 
-			try {
+			if ( IS_5101_PLUS ){
+				
 				processVuzePairing( args, result );
-			} catch (NoSuchMethodError t) { // 5.1
+			
+			}else{
+				
+				throw( new IOException( "Client version too old!" ));
 			}
 			
 		}else{
@@ -1700,7 +1733,7 @@ XMWebUIPlugin
 
 		for ( DownloadStub download_stub: downloads ){
 			
-			Download download = download_stub.destubbify();
+			Download download = destubbify( download_stub );
 			
 			if (moveData) {
 				download.moveDataFiles(fSavePath);
@@ -1907,7 +1940,7 @@ XMWebUIPlugin
 		for ( DownloadStub download_stub: downloads ){
 			
 			try{
-				Download	download = download_stub.destubbify();
+				Download	download = destubbify( download_stub );
 				
 				Torrent t = download.getTorrent();
 				
@@ -2059,7 +2092,7 @@ XMWebUIPlugin
 		for ( DownloadStub download: downloads ){
 			
 			try{
-				download.destubbify().requestTrackerAnnounce();
+				destubbify( download ).requestTrackerAnnounce();
 
 			}catch( Throwable e ){
 				
@@ -2096,7 +2129,7 @@ XMWebUIPlugin
 		for ( DownloadStub download_stub: downloads ){
 			
 			try{
-				Download download = download_stub.destubbify();
+				Download download = destubbify( download_stub );
 				
 				int	state = download.getState();
 				
@@ -2138,7 +2171,7 @@ XMWebUIPlugin
 		for ( DownloadStub download_stub: downloads ){
 			
 			try{
-				Download download = download_stub.destubbify();
+				Download download = destubbify( download_stub );
 				
 				int	state = download.getState();
 				
@@ -2171,7 +2204,7 @@ XMWebUIPlugin
 			if ( !download_stub.isStub()){
 				
 				try{
-					Download download = download_stub.destubbify();
+					Download download = destubbify( download_stub );
 					
 					int	state = download.getState();
 					
@@ -2200,7 +2233,7 @@ XMWebUIPlugin
 		for ( DownloadStub download_stub: downloads ){
 			
 			try{
-				Download download = download_stub.destubbify();
+				Download download = destubbify( download_stub );
 				
 				int	state = download.getState();
 				
@@ -2228,7 +2261,7 @@ XMWebUIPlugin
 		for ( DownloadStub download_stub: downloads ){
 			
 			try{
-				Download download = download_stub.destubbify();
+				Download download = destubbify( download_stub );
 				
 				download.startDownload(true);
 
@@ -2502,9 +2535,10 @@ XMWebUIPlugin
 				}
 				
 				long	size = 0;
-				try {
+				
+				if ( IS_5101_PLUS ){
+					
 					size = download_stub.getTorrentSize();
-				} catch (NoSuchMethodError t) { // 5.1
 				}
 				
 				for ( String field: fields ){
@@ -2517,9 +2551,12 @@ XMWebUIPlugin
 						
 					}else if ( field.equals( "downloadDir" )){
 						
-						try {
+						if ( IS_5101_PLUS ){
+							
 							value = download_stub.getSavePath();
-						} catch (NoSuchMethodError t) { // 5.1
+							
+						}else{
+							
 							value = "";
 						}
 					
@@ -4102,7 +4139,7 @@ XMWebUIPlugin
 				}
 			}else{
 				try{
-					Download download = download_stub.destubbify();
+					Download download = destubbify( download_stub );
 				
 					if ( hide_ln && download.getFlag( Download.FLAG_LOW_NOISE )){
 						
