@@ -1175,6 +1175,22 @@ Transmission.prototype =
 			 }
 			jQuery.each (fileInput[0].files, function(i,file) {
 				var reader = new FileReader();
+				// >> Vuze: Add error notification
+				reader.onerror = function(evt) {
+						    switch(evt.target.error.code) {
+						      case evt.target.error.NOT_FOUND_ERR:
+						        alert('File Not Found!');
+						        break;
+						      case evt.target.error.NOT_READABLE_ERR:
+						        alert('File is not readable');
+						        break;
+						      case evt.target.error.ABORT_ERR:
+						        break; // noop
+						      default:
+						        alert('An error occurred reading this file.');
+						    };
+				};
+				// << Vuze
 				reader.onload = function(e) { 
 					var contents = e.target.result;
 					var key = "base64,"
