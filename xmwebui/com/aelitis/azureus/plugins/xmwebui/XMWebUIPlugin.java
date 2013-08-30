@@ -1363,7 +1363,27 @@ XMWebUIPlugin
 			// RPC v5
 			
 			method_Blocklist_Update(args, result);
-			
+
+		}else if ( method.equals( "session-close" )){
+			// RPC v12
+			//TODO: This method tells the transmission session to shut down.
+
+		}else if ( method.equals( "queue-move-top" )){
+			// RPC v14
+			method_Queue_Move_Top(args, result);
+
+		}else if ( method.equals( "queue-move-up" )){
+			// RPC v14
+			method_Queue_Move_Up(args, result);
+
+		}else if ( method.equals( "queue-move-down" )){
+			// RPC v14
+			method_Queue_Move_Down(args, result);
+
+		}else if ( method.equals( "queue-move-bottom" )){
+			// RPC v14
+			method_Queue_Move_Bottom(args, result);
+
 		}else if ( method.equals( "vuze-search-start" )){
 			
 			MetaSearchManager ms_manager = MetaSearchManagerFactory.getSingleton();
@@ -1483,6 +1503,86 @@ XMWebUIPlugin
 		}
 
 		return( result );
+	}
+
+	private void method_Queue_Move_Bottom(Map args, Map result) {
+		// RPC v14
+/*
+	string      | value type & description
+	------------+----------------------------------------------------------
+	"ids"       | array   torrent list, as described in 3.1.
+*/
+		Object	ids = args.get( "ids" );
+
+		AzureusCore core = AzureusCoreFactory.getSingleton();
+		GlobalManager gm = core.getGlobalManager();
+
+		List<DownloadManager>	dms = getDownloadManagerListFromIDs( gm, ids );
+
+		gm.moveEnd(dms.toArray(new DownloadManager[0]));
+	}
+
+	private void method_Queue_Move_Down(Map args, Map result) {
+		// RPC v14
+/*
+	string      | value type & description
+	------------+----------------------------------------------------------
+	"ids"       | array   torrent list, as described in 3.1.
+*/
+		Object ids = args.get("ids");
+
+		AzureusCore core = AzureusCoreFactory.getSingleton();
+		GlobalManager gm = core.getGlobalManager();
+
+		List<DownloadManager>	dms = getDownloadManagerListFromIDs( gm, ids );
+    Collections.sort(dms, new Comparator<DownloadManager>() {
+			public int compare(DownloadManager a, DownloadManager b) {
+        return b.getPosition() - a.getPosition();
+			}
+    });
+    for (DownloadManager dm : dms) {
+			gm.moveDown(dm);
+		}
+	}
+
+	private void method_Queue_Move_Up(Map args, Map result) {
+		// RPC v14
+/*
+	string      | value type & description
+	------------+----------------------------------------------------------
+	"ids"       | array   torrent list, as described in 3.1.
+*/
+		Object ids = args.get("ids");
+
+		AzureusCore core = AzureusCoreFactory.getSingleton();
+		GlobalManager gm = core.getGlobalManager();
+
+		List<DownloadManager>	dms = getDownloadManagerListFromIDs( gm, ids );
+    Collections.sort(dms, new Comparator<DownloadManager>() {
+			public int compare(DownloadManager a, DownloadManager b) {
+        return a.getPosition() - b.getPosition();
+			}
+    });
+    for (DownloadManager dm : dms) {
+			gm.moveUp(dm);
+		}
+	}
+
+	private void method_Queue_Move_Top(Map args, Map result) {
+		// RPC v14
+/*
+	string      | value type & description
+	------------+----------------------------------------------------------
+	"ids"       | array   torrent list, as described in 3.1.
+*/
+		Object	ids = args.get( "ids" );
+
+		AzureusCore core = AzureusCoreFactory.getSingleton();
+		GlobalManager gm = core.getGlobalManager();
+
+		List<DownloadManager>	dms = getDownloadManagerListFromIDs( gm, ids );
+
+		gm.moveTop(dms.toArray(new DownloadManager[0]));
 	}
 
 	private void method_Session_Set(Map args, Map result)
@@ -4200,6 +4300,61 @@ XMWebUIPlugin
 			});
 		
 		return( downloads );
+	}
+	
+	public List<DownloadManager>
+	getDownloadManagerListFromIDs(
+			GlobalManager gm,
+			Object		ids )
+	{
+		List<DownloadStub> downloads = getDownloads(ids);
+		
+		ArrayList<DownloadManager> list = new ArrayList<DownloadManager>(downloads.size());
+
+		for ( DownloadStub downloadStub: downloads ){
+			
+			try{
+				Download download = destubbify( downloadStub );
+				if (download != null) {
+    			DownloadManager dm = PluginCoreUtils.unwrap(download);
+    			if (dm != null) {
+    				list.add(dm);
+    			}
+				}
+
+			}catch( Throwable e ){
+				
+				Debug.out( "Failed to get dm '" + downloadStub.getName() + "'", e );
+			}
+		}
+
+		return list;
+	}
+
+	public List<Download>
+	getDownloadListFromIDs(
+			GlobalManager gm,
+			Object		ids )
+	{
+		List<DownloadStub> downloads = getDownloads(ids);
+		
+		ArrayList<Download> list = new ArrayList<Download>(downloads.size());
+
+		for ( DownloadStub downloadStub: downloads ){
+			
+			try{
+				Download download = destubbify( downloadStub );
+				if (download != null) {
+  				list.add(download);
+				}
+
+			}catch( Throwable e ){
+				
+				Debug.out( "Failed to get download '" + downloadStub.getName() + "'", e );
+			}
+		}
+
+		return list;
 	}
 
 	protected List
