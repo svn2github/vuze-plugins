@@ -24,8 +24,19 @@ var RPC = {
 	_TurtleUpSpeedLimit     : 'alt-speed-up',
 	_UpSpeedLimit           : 'speed-limit-up',
 	_UpSpeedLimited         : 'speed-limit-up-enabled',
-	_AzMode                 : 'az-mode'
+	_AzMode                 : 'az-mode',
+	_BasicAuth              : ''
 };
+
+root = $.url().param("_Root");
+if (typeof root !== "undefined") {
+	RPC._Root = root;
+}
+
+basicAuth = $.url().param("_BasicAuth");
+if (typeof basicAuth !== "undefined") {
+	RPC._BasicAuth = basicAuth;
+}
 
 
 function TransmissionRemote(controller)
@@ -87,11 +98,13 @@ TransmissionRemote.prototype =
 		if(!remote._error.length )
 			 remote._error = 'Server not responding' + ( error_string ? ' ( ' + error_string + ' )' : '' );
 
-
+		// Vuze: Fixes Uncaught ReferenceError: remote is not defined
+		errorQuoted = remote._error.replace(/"/g, '\\"');
+		
 		dialog.confirm('Connection Failed',
 			'Could not connect to the server. You may need to reload the page to reconnect.',
 			'Details',
-			'alert(remote._error);',
+			'alert("' + errorQuoted + '");',
 			null,
 			'Dismiss');
 		remote._controller.togglePeriodicSessionRefresh(false);
@@ -99,6 +112,9 @@ TransmissionRemote.prototype =
 
 	appendSessionId: function(XHR) {
 		/* >> Vuze Added */
+		if (RPC._BasicAuth.length > 0) {
+			XHR.setRequestHeader('Authorization', 'Basic ' + RPC._BasicAuth);
+		}
 		if(this._token)
 		/* << Vuze Added */
 		XHR.setRequestHeader('X-Transmission-Session-Id', this._token);
