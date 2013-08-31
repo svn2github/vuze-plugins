@@ -4,6 +4,8 @@ import java.net.*;
 import java.util.Collections;
 import java.util.LinkedList;
 
+import com.aelitis.azureus.core.util.NetUtils;
+
 import lbms.plugins.mldht.kad.DHT.DHTtype;
 import lbms.plugins.mldht.kad.PeerAddressDBItem;
 
@@ -34,8 +36,7 @@ public class AddressUtils {
 		
 		try
 		{
-			for (NetworkInterface iface : Collections.list(NetworkInterface.getNetworkInterfaces()))
-			{
+			for (NetworkInterface iface : NetUtils.getNetworkInterfaces()){
 				try{
 					for (InterfaceAddress ifaceAddr : iface.getInterfaceAddresses())
 					{
