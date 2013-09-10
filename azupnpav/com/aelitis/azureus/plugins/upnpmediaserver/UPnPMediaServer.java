@@ -1,3 +1,4 @@
+
 /*
  * Created on 23-Mar-2006
  * Created by Paul Gardner
@@ -250,6 +251,7 @@ UPnPMediaServer
 	private BooleanParameter		sort_order_ascending;
 	
 	private boolean					use_categories;
+	private boolean					use_tags;
 	private BooleanParameter		show_percent_done;
 	private BooleanParameter		show_eta;
 	
@@ -521,6 +523,10 @@ UPnPMediaServer
 			
 			use_categories = separate_by_category.getValue();
 			
+			BooleanParameter separate_by_tags = config_model.addBooleanParameter2(	"upnpmediaserver.sep_by_tags", "upnpmediaserver.sep_by_tags", false );
+			
+			use_tags = separate_by_tags.getValue();
+
 			LabelParameter speed_lab = config_model.addLabelParameter2( "upnpmediaserver.stream.speed" );
 			
 			speed_bit_rate_mult = config_model.addIntParameter2( "upnpmediaserver.stream.speed_br_mult", "upnpmediaserver.stream.speed_br_mult", 10, 0, Integer.MAX_VALUE );
@@ -600,7 +606,7 @@ UPnPMediaServer
 							sort_order, sort_order_ascending, 
 							show_percent_done,
 							show_eta,
-							separate_by_category,
+							separate_by_category, separate_by_tags,
 							enable_publish_p,
 							speed_lab, speed_bit_rate_mult, speed_min_kb_sec, speed_max_kb_sec,
 							prevent_sleep_param,
@@ -1548,7 +1554,8 @@ UPnPMediaServer
 		String 				property )
 	{
 		
-		if ( property.equals( AzureusContentFile.PT_CATEGORIES ) && use_categories ){
+		if ( 	( property.equals( AzureusContentFile.PT_CATEGORIES ) && use_categories ) ||
+				( property.equals( AzureusContentFile.PT_TAGS ) && use_tags )){
 			
 			content_directory.contentChanged( file );
 		}
@@ -1558,6 +1565,12 @@ UPnPMediaServer
 	useCategories()
 	{
 		return( use_categories );
+	}
+	
+	protected boolean
+	useTags()
+	{
+		return( use_tags );
 	}
 	
 	protected boolean

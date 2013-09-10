@@ -44,6 +44,7 @@ import org.gudy.azureus2.core3.util.DelayedEvent;
 import org.gudy.azureus2.core3.util.DisplayFormatters;
 import org.gudy.azureus2.core3.util.FileUtil;
 import org.gudy.azureus2.core3.util.HashWrapper;
+import org.gudy.azureus2.core3.util.StringInterner;
 import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.core3.util.TimeFormatter;
 import org.gudy.azureus2.plugins.disk.DiskManagerFileInfo;
@@ -455,11 +456,12 @@ UPnPMediaServerContentDirectory
 	{
 		String type = findPrimaryContentType( con );
 		
-		if ( media_server.useCategories()){
+		if ( media_server.useCategories() || media_server.useTags()){
 			
-			String[]	categories = con.getCategories();
+			String[]	categories 	= media_server.useCategories()?con.getCategories():new String[0];
+			String[]	tags		= media_server.useTags()?con.getTags():new String[0];
 			
-			if ( categories.length == 0 ){
+			if ( categories.length == 0 && tags.length == 0 ){
 				
 				if ( type == CONTENT_VIDEO ){
 					
@@ -475,44 +477,47 @@ UPnPMediaServerContentDirectory
 				}
 			}else{
 				
-				for ( String cat: categories ){
+				for ( String[] entry: new String[][]{ categories, tags }){
 					
-					contentContainer parent = null;
-					
-					if ( type == CONTENT_VIDEO ){
+					for ( String cat_or_tag: entry ){
 						
-						parent = movies_container;
+						contentContainer parent = null;
 						
-					}else if ( type == CONTENT_AUDIO ){
-						
-						parent = music_container;
-				
-					}else if ( type == CONTENT_IMAGE ){
-						
-						parent = pictures_container;
-					}
-									
-					if ( parent != null ){
-						
-						content node = null;
-	
-						int		num = 0;
-						String	name;
-						
-						while( 	(! ( node instanceof contentContainer )) ||
-								((contentContainer)node).getACD() != null ){
-																		
-							name = num++==0?cat:( num + ". " + cat );
-								
-							node = parent.getChild( name );
+						if ( type == CONTENT_VIDEO ){
 							
-							if ( node == null ){
-								
-								node = new contentContainer( parent, name );
-							}
+							parent = movies_container;
+							
+						}else if ( type == CONTENT_AUDIO ){
+							
+							parent = music_container;
+					
+						}else if ( type == CONTENT_IMAGE ){
+							
+							parent = pictures_container;
 						}
-						
-						((contentContainer)node).addLink( con );
+										
+						if ( parent != null ){
+							
+							content node = null;
+		
+							int		num = 0;
+							String	name;
+							
+							while( 	(! ( node instanceof contentContainer )) ||
+									((contentContainer)node).getACD() != null ){
+																			
+								name = num++==0?cat_or_tag:( num + ". " + cat_or_tag );
+									
+								node = parent.getChild( name );
+								
+								if ( node == null ){
+									
+									node = new contentContainer( parent, name );
+								}
+							}
+							
+							((contentContainer)node).addLink( con );
+						}
 					}
 				}
 			}
@@ -543,7 +548,7 @@ UPnPMediaServerContentDirectory
 			
 			parent.removeLink( con.getName());
 			
-			if ( media_server.useCategories()){
+			if ( media_server.useCategories() || media_server.useTags()){
 				
 				List<content> kids = parent.getChildren();
 				
@@ -562,7 +567,7 @@ UPnPMediaServerContentDirectory
 	contentChanged(
 		AzureusContentFile	acf )
 	{
-		if ( media_server.useCategories()){
+		if ( media_server.useCategories() || media_server.useTags()){
 
 			synchronized( lock ){
 			
@@ -1415,6 +1420,9 @@ UPnPMediaServerContentDirectory
 		protected abstract String[]
 		getCategories();
 		
+		protected abstract String[]
+		getTags();
+		
 		protected void
 		deleted(
 			boolean	is_link )
@@ -1751,6 +1759,17 @@ UPnPMediaServerContentDirectory
 			return( children.get(0).getCategories());
 		}
 		
+		protected String[]
+		getTags()
+		{
+			if ( download == null || children.size() == 0 ){
+				
+				return( new String[0] );
+			}
+			
+			return( children.get(0).getTags());
+		}
+		
 		protected void
 		print(
 			String	indent )
@@ -1775,9 +1794,9 @@ UPnPMediaServerContentDirectory
 		extends content
 		implements Cloneable
 	{
-		private AzureusContentFile		content_file;
-		private byte[]					hash;
-		private String					title;
+		private final AzureusContentFile		content_file;
+		private final byte[]					hash;
+		private final String					title;
 		
 		private boolean		valid;
 				
@@ -1796,7 +1815,7 @@ UPnPMediaServerContentDirectory
 			try{
 				content_file	= _content_file;
 				hash			= _hash;
-				title			= _title;
+				title			= StringInterner.intern( _title );
 				
 				DiskManagerFileInfo		file = content_file.getFile();
 										
@@ -2043,6 +2062,22 @@ UPnPMediaServerContentDirectory
 			return( new String[0] );
 		}
 			
+		protected String[]
+		getTags()
+		{
+			try{
+				String[] tags = (String[])content_file.getProperty( AzureusContentFile.PT_TAGS );
+				
+				if ( tags != null ){
+					
+					return( tags );
+				}
+			}catch( Throwable e ){
+			}
+			
+			return( new String[0] );
+		}
+		
 		protected String
 		getProtocolInfo(
 			String	attributes )
