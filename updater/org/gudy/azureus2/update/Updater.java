@@ -1105,7 +1105,7 @@ Updater
 				log("Using java spawn");
 
 				//NOTE: no logging done here, as we need the method to return right away, before the external process completes
-				Process p = Runtime.getRuntime().exec(execString);
+				Process p = Runtime.getRuntime().exec( new String[]{ execString });
 
 				return true;
 			} catch (Throwable t) {
@@ -1295,6 +1295,9 @@ Updater
 		return( name );
 	  }
 	  
+	  /*
+	   * If you enable this then fix it not to use runtime.exec( String ) as this doesn't handle spaces from
+	   * 1.7_B21+
 	  private Process runExternalCommandLogged( String command ) {  //NOTE: will not return until external command process has completed
 	  	log("About to execute: U:[" +command+ "]" );
 	  	
@@ -1312,6 +1315,7 @@ Updater
 	  		return null;
 	  	}
 	  }
+	  */
 	  
 	  private Process runExternalCommandsLogged( String[] commands ) {  //NOTE: will not return until external command process has completed
 	  	String cmd = "About to execute: U:[";
