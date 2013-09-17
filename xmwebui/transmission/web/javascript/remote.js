@@ -53,6 +53,7 @@ TransmissionRemote.prototype =
 	initialize: function(controller) {
 		this._controller = controller;
 		this._error = '';
+		this._lastCallWasError = false;
 		this._token = '';
 		/* >> Vuze Added */
 		this._request_count = 0;
@@ -69,8 +70,12 @@ TransmissionRemote.prototype =
             return n >= ( max - remote._errors_tolerated )
         }).length > remote._errors_tolerated
     },
-	/* << Vuze Added */
 
+    hasError: function() {
+    	return this._lastCallWasError;
+    },
+	/* << Vuze Added */
+    
 	/*
 	 * Display an error if an ajax request fails, and stop sending requests
 	 * or on a 409, globally set the X-Transmission-Session-Id and resend
@@ -87,9 +92,17 @@ TransmissionRemote.prototype =
 		}
 
 		/* >> Vuze Added */
-		remote._error_array.push( remote._request_count )
-
-		if( !remote.isPersistentError() ) return
+		remote._lastCallWasError = true;
+//		remote._error_array.push( remote._request_count )
+//
+//		if( !remote.isPersistentError() ) { 
+//			console.log("not a persistent error -- exit");
+//			return;
+//		}
+		if (vz.handleConnectionError()) {
+			console.log("ext handled connection error -- exit");
+			return;
+		}
    		/* << Vuze Added */
 
 		remote._error = request.responseText
@@ -126,7 +139,8 @@ TransmissionRemote.prototype =
 			async = true;
 
 		/* >> Vuze Added */
-		remote._request_count += 1
+		remote._request_count += 1;
+		remote._lastCallWasError = false;
    		/* >> Vuze Added */
 
 		// >> Vuze: iPod caches without this
@@ -142,8 +156,10 @@ TransmissionRemote.prototype =
 			data: JSON.stringify(data),
 			beforeSend: function(XHR){ remote.appendSessionId(XHR); },
 			error: function(request, error_string, exception){ 
+				console.log(request);
+				console.log(error_string);
+				console.log(exception);
 				remote.ajaxError(request, error_string, exception, ajaxSettings);
-				//console.log("Error " + error_string);
 				},
 			success: callback,
 			context: context,
@@ -276,7 +292,11 @@ TransmissionRemote.prototype =
 				filename: url
 			}
 		};
-		this.sendRequest(o, function() {
+		this.sendRequest(o, function(response) {
+			var result = response['result'];
+			if (result != "success") {
+				alert("Error adding torrent:\n\n" + result);
+			}
 			remote._controller.refreshTorrents();
 		});
 	},
