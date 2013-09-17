@@ -313,14 +313,20 @@ div.main_container {
 
 #ul_torrent_context_menu {
 	display:none;
-	z-index: 6;
+	z-index: 101;
 	position: absolute;
-	width: 200px;
+	width: 250px;
 	text-align: left;
+	overflow-y: scroll;
+	overflow-x: none;
 }
 
 #ul_torrent_context_menu li ul {
-	width: 180px;
+	width: 150px;
+	/* Force to overlap existing menu just below menu header.
+	   Needed when overflow-y is scroll */
+	top: auto !important;
+	left: 97px !important;
 }
 
 
@@ -386,6 +392,13 @@ div#torrent_container {
 	right: auto;
 	position: relative;
 	padding: 80px 0 0 0;
+
+   user-select: none;
+   -o-user-select:none;
+   -moz-user-select: none;
+   -khtml-user-select: none;
+   -webkit-user-select: none;
+
 }
 
 ul.torrent_list li.torrent {
@@ -452,6 +465,9 @@ ul.torrent_list li.torrent a:hover div.torrent_info {
 ul.torrent_list li.torrent a:active div.torrent_info {
 	background-position: -36px -36px;
 }
+ul.torrent_list li.torrent a div.torrent_info.selected {
+	background-position: -36px -36px;
+}
 /* << Vuze: buttons changed to add info button */
 
 /*--------------------------------------
@@ -468,12 +484,35 @@ div#torrent_inspector {
 	left: auto;
 	right: auto;
 	position: relative;
-	padding: 90px 0 0 10px;
+	x-padding: 90px 0 0 10px;
+	x-float: right;
+	
+	padding: 10px 0 0 0;
+	width: 100%;
+	border-top: 1px dotted gray;
+	border-left: none;
+	color: #000;
 
-	float: right;
-	background-color: #fff; /* Otherwise torrent list bleeds in on orientation change */
+	x-background-color: #fff; /* Otherwise torrent list bleeds in on orientation change */
 }
 
+div#torrent_inspector_name {
+	display: none;
+}
+
+div#torrent_inspector.selected {
+	background-color: #ddddff;
+}
+
+div#torrent_inspector li.inspector_tracker_entry.odd {
+	background-color: #e4e4ff;
+}
+
+div#torrent_inspector #inspector-close {
+	display: none;
+}
+
+/*
 div#torrent_inspector #inspector-close {
 	right: 0px;
 	position: absolute;
@@ -484,6 +523,8 @@ div#torrent_inspector #inspector-close {
 	background: transparent url('images/buttons/cancel.png') no-repeat;
 	display: block;
 }
+*/
+
 
 
 
@@ -561,8 +602,10 @@ div#torrent_pref ul#settings_menu {
 	display: none;
 }
 
+
 .prefs-section .row .value {
-	margin-left: auto;
+	margin-left: 130px;
+	padding-top: 3px;
 }
 
 .prefs-section .row .value,
