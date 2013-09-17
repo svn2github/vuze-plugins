@@ -1,6 +1,6 @@
-var vz = window.vz || {}
+var vz = window.vz || {};
 
-vz.mode = "trial"
+vz.mode = "trial";
 
 vz.updatePrefs = function( prefs ){
 	var az_mode = prefs["az-mode"];
@@ -9,44 +9,66 @@ vz.updatePrefs = function( prefs ){
 	}else{
 		vz.mode = az_mode;
 	}
-}
+};
 
 vz.searchQuery = null;
 
 vz.validateSearch = function(str){
     if(!str || str == "" || str == "find...") {
-        return false
+        return false;
     }
     return true;
-}
-vz.executeSearch = function(){
-    var search_input = $("#search_input").get(0).value
+};
+
+vz.executeSearch = function(search_input){
+	if (typeof search_input === 'undefined') {
+		search_input = $("#search_input").get(0).value;
+	}
     if(! vz.validateSearch( search_input ) ) return;
-    var search_url = "http://search.vuze.com/xsearch/?q=" + search_input + "&xdmv=2.4.17.1&mode=plus&goo=//" + vz.mode + "&search_source=" + encodeURIComponent(window.location.href)
-    //$("#remotesearch_container").html("<iframe id='remotesearch'></iframe>")
-    //$("#remotesearch").attr({src: search_url})
-    if( vz.searchQuery != search_url ) {
-        $("#remotesearch_container").text("")
-        vz.remote = null
-        vz.createRemote( search_url )
+    
+    if (vz.hasExternalOSFunctions()) {
+		try {
+			if (externalOSFunctions.executeSearch(search_input)) {
+				return true;
+			}
+		} catch(e) {
+			console.log(e);
+		}
     }
-    vz.searchQuery = search_url
+    
+    var search_url;
+    if (window.location.href.lastIndexOf("file:", 0) === 0) {
+    	var root_url = $.url(RPC._Root);
+    	var search_source = root_url.attr("source").substring(0, root_url.attr("source").length - root_url.attr("relative").length + 1);
+        search_url = "http://search.vuze.com/xsearch/?q=" + encodeURIComponent(search_input) + "&xdmv=no&source=android&search_source=" + encodeURIComponent(search_source);
+        console.log(search_url);
+        $("#remotesearch_container").html("<iframe id='remotesearch'></iframe>");
+        $("#remotesearch").attr({src: search_url});
+    } else {
+	    search_url = "http://search.vuze.com/xsearch/?q=" + search_input + "&xdmv=2.4.17.1&mode=plus&goo=//" + vz.mode + "&search_source=" + encodeURIComponent(window.location.href);
+	    if( vz.searchQuery != search_url ) {
+	        $("#remotesearch_container").text("");
+	        vz.remote = null;
+	        vz.createRemote( search_url );
+	    }
+    }
+    vz.searchQuery = search_url;
     $("#torrent_filter_bar").hide();
-    if( !isMobileDevice && transmission[Prefs._ShowInspector] ) $("#torrent_inspector").hide();
     $("#torrent_container").hide();
     $("#remotesearch_container").show();
-}
+};
+
 vz.backFromSearch = function(){
     $("#torrent_filter_bar").show();
-    if( !isMobileDevice && transmission[Prefs._ShowInspector] ) $("#torrent_inspector").show();
     $("#torrent_container").show();
-    $("#remotesearch_container").hide()
-}
+    $("#remotesearch_container").hide();
+};
+
 vz.createRemote = function(remote_url){
 	console.log(remote_url);
     vz.remote = new easyXDM.Rpc(/** The channel configuration */{
-        local: "/easyXDM/hash.html",
-        swf: "easyxdm.swf",
+        local: "../easyXDM/hash.html",
+        swf: "easyxdm-2.4.18.4.swf",
         remote: remote_url,
         container: document.getElementById("remotesearch_container")
     }, /** The interface configuration */ {
@@ -65,15 +87,15 @@ vz.createRemote = function(remote_url){
                 method: function(url){
                     /*make sure call isn't made several times*/
                     if( vz.dls[url] != null && (new Date().getTime() - vz.dls[url].ts < 2000) ) return
-                    vz.ui.toggleRemoteSearch()
+                    vz.ui.toggleRemoteSearch();
                     transmission.setFilterMode(Prefs._FilterIncomplete);
-                    transmission.setSortMethod( 'age' )
-                    transmission.setSortDirection( 'descending' )
+                    transmission.setSortMethod( 'age' );
+                    transmission.setSortDirection( 'descending' );
                     transmission.remote.addTorrentByUrl( url, {} );
                     vz.dls[url] = {
                         url: url,
                         ts: new Date().getTime()
-                        }
+                        };
                 },
                 isVoid: true
             },
@@ -85,16 +107,16 @@ vz.createRemote = function(remote_url){
             }
         }
     });
-}
+};
 
-vz.ui = {}
+vz.ui = {};
 
 vz.ui.toggleRemoteSearch = function(){
     if( $(".toolbar-main").is(":visible") ) {
         $(".toolbar-main").hide();
         $(".toolbar-vuze").show();
         //$("#toolbar").addClass("search")
-        vz.executeSearch()
+        vz.executeSearch();
         $("#search_input").focus();
     } else {
         $(".toolbar-vuze").hide();
@@ -102,10 +124,10 @@ vz.ui.toggleRemoteSearch = function(){
         //$("#toolbar").removeClass("search");
         vz.backFromSearch();
     }
-}
+};
 
-vz.dls = {}
-vz.utils = {}
+vz.dls = {};
+vz.utils = {};
 
 vz.utils = {
     selectOnFocus: function(){
@@ -113,19 +135,63 @@ vz.utils = {
             this.select();
         });
     }
-}
+};
 
 vz.logout = function() {
 	if (vz.hasExternalOSFunctions()) {
 		externalOSFunctions.logout();
 	} else {
-		window.open('/pairedServiceLogout?redirect_to=http://remote.vuze.com/logout.php');
+		window.location.href = "/pairedServiceLogout?redirect_to=http://remote.vuze.com/logout.php";
 	}
-}
+};
+
+vz.showOpenTorrentDialog = function() {
+	if (vz.hasExternalOSFunctions()) {
+		try {
+			externalOSFunctions.showOpenTorrentDialog();
+			return true;
+		} catch(e) {
+			console.log(e);
+		}
+	}
+	return false;
+};
+
+vz.showStatusBar = function() {
+	if (vz.hasExternalOSFunctions()) {
+		try {
+			return externalOSFunctions.showStatusBar();
+		} catch(e) {
+			console.log(e);
+		}
+	}
+	return true;
+};
+
+vz.handleConnectionError = function() {
+	if (vz.hasExternalOSFunctions()) {
+		try {
+			return externalOSFunctions.handleConnectionError();
+		} catch(e) {
+			console.log(e);
+		}
+	}
+	return false;
+};
+
+vz.uiReady = function() {
+	if (vz.hasExternalOSFunctions()) {
+		try {
+			externalOSFunctions.uiReady();
+		} catch(e) {
+			console.log(e);
+		}
+	}
+};
 
 vz.hasExternalOSFunctions = function() {
 	return  typeof externalOSFunctions !== 'undefined';
-}
+};
 
 function isTouchDevice(){
 	try{
@@ -201,3 +267,11 @@ $(document).ready( function(){
 		$("#toolbar-search").hide();
 	}
 });
+
+if (vz.hasExternalOSFunctions()) {
+	var fileref=document.createElement("link");
+	fileref.setAttribute("rel", "stylesheet");
+	fileref.setAttribute("type", "text/css");
+	fileref.setAttribute("href", "./style/transmission/vuzeandroid.css");
+	document.getElementsByTagName("head")[0].appendChild(fileref);
+}
