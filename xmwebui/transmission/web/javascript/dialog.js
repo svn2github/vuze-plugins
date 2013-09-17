@@ -86,9 +86,13 @@ Dialog.prototype = {
 		this._callback_data = callback_data;
 		$('body').addClass('dialog_showing');
 		this._container.show();
+		// >> Vuze: Add transmission var check because loadDaemonPrefs on init of transmission will show dialog
+		//          on connection error, and 'transmission' isn't set yet..
+		if (typeof transmission !== 'undefined') {
 		transmission.updateButtonStates();
 		if (isMobileDevice)
 			transmission.hideMobileAddressbar();
+		}
 	},
 
 	/*
