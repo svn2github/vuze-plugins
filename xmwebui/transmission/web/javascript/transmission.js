@@ -31,6 +31,7 @@ Transmission.prototype =
 
 		// >> Vuze: Always show menu!
 		this.isMenuEnabled = true; //!isMobileDevice;
+		this.uiPaused = false;
 		// << Vuze
 
 		// Initialize the implementation fields
@@ -114,12 +115,18 @@ Transmission.prototype =
 		// Get preferences & torrents from the daemon
 		var async = false;
 		this.loadDaemonPrefs(async);
+		if (this.remote.hasError()) {
+			console.log("has error.. logging out");
+			return;
+		}
 		this.loadDaemonStats(async);
 		this.initializeTorrents();
 		this.refreshTorrents();
 		this.togglePeriodicSessionRefresh(true);
 
 		this.updateButtonsSoon();
+		
+		vz.uiReady();
 	},
 
 	loadDaemonPrefs: function(async) {
@@ -161,12 +168,16 @@ Transmission.prototype =
 
 		/* >> Vuze: Pairing Logout, hide turtle mode, 'Add' for isMobileDevice (Why?) */
 		// determine whether to display logout button
-		$.get("/isServicePaired", {}, function(responseText) {
-			var json = eval('(' + responseText + ')');
-			if (json['servicepaired']) {
-				$("#log_out").show();
-			} else {
-				$("#log_out").hide();
+		
+		$.ajax({
+			url: "/isServicePaired",
+			success: function(responseText) {
+				var json = eval('(' + responseText + ')');
+				if (json['servicepaired']) {
+					$("#log_out").show();
+				} else {
+					$("#log_out").hide();
+				}
 			}
 		});
 
@@ -218,7 +229,7 @@ Transmission.prototype =
 		// Set up the context menu
 		$('#ul_torrent_context_menu').menu();
 		$('#ul_torrent_context_menu').hide();
-		$('ul#torrent_list').bind('contextmenu taphold', function(e) {
+		$('ul#torrent_list').bind('contextmenu', function(e) {
 			// taphold doesn't have pageX and others.. try originalEvent
 			if (typeof e.originalEvent != 'undefined') {
 				e = e.originalEvent;
@@ -231,6 +242,34 @@ Transmission.prototype =
 				tr.setSelectedRow(tr._rows[i]);
 
 			$('#ul_torrent_context_menu').css({left : e["pageX"], top : e["pageY"]}).show();
+			$(document).one('click', function() {
+				$('#ul_torrent_context_menu').hide();
+			});
+			return false;
+		});
+		$('ul#torrent_list').bind('taphold', function(e) {
+			e.stopPropagation();
+			e.preventDefault();
+
+			// taphold doesn't have pageX and others.. try originalEvent
+			if (typeof e.originalEvent != 'undefined') {
+				e = e.originalEvent;
+			}
+			
+			// select current row
+			var element = $(e.target).closest('.torrent')[0];
+			var i = $('#torrent_list > li').index(element);
+			if ((i!==-1) && !tr._rows[i].isSelected())
+				tr.setSelectedRow(tr._rows[i]);
+
+			$('#ul_torrent_context_menu').position({
+				   my: "center",
+				   at: "center",
+				   of: $('ul#torrent_list'),
+				   within: $('ul#torrent_list')
+				});
+			$('#ul_torrent_context_menu').center();
+			$('#ul_torrent_context_menu').show();
 			$(document).one('click', function() {
 				$('#ul_torrent_context_menu').hide();
 			});
@@ -405,7 +444,7 @@ Transmission.prototype =
 	// Vuze: Added immediate
 	setSelectedRow: function(row, immediate) {
 		$(this.elements.torrent_list).children('.selected').removeClass('selected');
-		this.selectRow(row);
+		this.selectRow(row, immediate);
 	},
 
 	// Vuze: Added immediate
@@ -414,6 +453,8 @@ Transmission.prototype =
 		immediate = typeof immediate !== 'undefined' ? immediate : false;
 		if (!immediate) {
 			this.callSelectionChangedSoon();
+		} else {
+			this.selectionChanged();
 		}
 	},
 
@@ -464,7 +505,9 @@ Transmission.prototype =
 	{
 		this.updateButtonStates();
 
+		/** >> Vuze: Inspector is now inline and does not follow the cursor
 		this.inspector.setTorrents(this.inspectorIsVisible() ? this.getSelectedTorrents() : []);
+		*/
 
 		clearTimeout(this.selectionChangedTimer);
 		delete this.selectionChangedTimer;
@@ -589,8 +632,10 @@ Transmission.prototype =
 
 	openTorrentClicked: function(ev) {
 		if (this.isButtonEnabled(ev)) {
-			$('body').addClass('open_showing');
-			this.uploadTorrentFile();
+			if (!vz.showOpenTorrentDialog()) {
+				$('body').addClass('open_showing');
+				this.uploadTorrentFile();
+			}
 			this.updateButtonStates();
 		}
 	},
@@ -610,6 +655,17 @@ Transmission.prototype =
 	
 	vuzeLogOutClicked: function(ev) {
 		vz.logout();
+	},
+	
+	pauseUI: function() {
+		// schedule the next request
+		clearTimeout(this.refreshTorrentsTimeout);
+		this.uiPaused = true;
+	},
+	
+	resumeUI: function() {
+		this.uiPaused = false;
+		refreshTorrents();
 	},
 	/* << Vuze */
 
@@ -754,6 +810,8 @@ Transmission.prototype =
 
 		// >> Vuze: Submenu? exit early. No Submenu? Hide the menu.
 		if ( element.children( "a[aria-haspopup='true']" ).length ) {
+//			console.log(element);
+//			element.css({ left: "auto", top: "auto", position: "relative" });
 			return false;
 		} else {
 			$(ev.target).hide();
@@ -1045,7 +1103,9 @@ Transmission.prototype =
 
 		// schedule the next request
 		clearTimeout(this.refreshTorrentsTimeout);
-		this.refreshTorrentsTimeout = setTimeout(callback, msec);
+		if (!this.uiPaused) {
+			this.refreshTorrentsTimeout = setTimeout(callback, msec);
+		}
 	},
 
 	initializeTorrents: function()
@@ -1080,13 +1140,37 @@ Transmission.prototype =
 
 		/* >> Vuze */
 		// handle the per-row "torrent_info" button
-		if (ev.target.className === 'torrent_info') {
+		if ($(ev.target).hasClass('torrent_info')) {
 			if (!row.isSelected()) {
-				this.setSelectedRow(row, true);
+				this.setSelectedRow(row);
 			}
-			this.setInspectorVisible(true);
-			return;
-		}
+			
+			if ($(ev.target).hasClass('selected')) {
+				this.setInspectorVisible(false);
+				$(this.elements.torrent_list).find('.torrent_info.selected').removeClass('selected');
+			} else {
+				$(this.elements.torrent_list).find('.torrent_info.selected').removeClass('selected');
+				if (this.inspectorIsVisible()) {
+					var iOffset = $('#torrent_inspector').offset();
+					var y2 = iOffset.top + $('#torrent_inspector').outerHeight();
+					var btnY1 = $(ev.target).offset().top;
+					//console.log("y2=" + y2 + ";y1=" + btnY1);
+					if (btnY1 > y2) {
+						var list = $('#torrent_container');
+					    var scrollTop = list.scrollTop();
+						$(window).scrollTop(scrollTop - $('#torrent_inspector').outerHeight());
+					}
+				}
+
+				this.setInspectorVisible(true);
+
+				this.inspector.setTorrents(this.getSelectedTorrents());
+
+				$(ev.target).toggleClass('selected', true);
+				//this.setInspectorVisible(true);
+			}
+
+		} else 
 		/* << Vuze */
 
 		if (isMobileDevice) {
@@ -1565,6 +1649,17 @@ Transmission.prototype =
 	},
 	setInspectorVisible: function(visible)
 	{
+		if (!visible) {
+			$('#torrent_inspector').toggle(visible);
+			return;
+		}
+		$('#torrent_inspector').toggle(!visible);
+		var rows = this.getSelectedRows();
+		var rowElement = rows[0].getElement();
+		$("#torrent_inspector").appendTo(rowElement);
+		$('#torrent_inspector').toggle(visible);
+		$('#toolbar-inspector').toggleClass('selected',visible);
+		/* Vuze: Removed for inline inspector! 
 		if ($('#inspector-close').css('display') === "block") {
 			if (visible)
 				this.inspector.setTorrents(this.getSelectedTorrents());
@@ -1579,14 +1674,15 @@ Transmission.prototype =
 				var y = $('body').scrollTop() + 82;
 				$('#torrent_inspector').css('padding-top', y + 'px');
 
-				/* Vuze: Not needed now that layout isn't a scrollable div
+				// >> Vuze: Not needed now that layout isn't a scrollable div
 				var w = visible ? $('#torrent_inspector').outerWidth() + 1 + 'px' : '0px';
 				$('#torrent_container')[0].style.right = w;
-				*/
+				// << Vuze
 			}
 		} else {
 			$('#torrent_inspector').dialog({'title': 'Torrent Inspector'});
 		}
+		*/
 	},
 
 	/****
