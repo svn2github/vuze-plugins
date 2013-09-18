@@ -23,14 +23,12 @@ import java.net.SocketException;
 import java.util.Map;
 
 import lbms.plugins.mldht.DHTConfiguration;
-import lbms.plugins.mldht.azureus.gui.DHTView;
-import lbms.plugins.mldht.azureus.gui.SWTHelper;
 import lbms.plugins.mldht.kad.DHT;
 import lbms.plugins.mldht.kad.DHTConstants;
 import lbms.plugins.mldht.kad.DHTLogger;
 import lbms.plugins.mldht.kad.DHT.DHTtype;
 
-import org.eclipse.swt.graphics.Image;
+import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.PluginListener;
@@ -49,7 +47,6 @@ import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.plugins.ui.tables.TableContextMenuItem;
 import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.plugins.ui.tables.TableRow;
-import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 
 import com.aelitis.azureus.plugins.upnp.UPnPPlugin;
 
@@ -69,11 +66,10 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 	private LoggerChannel			logChannel;
 	private LoggerChannelListener	logListener;
 	private UIManagerListener		uiListener;
-	private UISWTInstance			swtInstance	= null;
 
 	//private Display					display;
 
-	private SWTHelper				swtHelper;
+	private UIHelper				uiHelper;
 
 	private Object					mlDHTProvider;
 
@@ -228,10 +224,22 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 			 * .gudy.azureus2.plugins.ui.UIInstance)
 			 */
 			public void UIAttached (UIInstance instance) {
-				if (swtHelper == null) {
-					swtHelper = new SWTHelper(MlDHTPlugin.this);
+				if (uiHelper == null) {
+					if ( instance.getUIType() == UIInstance.UIT_SWT ){
+						try{
+							Class cla = getClass().getClassLoader().loadClass( "lbms.plugins.mldht.azureus.gui.SWTHelper");
+							
+							uiHelper = (UIHelper)cla.getConstructor( MlDHTPlugin.class ).newInstance( MlDHTPlugin.this );
+							
+						}catch( Throwable e ){
+							
+							Debug.out( e );
+						}
+					}
 				}
-				swtHelper.UIAttached(instance);
+				if ( uiHelper != null ){
+					uiHelper.UIAttached(instance);
+				}
 			}
 
 			/*
@@ -242,8 +250,8 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 			 * .gudy.azureus2.plugins.ui.UIInstance)
 			 */
 			public void UIDetached (UIInstance instance) {
-				if (swtHelper != null) {
-					swtHelper.UIDetached(instance);
+				if (uiHelper != null) {
+					uiHelper.UIDetached(instance);
 				}
 
 			}
@@ -359,13 +367,10 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 	 * @see org.gudy.azureus2.plugins.UnloadablePlugin#unload()
 	 */
 	public void unload () throws PluginException {
-		if (swtHelper != null) {
-			swtHelper.onPluginUnload();
+		if (uiHelper != null) {
+			uiHelper.onPluginUnload();
 		}
-		if (swtInstance != null) {
-			swtInstance.removeViews(UISWTInstance.VIEW_MAIN, DHTView.VIEWID);
-			swtInstance = null;
-		}
+
 		stopDHT();
 
 		if ( pluginInterface != null ){

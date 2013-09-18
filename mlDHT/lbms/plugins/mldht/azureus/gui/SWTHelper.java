@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import lbms.plugins.mldht.azureus.MlDHTPlugin;
+import lbms.plugins.mldht.azureus.UIHelper;
 import lbms.plugins.mldht.kad.*;
 import lbms.plugins.mldht.kad.DHT.DHTtype;
 import lbms.plugins.mldht.kad.utils.PopulationListener;
@@ -43,7 +44,7 @@ import org.gudy.azureus2.ui.swt.plugins.UISWTStatusEntryListener;
  * @author Leonard
  * 
  */
-public class SWTHelper implements UIManagerListener, PopulationListener, DHTStatusListener {
+public class SWTHelper implements UIHelper, UIManagerListener, PopulationListener, DHTStatusListener {
 	
 	private static final boolean	SHOW_STATUS_TEXT	= false;
 	
@@ -65,6 +66,8 @@ public class SWTHelper implements UIManagerListener, PopulationListener, DHTStat
 		for(DHTtype type : DHTtype.values()) {
 			swtInstance.removeViews(UISWTInstance.VIEW_MAIN, DHTView.VIEWID+"."+type.shortName);
 		}
+		
+		swtInstance.removeViews(UISWTInstance.VIEW_MAIN, DHTView.VIEWID);
 		
 		if (statusEntry != null) {
 			statusEntry.destroy();
