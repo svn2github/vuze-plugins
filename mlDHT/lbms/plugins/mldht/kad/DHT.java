@@ -100,6 +100,9 @@ public class DHT implements DHTBase {
 	}
 
 	private boolean							running;
+	
+	private long							server_create_counter;
+	private long							last_rpc_create;
 
 	private boolean							bootstrapping;
 	private long							lastBootstrap;
@@ -745,18 +748,47 @@ public class DHT implements DHTBase {
 	 * @see lbms.plugins.mldht.kad.DHTBase#update()
 	 */
 	public void update () {
-		if(running)
-		{
-			if(config.allowMultiHoming() || servers.size() < 1)
-				new RPCServer(this, getPort(),serverStats);
-		}
+		long mono_now = SystemTime.getMonotonousTime();
 		
+		if ( running ){
+			
+			if (config.allowMultiHoming() || servers.size() < 1) {
+				
+					// rate limit creation of new servers when things are obviously not working (in particular ipv6 dht with no ipv6 avail)
+				
+				int delay = 1000;
+				
+				for ( int i=0;i<server_create_counter;i++){
+					delay = delay*2;
+					if ( delay > 60*1000 ){
+						delay = 60*1000;
+						break;
+					}
+				}
+				
+				if ( last_rpc_create == 0 || mono_now - last_rpc_create >= delay ){
+					
+					last_rpc_create = mono_now;
+					
+					new RPCServer(this, getPort(),serverStats);
+					
+					server_create_counter++;
+					
+				}else{
+					
+					return;
+				}
+			}
+		}
 		
 		if (!isRunning()) {
 			return;
 		}
-		long now = System.currentTimeMillis();
+				
+		server_create_counter = 0;
 		
+		long now = System.currentTimeMillis();
+
 		node.doBucketChecks(now);
 
 		if (!bootstrapping) {
