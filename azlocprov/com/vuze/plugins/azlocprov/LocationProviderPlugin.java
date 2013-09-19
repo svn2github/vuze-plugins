@@ -23,6 +23,8 @@ package com.vuze.plugins.azlocprov;
 
 import java.io.File;
 
+import org.gudy.azureus2.core3.config.COConfigurationManager;
+import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.UnloadablePlugin;
@@ -41,6 +43,8 @@ LocationProviderPlugin
 	
 		throws PluginException 
 	{
+		applyPatch();
+		
 		plugin_interface = _pi;
 		
 		provider = new LocationProviderImpl( plugin_interface.getPluginVersion(), new File( plugin_interface.getPluginDirectoryName()));
@@ -62,6 +66,68 @@ LocationProviderPlugin
 			
 			provider			= null;
 			plugin_interface 	= null;
+		}
+	}
+	
+	private void
+	applyPatch()
+	{
+		// 5100 bug with simple torrent being saved to a FILE named 'Vuze Downloads'
+		// installer has been fixed to create the folder to prevent the issue with new users
+		// for existing users look to see if the problem has been encountered and recover things a bit
+		
+		try{
+			if ( Constants.AZUREUS_VERSION.startsWith( "5.1.0." )){
+				
+				if ( COConfigurationManager.getIntParameter( "azlocprov.patch5100.1.applied", 0 ) == 0 ){
+					
+					int	patch_result = 99;
+					
+					try{
+						File save_path = new File( COConfigurationManager.getStringParameter( "Default save path" ));
+					
+						if ( !save_path.exists()){
+							
+							save_path.mkdirs();
+							
+							patch_result = 1;
+							
+						}else if ( save_path.isFile()){
+							
+							String str = save_path.getAbsolutePath();
+							
+							if ( !str.endsWith( "2" )){
+								
+								save_path = new File( str + "2" );
+								
+								if ( save_path.mkdirs()){
+									
+									COConfigurationManager.setParameter( "Default save path", save_path.getAbsolutePath());
+									
+									patch_result = 2;
+									
+								}else{
+									
+									patch_result = 3;
+								}
+							}else{
+								
+								patch_result = 4;
+							}
+						}else{
+							
+							patch_result = 5;
+						}
+					}finally{
+						
+						COConfigurationManager.setParameter( "azlocprov.patch5100.1.applied", patch_result );
+						
+						COConfigurationManager.save();
+					}
+				}
+			}
+		}catch( Throwable e ){
+			
 		}
 	}
 }
