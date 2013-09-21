@@ -289,6 +289,7 @@ TransmissionRemote.prototype =
 			method: 'torrent-add',
 			arguments: {
 				paused: (options.paused),
+				'download-dir': (options.destination),
 				filename: url
 			}
 		};
