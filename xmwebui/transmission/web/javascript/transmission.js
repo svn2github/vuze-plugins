@@ -1,4 +1,4 @@
-/* Transmission Revision 14025 */
+/* Transmission Revision 14090 */
 /**
  * Copyright © Jordan Lee, Dave Perrett, Malcolm Jarvis and Bruno Bierbaumer
  *
@@ -45,7 +45,6 @@ Transmission.prototype =
 		Prefs.getClutchPrefs(this);
 
 		// Set up user events
-		$(".numberinput").forceNumeric();
 		$('#toolbar-pause').click($.proxy(this.stopSelectedClicked,this));
 		$('#toolbar-start').click($.proxy(this.startSelectedClicked,this));
 		$('#toolbar-pause-all').click($.proxy(this.stopAllClicked,this));
@@ -706,7 +705,9 @@ Transmission.prototype =
 			if (/^#/.test(uri)) // lines which start with "#" are comments
 				continue;
 			if (/^[a-z-]+:/i.test(uri)) // close enough to a url
-				this.remote.addTorrentByUrl(uri, paused);
+				this.remote.addTorrentByUrl(uri, {
+					paused : paused
+				});
 		}
 
 		ev.preventDefault();
@@ -1254,9 +1255,6 @@ Transmission.prototype =
 			    destination = folderInput.val(),
 			    remote = this.remote;
 
-			 if ('' != $('#torrent_upload_url').val()) {
-				 remote.addTorrentByUrl($('#torrent_upload_url').val(), { paused: paused });
-			 }
 			jQuery.each (fileInput[0].files, function(i,file) {
 				var reader = new FileReader();
 				// >> Vuze: Add error notification
@@ -1296,7 +1294,16 @@ Transmission.prototype =
 					}
 				}
 				reader.readAsDataURL (file);
+				
 			});
+			var url = $('#torrent_upload_url').val();
+			if (url != '') {
+				// Vuze: Rev 14090 added code which is almost the same as remote.addTorrentByUrl
+				remote.addTorrentByUrl($('#torrent_upload_url').val(), {
+					paused : paused,
+					'download-dir' : destination
+				});
+			}
 		}
 	},
 
