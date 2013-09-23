@@ -32,6 +32,7 @@ Transmission.prototype =
 		// >> Vuze: Always show menu!
 		this.isMenuEnabled = true; //!isMobileDevice;
 		this.uiPaused = false;
+		this.skipClick = false;
 		// << Vuze
 
 		// Initialize the implementation fields
@@ -61,22 +62,26 @@ Transmission.prototype =
 		// << Vuze
 
 
-		$('#upload_confirm_button').click($.proxy(this.confirmUploadClicked,this));
-		$('#upload_cancel_button').click($.proxy(this.hideUploadDialog,this));
+		// Vuze: added ".button()" to give it jQuery UI style
+		$('#upload_confirm_button').button().click($.proxy(this.confirmUploadClicked,this));
+		$('#upload_cancel_button').button().click($.proxy(this.hideUploadDialog,this));
 
-		$('#move_confirm_button').click($.proxy(this.confirmMoveClicked,this));
-		$('#move_cancel_button').click($.proxy(this.hideMoveDialog,this));
+		$('#move_confirm_button').button().click($.proxy(this.confirmMoveClicked,this));
+		$('#move_cancel_button').button().click($.proxy(this.hideMoveDialog,this));
 
+		/* Vuze: No Turtle or Compact Button
 		$('#turtle-button').click($.proxy(this.toggleTurtleClicked,this));
 		$('#compact-button').click($.proxy(this.toggleCompactClicked,this));
+		*/
 
 		// tell jQuery to copy the dataTransfer property from events over if it exists
 		jQuery.event.props.push("dataTransfer");
 
-		$('#torrent_upload_form').submit(function() { $('#upload_confirm_button').click(); return false; });
-		// >> Vuze
+		// Vuze: added ".button()" to give it jQuery UI style
+		$('#torrent_upload_form').submit(function() { $('#upload_confirm_button').button().click(); return false; });
+		/* >> Vuze: Inspector now inline
 		$('#inspector-close').click($.proxy(this.toggleInspector,this));
-		// << Vuze
+		*/
 		$('#toolbar-inspector').click($.proxy(this.toggleInspector,this));
 
 		e = $('#filter-mode');
@@ -115,7 +120,6 @@ Transmission.prototype =
 		var async = false;
 		this.loadDaemonPrefs(async);
 		if (this.remote.hasError()) {
-			console.log("has error.. logging out");
 			return;
 		}
 		this.loadDaemonStats(async);
@@ -180,7 +184,9 @@ Transmission.prototype =
 			}
 		});
 
+		/* Vuze : No Turtle Button 
 		$("div.limit_turtle").hide()
+		*/
 
 		if (isMobileDevice) {
 			$("div#open_link span").text("Add")
@@ -229,11 +235,6 @@ Transmission.prototype =
 		$('#ul_torrent_context_menu').menu();
 		$('#ul_torrent_context_menu').hide();
 		$('ul#torrent_list').bind('contextmenu', function(e) {
-			// taphold doesn't have pageX and others.. try originalEvent
-			if (typeof e.originalEvent != 'undefined') {
-				e = e.originalEvent;
-			}
-			
 			// select current row
 			var element = $(e.target).closest('.torrent')[0];
 			var i = $('#torrent_list > li').index(element);
@@ -253,25 +254,23 @@ Transmission.prototype =
 			// taphold doesn't have pageX and others.. try originalEvent
 			if (typeof e.originalEvent != 'undefined') {
 				e = e.originalEvent;
+				e.stopPropagation();
+				e.preventDefault();
 			}
-			
+
+
 			// select current row
 			var element = $(e.target).closest('.torrent')[0];
 			var i = $('#torrent_list > li').index(element);
 			if ((i!==-1) && !tr._rows[i].isSelected())
 				tr.setSelectedRow(tr._rows[i]);
 
-			$('#ul_torrent_context_menu').position({
-				   my: "center",
-				   at: "center",
-				   of: $('ul#torrent_list'),
-				   within: $('ul#torrent_list')
-				});
-			$('#ul_torrent_context_menu').center();
-			$('#ul_torrent_context_menu').show();
-			$(document).one('click', function() {
-				$('#ul_torrent_context_menu').hide();
-			});
+			if (vz.handleTapHold()) {
+				return;
+			}
+
+			tr.showContextMenu();
+
 			return false;
 		});
 		$("#ul_torrent_context_menu" ).on( "menuselect", $.proxy(this.onContextMenuClicked,this));
@@ -315,6 +314,22 @@ Transmission.prototype =
 		});
 		*/
 	},
+
+	// >> Vuze: Show context menu, centered
+	showContextMenu: function() {
+		$('#ul_torrent_context_menu').position({
+			   my: "center",
+			   at: "center",
+			   of: $('ul#torrent_list'),
+			   within: $('ul#torrent_list')
+			});
+		$('#ul_torrent_context_menu').center();
+		$('#ul_torrent_context_menu').show();
+		$(document).one('click', function() {
+			$('#ul_torrent_context_menu').hide();
+		});
+	},
+	// << Vuze
 
 	createSettingsMenu: function() {
 		$('#settings_menu').click($.proxy(this.settingsMenuClicked,this));
@@ -430,6 +445,11 @@ Transmission.prototype =
 		return $.grep(this._rows, function(r) {return r.isSelected();});
 	},
 
+	getRowFromTorrent: function(torrent) {
+		var id = torrent.getId();
+		return $.grep(this._rows, function(r) {return r.getTorrent().getId() == id;})[0];
+	},
+
 	getSelectedTorrents: function() {
 		return $.map(this.getSelectedRows(),function(r) {
 			return r.getTorrent();
@@ -440,21 +460,14 @@ Transmission.prototype =
 		return this.getTorrentIds(this.getSelectedTorrents());
 	},
 
-	// Vuze: Added immediate
-	setSelectedRow: function(row, immediate) {
+	setSelectedRow: function(row) {
 		$(this.elements.torrent_list).children('.selected').removeClass('selected');
-		this.selectRow(row, immediate);
+		this.selectRow(row);
 	},
 
-	// Vuze: Added immediate
-	selectRow: function(row, immediate) {
+	selectRow: function(row) {
 		$(row.getElement()).addClass('selected');
-		immediate = typeof immediate !== 'undefined' ? immediate : false;
-		if (!immediate) {
-			this.callSelectionChangedSoon();
-		} else {
-			this.selectionChanged();
-		}
+		this.callSelectionChangedSoon();
 	},
 
 	deselectRow: function(row) {
@@ -502,15 +515,14 @@ Transmission.prototype =
 
 	selectionChanged: function()
 	{
+		clearTimeout(this.selectionChangedTimer);
+		delete this.selectionChangedTimer;
+
 		this.updateButtonStates();
 
 		/** >> Vuze: Inspector is now inline and does not follow the cursor
 		this.inspector.setTorrents(this.inspectorIsVisible() ? this.getSelectedTorrents() : []);
 		*/
-
-		clearTimeout(this.selectionChangedTimer);
-		delete this.selectionChangedTimer;
-
 	},
 
 	callSelectionChangedSoon: function()
@@ -753,12 +765,14 @@ Transmission.prototype =
 		}
 	},
 
+	/* Vuze : No Turtle Button 
 	toggleTurtleClicked: function()
 	{
 		var o = {};
 		o[RPC._TurtleState] = !$('#turtle-button').hasClass('selected');
 		this.remote.savePrefs(o);
 	},
+	*/
 
 	/*--------------------------------------------
 	 *
@@ -811,8 +825,6 @@ Transmission.prototype =
 
 		// >> Vuze: Submenu? exit early. No Submenu? Hide the menu.
 		if ( element.children( "a[aria-haspopup='true']" ).length ) {
-//			console.log(element);
-//			element.css({ left: "auto", top: "auto", position: "relative" });
 			return false;
 		} else {
 			$(ev.target).hide();
@@ -1083,12 +1095,10 @@ Transmission.prototype =
 			this.deleteTorrents(removed_ids);
 			this.refilterSoon();
 		}
-		//console.log("<updateFromTorrentGet");
 	},
 
 	updateTorrents: function(ids, fields)
 	{
-		//console.log("updateTorrents");
 		this.remote.updateTorrents(ids, fields,
 		                           this.updateFromTorrentGet, this);
 	},
@@ -1118,6 +1128,28 @@ Transmission.prototype =
 
 	onRowClicked: function(ev)
 	{
+		// Prevents click carrying to parent element
+		// which deselects all on click
+		ev.stopPropagation();
+		// prevent click event when tap is pressed
+		ev.preventDefault();
+
+		// ev.preventDefault doesn't always cancel click event..
+		// ignore clicks if tap has been pressed once
+		if (!this.skipClick) {
+			if (ev.type == 'tap') {
+				this.skipClick = true;
+			}
+		} else {
+			if (ev.type == 'click') {
+				return;
+			}
+		}
+
+		// but still hide the context menu if it is showing
+		$('#ul_torrent_context_menu').hide();
+
+		
 		var meta_key = ev.metaKey || ev.ctrlKey,
 		    row = ev.currentTarget.row;
 
@@ -1133,18 +1165,9 @@ Transmission.prototype =
 			return;
 		}
 
-		// Prevents click carrying to parent element
-		// which deselects all on click
-		ev.stopPropagation();
-		// but still hide the context menu if it is showing
-		$('#ul_torrent_context_menu').hide();
-
 		/* >> Vuze */
 		// handle the per-row "torrent_info" button
 		if ($(ev.target).hasClass('torrent_info')) {
-			if (!row.isSelected()) {
-				this.setSelectedRow(row);
-			}
 			
 			if ($(ev.target).hasClass('selected')) {
 				this.setInspectorVisible(false);
@@ -1155,7 +1178,6 @@ Transmission.prototype =
 					var iOffset = $('#torrent_inspector').offset();
 					var y2 = iOffset.top + $('#torrent_inspector').outerHeight();
 					var btnY1 = $(ev.target).offset().top;
-					//console.log("y2=" + y2 + ";y1=" + btnY1);
 					if (btnY1 > y2) {
 						var list = $('#torrent_container');
 					    var scrollTop = list.scrollTop();
@@ -1163,14 +1185,16 @@ Transmission.prototype =
 					}
 				}
 
+				this.inspector.setTorrents([ row.getTorrent() ]);
 				this.setInspectorVisible(true);
-
-				this.inspector.setTorrents(this.getSelectedTorrents());
 
 				$(ev.target).toggleClass('selected', true);
 				//this.setInspectorVisible(true);
 			}
 
+		} else if ($(ev.target).hasParent("#torrent_inspector").length > 0) {
+			// part of torrent inpector -- don't allow selection
+			return;
 		} else 
 		/* << Vuze */
 
@@ -1198,7 +1222,7 @@ Transmission.prototype =
 
 		// Regular Click, selected
 		} else if (row.isSelected()) {
-			this.setSelectedRow(row);
+			this.deselectRow(row);
 		}
 
 		this._last_torrent_clicked = row.getTorrentId();
@@ -1488,6 +1512,7 @@ Transmission.prototype =
 
 		this.prefsDialog.set(o);
 
+		/* Vuze : No Turtle Button 
 		if (RPC._TurtleState in o)
 		{
 			b = o[RPC._TurtleState];
@@ -1501,6 +1526,7 @@ Transmission.prototype =
 			e.toggleClass('selected', b);
 			e.attr('title', text);
 		}
+		*/
 
 		if (this.isMenuEnabled && (RPC._DownSpeedLimited in o)
 		                       && (RPC._DownSpeedLimit in o))
@@ -1545,8 +1571,6 @@ Transmission.prototype =
 
 	updateStatusbar: function()
 	{
-		//console.log("updateStatusBar");
-		//console.trace();
 		var u=0, d=0,
 		    i, row,
 		    fmt = Transmission.fmt,
@@ -1620,7 +1644,8 @@ Transmission.prototype =
 		    havePaused = false,
 		    haveSel = false,
 		    haveActiveSel = false,
-		    havePausedSel = false;
+		    havePausedSel = false,
+		    selectionCount = 0;
 
 		clearTimeout(this.buttonRefreshTimer);
 		delete this.buttonRefreshTimer;
@@ -1631,9 +1656,15 @@ Transmission.prototype =
 			if (!isStopped) haveActive = true;
 			if (isStopped) havePaused = true;
 			if (isSelected) haveSel = true;
+			if (isSelected) selectionCount++;
 			if (isSelected && !isStopped) haveActiveSel = true;
 			if (isSelected && isStopped) havePausedSel = true;
 		}
+		
+		// >> Vuze: callback
+		vz.selectionChanged(selectionCount, haveActive, havePaused, haveActiveSel, havePausedSel);
+		// << Vuze
+
 
 		this.setEnabled(e.toolbar_pause_button,  haveActiveSel);
 		this.setEnabled(e.toolbar_start_button,  havePausedSel);
@@ -1650,9 +1681,20 @@ Transmission.prototype =
 	{
 		return $('#torrent_inspector').is(':visible');
 	},
-	toggleInspector: function()
+	toggleInspector: function(ev)
 	{
-		this.setInspectorVisible(!this.inspectorIsVisible());
+	    var row = ev.currentTarget.row;
+
+	    if (this.inspectorIsVisible()) {
+			var torrents = this.inspector.getTorrents();
+			if (torrents.length == 0 || torrents[0].getId() == row.getTorrentId()) {
+				this.setInspectorVisible(false);
+		    	return;
+			}
+	    }
+	    
+		this.inspector.setTorrents([ row.getTorrent() ]);
+    	this.setInspectorVisible(true);
 	},
 	setInspectorVisible: function(visible)
 	{
@@ -1661,8 +1703,13 @@ Transmission.prototype =
 			return;
 		}
 		$('#torrent_inspector').toggle(!visible);
-		var rows = this.getSelectedRows();
-		var rowElement = rows[0].getElement();
+		var torrents = this.inspector.getTorrents();
+		if (torrents.length == 0) {
+			return;
+		}
+		var row = this.getRowFromTorrent(torrents[0]);
+		var rowElement = row.getElement();
+		
 		$("#torrent_inspector").appendTo(rowElement);
 		$('#torrent_inspector').toggle(visible);
 		$('#toolbar-inspector').toggleClass('selected',visible);
@@ -1700,8 +1747,6 @@ Transmission.prototype =
 
 	refilterSoon: function()
 	{
-		//console.log("refiltersoon");
-		//console.trace();
 		if (!this.refilterTimer) {
 			var tr = this,
 			    callback = function(){tr.refilter(false);},
@@ -1731,8 +1776,6 @@ Transmission.prototype =
 
 	refilter: function(rebuildEverything)
 	{
-		//console.log('refilter' + rebuildEverything);
-		//console.trace();
 		var i, e, id, t, row, tmp, rows, clean_rows, dirty_rows, frag,
 		    sort_mode = this[Prefs._SortMethod],
 		    sort_direction = this[Prefs._SortDirection],
@@ -1794,6 +1837,14 @@ Transmission.prototype =
 				dirty_rows.push(row);
 				$(e).click($.proxy(this.onRowClicked,this));
 				$(e).dblclick($.proxy(this.toggleInspector,this));
+
+				// Vuze: add tap, as it doesn't have a 300ms delay on mobiles
+				$(e).bind('tap', $.proxy(this.onRowClicked,this));
+				// Vuze: tap is 'fuzzy' and seems to prefer the element it binds on,
+				// Bind directly on torrent_info button, otherwise it's really
+				// hard to tap the button.
+				$(e).find(".torrent_info")[0].row = row;
+				$(e).find(".torrent_info").bind('tap', $.proxy(this.onRowClicked,this));
 			}
 		}
 
