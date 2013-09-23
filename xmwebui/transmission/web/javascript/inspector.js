@@ -811,6 +811,10 @@ function Inspector(controller) {
         // refresh the inspector's UI
         updateInspector();
     };
+    
+    this.getTorrents = function() {
+    	return data.torrents;
+    }
 
     initialize (controller);
 };
