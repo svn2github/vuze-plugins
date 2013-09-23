@@ -1,11 +1,28 @@
+div#toolbar-area {
+	height: auto;
+}
+
+.toolbar-vuze {
+	display: none;
+}
+
+.toolbar-main {
+	display: none;
+}
+
+#torrent_logo {
+	display: none;
+}
+
 #statusbar {
 	display: none;
 }
 
 #remotesearch_container {
-	padding: 51px 0 0 0;
+	padding: 19px 0 0 0;
 }
 
 div#torrent_container {
-	padding: 51px 0 0 0;
+	padding: 19px 0 0 0;
 }
+
