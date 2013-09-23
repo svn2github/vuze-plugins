@@ -237,9 +237,7 @@ div.dialog_container div.dialog_window h2.dialog_heading { display: block; float
 
 div.dialog_container div.dialog_window div.dialog_message { float: left; padding-left: 3px; margin-left: -3px; width: 305px; overflow: hidden; }
 
-div.dialog_container div.dialog_window a { display: block; float: right; margin: 10px 20px 10px -8px; padding: 5px; background-color: #EEE; border: 1px solid #787878; width: 50px; height: 15px; text-align: center; font-weight: bold; text-decoration: none; color: #323232; -webkit-appearance: button; font: -webkit-control; cursor: default; }
-
-div.dialog_container div.dialog_window a:hover, div.dialog_container div.dialog_window a:active { background: #c0c8d6 url("images/filter_bar.png") bottom repeat-x; }
+div.dialog_container div.dialog_window a { display: block; float: right; margin: 10px 20px 10px -8px; }
 
 div#upload_container div.dialog_window div.dialog_message label { margin-top: 15px; display: block; }
 

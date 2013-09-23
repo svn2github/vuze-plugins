@@ -809,24 +809,6 @@ div.torrent_footer
 		@include buttonImage('images/settings.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
 	}
 
-	#prefs-button {
-		@include roundedBox(5px);
-		@include buttonImage('images/wrench.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
-	}
-
-	#turtle-button {
-		@include roundedBox(5px);
-		@include buttonImage('images/turtle.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
-		&:active, &.selected {
-			@include imageOnVerticalGradient('images/blue-turtle.png', $active-color-top, $active-color-bottom);
-		}
-	}
-
-	#compact-button {
-		@include roundedBox(5px);
-		@include buttonImage('images/compact.png', $idle-color-top, $idle-color-bottom, $active-color-top, $active-color-bottom);
-	}
-
 	#freespace-info	{
 		float: right;
                 text-align: right;
@@ -902,24 +884,8 @@ div.dialog_container div.dialog_window a {
 	display: block;
 	float: right;
 	margin: 10px 20px 10px -8px;
-	padding: 5px;
-	background-color: #EEE;
-	border: 1px solid #787878;
-	width: 50px;
-	height: 15px;
-	text-align: center;
-	font-weight: bold;
-	text-decoration: none;
-	color: #323232;
-	-webkit-appearance: button;
-	font: -webkit-control;
-	cursor: default;
 }
 
-div.dialog_container div.dialog_window a:hover,
-div.dialog_container div.dialog_window a:active {
-	background: #C0C8D6 url('images/filter_bar.png') bottom repeat-x;
-}
 
 div#upload_container div.dialog_window div.dialog_message label {
 	margin-top: 15px;
