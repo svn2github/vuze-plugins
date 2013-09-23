@@ -1,14 +1,3 @@
 div#torrent_logo {
 	display: none;
 }
-
-div#torrent_inspector {
-	float: none;
-	border: 0;
-	padding:2px;
-	width: 100%;
-}
-
-div#torrent_inspector #inspector-close {
-	display: none;
-}

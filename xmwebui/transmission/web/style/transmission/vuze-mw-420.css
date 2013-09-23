@@ -31,17 +31,6 @@ div.dialog_container div.dialog_window {
 	margin-top: 0;
 }
 
-div#torrent_inspector {
-	float: none;
-	border: 0;
-	padding:2px;
-	width: 100%;
-}
-
-div#torrent_inspector #inspector-close {
-	display: none;
-}
-
 #menu_sep_rates,
 #menu_total_download_rate,
 #menu_total_upload_rate {
