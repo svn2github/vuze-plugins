@@ -834,7 +834,7 @@ if ( eventCaptureSupported ) {
 					// the same as the stop target.
 					//if ( origTarget === event.target ) {
 					// Vuze: don't fire tap when taphold is pressed
-					if ( origTarget === event.target && !tapfired) {
+					if ( origTarget === event.target && !tapFired) {
 						triggerCustomEvent( thisObject, "tap", event );
 					}
 				}
@@ -845,7 +845,7 @@ if ( eventCaptureSupported ) {
 
 				timer = setTimeout( function() {
 					// >> Vuze: Added originalEvent, so we can get pageY
-					tapfired = true;
+					tapFired = true;
 					triggerCustomEvent( thisObject, "taphold", $.Event( "taphold", { target: origTarget, originalEvent: event } ) );
 					// << Vuze
 				}, $.event.special.tap.tapholdThreshold );
