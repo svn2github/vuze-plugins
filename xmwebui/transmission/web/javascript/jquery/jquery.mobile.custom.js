@@ -9,6 +9,7 @@
 * Vuze Custom via http://jquerymobile.com/download-builder/
 * : Virtual Mouse (vmouse) Bindings, Orientation Change, Touch
 * : Added originalEvent to taphold event
+* : Added tapFired to prevent tap on taphold from http://stackoverflow.com/a/11941654
 */
 
 (function ( root, doc, factory ) {
@@ -811,6 +812,7 @@ if ( eventCaptureSupported ) {
 
 				var origTarget = event.target,
 					origEvent = event.originalEvent,
+					tapFired = false,
 					timer;
 
 				function clearTapTimer() {
@@ -830,7 +832,9 @@ if ( eventCaptureSupported ) {
 
 					// ONLY trigger a 'tap' event if the start target is
 					// the same as the stop target.
-					if ( origTarget === event.target ) {
+					//if ( origTarget === event.target ) {
+					// Vuze: don't fire tap when taphold is pressed
+					if ( origTarget === event.target && !tapfired) {
 						triggerCustomEvent( thisObject, "tap", event );
 					}
 				}
@@ -841,6 +845,7 @@ if ( eventCaptureSupported ) {
 
 				timer = setTimeout( function() {
 					// >> Vuze: Added originalEvent, so we can get pageY
+					tapfired = true;
 					triggerCustomEvent( thisObject, "taphold", $.Event( "taphold", { target: origTarget, originalEvent: event } ) );
 					// << Vuze
 				}, $.event.special.tap.tapholdThreshold );
