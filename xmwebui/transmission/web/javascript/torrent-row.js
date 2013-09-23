@@ -131,9 +131,9 @@ TorrentRendererFull.prototype =
 		details = document.createElement('div');
 		details.className = 'torrent_progress_details';
 
-		image = document.createElement('div');
-		button = document.createElement('a');
-		button.appendChild(image);
+		//image = document.createElement('div');
+		//button = document.createElement('a');
+		//button.appendChild(image);
 
 		/* >> Vuze: Info Button */
 		var image2 = document.createElement('div');
@@ -146,7 +146,7 @@ TorrentRendererFull.prototype =
 
 		root.appendChild(name);
 		root.appendChild(peers);
-		root.appendChild(button);
+		//root.appendChild(button);
 		/* >> Vuze: Info Button */
 		root.appendChild(button2);
 		/* << Vuze: Info Button */
@@ -157,11 +157,11 @@ TorrentRendererFull.prototype =
 		root._peer_details_container = peers;
 		root._progress_details_container = details;
 		root._progressbar = progressbar;
-		root._pause_resume_button_image = image;
+		//root._pause_resume_button_image = image;
 		/* >> Vuze: Info Button */
 		root._toggle_info_button = image2;
 		/* << Vuze: Info Button */
-		root._toggle_running_button = button;
+		//root._toggle_running_button = button;
 
 		return root;
 	},
@@ -298,12 +298,14 @@ TorrentRendererFull.prototype =
 		e = root._progress_details_container;
 		setTextContent(e, this.getProgressDetails(controller, t));
 
+		/*
 		// pause/resume button
 		var is_stopped = t.isStopped();
 		e = root._pause_resume_button_image;
-		/* Vuze: Change Resume/Pause to Start/Stop */
+		// Vuze: Change Resume/Pause to Start/Stop
 		e.alt = is_stopped ? 'Start' : 'Stop';
 		e.className = is_stopped ? 'torrent_resume' : 'torrent_pause';
+		*/
 	}
 };
 
