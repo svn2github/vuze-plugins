@@ -28,16 +28,25 @@ var RPC = {
 	_BasicAuth              : ''
 };
 
-root = $.url().param("_Root");
+// >> Vuze: Override some RPC prefs via url parameters
+var url = window.location.toString();
+// Android API 11-15 doesn't support url parameters on local files.  We
+// hack it into userAgent :)
+if (navigator.userAgent.lastIndexOf("?", 0) === 0) {
+	url = url + navigator.userAgent;
+	url = url.replace(/[\r\n]/g, "");
+}
+var urlParser = $.url(url);
+root = urlParser.param("_Root");
 if (typeof root !== "undefined") {
 	RPC._Root = root;
 }
 
-basicAuth = $.url().param("_BasicAuth");
+basicAuth = urlParser.param("_BasicAuth");
 if (typeof basicAuth !== "undefined") {
 	RPC._BasicAuth = basicAuth;
 }
-
+// << Vuze
 
 function TransmissionRemote(controller)
 {
