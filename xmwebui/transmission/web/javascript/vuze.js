@@ -41,7 +41,6 @@ vz.executeSearch = function(search_input){
     	var root_url = $.url(RPC._Root);
     	var search_source = root_url.attr("source").substring(0, root_url.attr("source").length - root_url.attr("relative").length + 1);
         search_url = "http://search.vuze.com/xsearch/?q=" + encodeURIComponent(search_input) + "&xdmv=no&source=android&search_source=" + encodeURIComponent(search_source);
-        console.log(search_url);
         $("#remotesearch_container").html("<iframe id='remotesearch'></iframe>");
         $("#remotesearch").attr({src: search_url});
     } else {
@@ -53,19 +52,16 @@ vz.executeSearch = function(search_input){
 	    }
     }
     vz.searchQuery = search_url;
-    $("#torrent_filter_bar").hide();
     $("#torrent_container").hide();
     $("#remotesearch_container").show();
 };
 
 vz.backFromSearch = function(){
-    $("#torrent_filter_bar").show();
     $("#torrent_container").show();
     $("#remotesearch_container").hide();
 };
 
 vz.createRemote = function(remote_url){
-	console.log(remote_url);
     vz.remote = new easyXDM.Rpc(/** The channel configuration */{
         local: "../easyXDM/hash.html",
         swf: "easyxdm-2.4.18.4.swf",
@@ -157,21 +153,21 @@ vz.showOpenTorrentDialog = function() {
 	return false;
 };
 
-vz.showStatusBar = function() {
-	if (vz.hasExternalOSFunctions()) {
-		try {
-			return externalOSFunctions.showStatusBar();
-		} catch(e) {
-			console.log(e);
-		}
-	}
-	return true;
-};
-
 vz.handleConnectionError = function() {
 	if (vz.hasExternalOSFunctions()) {
 		try {
 			return externalOSFunctions.handleConnectionError();
+		} catch(e) {
+			console.log(e);
+		}
+	}
+	return false;
+};
+
+vz.handleTapHold = function() {
+	if (vz.hasExternalOSFunctions()) {
+		try {
+			return externalOSFunctions.handleTapHold();
 		} catch(e) {
 			console.log(e);
 		}
@@ -187,6 +183,41 @@ vz.uiReady = function() {
 			console.log(e);
 		}
 	}
+};
+
+vz.selectionChanged = function(selectionCount, haveActive, havePaused, haveActiveSel, havePausedSel) {
+	if (vz.hasExternalOSFunctions()) {
+		try {
+			externalOSFunctions.selectionChanged(selectionCount, haveActive, havePaused, haveActiveSel, havePausedSel);
+		} catch(e) {
+			console.log(e);
+		}
+	}
+};
+
+vz.goBack = function() {
+	if ($('#ul_torrent_context_menu').is(':visible')) {
+		externalOSFunctions.cancelGoBack(true);
+		$('#ul_torrent_context_menu').hide();
+		return false;
+	}
+
+	var visibleDialog = $('.ui-dialog-content:visible');
+	if (visibleDialog.length) {
+		externalOSFunctions.cancelGoBack(true);
+		visibleDialog.dialog('close');
+		return false;
+	}
+	
+	visibleDialog = $(".dialog_container:visible");
+	if (visibleDialog.length) {
+		externalOSFunctions.cancelGoBack(true);
+		visibleDialog.hide();
+		return false;
+	}
+	
+	externalOSFunctions.cancelGoBack(false);
+	return true;
 };
 
 vz.hasExternalOSFunctions = function() {
@@ -246,7 +277,9 @@ function getWebkitVersion() {
 
 $(document).ready( function(){
 	
-	$(window).resize(vuzeOnResize);
+	if (!vz.hasExternalOSFunctions() && $.url().param("testAND") != "1") {
+		$(window).resize(vuzeOnResize);
+	}
 
     vz.utils.selectOnFocus();
     // WebKit 533.1  (Android 2.3.3) needs scrollable divs hack
@@ -268,7 +301,7 @@ $(document).ready( function(){
 	}
 });
 
-if (vz.hasExternalOSFunctions()) {
+if (vz.hasExternalOSFunctions() || $.url().param("testAND") == "1") {
 	var fileref=document.createElement("link");
 	fileref.setAttribute("rel", "stylesheet");
 	fileref.setAttribute("type", "text/css");
