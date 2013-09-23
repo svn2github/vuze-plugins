@@ -81,6 +81,9 @@ Dialog.prototype = {
 		setTextContent(this._message[0], dialog_message);
 		setTextContent(this._cancel_button[0], cancel_button_label || 'Cancel');
 		setTextContent(this._confirm_button[0], confirm_button_label);
+		this._cancel_button.button();
+		this._confirm_button.button();
+		
 		this._confirm_button.show();
 		this._callback_function = callback_function;
 		this._callback_data = callback_data;
@@ -106,6 +109,8 @@ Dialog.prototype = {
 		// jquery::hide() doesn't work here in Safari for some odd reason
 		this._confirm_button.css('display', 'none');
 		setTextContent(this._cancel_button[0], cancel_button_label);
+		this._cancel_button.button();
+
 		// Just in case
 		$('#upload_container').hide();
 		$('#move_container').hide();
