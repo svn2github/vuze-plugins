@@ -129,96 +129,6 @@ div#torrent_logo {
 	margin-left: 4px;
 }
  
-div#torrent_filter_bar {
-	margin: 0;
-/* Vuze: Original:
-	height: 24px;
-*/
-	height: 33px;
-	background: #ddd url('images/filter_bar.png') repeat-x bottom left;
-	position: fixed;
-	left: 0;
-	right: 0px;
-/* Vuze: Original:
-	top: 97px;
-*/
-	top: 75px;
-	z-index: 2;
-	display: none;
-	/* Vuze: Removed Line:
-	overflow: hidden;
-	*/
-}
-
-div#torrent_filter_bar ul#t_filters {
-	height: 18px;
-	margin: 0;
-	padding: 0;
-	text-align: left;
-	display: inline;
-}
-
-div#torrent_filter_bar ul#t_filters li {
-	list-style-type: none;
-	list-style-image: none;
-	float: left;
-	padding: 0;
-	margin: 8px 0 0 5px;
-	vertical-align: middle;
-	height: 18px;
-    line-height:18px;
-}
-
-div#torrent_filter_bar ul#t_filters li a {
-	font-size: 1.2em;
-	color: #222;
-	text-shadow: 0 1px 0 #fff;
-	/* Vuze: We used to have this, but it breaks the filter bar now:
-	position:absolute;
-	right: 0px;
-	top: 0px;
-	border-radius: 10px;
-	*/
-	text-decoration: none;
-	font-weight: bold;
-	padding: 0 7px 0 0;
-	margin: 0 0 0 7px;
-	height: 18px;
-	display: block;
-	cursor: default;
-}
-
-div#torrent_filter_bar ul#t_filters li.selected, div#torrent_filter_bar ul#t_filters li.selected a, div#torrent_filter_bar ul#t_filters li:hover, div#torrent_filter_bar ul#t_filters li:hover a, div#torrent_filter_bar ul#t_filters li:active, div#torrent_filter_bar ul#t_filters li:active a {
-	background-image: url('images/filter_bar.png');
-	background-repeat: no-repeat;
-	text-shadow: 0 1px 0 #444;
-	color: #fff !important;
-}
-
-div#torrent_filter_bar ul#t_filters li:hover {
-	background-position: left -19px;
-}
-
-div#torrent_filter_bar ul#t_filters li:hover a {
-	background-position: right -19px;
-}
-
-div#torrent_filter_bar ul#t_filters li:active {
-	background-position: left -38px;
-}
-
-div#torrent_filter_bar ul#t_filters li:active a {
-	background-position: right -38px;
-}
-
-div#torrent_filter_bar ul#t_filters li.selected {
-	background-position: left top;
-}
-
-div#torrent_filter_bar ul#t_filters li.selected a {
-	background-position: right top;
-}
-
 #statusbar #filter input#torrent_search {
 	height: 18px;
 	width: 110px;
@@ -240,9 +150,6 @@ div#torrent_filter_bar ul#t_filters li.selected a {
 		width: 76px;
 		-moz-border-radius: 10px;
 		height:15px
-	}
-	div#torrent_filter_bar input#torrent_search.blur {
-		border-color: #CCC;
 	}
 }
 
@@ -415,7 +322,7 @@ ul.torrent_list li.torrent div.torrent_peer_details {
 }
 
 ul.torrent_list div.torrent_progress_bar_container.full {
-	margin-right: 80px;
+	margin-right: 45px;
 }
 
 /****
@@ -428,45 +335,27 @@ ul.torrent_list li.torrent a {
 	position: relative;
 	right: auto;
 	top: -9px;
-  margin:8px;
+  margin-right: 4px;
 }
+
 ul.torrent_list li.torrent a div {
-	background: url('images/buttons/torrent_buttons_vuze.png');
-	height: 18px;
-	width: 18px;
-}
-ul.torrent_list li.torrent a div.torrent_pause {
-	background-position: left top;
-}
-ul.torrent_list li.torrent a:hover div.torrent_pause {
-	background-position: 0 -18px;
-}
-ul.torrent_list li.torrent a:active div.torrent_pause {
-	background-position: 0 -36px;
-}
-ul.torrent_list li.torrent a div.torrent_resume {
-	background-position: -18px 0;
-}
-ul.torrent_list li.torrent a:hover div.torrent_resume {
-	background-position: -18px -18px;
-}
-ul.torrent_list li.torrent a:active div.torrent_resume {
-	background-position: -18px -36px;
+	background: none;
 }
 
 ul.torrent_list li.torrent a div.torrent_info {
-	background-position: -36px top;
+	background: url('images/toolbar-info.png');
+	width: 30px;
+	height: 30px;
 }
 
 ul.torrent_list li.torrent a:hover div.torrent_info {
-	background-position: -36px -18px;
 }
 
 ul.torrent_list li.torrent a:active div.torrent_info {
-	background-position: -36px -36px;
 }
+
 ul.torrent_list li.torrent a div.torrent_info.selected {
-	background-position: -36px -36px;
+	background: url('images/toolbar-info-active.png');
 }
 /* << Vuze: buttons changed to add info button */
 
@@ -484,16 +373,12 @@ div#torrent_inspector {
 	left: auto;
 	right: auto;
 	position: relative;
-	x-padding: 90px 0 0 10px;
-	x-float: right;
 	
 	padding: 10px 0 0 0;
 	width: 100%;
 	border-top: 1px dotted gray;
 	border-left: none;
 	color: #000;
-
-	x-background-color: #fff; /* Otherwise torrent list bleeds in on orientation change */
 }
 
 div#torrent_inspector_name {
@@ -507,25 +392,6 @@ div#torrent_inspector.selected {
 div#torrent_inspector li.inspector_tracker_entry.odd {
 	background-color: #e4e4ff;
 }
-
-div#torrent_inspector #inspector-close {
-	display: none;
-}
-
-/*
-div#torrent_inspector #inspector-close {
-	right: 0px;
-	position: absolute;
-	margin-right: 10px;
-  cursor: pointer;
-	width: 20px;
-	height: 20px;
-	background: transparent url('images/buttons/cancel.png') no-repeat;
-	display: block;
-}
-*/
-
-
 
 
 /****
@@ -542,12 +408,18 @@ div.torrent_footer {
 #prefs-button,
 #turtle-button {
 	display:none;
+	background: none;
+}
+.prefs-section #alternative-speed-limits-title {
+	background: none;
 }
 
 #compact-button {
 	/* Vuze: hide compact buttonf or now (we still have a menu) */
 	display:none;
+	background: none;
 }
+
 
 /* >> Vuze: Misc stuff, no idea if needed */
 
