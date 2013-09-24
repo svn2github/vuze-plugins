@@ -823,6 +823,8 @@ Transmission.prototype =
 		var tr = this;
 	    var element = $(ui.item[0]);
 
+		//console.log(ev.type + " for " + id);
+
 		// >> Vuze: Submenu? exit early. No Submenu? Hide the menu.
 		if ( element.children( "a[aria-haspopup='true']" ).length ) {
 			return false;
@@ -1128,6 +1130,11 @@ Transmission.prototype =
 
 	onRowClicked: function(ev)
 	{
+		if ($(ev.target).hasParent("#torrent_inspector").length > 0) {
+			// part of torrent inpector -- return early and allow propogation
+			return;
+		}
+
 		// Prevents click carrying to parent element
 		// which deselects all on click
 		ev.stopPropagation();
@@ -1145,6 +1152,8 @@ Transmission.prototype =
 				return;
 			}
 		}
+
+		//console.log(ev.type + " for " + ev.target.className);
 
 		// but still hide the context menu if it is showing
 		$('#ul_torrent_context_menu').hide();
@@ -1192,9 +1201,6 @@ Transmission.prototype =
 				//this.setInspectorVisible(true);
 			}
 
-		} else if ($(ev.target).hasParent("#torrent_inspector").length > 0) {
-			// part of torrent inpector -- don't allow selection
-			return;
 		} else 
 		/* << Vuze */
 
