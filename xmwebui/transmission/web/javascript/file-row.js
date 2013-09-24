@@ -171,9 +171,26 @@ function FileRow(torrent, depth, name, indices, even)
 	},
 
 	fireWantedChanged = function(do_want) {
+		// >> Vuze: Show user they changed it (refresh will set it to the correct value)
+		$(e[0].checkbox).prop('checked', do_want);
+		// << Vuze
 		$(fields.me).trigger('wantedToggled',[ fields.indices, do_want ]);
 	},
 	firePriorityChanged = function(priority) {
+		// >> Vuze: Select priority user just clicked.  2 items will temporarily
+		//          be selected until the refresh kicks in
+		if (priority == -1) {
+			$(elements.priority_low_button).toggleClass('selected', true);
+		}
+
+		if (priority == 0) {
+			$(elements.priority_normal_button).toggleClass('selected', true);
+		}
+
+		if (priority == 1) {
+			$(elements.priority_high_button).toggleClass('selected', true);
+		}
+		// << Vuze
 		$(fields.me).trigger('priorityToggled',[ fields.indices, priority ]);
 	},
 	fireNameClicked = function() {
