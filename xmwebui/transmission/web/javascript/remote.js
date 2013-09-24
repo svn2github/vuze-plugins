@@ -92,13 +92,19 @@ TransmissionRemote.prototype =
 	ajaxError: function(request, error_string, exception, ajaxObject) {
 		var token,
 		   remote = this;
-
+		
 		// set the Transmission-Session-Id on a 409
 		if (request.status === 409 && (token = request.getResponseHeader('X-Transmission-Session-Id'))){
 			remote._token = token;
 			$.ajax(ajaxObject);
 			return;
 		}
+
+		remote._error = request.responseText
+		? request.responseText.trim().replace(/(<([^>]+)>)/ig,"")
+				: "";
+		if(!remote._error.length )
+			remote._error = 'Server not responding' + ( error_string ? ' ( ' + error_string + ' )' : '' );
 
 		/* >> Vuze Added */
 		remote._lastCallWasError = true;
@@ -108,17 +114,12 @@ TransmissionRemote.prototype =
 //			console.log("not a persistent error -- exit");
 //			return;
 //		}
-		if (vz.handleConnectionError()) {
+		if (vz.handleConnectionError(1, remote._error)) {
 			console.log("ext handled connection error -- exit");
 			return;
 		}
    		/* << Vuze Added */
 
-		remote._error = request.responseText
-					? request.responseText.trim().replace(/(<([^>]+)>)/ig,"")
-					: "";
-		if(!remote._error.length )
-			 remote._error = 'Server not responding' + ( error_string ? ' ( ' + error_string + ' )' : '' );
 
 		// Vuze: Fixes Uncaught ReferenceError: remote is not defined
 		errorQuoted = remote._error.replace(/"/g, '\\"');

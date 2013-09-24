@@ -153,10 +153,10 @@ vz.showOpenTorrentDialog = function() {
 	return false;
 };
 
-vz.handleConnectionError = function() {
+vz.handleConnectionError = function(errNo, msg) {
 	if (vz.hasExternalOSFunctions()) {
 		try {
-			return externalOSFunctions.handleConnectionError();
+			return externalOSFunctions.handleConnectionError(errNo, msg);
 		} catch(e) {
 			console.log(e);
 		}
