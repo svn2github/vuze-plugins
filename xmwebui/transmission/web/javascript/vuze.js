@@ -1,6 +1,7 @@
 var vz = window.vz || {};
 
 vz.mode = "trial";
+vz.lastSelectionChanged = "";
 
 vz.updatePrefs = function( prefs ){
 	var az_mode = prefs["az-mode"];
@@ -185,10 +186,16 @@ vz.uiReady = function() {
 	}
 };
 
-vz.selectionChanged = function(selectionCount, haveActive, havePaused, haveActiveSel, havePausedSel) {
+vz.selectionChanged = function(selectedRows, haveActive, havePaused, haveActiveSel, havePausedSel) {
+
 	if (vz.hasExternalOSFunctions()) {
 		try {
-			externalOSFunctions.selectionChanged(selectionCount, haveActive, havePaused, haveActiveSel, havePausedSel);
+			var t = String(haveActive) + String(havePaused) + String(haveActiveSel) + String(havePausedSel) + selectedRows.join(",");
+			if (t !== vz.lastSelectionChanged) {
+				vz.lastSelectionChanged = t;
+				externalOSFunctions.selectionChanged(selectedRows.length, haveActive, havePaused, haveActiveSel, havePausedSel);
+			}
+			
 		} catch(e) {
 			console.log(e);
 		}
