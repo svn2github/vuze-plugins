@@ -24,7 +24,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import lbms.plugins.mldht.kad.*;
 import lbms.plugins.mldht.kad.DHT.DHTtype;
-import lbms.plugins.mldht.kad.tasks.AnnounceTask;
 import lbms.plugins.mldht.kad.tasks.PeerLookupTask;
 import lbms.plugins.mldht.kad.tasks.Task;
 import lbms.plugins.mldht.kad.tasks.TaskListener;
@@ -33,9 +32,7 @@ import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.core3.util.AsyncDispatcher;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.download.DownloadAnnounceResult;
-import org.gudy.azureus2.plugins.download.DownloadAnnounceResultPeer;
 import org.gudy.azureus2.plugins.download.DownloadAttributeListener;
-import org.gudy.azureus2.plugins.download.DownloadException;
 import org.gudy.azureus2.plugins.download.DownloadListener;
 import org.gudy.azureus2.plugins.download.DownloadManagerListener;
 import org.gudy.azureus2.plugins.download.DownloadScrapeResult;
@@ -51,9 +48,10 @@ public class Tracker {
 	public static final int					MAX_CONCURRENT_ANNOUNCES	= 8;
 	public static final int					MAX_CONCURRENT_SCRAPES		= 1;
 
-	public static final int					TRACKER_UPDATE_INTERVAL		= 30 * 1000;
+	public static final int					TRACKER_UPDATE_INTERVAL		= 10 * 1000;
 
 	public static final int					SHORT_DELAY					= 60 * 1000;
+	public static final int					VERY_SHORT_DELAY			= 5 * 1000;
 
 	public static final int					MIN_ANNOUNCE_INTERVAL		= 5 * 60 * 1000;
 	//actually MIN is added to this
@@ -162,7 +160,31 @@ public class Tracker {
 			
 			new TaskListener() {
 				Set<PeerAddressDBItem> items = new HashSet<PeerAddressDBItem>();
-				ScrapeResponseHandler handler = new ScrapeResponseHandler();
+				ScrapeResponseHandler scrapeHandler = new ScrapeResponseHandler();
+				AnnounceResponseHandler announceHandler = 
+					(scrapeOnly||tor==null||tor.getAnnounceCount()>1)?
+					null:
+					new AnnounceResponseHandler()
+					{
+						private Set<PeerAddressDBItem> interim_items = new HashSet<PeerAddressDBItem>();
+						
+						public void
+						itemsUpdated(
+							PeerLookupTask	task )
+						{
+							if ( interim_items.size() >= 200 ){
+								
+								return;
+							}
+							
+							interim_items.addAll( task.getReturnedItems());
+							
+							DHTAnnounceResult res = new DHTAnnounceResult( dl, interim_items, 0);
+							
+							dl.setAnnounceResult(res);
+						}
+					};
+				
 				AtomicInteger pendingCount = new AtomicInteger();
 				
 				{ // initializer
@@ -174,7 +196,8 @@ public class Tracker {
 						PeerLookupTask lookupTask = dht.createPeerLookup(dl.getTorrent().getHash());
 						if (lookupTask != null) {
 							pendingCount.incrementAndGet();
-							lookupTask.setScrapeHandler(handler);
+							lookupTask.setScrapeHandler(scrapeHandler);
+							lookupTask.setAnounceHandler(announceHandler);
 							lookupTask.setScrapeOnly(scrapeOnly);
 							lookupTask.addListener(this);
 							lookupTask.setInfo(dl.getName());
@@ -211,7 +234,7 @@ public class Tracker {
 				
 				private void allFinished(byte[] hash)
 				{
-					handler.process();
+					scrapeHandler.process();
 					
 					currentAnnounces.remove(dl);
 					currentScrapes.remove(dl);
@@ -225,15 +248,15 @@ public class Tracker {
 					
 					if (!scrapeOnly && items.size() > 0) {
 						DHTAnnounceResult res = new DHTAnnounceResult(dl, items, tor != null ? (int) tor.getDelay(TimeUnit.SECONDS) : 0);
-						res.setScrapePeers(handler.getScrapedPeers());
-						res.setScrapeSeeds(handler.getScrapedSeeds());
+						res.setScrapePeers(scrapeHandler.getScrapedPeers());
+						res.setScrapeSeeds(scrapeHandler.getScrapedSeeds());
 						
 						dl.setAnnounceResult(res);
 					}
 					
-					if(scrapeOnly && (handler.getScrapedPeers() > 0 || handler.getScrapedSeeds() > 0))
+					if(scrapeOnly && (scrapeHandler.getScrapedPeers() > 0 || scrapeHandler.getScrapedSeeds() > 0))
 					{
-						DHTScrapeResult res = new DHTScrapeResult(dl, handler.getScrapedSeeds(), handler.getScrapedPeers());
+						DHTScrapeResult res = new DHTScrapeResult(dl, scrapeHandler.getScrapedSeeds(), scrapeHandler.getScrapedPeers());
 						res.setScrapeStartTime(startTime);
 						dl.setScrapeResult(res);
 					}
@@ -247,7 +270,7 @@ public class Tracker {
 		}
 	}
 
-	private void scheduleTorrent (Download dl, boolean shortDelay) {
+	private void scheduleTorrent (final Download dl, boolean shortDelay) {
 		if (!running) {
 			return;
 		}
@@ -277,7 +300,15 @@ public class Tracker {
 						
 					}else{
 						
-						delay = SHORT_DELAY + random.nextInt(SHORT_DELAY);
+						if ( t.getAnnounceCount() == 0 && !dl.isComplete(true)){
+						
+								// first announce for an incomplete download, let's get some urgency into this!
+							
+							delay = VERY_SHORT_DELAY + random.nextInt(VERY_SHORT_DELAY);
+						}else{
+						
+							delay = SHORT_DELAY + random.nextInt(SHORT_DELAY);
+						}
 					}
 				}else{
 					
@@ -296,11 +327,21 @@ public class Tracker {
 
 			DHT.logInfo("Tracker: scheduled "+(t.scrapeOnly() ? "scrape" : "announce")+" in "
 					+ t.getDelay(TimeUnit.SECONDS) + "sec for: " + dl.getName());
-			targetQueue.add(t);
-
+			
 			if ( delay == 0 ){
 				
-				checkQueues();
+				dispatcher.dispatch(
+						new AERunnable()
+						{
+							public void 
+							runSupport() 
+							{
+								announceDownload(dl);
+							}
+						});
+			}else{
+				
+				targetQueue.add(t);
 			}
 		}
 	}
@@ -385,18 +426,20 @@ public class Tracker {
 
 		if (dl.getState() == Download.ST_DOWNLOADING || dl.getState() == Download.ST_SEEDING) {
 
-			//only act as backup tracker
-			if (plugin.getPluginInterface().getPluginconfig().getPluginBooleanParameter("backupOnly")) {
-				DownloadAnnounceResult result = dl.getLastAnnounceResult();
-
-				if (result == null || result.getResponseType() == DownloadAnnounceResult.RT_ERROR) {
-					addTrackedTorrent(dl, "BackupTracker");
-				} else {
-					removeTrackedTorrent(dl, "BackupTracker no longer needed");
-				}	
-
-				return;
-			}
+			 if ( !dl.getFlag( Download.FLAG_METADATA_DOWNLOAD )){
+				//only act as backup tracker
+				if (plugin.getPluginInterface().getPluginconfig().getPluginBooleanParameter("backupOnly")) {
+					DownloadAnnounceResult result = dl.getLastAnnounceResult();
+	
+					if (result == null || result.getResponseType() == DownloadAnnounceResult.RT_ERROR) {
+						addTrackedTorrent(dl, "BackupTracker");
+					} else {
+						removeTrackedTorrent(dl, "BackupTracker no longer needed");
+					}	
+	
+					return;
+				}
+			 }
 
 			addTrackedTorrent(dl, "Normal");
 

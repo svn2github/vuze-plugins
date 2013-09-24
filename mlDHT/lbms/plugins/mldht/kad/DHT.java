@@ -700,8 +700,10 @@ public class DHT implements DHTBase {
 		for(RPCServer s : servers)
 			s.destroy();
 		try {
-			node.saveTable(table_file);
-		} catch (IOException e) {
+			if ( node != null ){
+				node.saveTable(table_file);
+			}
+		} catch (Throwable e) {
 			e.printStackTrace();
 		}
 		running = false;
@@ -712,6 +714,8 @@ public class DHT implements DHTBase {
 		cache = null;
 		servers = null;
 		setStatus(DHTStatus.Stopped);
+		
+		dhts = null;
 	}
 
 	/*

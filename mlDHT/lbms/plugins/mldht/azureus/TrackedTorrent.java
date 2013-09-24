@@ -31,6 +31,7 @@ public class TrackedTorrent implements Delayed {
 	private long		lastAnnounceStart;
 	private Download	download;
 	private boolean		announcing;
+	private int			announceCount;
 
 	public TrackedTorrent (Download download) {
 		this.download = download;
@@ -99,8 +100,17 @@ public class TrackedTorrent implements Delayed {
 	 */
 	public void setAnnouncing (boolean announcing) {
 		this.announcing = announcing;
+		if ( announcing){
+			announceCount++;
+		}
 	}
 
+	public int
+	getAnnounceCount()
+	{
+		return( announceCount );
+	}
+	
 	public void setDelay (long delay) {
 		timestamp = System.currentTimeMillis() + delay;
 

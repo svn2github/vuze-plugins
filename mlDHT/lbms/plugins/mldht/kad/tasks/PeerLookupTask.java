@@ -38,7 +38,8 @@ public class PeerLookupTask extends Task {
 	private boolean							fastLookup;
 	
 	// nodes which have answered with tokens
-	private List<KBucketEntryAndToken>		announceCanidates;		
+	private List<KBucketEntryAndToken>		announceCanidates;
+	private AnnounceResponseHandler			announceHandler;
 	private ScrapeResponseHandler			scrapeHandler;
 
 	private Set<PeerAddressDBItem>			returnedItems;
@@ -67,6 +68,9 @@ public class PeerLookupTask extends Task {
 		this.scrapeHandler = scrapeHandler;
 	}
 	
+	public void setAnounceHandler(AnnounceResponseHandler announceHandler) {
+		this.announceHandler = announceHandler;
+	}
 	public void setNoSeeds(boolean avoidSeeds) {
 		noSeeds = avoidSeeds;
 	}
@@ -134,6 +138,7 @@ public class PeerLookupTask extends Task {
 		}
 
 		List<DBItem> items = gpr.getPeerItems();
+		boolean newItem = false;
 		//if(items.size() > 0)
 		//	System.out.println("unique:"+new HashSet<DBItem>(items).size()+" all:"+items.size()+" ver:"+gpr.getVersion()+" entries:"+items);
 		for (DBItem item : items)
@@ -142,8 +147,11 @@ public class PeerLookupTask extends Task {
 				continue;
 			PeerAddressDBItem it = (PeerAddressDBItem) item;
 			// also add the items to the returned_items list
-			if(!AddressUtils.isBogon(it))
-				returnedItems.add(it);
+			if(!AddressUtils.isBogon(it)){
+				if (returnedItems.add(it)){
+					newItem = true;
+				}
+			}
 		}
 		
 		KBucketEntry entry = new KBucketEntry(rsp.getOrigin(), rsp.getID());
@@ -155,8 +163,13 @@ public class PeerLookupTask extends Task {
 		// if someone has peers he might have filters, collect for scrape
 		if(!items.isEmpty())
 		{
-			if(scrapeHandler != null)
+			if(scrapeHandler != null){
 				scrapeHandler.addGetPeersRespone(gpr);
+			}
+			
+			if (announceHandler != null && newItem ){
+				announceHandler.itemsUpdated( this );
+			}
 		}
 		
 		if (gpr.getToken() != null)

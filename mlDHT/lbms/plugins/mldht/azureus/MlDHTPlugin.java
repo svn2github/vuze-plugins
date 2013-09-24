@@ -398,6 +398,8 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 			
 			logChannel.removeListener(logListener);
 		}
+		
+		singleton = null;
 	}
 
 	/*
