@@ -138,6 +138,7 @@ Transmission.prototype =
 			Prefs.getClutchPrefs(o);
 			this.updateGuiFromSession(o);
 			this.sessionProperties = o;
+			vz.updateSessionProperties(o);
 		}, this, async);
 	},
 
@@ -676,7 +677,7 @@ Transmission.prototype =
 	
 	resumeUI: function() {
 		this.uiPaused = false;
-		refreshTorrents();
+		this.refreshTorrents();
 	},
 	/* << Vuze */
 
@@ -760,7 +761,8 @@ Transmission.prototype =
 		delete this.sessionInterval;
 		if (enabled) {
 		        var callback = $.proxy(this.loadDaemonPrefs,this),
-			    msec = 8000;
+		        // >> Vuze: Was 8s.. why do we need to call it so often!?
+			    msec = 80000;
 			this.sessionInterval = setInterval(callback, msec);
 		}
 	},
@@ -1116,7 +1118,7 @@ Transmission.prototype =
 
 		// schedule the next request
 		clearTimeout(this.refreshTorrentsTimeout);
-		if (!this.uiPaused) {
+		if (!this.uiPaused && msec > 0) {
 			this.refreshTorrentsTimeout = setTimeout(callback, msec);
 		}
 	},
@@ -1308,19 +1310,13 @@ Transmission.prototype =
 					var key = "base64,"
 					var index = contents.indexOf (key);
 					if (index > -1) {
-						var metainfo = contents.substring (index + key.length);
-						var o = {
-							'method': 'torrent-add',
-							arguments: {
-								'paused': paused,
-								'download-dir': destination,
-								'metainfo': metainfo
-							}
+						var metainfo = contents.substring(index + key.length);
+						var arguments = {
+							'download-dir' : destination,
+							'paused' : paused
 						};
-						remote.sendRequest (o, function(response) {
-							if (response.result != 'success')
-								alert ('Error adding "' + file.name + '": ' + response.result);
-						});
+
+						remote.addTorrentByMetaInfo(metainfo, arguments);
 					}
 				}
 				reader.readAsDataURL (file);
@@ -1397,6 +1393,9 @@ Transmission.prototype =
 	{
 		if (torrents.length === 1)
 		{
+			if (vz.showConfirmDeleteDialog(torrents[0])) {
+				return;
+			}
 			var torrent = torrents[0],
 			    header = 'Remove ' + torrent.getName() + ' and delete data?',
 			    message = 'All data downloaded for this torrent will be deleted. Are you sure you want to remove it?';
@@ -1596,6 +1595,9 @@ Transmission.prototype =
 
 		// visible torrents
 		$('#filter-count').text( fmt.countString('Transfer','Transfers',this._rows.length ) );
+
+		vz.updateSpeed(d, u);
+		vz.updateTorrentCount(this._rows.length);
 	},
 
 	setEnabled: function(key, flag)
