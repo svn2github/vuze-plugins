@@ -154,10 +154,21 @@ vz.showOpenTorrentDialog = function() {
 	return false;
 };
 
-vz.handleConnectionError = function(errNo, msg) {
+vz.handleConnectionError = function(errNo, msg, status) {
 	if (vz.hasExternalOSFunctions()) {
 		try {
-			return externalOSFunctions.handleConnectionError(errNo, msg);
+			return externalOSFunctions.handleConnectionError(errNo, msg, status);
+		} catch(e) {
+			console.log(e);
+		}
+	}
+	return false;
+};
+
+vz.showConfirmDeleteDialog = function(torrent) {
+	if (vz.hasExternalOSFunctions()) {
+		try {
+			return externalOSFunctions.showConfirmDeleteDialog(torrent.getName(), torrent.getId());
 		} catch(e) {
 			console.log(e);
 		}
@@ -186,6 +197,26 @@ vz.uiReady = function() {
 	}
 };
 
+vz.updateSpeed = function(downSpeed, upSpeed) {
+	if (vz.hasExternalOSFunctions()) {
+		try {
+			externalOSFunctions.updateSpeed(downSpeed, upSpeed);
+		} catch(e) {
+			console.log(e);
+		}
+	}
+};
+
+vz.updateTorrentCount= function(total) {
+	if (vz.hasExternalOSFunctions()) {
+		try {
+			externalOSFunctions.updateTorrentCount(total);
+		} catch(e) {
+			console.log(e);
+		}
+	}
+};
+
 vz.selectionChanged = function(selectedRows, haveActive, havePaused, haveActiveSel, havePausedSel) {
 
 	if (vz.hasExternalOSFunctions()) {
@@ -196,6 +227,16 @@ vz.selectionChanged = function(selectedRows, haveActive, havePaused, haveActiveS
 				externalOSFunctions.selectionChanged(selectedRows.length, haveActive, havePaused, haveActiveSel, havePausedSel);
 			}
 			
+		} catch(e) {
+			console.log(e);
+		}
+	}
+};
+
+vz.updateSessionProperties = function(sessionProperties) {
+	if (vz.hasExternalOSFunctions()) {
+		try {
+			externalOSFunctions.updateSessionProperties(JSON.stringify(sessionProperties));
 		} catch(e) {
 			console.log(e);
 		}
