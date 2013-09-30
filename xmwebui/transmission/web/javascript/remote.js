@@ -92,7 +92,7 @@ TransmissionRemote.prototype =
 	ajaxError: function(request, error_string, exception, ajaxObject) {
 		var token,
 		   remote = this;
-		
+
 		// set the Transmission-Session-Id on a 409
 		if (request.status === 409 && (token = request.getResponseHeader('X-Transmission-Session-Id'))){
 			remote._token = token;
@@ -104,7 +104,7 @@ TransmissionRemote.prototype =
 		? request.responseText.trim().replace(/(<([^>]+)>)/ig,"")
 				: "";
 		if(!remote._error.length )
-			remote._error = 'Server not responding' + ( error_string ? ' ( ' + error_string + ' )' : '' );
+			remote._error = 'Server not responding' + ' ( ' + String(error_string) + ': ' + String(exception) + ' )';
 
 		/* >> Vuze Added */
 		remote._lastCallWasError = true;
@@ -114,7 +114,7 @@ TransmissionRemote.prototype =
 //			console.log("not a persistent error -- exit");
 //			return;
 //		}
-		if (vz.handleConnectionError(1, remote._error)) {
+		if (vz.handleConnectionError(1, remote._error, error_string)) {
 			console.log("ext handled connection error -- exit");
 			return;
 		}
@@ -163,12 +163,15 @@ TransmissionRemote.prototype =
 			contentType: 'json',
 			dataType: 'json',
 			cache: false,
+			timeout: 40000,
 			data: JSON.stringify(data),
 			beforeSend: function(XHR){ remote.appendSessionId(XHR); },
-			error: function(request, error_string, exception){ 
-				console.log(request);
-				console.log(error_string);
-				console.log(exception);
+			error: function(request, error_string, exception){
+				if (request.status !== 409) {
+					console.log(request);
+					console.log(error_string);
+					console.log(exception);
+				}
 				remote.ajaxError(request, error_string, exception, ajaxSettings);
 				},
 			success: callback,
@@ -284,6 +287,22 @@ TransmissionRemote.prototype =
 			remote._controller.refreshTorrents();
 		});
 	},
+	// >> Vuze
+	removeTorrentAndDataById: function(id) {
+		var remote = this;
+		var o = {
+			method: 'torrent-remove',
+			arguments: {
+				'delete-local-data': true,
+				ids: [ id ]
+			}
+		};
+
+		this.sendRequest(o, function() {
+			remote._controller.refreshTorrents();
+		});
+	},
+	// << Vuze
 	verifyTorrents: function(torrent_ids, callback, context) {
 		this.sendTorrentActionRequests('torrent-verify', torrent_ids, callback, context);
 	},
@@ -291,6 +310,15 @@ TransmissionRemote.prototype =
 		this.sendTorrentActionRequests('torrent-reannounce', torrent_ids, callback, context);
 	},
 	addTorrentByUrl: function(url, options) {
+		// >> Vuze: fill in default options
+		if (typeof options !== "object" || options == null) {
+			options = {
+				'download-dir' : $("#download-dir").val(),
+				paused : !transmission.shouldAddedTorrentsStart()
+			};
+		}
+		// << Vuze
+
 		var remote = this;
 		if (url.match(/^[0-9a-f]{40}$/i)) {
 			url = 'magnet:?xt=urn:btih:'+url;
@@ -311,6 +339,33 @@ TransmissionRemote.prototype =
 			remote._controller.refreshTorrents();
 		});
 	},
+	// >> Vuze
+	addTorrentByMetainfo: function(metainfo, options) {
+		var remote = this;
+
+		if (typeof options !== "object" || options == null) {
+			options = {
+				'download-dir' : $("#download-dir").val(),
+				paused : !transmission.shouldAddedTorrentsStart()
+			};
+		}
+
+		var o = {
+			'method' : 'torrent-add',
+			arguments : {
+				paused: (options.paused),
+				'download-dir': (options.destination),
+				'metainfo' : metainfo
+			}
+		};
+		remote.sendRequest(o, function(response) {
+			if (response.result != 'success') {
+				alert('Error adding torrent: ' + response.result);
+			}
+			remote._controller.refreshTorrents();
+		});
+	},
+	// << Vuze
 	savePrefs: function(args) {
 		var remote = this;
 		var o = {
