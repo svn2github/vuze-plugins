@@ -2,6 +2,10 @@ div#toolbar-area {
 	display: none;
 }
 
+div#torrent_logo {
+	display: none;
+}
+
 #statusbar {
 	display: none;
 }
