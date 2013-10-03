@@ -30,7 +30,6 @@ import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.layout.*;
 import org.eclipse.swt.program.Program;
 import org.eclipse.swt.widgets.*;
-
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.config.ParameterListener;
 import org.gudy.azureus2.core3.internat.MessageText;
@@ -721,7 +720,7 @@ SBC_RCMView
 					if ( rc.getHash() != null ){
 						SelectedContent sc = new SelectedContent(Base32.encode(rc.getHash()), rc.getTitle());
 						sc.setDownloadInfo(new DownloadUrlInfo(
-								UrlUtils.getMagnetURI(rc.getHash()) + "&dn=" + rc.getTitle()));
+								UrlUtils.getMagnetURI(rc.getHash()) + "&dn=" + UrlUtils.encode( rc.getTitle())));
 						valid.add(sc);
 					}
 				}

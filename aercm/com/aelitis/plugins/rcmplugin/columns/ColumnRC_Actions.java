@@ -21,10 +21,10 @@ package com.aelitis.plugins.rcmplugin.columns;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.*;
 import org.eclipse.swt.widgets.Display;
-
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.UrlUtils;
 import org.gudy.azureus2.plugins.ui.tables.*;
 import org.gudy.azureus2.ui.swt.mainwindow.TorrentOpener;
 import org.gudy.azureus2.ui.swt.shells.GCStringPrinter;
@@ -199,7 +199,7 @@ public class ColumnRC_Actions
 							
 							rc.setUnread( false );
 							
-							TorrentOpener.openTorrent( ByteFormatter.encodeString( hash ));
+							TorrentOpener.openTorrent( UrlUtils.getMagnetURI( hash ) + "&dn=" + UrlUtils.encode( rc.getTitle()));
 						}
 						
 					} else if (hitUrl.url.equals("search")) {
