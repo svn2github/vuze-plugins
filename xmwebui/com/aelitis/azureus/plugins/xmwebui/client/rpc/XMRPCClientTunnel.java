@@ -546,7 +546,7 @@ XMRPCClientTunnel
 			
 			System.out.println( "Received reply: " + reply_headers );
 		
-			return( utils.createHTTPResponse( reply_headers, reply_data, reply_data_offset ));
+			return( utils.createHTTPResponse((Map<String,String>)(Object)reply_headers, reply_data, reply_data_offset ));
 			
 		}catch( XMRPCClientException e ){
 			
