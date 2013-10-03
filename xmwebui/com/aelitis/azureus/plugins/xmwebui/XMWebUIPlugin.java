@@ -2779,7 +2779,7 @@ XMWebUIPlugin
 				
 				DownloadStats	stats = download.getStats();
 				
-				Map torrent = new HashMap();
+				Map torrent = new HashMap( fields.size()+8);
 				
 				torrent_info.put( download_id, torrent );
 				
@@ -3677,7 +3677,7 @@ XMWebUIPlugin
 	    	statusString = "";
 	    }
 
-	    Map<String, Object> map = new HashMap<String, Object>();
+	    Map<String, Object> map = new HashMap<String, Object>( 64 );
 			
 	    /* how many downloads this tracker knows of (-1 means it does not know) */
 	    map.put("downloadCount", -1); // TODO
@@ -3930,7 +3930,7 @@ XMWebUIPlugin
 		
 		for ( DiskManagerFileInfo file: files ){
 			
-			Map obj = new HashMap();
+			Map obj = new HashMap(8);
 			
 			stats_list.add( obj );
 			
@@ -3955,7 +3955,7 @@ XMWebUIPlugin
 		
 		for ( org.gudy.azureus2.core3.disk.DiskManagerFileInfo file: files ){
 			
-			Map obj = new HashMap();
+			Map obj = new HashMap(8);
 			
 			file_list.add( obj );
 			
