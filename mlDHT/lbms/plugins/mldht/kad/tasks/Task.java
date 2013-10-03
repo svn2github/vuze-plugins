@@ -204,7 +204,7 @@ public abstract class Task implements RPCCallListener {
 
 	/// See if we can do a request
 	boolean canDoRequest () {
-		return outstandingRequestsExcludingStalled.get() < DHTConstants.MAX_CONCURRENT_REQUESTS;
+		return rpc.isRunning() && outstandingRequestsExcludingStalled.get() < DHTConstants.MAX_CONCURRENT_REQUESTS;
 	}
 	
 	boolean hasUnfinishedRequests() {

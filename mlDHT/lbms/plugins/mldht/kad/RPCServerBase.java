@@ -29,6 +29,8 @@ public interface RPCServerBase {
 
 	public void start ();
 
+	public boolean isRunning();
+	
 	public void destroy ();
 
 	/**

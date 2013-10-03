@@ -473,7 +473,11 @@ public class Node {
 	 * @param file to save to
 	 * @throws IOException
 	 */
-	void saveTable (File file) throws IOException {
+	void saveTable (File file, boolean forClose) throws IOException {
+		if(dataStore == null){
+			return;
+		}
+		
 		ObjectOutputStream oos = null;
 		
 		File tempFile = new File(file.getPath()+".tmp");
@@ -504,6 +508,10 @@ public class Node {
 			if (oos != null) {
 				oos.close();
 			}
+		}
+		
+		if ( forClose ){
+			dataStore = null;
 		}
 	}
 	

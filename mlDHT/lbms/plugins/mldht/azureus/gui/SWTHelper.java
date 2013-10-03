@@ -203,13 +203,15 @@ public class SWTHelper implements UIHelper, UIManagerListener, PopulationListene
 			if (display != null && !display.isDisposed()) {
 				display.asyncExec(new Runnable() {
 					public void run () {
-						if ( SHOW_STATUS_TEXT ){
-							statusEntry.setText(text.toString());
-						}else{
-							statusEntry.setText( "mlDHT" );
+						if ( statusEntry != null ){
+							if ( SHOW_STATUS_TEXT ){
+								statusEntry.setText(text.toString());
+							}else{
+								statusEntry.setText( "mlDHT" );
+							}
+							statusEntry.setTooltipText(tooltip.toString());
+							statusEntry.setVisible(plugin.getPluginInterface().getPluginconfig().getPluginBooleanParameter("showStatusEntry"));
 						}
-						statusEntry.setTooltipText(tooltip.toString());
-						statusEntry.setVisible(plugin.getPluginInterface().getPluginconfig().getPluginBooleanParameter("showStatusEntry"));
 					}
 				});
 			}

@@ -73,6 +73,13 @@ public class RPCServer implements Runnable, RPCServerBase {
 		return dh_table;
 	}
 	
+	@Override
+	public boolean 
+	isRunning() 
+	{
+		return( dh_table.isRunning());
+	}
+	
 	private boolean createSocket() 
 	{
 		if(sock != null)
@@ -229,7 +236,10 @@ public class RPCServer implements Runnable, RPCServerBase {
 			DHT.logInfo("Stopping RPC Server");
 		running = false;
 		dh_table.removeServer(this);
-		dh_table.getNode().removeServer(this);
+		Node node = dh_table.getNode();
+		if ( node != null ){
+			node.removeServer(this);
+		}
 		synchronized (interfacesInUse)
 		{
 			interfacesInUse.values().remove(this);

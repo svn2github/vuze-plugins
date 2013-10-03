@@ -69,6 +69,19 @@ public class DHT implements DHTBase {
 	
 	static {
 		executorGroup = new ThreadGroup("mlDHT");
+		initStatics();
+	}
+
+	public static void
+	initStatics()
+	{
+		createScheduler();
+		createLogger();
+	}
+	
+	private static void
+	createScheduler()
+	{
 		int threads = Math.max(Runtime.getRuntime().availableProcessors(),2);
 		scheduler = new ScheduledThreadPoolExecutor(threads, new ThreadFactory() {
 			public Thread newThread (Runnable r) {
@@ -82,24 +95,23 @@ public class DHT implements DHTBase {
 		scheduler.setMaximumPoolSize(threads*2);
 		scheduler.setKeepAliveTime(20, TimeUnit.SECONDS);
 		scheduler.allowCoreThreadTimeOut(true);
-
+	}
+	
+	private static void
+	createLogger()
+	{
 		logger = new DHTLogger() {
 			public void log (String message) {
 				System.out.println(message);
 			};
-
-			/*
-			 * (non-Javadoc)
-			 * 
-			 * @see lbms.plugins.mldht.kad.DHTLogger#log(java.lang.Exception)
-			 */
 			public void log (Exception e) {
 				e.printStackTrace();
 			}
 		};
 	}
-
+	
 	private boolean							running;
+	private boolean							stopped;
 	
 	private long							server_create_counter;
 	private long							last_rpc_create;
@@ -107,9 +119,9 @@ public class DHT implements DHTBase {
 	private boolean							bootstrapping;
 	private long							lastBootstrap;
 
-	private DHTConfiguration					config;
+	private DHTConfiguration				config;
 	private Node							node;
-	private List<RPCServer>					servers;
+	private List<RPCServer>					servers = new CopyOnWriteArrayList<RPCServer>();
 	private Database						db;
 	private TaskManager						tman;
 	private File							table_file;
@@ -158,7 +170,6 @@ public class DHT implements DHTBase {
 		statusListeners = new ArrayList<DHTStatusListener>(2);
 		indexingListeners = new ArrayList<DHTIndexingListener>();
 		estimator = new PopulationEstimator();
-		servers = new CopyOnWriteArrayList<RPCServer>();
 	}
 	
 	public void ping (PingRequest r) {
@@ -472,7 +483,7 @@ public class DHT implements DHTBase {
 	 * @see lbms.plugins.mldht.kad.DHTBase#isRunning()
 	 */
 	public boolean isRunning () {
-		return running && servers.size() > 0;
+		return running && !stopped && servers.size() > 0;
 	}
 
 	/*
@@ -509,7 +520,7 @@ public class DHT implements DHTBase {
 	 */
 	public void start (DHTConfiguration config)
 			throws SocketException {
-		if (running) {
+		if (running || stopped) {
 			return;
 		}
 
@@ -668,7 +679,7 @@ public class DHT implements DHTBase {
 				
 				try {
 					if(!node.isInSurvivalMode())
-						node.saveTable(table_file);
+						node.saveTable(table_file,false);
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -685,8 +696,8 @@ public class DHT implements DHTBase {
 		if (!running) {
 			return;
 		}
-
-		//scheduler.shutdown();
+		stopped();
+		
 		logInfo("Stopping DHT");
 		for (Task t : tman.getActiveTasks()) {
 			t.kill();
@@ -695,24 +706,25 @@ public class DHT implements DHTBase {
 		for(ScheduledFuture<?> future : scheduledActions)
 			future.cancel(false);
 		scheduler.getQueue().removeAll(scheduledActions);
+		scheduler.shutdownNow();
+
 		scheduledActions.clear();
 
 		for(RPCServer s : servers)
 			s.destroy();
 		try {
 			if ( node != null ){
-				node.saveTable(table_file);
+				node.saveTable(table_file,true);
 			}
 		} catch (Throwable e) {
 			e.printStackTrace();
 		}
 		running = false;
-		stopped();
+		
 		tman = null;
 		db = null;
 		node = null;
 		cache = null;
-		servers = null;
 		setStatus(DHTStatus.Stopped);
 		
 		dhts = null;
@@ -742,7 +754,8 @@ public class DHT implements DHTBase {
 	 * @see lbms.plugins.mldht.kad.DHTBase#stopped()
 	 */
 	public void stopped () {
-		// TODO Auto-generated method stub
+		
+		stopped = true;
 
 	}
 

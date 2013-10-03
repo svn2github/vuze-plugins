@@ -398,8 +398,12 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 			
 			logChannel.removeListener(logListener);
 		}
+			
+		DHT.initStatics();	// reset in case plugin class isn't unloaded (happend when bundled)
 		
-		singleton = null;
+		dhts 		= null;
+		
+		singleton 	= null;
 	}
 
 	/*
