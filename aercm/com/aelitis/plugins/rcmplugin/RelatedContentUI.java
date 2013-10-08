@@ -41,7 +41,6 @@ import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.MessageBox;
 import org.eclipse.swt.widgets.TreeItem;
 import org.eclipse.swt.widgets.Shell;
-
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.*;
@@ -1906,7 +1905,6 @@ RelatedContentUI
 	RCMView
 		implements 	ViewTitleInfo
 	{
-		private String			parent_key;
 		private String			name;
 		
 		private int				num_unread;
@@ -1916,7 +1914,6 @@ RelatedContentUI
 			String			_parent_key,
 			String			_name )
 		{
-			parent_key	= _parent_key;
 			name		= _name;
 		}
 		
@@ -2216,6 +2213,166 @@ RelatedContentUI
 				
 					manager.lookupContent( hash, listener );
 					
+					SubscriptionManager subs_man = SubscriptionManagerFactory.getSingleton();
+					
+					subs_man.lookupAssociations(
+						hash,
+						new SubscriptionLookupListener()
+						{
+							private Map<String,SubsRelatedContent>	s_map = new HashMap<String,SubsRelatedContent>();
+
+							public void
+							found(
+								byte[]					hash,
+								Subscription			subscription )
+							{
+								try{
+									RelatedContent[] content;
+									
+									if ( subscription.isSearchTemplate()){
+										
+										if ( !subscription.isSearchTemplateImportable()){
+											
+											return;
+										}
+										
+										String sub_name = subscription.getName();
+										
+										int	pos = sub_name.indexOf( ":" ) + 1;
+										
+										String t_prefix = sub_name.substring( 0, pos ) + " ";
+										String t_name 	= sub_name.substring( pos );
+										
+										pos	= t_name.indexOf( "(v" );
+										
+										int t_ver;
+										
+										if ( pos == -1 ){
+											
+											t_ver = 1;
+											
+										}else{
+											
+											String s = t_name.substring( pos+2, t_name.length()-1);
+											
+											t_name = t_name.substring( 0, pos );
+											
+											try{
+										
+												t_ver = Integer.parseInt(s);
+												
+											}catch( Throwable e ){
+												
+												t_ver = 1;
+											}
+										}
+										
+										t_name = t_name.trim();
+										
+										synchronized( RCMItemContent.this ){
+													
+											if ( destroyed ){
+												
+												return;
+											}
+											
+											SubsRelatedContent existing = s_map.get( t_name );
+											
+											if ( existing != null ){
+												
+												int e = existing.getRank();
+												
+												if ( e >= t_ver ){
+													
+													return;
+												}
+												
+												existing.setRank( t_ver );
+												
+												existing.setSubscription( subscription );
+												
+												return;
+												
+											}else{
+												
+												existing = new SubsRelatedContent( subscription, t_prefix + t_name );
+												
+												s_map.put( t_name, existing );
+												
+												existing.setRank( t_ver );
+												
+												content_list.add( existing );
+												
+												content = new RelatedContent[]{ existing };
+											}
+										}
+											
+									}else{
+									
+										synchronized( RCMItemContent.this ){
+												
+											if ( destroyed ){
+												
+												return;
+											}
+	
+											String id = subscription.getID();
+											
+											SubsRelatedContent existing = s_map.get( id );
+											
+											if ( existing == null ){
+												
+												existing = new SubsRelatedContent( subscription, subscription.getName());
+												
+												s_map.put( id, existing );
+												
+												content_list.add( existing );
+												
+												content = new RelatedContent[]{ existing };
+												
+											}else{
+												
+												existing.setRank( existing.getRank() + 1 );
+												
+												return;
+											}
+										}
+									}
+																
+									updateNumUnread();
+									
+									for ( RelatedContentEnumeratorListener listener: listeners ){
+										
+										try{
+											listener.contentFound( content );
+											
+										}catch( Throwable e ){
+											
+											Debug.out( e );
+										}
+									}	
+								}catch( Throwable e ){
+									
+								}
+							}
+							
+							public void
+							complete(
+								byte[]					hash,
+								Subscription[]			subscriptions )
+							{
+								
+							}
+							
+							public void
+							failed(
+								byte[]					hash,
+								SubscriptionException	error )
+							{
+								
+							}
+						});
+					
 				}else{
 					
 					manager.lookupContent( file_size, listener );
@@ -2475,9 +2632,12 @@ RelatedContentUI
 											
 											if ( !listener.searching()){
 												
-												update_event.cancel();
+												if ( update_event != null ){
 												
-												update_event = null;
+													update_event.cancel();
+												
+													update_event = null;
+												}
 											}
 										}
 									}
@@ -2628,7 +2788,7 @@ RelatedContentUI
 													
 													if ( existing == null ){
 														
-														existing = new SubsRelatedContent( subscription );
+														existing = new SubsRelatedContent( subscription, subscription.getName());
 														
 														s_map.put( id, existing );
 														
@@ -2880,14 +3040,28 @@ RelatedContentUI
 		
 		private
 		SubsRelatedContent(
-			Subscription	subs )
+			Subscription	subs,
+			String			name )
 		{
-			super( subs.getName(), new byte[0], subs.getNameEx(), -1, -1, (int)(subs.getCachedPopularity()<<16), (byte)ContentNetwork.CONTENT_NETWORK_UNKNOWN );
+			super( name, new byte[0], subs.getNameEx(), -1, -1, (int)(subs.getCachedPopularity()<<16), (byte)ContentNetwork.CONTENT_NETWORK_UNKNOWN );
 			
 			subscription = subs;
 		}
 		
-		public void
+		public Subscription
+		getSubscription()
+		{
+			return( subscription );
+		}
+		
+		private void
+		setSubscription(
+			Subscription		_subs )
+		{
+			subscription = _subs;
+		}
+		
+		private void
 		setRank(
 			int		r )
 		{

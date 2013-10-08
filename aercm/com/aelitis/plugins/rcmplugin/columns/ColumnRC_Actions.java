@@ -33,6 +33,11 @@ import org.gudy.azureus2.ui.swt.views.table.TableCellSWT;
 import org.gudy.azureus2.ui.swt.views.table.TableCellSWTPaintListener;
 
 import com.aelitis.azureus.core.content.RelatedContent;
+import com.aelitis.azureus.core.metasearch.Engine;
+import com.aelitis.azureus.core.subs.Subscription;
+import com.aelitis.azureus.core.vuzefile.VuzeFile;
+import com.aelitis.azureus.core.vuzefile.VuzeFileComponent;
+import com.aelitis.azureus.core.vuzefile.VuzeFileHandler;
 import com.aelitis.azureus.ui.UIFunctionsManager;
 import com.aelitis.azureus.ui.common.table.TableColumnCore;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinFactory;
@@ -141,8 +146,16 @@ public class ColumnRC_Actions
 		
 		if ( rc instanceof RelatedContentUI.SubsRelatedContent ){
 			
-			s = "<A HREF=\"subscribe\">" + "Subscribe" + "</A>";
-
+			Subscription subs = ((RelatedContentUI.SubsRelatedContent)rc).getSubscription();
+			
+			if ( subs.isSearchTemplate()){
+				
+				s = "<A HREF=\"install\">" + "Install" + "</A>";
+			
+			}else{
+			
+				s = "<A HREF=\"subscribe\">" + "Subscribe" + "</A>";
+			}
 		}else{
 			s = "<A HREF=\"search\">" + MessageText.getString("Button.search") + "</A>";
 			if (downloadable) {
@@ -210,6 +223,33 @@ public class ColumnRC_Actions
 						UIFunctionsManager.getUIFunctions().doSearch( title );
 					} else if (hitUrl.url.equals("subscribe")) {
 						rc.setUnread( false );
+					} else if (hitUrl.url.equals("install")) {
+						Subscription subs = ((RelatedContentUI.SubsRelatedContent)rc).getSubscription();
+						
+						try{
+							VuzeFile vf = subs.getSearchTemplateVuzeFile();
+							
+							if ( vf != null ){
+							
+								subs.setSubscribed( true );
+								
+								VuzeFileHandler.getSingleton().handleFiles( new VuzeFile[]{ vf }, VuzeFileComponent.COMP_TYPE_NONE );
+								
+								
+								for ( VuzeFileComponent comp: vf.getComponents()){
+									
+									Engine engine = (Engine)comp.getData( Engine.VUZE_FILE_COMPONENT_ENGINE_KEY );
+									
+									if ( engine != null && engine.getSelectionState() == Engine.SEL_STATE_DESELECTED ){
+										
+										engine.setSelectionState( Engine.SEL_STATE_MANUAL_SELECTED );
+									}
+								}
+							}
+						}catch( Throwable e ){
+							
+							Debug.out( e );
+						}
 					}
 				}
 
