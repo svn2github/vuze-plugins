@@ -699,7 +699,7 @@ XMWebUIPlugin
 			
 			String	url = request.getURL();
 		
-			//System.out.println( request.getHeader() );
+			//System.out.println( "Header: " + request.getHeader() );
 			
 			if ( url.equals( "/transmission/rpc" )){
 							
@@ -1171,12 +1171,13 @@ XMWebUIPlugin
 			
 			String 	save_dir 	= pc.getCoreStringParameter( PluginConfig.CORE_PARAM_STRING_DEFAULT_SAVE_PATH );
 			int		tcp_port 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_INCOMING_TCP_PORT );
-			int		up_limit_normal 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_KBYTES_PER_SEC );
-			int		up_limit_seedingOnly 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_SEEDING_KBYTES_PER_SEC );
+			//int		up_limit_normal 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_KBYTES_PER_SEC );
+			//int		up_limit_seedingOnly 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_SEEDING_KBYTES_PER_SEC );
 			int up_limit = pc.getCoreIntParameter( TransferSpeedValidator.getActiveUploadParameter(AzureusCoreFactory.getSingleton().getGlobalManager()));
 			int		down_limit 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_DOWNLOAD_SPEED_KBYTES_PER_SEC );
 			int		glob_con	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_CONNECTIONS_GLOBAL );
 			int		tor_con 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_CONNECTIONS_PER_TORRENT );
+			
 			
 			boolean auto_speed_on = pc.getCoreBooleanParameter( PluginConfig.CORE_PARAM_BOOLEAN_AUTO_SPEED_ON ) ||
 									pc.getCoreBooleanParameter( PluginConfig.CORE_PARAM_BOOLEAN_AUTO_SPEED_SEEDING_ON );
@@ -1215,7 +1216,7 @@ XMWebUIPlugin
 	    // RPC 12 to 14
 	    result.put("download-dir-free-space", -1);
 
-	    result.put(TransmissionVars.TR_PREFS_KEY_DSPEED_KBps, down_limit );
+	    result.put(TransmissionVars.TR_PREFS_KEY_DSPEED_KBps, down_limit > 0 ? down_limit : pc.getUnsafeIntParameter("config.ui.speed.partitions.manual.download.last"));
 	    result.put(TransmissionVars.TR_PREFS_KEY_DSPEED_ENABLED, down_limit != 0 );
 	    result.put(TransmissionVars.TR_PREFS_KEY_ENCRYPTION, require_enc?"required":"preferred" );               		// string     "required", "preferred", "tolerated"
 	    result.put(TransmissionVars.TR_PREFS_KEY_IDLE_LIMIT, 30 ); //TODO
@@ -1262,7 +1263,7 @@ XMWebUIPlugin
 	    result.put(TransmissionVars.TR_PREFS_KEY_ALT_SPEED_TIME_ENABLED, false ); //TODO
 	    result.put(TransmissionVars.TR_PREFS_KEY_ALT_SPEED_TIME_END, 1020 ); /* 5pm */ //TODO
 	    result.put(TransmissionVars.TR_PREFS_KEY_ALT_SPEED_TIME_DAY, TransmissionVars.TR_SCHED_ALL ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_USPEED_KBps, up_limit );
+	    result.put(TransmissionVars.TR_PREFS_KEY_USPEED_KBps, up_limit > 0 ? up_limit :pc.getUnsafeIntParameter("config.ui.speed.partitions.manual.upload.last"));
 	    result.put(TransmissionVars.TR_PREFS_KEY_USPEED_ENABLED, up_limit != 0);
 	    result.put(TransmissionVars.TR_PREFS_KEY_UMASK, 022 ); //TODO
 	    result.put(TransmissionVars.TR_PREFS_KEY_UPLOAD_SLOTS_PER_TORRENT, 14 ); //TODO
@@ -1384,6 +1385,10 @@ XMWebUIPlugin
 			// RPC v14
 			method_Queue_Move_Bottom(args, result);
 
+		}else if ( method.equals( "free-space" )){
+			// RPC v15
+			method_Free_Space(args, result);
+
 		}else if ( method.equals( "vuze-search-start" )){
 			
 			MetaSearchManager ms_manager = MetaSearchManagerFactory.getSingleton();
@@ -1503,6 +1508,39 @@ XMWebUIPlugin
 		}
 
 		return( result );
+	}
+
+	private void method_Free_Space(Map args, Map result) {
+		// RPC v15
+/*
+   This method tests how much free space is available in a
+   client-specified folder.
+
+   Method name: "free-space"
+
+   Request arguments:
+
+   string      | value type & description
+   ------------+----------------------------------------------------------
+   "path"      | string  the directory to query
+
+   Response arguments:
+
+   string      | value type & description
+   ------------+----------------------------------------------------------
+   "path"      | string  same as the Request argument
+   "size-bytes"| number  the size, in bytes, of the free space in that directory
+ */
+		Object oPath = args.get("path");
+		if (!(oPath instanceof String)) {
+			return;
+		}
+		
+		File file = new File((String) oPath);
+		long space = FileUtil.getUsableSpace(file);
+		
+		result.put("path", oPath);
+		result.put("size-bytes", space);
 	}
 
 	private void method_Queue_Move_Bottom(Map args, Map result) {
@@ -1705,9 +1743,13 @@ XMWebUIPlugin
 								PluginConfig.CORE_PARAM_INT_MAX_DOWNLOAD_SPEED_KBYTES_PER_SEC,
 								down_limit);
 					} else if (enable && down_limit == 0) {
+						int lastRate = pc.getUnsafeIntParameter("config.ui.speed.partitions.manual.download.last");
+						if (lastRate <= 0) {
+							lastRate = 10;
+						}
 						pc.setCoreIntParameter(
 								PluginConfig.CORE_PARAM_INT_MAX_DOWNLOAD_SPEED_KBYTES_PER_SEC,
-								10);
+								lastRate);
 					}
 				} else if (key.equals("speed-limit-down")
 						|| key.equals("downloadLimit")) {
@@ -1742,11 +1784,15 @@ XMWebUIPlugin
 								PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_SEEDING_KBYTES_PER_SEC,
 								0);
 					} else {
+						int lastRate = pc.getUnsafeIntParameter("config.ui.speed.partitions.manual.upload.last");
+						if (lastRate <= 0) {
+							lastRate = 10;
+						}
 						pc.setCoreIntParameter(
-								PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_KBYTES_PER_SEC, 10);
+								PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_KBYTES_PER_SEC, lastRate);
 						pc.setCoreIntParameter(
 								PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_SEEDING_KBYTES_PER_SEC,
-								10);
+								lastRate);
 					}
 				} else if (key.equals("speed-limit-up") || key.equals("uploadLimit")) {
 
