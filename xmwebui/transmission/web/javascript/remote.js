@@ -163,7 +163,7 @@ TransmissionRemote.prototype =
 			contentType: 'json',
 			dataType: 'json',
 			cache: false,
-			timeout: 40000,
+			timeout: 60000,
 			data: JSON.stringify(data),
 			beforeSend: function(XHR){ remote.appendSessionId(XHR); },
 			error: function(request, error_string, exception){
