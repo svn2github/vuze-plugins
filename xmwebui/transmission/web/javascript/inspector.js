@@ -41,11 +41,23 @@ function Inspector(controller) {
     onTabClicked = function (ev) {
         var tab = ev.currentTarget;
 
-        if (isMobileDevice)
-            ev.stopPropagation();
+        ev.stopPropagation();
+		ev.preventDefault();
+		// ev.preventDefault doesn't always cancel click event..
+		// ignore clicks if tap has been pressed once
+		if (!this.skipClick) {
+			if (ev.type == 'tap') {
+				this.skipClick = true;
+			}
+		} else {
+			if (ev.type == 'click') {
+				return;
+			}
+		}
 
         // select this tab and deselect the others
-        $(tab).addClass('selected').siblings().removeClass('selected');
+		$(tab).siblings().removeClass('selected');
+        $(tab).addClass('selected');
 
         // show this tab and hide the others
         $('#' + tab.id.replace('tab','page')).show().siblings('.inspector-page').hide();
@@ -542,7 +554,7 @@ function Inspector(controller) {
     },
                 
     updateFilesPage = function() {
-        var i, n, tor, fragment, tree,
+       var i, n, tor, fragment, tree,
             file_list = data.elements.file_list,
             torrents = data.torrents;
 
@@ -755,7 +767,11 @@ function Inspector(controller) {
 
         data.controller = controller;
 
+		this.skipClick = false;
+
         $('.inspector-tab').click(onTabClicked);
+		// Vuze: add tap, as it doesn't have a 300ms delay on mobiles
+        $('.inspector-tab').bind('tap', onTabClicked);
 
         data.elements.info_page      = $('#inspector-page-info')[0];
         data.elements.files_page     = $('#inspector-page-files')[0];
@@ -798,6 +814,8 @@ function Inspector(controller) {
     this.setTorrents = function (torrents) {
         var d = data;
 
+        clearFileList();
+
         // update the inspector when a selected torrent's data changes.
         $(d.torrents).unbind('dataChanged.inspector');
         $(torrents).bind('dataChanged.inspector', $.proxy(updateInspector,this));
@@ -805,7 +823,8 @@ function Inspector(controller) {
 
         // periodically ask for updates to the inspector's torrents
         clearInterval(d.refreshInterval);
-        d.refreshInterval = setInterval($.proxy(refreshTorrents,this), 2000);
+        msec = controller[Prefs._RefreshRate] * 1000;
+        d.refreshInterval = setInterval($.proxy(refreshTorrents,this), msec);
         refreshTorrents();
 
         // refresh the inspector's UI
