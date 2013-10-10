@@ -172,6 +172,7 @@ function FileRow(torrent, depth, name, indices, even)
 
 	fireWantedChanged = function(do_want) {
 		// >> Vuze: Show user they changed it (refresh will set it to the correct value)
+		var e = $(elements.root);
 		$(e[0].checkbox).prop('checked', do_want);
 		// << Vuze
 		$(fields.me).trigger('wantedToggled',[ fields.indices, do_want ]);
