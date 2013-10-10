@@ -2,6 +2,7 @@
 body {
 	overflow: auto;
 	height: 100%;
+	font-size: 0.12in;
 -webkit-tap-highlight-color: rgba(255, 255, 255, 0);
 -webkit-focus-ring-color: rgba(0, 0, 0, 0);
 }
@@ -51,9 +52,6 @@ div#toolbar div#search_li {
 	border:none;
 }
 
-.search_term, .search_term form, .search_term input {
-/*float:left;*/
-}
 div#search_term a {
 	margin-left:6px;color:#264356
 }
@@ -133,6 +131,7 @@ div#torrent_logo {
 	height: 18px;
 	width: 110px;
 	margin-left: 20px
+	outline: none;
 }
 
 #statusbar #filter #filter-count {
@@ -145,7 +144,7 @@ div#torrent_logo {
 	div#statusbar input#torrent_search {
 		background: #FFF url('images/filter_icon.png') top left no-repeat;
 		border: 1px solid #5D80A1;
-		margin-top: 8px;
+		margin-top: 0px;
 		padding: 1px 10px 1px 18px;
 		width: 76px;
 		-moz-border-radius: 10px;
@@ -222,9 +221,9 @@ div.main_container {
 	display:none;
 	z-index: 101;
 	position: absolute;
-	width: 250px;
+	width: 290px;
 	text-align: left;
-	overflow-y: scroll;
+	overflow-y: auto;
 	overflow-x: none;
 }
 
@@ -233,7 +232,7 @@ div.main_container {
 	/* Force to overlap existing menu just below menu header.
 	   Needed when overflow-y is scroll */
 	top: auto !important;
-	left: 97px !important;
+	left: 137px !important;
 }
 
 
@@ -252,7 +251,7 @@ div.main_container {
 }
 
 .ui-menu .ui-menu-item a {
-	line-height: 3;
+	line-height: 2.5em;
 }
 
 .ui-menu .ui-icon {
@@ -309,8 +308,7 @@ div#torrent_container {
 }
 
 ul.torrent_list li.torrent {
-	/* Vuze: More right padding for info button */
-	padding: 4px 5px 5px 10px; /* Make space for buttons on the right */
+	padding: 4px 5px 2px 10px; /* Make space for buttons on the right */
 }
 
 ul.torrent_list li.torrent div.torrent_progress_details {
@@ -322,7 +320,7 @@ ul.torrent_list li.torrent div.torrent_peer_details {
 }
 
 ul.torrent_list div.torrent_progress_bar_container.full {
-	margin-right: 45px;
+	margin-right: 53px;
 }
 
 /****
@@ -334,8 +332,8 @@ ul.torrent_list li.torrent a {
 	float: right;
 	position: relative;
 	right: auto;
-	top: -9px;
-  margin-right: 4px;
+	top: -13px;
+  margin-right: 0px;
 }
 
 ul.torrent_list li.torrent a div {
@@ -343,7 +341,8 @@ ul.torrent_list li.torrent a div {
 }
 
 ul.torrent_list li.torrent a div.torrent_info {
-	background: url('images/toolbar-info.png');
+	background: url('images/toolbar-info.png') center no-repeat;
+	padding: 0px 8px 8px 12px;
 	width: 30px;
 	height: 30px;
 }
@@ -355,7 +354,7 @@ ul.torrent_list li.torrent a:active div.torrent_info {
 }
 
 ul.torrent_list li.torrent a div.torrent_info.selected {
-	background: url('images/toolbar-info-active.png');
+	background: url('images/toolbar-info-active.png') center no-repeat;
 }
 /* << Vuze: buttons changed to add info button */
 
@@ -485,3 +484,22 @@ div#torrent_pref ul#settings_menu {
 	word-wrap: break-word; /* otherwise long value strings will create horizontal scroll */
 }
 
+
+div#torrent_inspector #inspector-tabs-wrapper #inspector-tabs > * {
+	width: 0.5in;
+	height: 0.4in;
+}
+
+#inspector_file_list div li input[type="checkbox"] {
+    float: left;
+}
+
+div#torrent_inspector div.inspector_torrent_file_list_entry_name {
+	overflow: auto;
+	word-break: break-all;
+	display: block;
+}
+
+#inspector_file_list li {
+	padding-top: 1em;
+}
