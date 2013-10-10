@@ -135,6 +135,7 @@ Transmission.prototype =
 	loadDaemonPrefs: function(async) {
 		this.remote.loadDaemonPrefs(function(data) {
 			var o = data['arguments'];
+			// data might be {"result":"error:some error"}
 			Prefs.getClutchPrefs(o);
 			this.updateGuiFromSession(o);
 			this.sessionProperties = o;
@@ -207,7 +208,6 @@ Transmission.prototype =
 		});
 		/* Vuze: Removed browser logic (jquery no longer has browser)
 		if (!$.browser.safari)
-		*/
 		{
 			search_box.addClass('blur');
 			search_box[0].value = 'Filter';
@@ -224,6 +224,7 @@ Transmission.prototype =
 				}
 			});
 		}
+		 */
 	},
 
 	/**
@@ -670,13 +671,13 @@ Transmission.prototype =
 	},
 	
 	pauseUI: function() {
-		// schedule the next request
 		clearTimeout(this.refreshTorrentsTimeout);
 		this.uiPaused = true;
 	},
 	
 	resumeUI: function() {
 		this.uiPaused = false;
+		// schedule the next request
 		this.refreshTorrents();
 	},
 	/* << Vuze */
@@ -1343,6 +1344,8 @@ Transmission.prototype =
 			}
 			$('input#torrent_path').attr('value', path);
 			$('#move_container').show();
+			// Vuze: some browsers don't scroll up to the dialog, so manually scroll
+			$(document).scrollTop($('#move_container').offset());
 			$('#torrent_path').focus();
 		} else {
 			var ids = this.getTorrentIds(torrents);
@@ -1708,6 +1711,9 @@ Transmission.prototype =
 	{
 		if (!visible) {
 			$('#torrent_inspector').toggle(visible);
+			this.inspector.setTorrents([ ]);
+			// Move to body since row might disappear
+			$("#torrent_inspector").appendTo($('body'));
 			return;
 		}
 		$('#torrent_inspector').toggle(!visible);
@@ -1795,11 +1801,14 @@ Transmission.prototype =
 		    old_sel_count = $(list).children('.selected').length;
 
 		this.updateFilterSelect();
-
+		
 		clearTimeout(this.refilterTimer);
 		delete this.refilterTimer;
 
 		if (rebuildEverything) {
+			// Vuze: set inspector invisible so it moves outside of the row (and thus doesn't get deleted)
+			this.setInspectorVisible(false);
+
 			$(list).empty();
 			this._rows = [];
 			for (id in this._torrents)
