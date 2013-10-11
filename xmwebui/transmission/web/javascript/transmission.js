@@ -1581,6 +1581,8 @@ Transmission.prototype =
 	{
 		var u=0, d=0,
 		    i, row,
+		    haveActive = false,
+		    havePaused = false,
 		    fmt = Transmission.fmt,
 		    torrents = this.getAllTorrents();
 
@@ -1588,6 +1590,9 @@ Transmission.prototype =
 		for (i=0; row=torrents[i]; ++i) {
 			u += row.getUploadSpeed();
 			d += row.getDownloadSpeed();
+			var isStopped = row.isStopped();
+			if (!isStopped) haveActive = true;
+			if (isStopped) havePaused = true;
 		}
 
 		$('#speed-up-container').toggleClass('active', u>0 );
@@ -1601,6 +1606,7 @@ Transmission.prototype =
 
 		vz.updateSpeed(d, u);
 		vz.updateTorrentCount(this._rows.length);
+		vz.updateTorrentStates(haveActive, havePaused);
 	},
 
 	setEnabled: function(key, flag)
@@ -1651,8 +1657,6 @@ Transmission.prototype =
 	updateButtonStates: function()
 	{
 		var e = this.elements,
-		    haveActive = false,
-		    havePaused = false,
 		    haveSel = false,
 		    haveActiveSel = false,
 		    havePausedSel = false,
@@ -1664,8 +1668,6 @@ Transmission.prototype =
 		for (var i=0, row; row=this._rows[i]; ++i) {
 			var isStopped = row.getTorrent().isStopped();
 			var isSelected = row.isSelected();
-			if (!isStopped) haveActive = true;
-			if (isStopped) havePaused = true;
 			if (isSelected) haveSel = true;
 			if (isSelected) selectedRows[selectedRows.length] = row.getTorrentId();
 			if (isSelected && !isStopped) haveActiveSel = true;
@@ -1673,7 +1675,7 @@ Transmission.prototype =
 		}
 		
 		// >> Vuze: callback
-		vz.selectionChanged(selectedRows, haveActive, havePaused, haveActiveSel, havePausedSel);
+		vz.selectionChanged(selectedRows, haveActiveSel, havePausedSel);
 		// << Vuze
 
 

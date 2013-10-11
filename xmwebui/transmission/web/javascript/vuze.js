@@ -2,6 +2,7 @@ var vz = window.vz || {};
 
 vz.mode = "trial";
 vz.lastSelectionChanged = "";
+vz.lastTorrenStates = "";
 
 vz.updatePrefs = function( prefs ){
 	var az_mode = prefs["az-mode"];
@@ -207,6 +208,23 @@ vz.updateSpeed = function(downSpeed, upSpeed) {
 	}
 };
 
+vz.updateTorrentStates = function(haveActive, havePaused, haveActiveSel, havePausedSel) {
+	if (vz.hasExternalOSFunctions()) {
+		try {
+			var t = String(haveActive) + String(havePaused)
+					+ String(haveActiveSel) + String(havePausedSel);
+			if (t !== vz.lastTorrenStates) {
+				vz.lastTorrenStates = t;
+				externalOSFunctions.updateTorrentStates(haveActive, havePaused,
+						haveActiveSel, havePausedSel);
+			}
+		} catch(e) {
+			console.log(e);
+		}
+	}
+};
+
+
 vz.updateTorrentCount= function(total) {
 	if (vz.hasExternalOSFunctions()) {
 		try {
@@ -217,14 +235,14 @@ vz.updateTorrentCount= function(total) {
 	}
 };
 
-vz.selectionChanged = function(selectedRows, haveActive, havePaused, haveActiveSel, havePausedSel) {
+vz.selectionChanged = function(selectedRows, haveActiveSel, havePausedSel) {
 
 	if (vz.hasExternalOSFunctions()) {
 		try {
-			var t = String(haveActive) + String(havePaused) + String(haveActiveSel) + String(havePausedSel) + selectedRows.join(",");
+			var t = String(haveActiveSel) + String(havePausedSel) + selectedRows.join(",");
 			if (t !== vz.lastSelectionChanged) {
 				vz.lastSelectionChanged = t;
-				externalOSFunctions.selectionChanged(selectedRows.length, haveActive, havePaused, haveActiveSel, havePausedSel);
+				externalOSFunctions.selectionChanged(selectedRows.length, haveActiveSel, havePausedSel);
 			}
 			
 		} catch(e) {
