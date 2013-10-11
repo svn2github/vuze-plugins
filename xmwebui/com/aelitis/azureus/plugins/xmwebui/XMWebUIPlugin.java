@@ -118,6 +118,8 @@ XMWebUIPlugin
 	
 	private static final boolean IS_5101_PLUS = Constants.isCurrentVersionGE( "5.1.0.1" );
 	
+	private static final int VUZE_RPC_VERSION = 1;
+	
 	private static Download
 	destubbify(
 		DownloadStub	stub )
@@ -1295,6 +1297,7 @@ XMWebUIPlugin
 
 			String version = plugin_interface.getPluginVersion();
 			result.put( "version",  version == null ? "Source" : version);           // string     
+			result.put( "az-rpc-version", VUZE_RPC_VERSION);
 			result.put( "az-version", az_version );                  // string     
 			result.put( "az-mode", az_mode );										// string
 			
