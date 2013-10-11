@@ -2040,6 +2040,8 @@ XMWebUIPlugin
 		List priority_low		= (List)args.get( "priority-low" );
 		List priority_normal	= (List)args.get( "priority-normal" );
 
+		List file_infos 		= (List)args.get( "files" );
+		
 		// RPC v14
 		// "queuePosition"       | number     position of this torrent in its queue [0...n)
 		Number queuePosition = getNumber("queuePosition", null);
@@ -2214,6 +2216,67 @@ XMWebUIPlugin
 						download.getStats().resetUploadedDownloaded( uploaded_ever, downloaded_ever );
 						
 					}catch( Throwable e ){
+					}
+				}
+				
+				if ( file_infos != null ){
+					
+					boolean	paused_it = false;
+					
+					try{
+						for ( int i=0;i<file_infos.size();i++){
+							
+							Map file_info = (Map)file_infos.get( i );
+							
+							int index = ((Number)file_info.get( "index" )).intValue();
+							
+							if ( index < 0 || index >= files.length ){
+							
+								throw( new IOException( "File index '" + index + "' invalid for '" + download.getName()+ "'" ));
+							}
+							
+							//String	path 	= (String)file_info.get( "path" ); don't support changing this yet
+							
+							String  new_name	= (String)file_info.get( "name" );		// terminal name of the file (NOT the whole relative path+name)
+							
+							if ( new_name == null || new_name.trim().length() == 0 ){
+								
+								throw( new IOException( "'name' is mandatory"));
+							}
+							
+							new_name = new_name.trim();
+							
+							DiskManagerFileInfo file = files[index];
+							
+							File existing = file.getFile( true );
+							
+							if ( existing.getName().equals( new_name )){
+								
+								continue;
+							}
+							
+							if ( !download.isPaused()){
+								
+								download.pause();
+								
+								paused_it = true;
+							}
+							
+							File new_file = new File( existing.getParentFile(), new_name );
+							
+							if ( new_file.exists()){
+								
+								throw( new IOException( "new file '" + new_file + "' already exists" ));
+							}
+							
+							file.setLink( new_file );
+						}
+					}finally{
+						
+						if ( paused_it ){
+							
+							download.resume();
+						}
 					}
 				}
 			}catch( Throwable e ){
