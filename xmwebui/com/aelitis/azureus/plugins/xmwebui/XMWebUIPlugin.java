@@ -105,6 +105,10 @@ import com.aelitis.azureus.plugins.startstoprules.defaultplugin.DefaultRankCalcu
 import com.aelitis.azureus.plugins.startstoprules.defaultplugin.StartStopRulesDefaultPlugin;
 import com.aelitis.azureus.util.JSONUtils;
 
+@SuppressWarnings({
+	"unchecked",
+	"rawtypes"
+})
 public class 
 XMWebUIPlugin
 	extends WebPlugin
@@ -557,7 +561,7 @@ XMWebUIPlugin
 	protected void
 	setViewMode()
 	{
-		String mode_str = plugin_interface.getPluginconfig().getPluginStringParameter( WebPlugin.CONFIG_MODE, ((WebPlugin)plugin_interface.getPlugin()).CONFIG_MODE_DEFAULT );
+		String mode_str = plugin_interface.getPluginconfig().getPluginStringParameter( WebPlugin.CONFIG_MODE, WebPlugin.CONFIG_MODE_DEFAULT );
 
 		view_mode = !mode_str.equalsIgnoreCase( WebPlugin.CONFIG_MODE_FULL );
 		
@@ -1144,7 +1148,6 @@ XMWebUIPlugin
 		return defaultNumber;
 	}
 	
-	@SuppressWarnings("unchecked")
 	protected Map
 	processRequest(
 		String					session_id,
@@ -1153,11 +1156,6 @@ XMWebUIPlugin
 	
 		throws Exception
 	{
-		final Long	ZERO 	= new Long(0);
-
-		final Boolean	TRUE 	= new Boolean(true);
-		final Boolean	FALSE 	= new Boolean(false);
-				
 		Map	result = new HashMap();
 				
 			// https://trac.transmissionbt.com/browser/trunk/extras/rpc-spec.txt
@@ -1179,8 +1177,8 @@ XMWebUIPlugin
 			int		tor_con 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_CONNECTIONS_PER_TORRENT );
 			
 			
-			boolean auto_speed_on = pc.getCoreBooleanParameter( PluginConfig.CORE_PARAM_BOOLEAN_AUTO_SPEED_ON ) ||
-									pc.getCoreBooleanParameter( PluginConfig.CORE_PARAM_BOOLEAN_AUTO_SPEED_SEEDING_ON );
+			//boolean auto_speed_on = pc.getCoreBooleanParameter( PluginConfig.CORE_PARAM_BOOLEAN_AUTO_SPEED_ON ) ||
+			//						pc.getCoreBooleanParameter( PluginConfig.CORE_PARAM_BOOLEAN_AUTO_SPEED_SEEDING_ON );
 						
 			
 			boolean require_enc = COConfigurationManager.getBooleanParameter("network.transport.encrypted.require");
@@ -2097,8 +2095,6 @@ XMWebUIPlugin
 					continue;
 				}
 	
-				DownloadManager	core_download = PluginCoreUtils.unwrap( download );
-				
 				if (location != null) {
 					File file = new File(location);
 					if (!file.isFile()) {
@@ -4638,7 +4634,7 @@ XMWebUIPlugin
 					}
 				}
 				
-				plugin_interface.getPluginManager().stopAzureus();
+				PluginManager.stopAzureus();
 				
 			}else if ( cmd.equals( "restart" )){
 				
@@ -4654,7 +4650,7 @@ XMWebUIPlugin
 					}
 				}
 								
-				plugin_interface.getPluginManager().restartAzureus();
+				PluginManager.restartAzureus();
 				
 			}else if ( cmd.equals( "update-check" )){
 				
@@ -4839,7 +4835,7 @@ XMWebUIPlugin
 											}
 										}
 										
-										plugin_interface.getPluginManager().restartAzureus();
+										PluginManager.restartAzureus();
 										
 										restarting[0] = true;
 									}
@@ -4967,7 +4963,8 @@ XMWebUIPlugin
 	protected class
 	PermissionDeniedException
 		extends IOException
-	{		
+	{
+		private static final long serialVersionUID = -344396020759893604L;		
 	}
 	
 	protected String
@@ -5200,7 +5197,7 @@ XMWebUIPlugin
 			
 			synchronized( this ){
 
-				List list = (List)engine_results.get( engine.getUID());
+				List list = engine_results.get( engine.getUID());
 				
 				if ( list != null ){
 					
@@ -5222,7 +5219,7 @@ XMWebUIPlugin
 			
 			synchronized( this ){
 
-				List list = (List)engine_results.get( engine.getUID());
+				List list = engine_results.get( engine.getUID());
 				
 				if ( list != null ){
 					
@@ -5245,7 +5242,7 @@ XMWebUIPlugin
 			
 			synchronized( this ){
 
-				List list = (List)engine_results.get( engine.getUID());
+				List list = engine_results.get( engine.getUID());
 				
 				if ( list != null ){
 					
