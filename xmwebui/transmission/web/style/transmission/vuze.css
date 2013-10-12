@@ -308,7 +308,7 @@ div#torrent_container {
 }
 
 ul.torrent_list li.torrent {
-	padding: 4px 5px 2px 10px; /* Make space for buttons on the right */
+	padding: 4px 5px 4px 10px; /* Make space for buttons on the right */
 }
 
 ul.torrent_list li.torrent div.torrent_progress_details {
@@ -341,10 +341,10 @@ ul.torrent_list li.torrent a div {
 }
 
 ul.torrent_list li.torrent a div.torrent_info {
-	background: url('images/toolbar-info.png') center no-repeat;
+	background: url('images/row-info.png') center no-repeat;
 	padding: 0px 8px 8px 12px;
-	width: 30px;
-	height: 30px;
+	width: 32px;
+	height: 32px;
 }
 
 ul.torrent_list li.torrent a:hover div.torrent_info {
@@ -354,7 +354,7 @@ ul.torrent_list li.torrent a:active div.torrent_info {
 }
 
 ul.torrent_list li.torrent a div.torrent_info.selected {
-	background: url('images/toolbar-info-active.png') center no-repeat;
+	background: url('images/row-info-active.png') center no-repeat;
 }
 /* << Vuze: buttons changed to add info button */
 
