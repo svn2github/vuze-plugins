@@ -88,6 +88,7 @@ Dialog.prototype = {
 		this._callback_function = callback_function;
 		this._callback_data = callback_data;
 		$('body').addClass('dialog_showing');
+		$(document).scrollTop(this._container.offset());
 		this._container.show();
 		// >> Vuze: Add transmission var check because loadDaemonPrefs on init of transmission will show dialog
 		//          on connection error, and 'transmission' isn't set yet..
