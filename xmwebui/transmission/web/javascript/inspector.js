@@ -815,6 +815,10 @@ function Inspector(controller) {
         var d = data;
 
         clearFileList();
+        
+        if (torrents.length > 0) {
+        	vz.torrentInfoShown(torrents[0].getId());
+        }
 
         // update the inspector when a selected torrent's data changes.
         $(d.torrents).unbind('dataChanged.inspector');
@@ -824,7 +828,9 @@ function Inspector(controller) {
         // periodically ask for updates to the inspector's torrents
         clearInterval(d.refreshInterval);
         msec = controller[Prefs._RefreshRate] * 1000;
-        d.refreshInterval = setInterval($.proxy(refreshTorrents,this), msec);
+		if (!controller.uiPaused && msec > 0) {
+        	d.refreshInterval = setInterval($.proxy(refreshTorrents,this), msec);
+        }
         refreshTorrents();
 
         // refresh the inspector's UI
