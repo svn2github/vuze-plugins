@@ -1876,7 +1876,7 @@ XMWebUIPlugin
 		boolean	moveData = getBoolean( args.get( "move" ));
 		String sSavePath = (String) args.get("location");
 		
-		List<DownloadStub>	downloads = getDownloads( ids );
+		List<DownloadStub>	downloads = getDownloads( ids, false );
 
 		File fSavePath = new File(sSavePath);
 
@@ -2014,7 +2014,7 @@ XMWebUIPlugin
 		
 		handleRecentlyRemoved( session_id, args, result );
 		
-		List<DownloadStub>	downloads = getDownloads( ids );
+		List<DownloadStub>	downloads = getDownloads( ids, false );
 		
 		// RPC v5
 		// Not used: Number bandwidthPriority = getNumber("bandwidthPriority", null);
@@ -2089,7 +2089,7 @@ XMWebUIPlugin
 		
 
 		for ( DownloadStub download_stub: downloads ){
-			
+						
 			try{
 				Download	download = destubbify( download_stub );
 				
@@ -2297,16 +2297,16 @@ XMWebUIPlugin
 		
 		Object	ids = args.get( "ids" );
 
-		List<DownloadStub>	downloads = getDownloads( ids );
+		List<DownloadStub>	downloads = getDownloads( ids, false );
 
-		for ( DownloadStub download: downloads ){
-			
+		for ( DownloadStub download_stub: downloads ){
+						
 			try{
-				destubbify( download ).requestTrackerAnnounce();
+				destubbify( download_stub ).requestTrackerAnnounce();
 
 			}catch( Throwable e ){
 				
-				Debug.out( "Failed to reannounce '" + download.getName() + "'", e );
+				Debug.out( "Failed to reannounce '" + download_stub.getName() + "'", e );
 			}
 		}
 	}
@@ -2334,7 +2334,7 @@ XMWebUIPlugin
 
 		boolean	delete_data = getBoolean( args.get( "delete-local-data" ));
 		
-		List<DownloadStub>	downloads = getDownloads( ids );
+		List<DownloadStub>	downloads = getDownloads( ids, true );
 
 		for ( DownloadStub download_stub: downloads ){
 			
@@ -2386,7 +2386,7 @@ XMWebUIPlugin
 		
 		Object	ids = args.get( "ids" );
 
-		List<DownloadStub>	downloads = getDownloads( ids );
+		List<DownloadStub>	downloads = getDownloads( ids, false );
 
 		for ( DownloadStub download_stub: downloads ){
 			
@@ -2417,7 +2417,7 @@ XMWebUIPlugin
 		
 		Object	ids = args.get( "ids" );
 
-		List<DownloadStub>	downloads = getDownloads( ids );
+		List<DownloadStub>	downloads = getDownloads( ids, false );
 
 		for ( DownloadStub download_stub: downloads ){
 			
@@ -2448,7 +2448,7 @@ XMWebUIPlugin
 		
 		Object	ids = args.get( "ids" );
 
-		List<DownloadStub>	downloads = getDownloads( ids );
+		List<DownloadStub>	downloads = getDownloads( ids, false );
 
 		for ( DownloadStub download_stub: downloads ){
 			
@@ -2476,7 +2476,7 @@ XMWebUIPlugin
 		
 		Object	ids = args.get( "ids" );
 
-		List<DownloadStub>	downloads = getDownloads( ids );
+		List<DownloadStub>	downloads = getDownloads( ids, false );
 
 		for ( DownloadStub download_stub: downloads ){
 			
@@ -2738,14 +2738,19 @@ XMWebUIPlugin
 											
 											MagnetDownload md = (MagnetDownload)f_result[0];										
 											
+											boolean	already_removed;
+											
 											synchronized( magnet_downloads ){
 												
-												magnet_downloads.remove( md );
+												already_removed = !magnet_downloads.remove( md );
 											}
 											
-											addRecentlyRemoved( md );
+											if ( !already_removed ){
+												
+												addRecentlyRemoved( md );
 											
-											addTorrent( torrent, file_Download_dir, add_stopped, add_listener );
+												addTorrent( torrent, file_Download_dir, add_stopped, add_listener );
+											}
 										}
 									}
 								}catch( Throwable e ){
@@ -2843,7 +2848,7 @@ XMWebUIPlugin
 		
 		boolean is_recently_active = handleRecentlyRemoved( session_id, args, result );
 		
-		List<DownloadStub>	downloads = getDownloads( ids );
+		List<DownloadStub>	downloads = getDownloads( ids, true );
 				
 		Map<Long,Map>	torrent_info = new LinkedHashMap<Long, Map>();
 		
@@ -2859,21 +2864,83 @@ XMWebUIPlugin
 
 				boolean	is_magnet_download = download_stub instanceof MagnetDownload;
 				
-				long status	= 0;
-				long error 	= TransmissionVars.TR_STAT_OK;
-				String error_str = "";
+				long 	status		= 0;
+				long 	error 		= TransmissionVars.TR_STAT_OK;
+				String 	error_str 	= "";
+				String	created_by	= "";
+				long	create_date	= 0;
+				float	md_comp		= 1.0f;
 				
 				if ( is_magnet_download ){
-					Throwable e = ((MagnetDownload)download_stub).getError();
+					
+					MagnetDownload md = (MagnetDownload)download_stub;
+					
+					Throwable e = md.getError();
 					
 					if ( e == null ){
+						
 						status = 4;
+						
+						md_comp		= 0.0f;
+						
 					}else{
+						
 						status		= 0;
+						
 						error 		= TransmissionVars.TR_STAT_LOCAL_ERROR;
-						error_str 	= Debug.getNestedExceptionMessage( e );
+						
+						Throwable temp = e;
+						
+						while( temp.getCause() != null ){
+							
+							temp = temp.getCause();
+						}
+						
+						String last_msg = temp.getMessage();
+						
+						if ( last_msg != null && last_msg.length() > 0 ){
+							
+							error_str = last_msg;
+							
+						}else{
+							
+							error_str = Debug.getNestedExceptionMessage( e );
+						}
+						
+						String magnet_url = md.getMagnetURL().toExternalForm();
+						
+						int	pos = error_str.indexOf( magnet_url );
+						
+						// tidy up the most common error messages by removing magnet uri from them and
+						// trimming prefix of 'Error:'
+						
+						if ( pos != -1 ){
+							
+							error_str = error_str.substring(0,pos) + error_str.substring( pos+magnet_url.length());
+						}
+						
+						error_str = error_str.trim();
+						
+						pos = error_str.indexOf( "rror:");
+						
+						if ( pos != -1 ){
+							
+							error_str = error_str.substring( pos+5 ).trim();
+						}
+						
+						if ( error_str.length() > 0 ){
+							
+								// probably not great for right-left languages but derp
+							
+							error_str = Character.toUpperCase( error_str.charAt(0)) + error_str.substring(1);
+						}
 					}
+					
+					created_by	= "Vuze";
+					create_date	= SystemTime.getCurrentTime()/1000;
+					
 				}
+				
 				//System.out.println( fields );
 				
 				Object[][] stub_defs = {
@@ -2882,8 +2949,8 @@ XMWebUIPlugin
 				{ "addedDate", 0 },
 				{ "comment", is_magnet_download?"Metadata Download": "Download Archived" },
 				{ "corruptEver", 0 },
-				{ "creator", "" },
-				{ "dateCreated", 0 },
+				{ "creator", created_by },
+				{ "dateCreated", create_date },
 				{ "desiredAvailable", 0 },
 				//{ "downloadDir", "" },
 				{ "downloadedEver", 0 },
@@ -2900,7 +2967,7 @@ XMWebUIPlugin
 				{ "isPrivate", false },
 				{ "isStalled", false },
 				{ "leftUntilDone", 0 },
-				{ "metadataPercentComplete", 1.0f },
+				{ "metadataPercentComplete",md_comp },
 				//{ "name", "" },
 				{ "peers", new ArrayList() },
 				{ "peersConnected", 0 },
@@ -4460,16 +4527,23 @@ XMWebUIPlugin
 	}
 
 	protected List<DownloadStub>
-	getAllDownloads()
+	getAllDownloads(
+		boolean	include_magnet_dowloads )
 	{
 		Download[] 		downloads1 = plugin_interface.getDownloadManager().getDownloads();
 		DownloadStub[] 	downloads2 = plugin_interface.getDownloadManager().getDownloadStubs();
 		
 		MagnetDownload[] 	downloads3;
 		
-		synchronized( magnet_downloads ){
+		if ( include_magnet_dowloads ){
 			
-			downloads3 = magnet_downloads.toArray( new MagnetDownload[magnet_downloads.size()]);
+			synchronized( magnet_downloads ){
+				
+				downloads3 = magnet_downloads.toArray( new MagnetDownload[magnet_downloads.size()]);
+			}
+		}else{
+			
+			downloads3 = new MagnetDownload[0];
 		}
 		
 		List<DownloadStub>	result = new ArrayList<DownloadStub>( downloads1.length + downloads2.length + downloads3.length );
@@ -4477,17 +4551,19 @@ XMWebUIPlugin
 		result.addAll( Arrays.asList( downloads1 ));
 		result.addAll( Arrays.asList( downloads2 ));
 		result.addAll( Arrays.asList( downloads3 ));
+
 		
 		return( result );
 	}
 	
 	protected List<DownloadStub>
 	getDownloads(
-		Object		ids )
+		Object		ids,
+		boolean		include_magnet_dowloads )
 	{
 		List<DownloadStub>	downloads = new ArrayList<DownloadStub>();
 		
-		List<DownloadStub> 	all_downloads = getAllDownloads();
+		List<DownloadStub> 	all_downloads = getAllDownloads( include_magnet_dowloads );
 
 		List<Long>		selected_ids 	= new ArrayList<Long>();
 		List<String>	selected_hashes = new ArrayList<String>();
@@ -4554,6 +4630,11 @@ XMWebUIPlugin
 						continue;
 					}
 					
+					if ( download.getFlag( Download.FLAG_METADATA_DOWNLOAD )){
+						
+						continue;
+					}
+					
 					if ( ids == null ){
 						
 						downloads.add( download );
@@ -4615,7 +4696,7 @@ XMWebUIPlugin
 			GlobalManager gm,
 			Object		ids )
 	{
-		List<DownloadStub> downloads = getDownloads(ids);
+		List<DownloadStub> downloads = getDownloads(ids,false);
 		
 		ArrayList<DownloadManager> list = new ArrayList<DownloadManager>(downloads.size());
 
@@ -4633,32 +4714,6 @@ XMWebUIPlugin
 			}catch( Throwable e ){
 				
 				Debug.out( "Failed to get dm '" + downloadStub.getName() + "'", e );
-			}
-		}
-
-		return list;
-	}
-
-	public List<Download>
-	getDownloadListFromIDs(
-			GlobalManager gm,
-			Object		ids )
-	{
-		List<DownloadStub> downloads = getDownloads(ids);
-		
-		ArrayList<Download> list = new ArrayList<Download>(downloads.size());
-
-		for ( DownloadStub downloadStub: downloads ){
-			
-			try{
-				Download download = destubbify( downloadStub );
-				if (download != null) {
-  				list.add(download);
-				}
-
-			}catch( Throwable e ){
-				
-				Debug.out( "Failed to get download '" + downloadStub.getName() + "'", e );
 			}
 		}
 
@@ -4717,7 +4772,7 @@ XMWebUIPlugin
 				
 				check_ids_outstanding = false;
 				
-				List<DownloadStub> all_downloads = getAllDownloads();
+				List<DownloadStub> all_downloads = getAllDownloads( true );
 
 				Set<Long>	all_ids = new HashSet<Long>();
 				
@@ -5534,6 +5589,7 @@ XMWebUIPlugin
 	MagnetDownload
 		implements DownloadStub
 	{
+		private URL				magnet_url;
 		private String			name;
 		private byte[]			hash;
 		
@@ -5547,7 +5603,9 @@ XMWebUIPlugin
 		MagnetDownload(
 			URL		_magnet )
 		{
-			String	str = _magnet.toExternalForm();
+			magnet_url	= _magnet;
+			
+			String	str = magnet_url.toExternalForm();
 			
 			int	pos = str.indexOf( '?' );
 			
@@ -5615,7 +5673,7 @@ XMWebUIPlugin
 				
 				if ( hash == null ){
 					
-					name = _magnet.toExternalForm();
+					name = magnet_url.toExternalForm();
 					
 				}else{
 					
@@ -5626,6 +5684,12 @@ XMWebUIPlugin
 			name = "Magnet download for '" + name + "'";
 			
 			getID( this, true );
+		}
+		
+		private URL
+		getMagnetURL()
+		{
+			return( magnet_url );
 		}
 		
 		public boolean
