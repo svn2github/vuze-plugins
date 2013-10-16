@@ -115,7 +115,6 @@ TransmissionRemote.prototype =
 //			return;
 //		}
 		if (vz.handleConnectionError(1, remote._error, error_string)) {
-			console.log("ext handled connection error -- exit");
 			return;
 		}
    		/* << Vuze Added */
@@ -158,6 +157,8 @@ TransmissionRemote.prototype =
 		// << Vuze
 		
 		var ajaxSettings = {
+			odata: data,
+			startTime: new Date().getTime(),
 			url: RPC._Root,
 			type: 'POST',
 			contentType: 'json',
@@ -178,8 +179,26 @@ TransmissionRemote.prototype =
 			context: context,
 			async: async
 		};
+		
+		
+		if (async) {
+			ajaxSettings.slowAjaxTimeOut = setTimeout(function() {
+				ajaxSettings.slowAjaxTimeOut = null;
+				vz.slowAjax(ajaxSettings.odata['method']);
+			}, 1000);
+		}
 
-		$.ajax(ajaxSettings);
+		$.ajax(ajaxSettings).always(function() {
+			diff = (new Date().getTime()) - ajaxSettings.startTime ;
+			if (typeof ajaxSettings.slowAjaxTimeOut !== "undefined") {
+				if (ajaxSettings.slowAjaxTimeOut != null) {
+					clearTimeout(ajaxSettings.slowAjaxTimeOut);
+				} else {
+					vz.slowAjaxDone(ajaxSettings.odata['method'], diff);
+				}
+			}
+		});
+		
 	},
 
 	loadDaemonPrefs: function(callback, context, async) {
