@@ -261,6 +261,36 @@ vz.updateSessionProperties = function(sessionProperties) {
 	}
 };
 
+vz.torrentInfoShown = function(id) {
+	if (vz.hasExternalOSFunctions()) {
+		try {
+			externalOSFunctions.torrentInfoShown(id);
+		} catch(e) {
+			console.log(e);
+		}
+	}
+};
+
+vz.slowAjax = function(id) {
+	if (vz.hasExternalOSFunctions()) {
+		try {
+			externalOSFunctions.slowAjax(id);
+		} catch(e) {
+			console.log(e);
+		}
+	}
+}
+
+vz.slowAjaxDone = function(id, ms) {
+	if (vz.hasExternalOSFunctions()) {
+		try {
+			externalOSFunctions.slowAjaxDone(id, ms);
+		} catch(e) {
+			console.log(e);
+		}
+	}
+}
+
 vz.goBack = function() {
 	if ($('#ul_torrent_context_menu').is(':visible')) {
 		externalOSFunctions.cancelGoBack(true);
@@ -345,6 +375,7 @@ $(document).ready( function(){
 	
 	if (!vz.hasExternalOSFunctions() && $.url().param("testAND") != "1") {
 		$(window).resize(vuzeOnResize);
+		vuzeOnResize();
 	}
 
     vz.utils.selectOnFocus();
