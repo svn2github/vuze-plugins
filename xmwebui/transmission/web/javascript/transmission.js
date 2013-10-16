@@ -1271,10 +1271,10 @@ Transmission.prototype =
 		if (!confirmed)
 		{
 			// update the upload dialog's fields
-			fileInput.attr('value', '');
-			urlInput.attr('value', '');
-			startInput.attr('checked', this.shouldAddedTorrentsStart());
-			folderInput.attr('value', $("#download-dir").val());
+			fileInput.val("");
+			urlInput.val('');
+			startInput.prop('checked', this.shouldAddedTorrentsStart());
+			folderInput.val($("#download-dir").val());
 			folderInput.change($.proxy(this.updateFreeSpaceInAddDialog,this));
 			this.updateFreeSpaceInAddDialog();
 
@@ -1317,7 +1317,7 @@ Transmission.prototype =
 							'paused' : paused
 						};
 
-						remote.addTorrentByMetaInfo(metainfo, arguments);
+						remote.addTorrentByMetainfo(metainfo, arguments);
 					}
 				}
 				reader.readAsDataURL (file);
