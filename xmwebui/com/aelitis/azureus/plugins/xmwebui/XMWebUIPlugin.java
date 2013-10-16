@@ -23,6 +23,7 @@ package com.aelitis.azureus.plugins.xmwebui;
 
 import java.io.*;
 import java.net.URL;
+import java.net.URLDecoder;
 import java.text.NumberFormat;
 import java.text.ParseException;
 import java.util.*;
@@ -192,6 +193,8 @@ XMWebUIPlugin
     private int 			lifecycle_state = 0;
     private boolean			update_in_progress;
     
+    private List<MagnetDownload>		magnet_downloads = new ArrayList<XMWebUIPlugin.MagnetDownload>();
+    
     public
     XMWebUIPlugin()
     {
@@ -235,7 +238,6 @@ XMWebUIPlugin
 					16,
 					100,
 					false );
-    			
     }
     
 	public void 
@@ -591,7 +593,7 @@ XMWebUIPlugin
 	
 	private void
 	addRecentlyRemoved(
-		Download	download )
+		DownloadStub	download )
 	{
 		synchronized( recently_removed ){			
 			
@@ -2337,26 +2339,36 @@ XMWebUIPlugin
 		for ( DownloadStub download_stub: downloads ){
 			
 			try{
-				Download download = destubbify( download_stub );
-				
-				int	state = download.getState();
-				
-				if ( state != Download.ST_STOPPED ){
-				
-					download.stop();
-				}
-				
-				if ( delete_data ){
+				if ( download_stub instanceof MagnetDownload ){
 					
-					download.remove( true, true );
+					synchronized( magnet_downloads ){
+						
+						magnet_downloads.remove( download_stub );
+					}
+					
+					addRecentlyRemoved( download_stub );
 					
 				}else{
+					Download download = destubbify( download_stub );
 					
-					download.remove();	
+					int	state = download.getState();
+					
+					if ( state != Download.ST_STOPPED ){
+					
+						download.stop();
+					}
+					
+					if ( delete_data ){
+						
+						download.remove( true, true );
+						
+					}else{
+						
+						download.remove();	
+					}
+				
+					addRecentlyRemoved( download );
 				}
-				
-				addRecentlyRemoved( download );
-				
 			}catch( Throwable e ){
 				
 				Debug.out( "Failed to remove download '" + download_stub.getName() + "'", e );
@@ -2517,11 +2529,79 @@ XMWebUIPlugin
 		 */
 		checkUpdatePermissions();
 
-		Torrent torrent;
-
+		Torrent 		torrent;
+		DownloadStub	download = null;
+		
 		String url = (String) args.get("filename");
+		
 		String metainfo = (String) args.get("metainfo");
+		
+		final boolean add_stopped = getBoolean(args.get("paused"));
+		
+		String download_dir = (String) args.get("download-dir");
+		
+		final File file_Download_dir = download_dir == null ? null : new File(download_dir);
 
+		// peer-limit not used
+		//getNumber(args.get("peer-limit"), 0);
+
+		// bandwidthPriority not used
+		//getNumber(args.get("bandwidthPriority"), TransmissionVars.TR_PRI_NORMAL);
+		
+		final DownloadWillBeAddedListener add_listener =
+			new DownloadWillBeAddedListener() {
+				public void initialised(Download download) {
+					int numFiles = download.getDiskManagerFileCount();
+					List files_wanted = getList(args.get("files-wanted"));
+					List files_unwanted = getList(args.get("files-unwanted"));
+	
+					boolean[] toDelete = new boolean[numFiles]; // all false
+	
+					int numWanted = files_wanted.size();
+					if (numWanted != 0 && numWanted != numFiles) {
+						// some wanted -- so, set all toDelete and reset ones in list
+						Arrays.fill(toDelete, true);
+						for (Object oWanted : files_wanted) {
+							int idx = getNumber(oWanted, -1).intValue();
+							if (idx >= 0 && idx < numFiles) {
+								toDelete[idx] = false;
+							}
+						}
+					}
+					for (Object oUnwanted : files_unwanted) {
+						int idx = getNumber(oUnwanted, -1).intValue();
+						if (idx >= 0 && idx < numFiles) {
+							toDelete[idx] = true;
+						}
+					}
+	
+					for (int i = 0; i < toDelete.length; i++) {
+						if (toDelete[i]) {
+							download.getDiskManagerFileInfo(i).setDeleted(true);
+						}
+					}
+	
+					List priority_high = getList(args.get("priority-high"));
+					for (Object oHighPriority : priority_high) {
+						int idx = getNumber(oHighPriority, -1).intValue();
+						if (idx >= 0 && idx < numFiles) {
+							download.getDiskManagerFileInfo(idx).setNumericPriority(
+									DiskManagerFileInfo.PRIORITY_HIGH);
+						}
+					}
+					List priority_low = getList(args.get("priority-low"));
+					for (Object oLowPriority : priority_low) {
+						int idx = getNumber(oLowPriority, -1).intValue();
+						if (idx >= 0 && idx < numFiles) {
+							download.getDiskManagerFileInfo(idx).setNumericPriority(
+									DiskManagerFileInfo.PRIORITY_LOW);
+						}
+					}
+					// don't need priority-normal if they are normal by default.
+				}
+			};
+		
+		
 		TorrentManager torrentManager = plugin_interface.getTorrentManager();
 
 		if (metainfo != null) {
@@ -2555,98 +2635,193 @@ XMWebUIPlugin
 				url = UrlUtils.parseTextForURL(url, true, true);
 			}
 
-			URL torrent_url = new URL(url);
+			final URL torrent_url = new URL(url);
 
-			try {
-				TorrentDownloader dl = torrentManager.getURLDownloader(torrent_url,
-						null, null);
+			try{
+				final TorrentDownloader dl = torrentManager.getURLDownloader(torrent_url, null, null);
 
 				Object cookies = args.get("cookies");
-				if (cookies != null) {
+				
+				if ( cookies != null ){
+					
 					dl.setRequestProperty("URL_Cookie", cookies);
 				}
 
-				torrent = dl.download(Constants.DEFAULT_ENCODING);
+				boolean is_magnet = torrent_url.getProtocol().equalsIgnoreCase( "magnet" );
+				
+				if ( is_magnet ){
+						
+					TimerEvent	magnet_event = null;
 
-			} catch (Throwable e) {
+					final Object[]	f_result = { null };
+					
+					try{
+						final AESemaphore sem = new AESemaphore( "magnetsem" );
+						
+						magnet_event = SimpleTimer.addEvent(
+							"magnetcheck",
+							SystemTime.getOffsetTime( 10*1000 ),
+							new TimerEventPerformer() 
+							{
+								public void 
+								perform(
+									TimerEvent event )
+								{
+									synchronized( f_result ){
+										
+										if ( f_result[0] != null ){
+											
+											return;
+										}
+										
+										MagnetDownload magnet_download = new MagnetDownload( torrent_url );
+										
+										byte[]	hash = magnet_download.getTorrentHash();
+										
+										synchronized( magnet_downloads ){
+											
+											boolean	duplicate = false;
+											
+											Iterator<MagnetDownload> it =  magnet_downloads.iterator();
+											
+											while( it.hasNext()){
+												
+												MagnetDownload md = it.next();
+												
+												if ( hash.length > 0 && Arrays.equals( hash, md.getTorrentHash())){
+													
+													if ( md.getError() == null ){
+														
+														duplicate = true;
+													
+														magnet_download = md;
+													
+														break;
+														
+													}else{
+														
+														it.remove();
+														
+														addRecentlyRemoved( md );
+													}
+												}
+											}
+											
+											if ( !duplicate ){
+											
+												magnet_downloads.add( magnet_download );
+											}
+										}
+										
+										f_result[0] = magnet_download;
+									}
+							
+									sem.release();
+								}
+							});
+											
+						new AEThread2( "magnetasync" )
+						{
+							public void
+							run()
+							{
+								try{
+									Torrent torrent = dl.download(Constants.DEFAULT_ENCODING);
+									
+									synchronized( f_result ){
+										
+										if ( f_result[0] == null ){
+										
+											f_result[0] = torrent;
+											
+										}else{
+											
+											MagnetDownload md = (MagnetDownload)f_result[0];										
+											
+											synchronized( magnet_downloads ){
+												
+												magnet_downloads.remove( md );
+											}
+											
+											addRecentlyRemoved( md );
+											
+											addTorrent( torrent, file_Download_dir, add_stopped, add_listener );
+										}
+									}
+								}catch( Throwable e ){
+									
+									synchronized( f_result ){
+										
+										if ( f_result[0] == null ){
+										
+											f_result[0] = e;
+										
+										}else{
+										
+											MagnetDownload md = (MagnetDownload)f_result[0];
+											
+											md.setError( e );
+										}
+									}
+								}finally{
+									
+									sem.release();
+								}
+							}
+						}.start();
+						
+						sem.reserve();
+						
+						Object res;
+						
+						synchronized( f_result ){
+							
+							res = f_result[0];
+						}
+						
+						if ( res instanceof Torrent ){
+							
+							torrent = (Torrent)res;
+							
+						}else if ( res instanceof Throwable ){
+							
+							throw((Throwable)res);
+							
+						}else{
+							
+							download 	= (MagnetDownload)res;
+							torrent		= null;
+						}
+					}finally{
+						
+						if ( magnet_event != null ){
+							
+							magnet_event.cancel();
+						}
+					}
+				}else{
+					
+					torrent = dl.download(Constants.DEFAULT_ENCODING);
+				}
+			}catch( Throwable e ){
 
 				e.printStackTrace();
 
-				throw (new IOException("torrent download failed: "
-						+ Debug.getNestedExceptionMessage(e)));
+				throw( new IOException( Debug.getNestedExceptionMessage( e )));
 			}
 		}
 
-		boolean add_stopped = getBoolean(args.get("paused"));
-		String download_dir = (String) args.get("download-dir");
-		File file_Download_dir = download_dir == null ? null : new File(
-				download_dir);
+		if ( download == null ){
 
-		// peer-limit not used
-		//getNumber(args.get("peer-limit"), 0);
-
-		// bandwidthPriority not used
-		//getNumber(args.get("bandwidthPriority"), TransmissionVars.TR_PRI_NORMAL);
-
-		Download download = addTorrent(torrent, file_Download_dir, add_stopped,
-				new DownloadWillBeAddedListener() {
-					public void initialised(Download download) {
-						int numFiles = download.getDiskManagerFileCount();
-						List files_wanted = getList(args.get("files-wanted"));
-						List files_unwanted = getList(args.get("files-unwanted"));
-
-						boolean[] toDelete = new boolean[numFiles]; // all false
-
-						int numWanted = files_wanted.size();
-						if (numWanted != 0 && numWanted != numFiles) {
-							// some wanted -- so, set all toDelete and reset ones in list
-							Arrays.fill(toDelete, true);
-							for (Object oWanted : files_wanted) {
-								int idx = getNumber(oWanted, -1).intValue();
-								if (idx >= 0 && idx < numFiles) {
-									toDelete[idx] = false;
-								}
-							}
-						}
-						for (Object oUnwanted : files_unwanted) {
-							int idx = getNumber(oUnwanted, -1).intValue();
-							if (idx >= 0 && idx < numFiles) {
-								toDelete[idx] = true;
-							}
-						}
-
-						for (int i = 0; i < toDelete.length; i++) {
-							if (toDelete[i]) {
-								download.getDiskManagerFileInfo(i).setDeleted(true);
-							}
-						}
-
-						List priority_high = getList(args.get("priority-high"));
-						for (Object oHighPriority : priority_high) {
-							int idx = getNumber(oHighPriority, -1).intValue();
-							if (idx >= 0 && idx < numFiles) {
-								download.getDiskManagerFileInfo(idx).setNumericPriority(
-										DiskManagerFileInfo.PRIORITY_HIGH);
-							}
-						}
-						List priority_low = getList(args.get("priority-low"));
-						for (Object oLowPriority : priority_low) {
-							int idx = getNumber(oLowPriority, -1).intValue();
-							if (idx >= 0 && idx < numFiles) {
-								download.getDiskManagerFileInfo(idx).setNumericPriority(
-										DiskManagerFileInfo.PRIORITY_LOW);
-							}
-						}
-						// don't need priority-normal if they are normal by default.
-					}
-				});
-
+			download = addTorrent( torrent, file_Download_dir, add_stopped, add_listener );
+		}
+		
 		Map<String, Object> torrent_details = new HashMap<String, Object>();
 
 		torrent_details.put("id", new Long(getID(download, true)));
 		torrent_details.put("name", escapeXML(download.getName()));
 		torrent_details.put("hashString",
-				ByteFormatter.encodeString(torrent.getHash()));
+				ByteFormatter.encodeString(download.getTorrentHash()));
 
 		result.put("torrent-added", torrent_details);
 	}
@@ -2682,21 +2857,38 @@ XMWebUIPlugin
 				
 				torrent_info.put( download_id, torrent );
 
+				boolean	is_magnet_download = download_stub instanceof MagnetDownload;
+				
+				long status	= 0;
+				long error 	= TransmissionVars.TR_STAT_OK;
+				String error_str = "";
+				
+				if ( is_magnet_download ){
+					Throwable e = ((MagnetDownload)download_stub).getError();
+					
+					if ( e == null ){
+						status = 4;
+					}else{
+						status		= 0;
+						error 		= TransmissionVars.TR_STAT_LOCAL_ERROR;
+						error_str 	= Debug.getNestedExceptionMessage( e );
+					}
+				}
 				//System.out.println( fields );
 				
 				Object[][] stub_defs = {
 				{ "activityDate", 0 },
 				{ "activityDateRelative",0 },
 				{ "addedDate", 0 },
-				{ "comment", "Download Archived" },
+				{ "comment", is_magnet_download?"Metadata Download": "Download Archived" },
 				{ "corruptEver", 0 },
 				{ "creator", "" },
 				{ "dateCreated", 0 },
 				{ "desiredAvailable", 0 },
 				//{ "downloadDir", "" },
 				{ "downloadedEver", 0 },
-				{ "error", "" },
-				{ "errorString", "" },
+				{ "error", error },
+				{ "errorString", error_str },
 				{ "eta", TransmissionVars.TR_ETA_NOT_AVAIL },
 				//{ "fileStats", "" },
 				//{ "files", "" },
@@ -2725,7 +2917,7 @@ XMWebUIPlugin
 				{ "seedRatioMode", TransmissionVars.TR_RATIOLIMIT_GLOBAL },
 				//{ "sizeWhenDone", "" },
 				{ "startDate", 0 },
-				{ "status", 0 },
+				{ "status", status },
 				//{ "totalSize", "" },
 				{ "trackerStats", new ArrayList() },
 				{ "trackers", new ArrayList() },
@@ -4273,10 +4465,18 @@ XMWebUIPlugin
 		Download[] 		downloads1 = plugin_interface.getDownloadManager().getDownloads();
 		DownloadStub[] 	downloads2 = plugin_interface.getDownloadManager().getDownloadStubs();
 		
-		List<DownloadStub>	result = new ArrayList<DownloadStub>( downloads1.length + downloads2.length );
+		MagnetDownload[] 	downloads3;
+		
+		synchronized( magnet_downloads ){
+			
+			downloads3 = magnet_downloads.toArray( new MagnetDownload[magnet_downloads.size()]);
+		}
+		
+		List<DownloadStub>	result = new ArrayList<DownloadStub>( downloads1.length + downloads2.length + downloads3.length );
 		
 		result.addAll( Arrays.asList( downloads1 ));
 		result.addAll( Arrays.asList( downloads2 ));
+		result.addAll( Arrays.asList( downloads3 ));
 		
 		return( result );
 	}
@@ -5327,6 +5527,187 @@ XMWebUIPlugin
 			}
 			*/
 			return( false );
+		}
+	}
+	
+	private class
+	MagnetDownload
+		implements DownloadStub
+	{
+		private String			name;
+		private byte[]			hash;
+		
+		private Map<TorrentAttribute,Long>	attributes = new HashMap<TorrentAttribute, Long>();
+		
+		private String temp_dir = AETemporaryFileHandler.getTempDirectory().getAbsolutePath();
+		
+		private Throwable error;
+		
+		private
+		MagnetDownload(
+			URL		_magnet )
+		{
+			String	str = _magnet.toExternalForm();
+			
+			int	pos = str.indexOf( '?' );
+			
+			if ( pos != -1 ){
+				
+				str = str.substring( pos+1 );
+			}
+			
+			String[]	args = str.split( "&" );
+
+			Map<String,String>	arg_map = new HashMap<String,String>();
+			
+			for ( String arg: args ){
+				
+				String[] bits = arg.split( "=" );
+				
+				if ( bits.length == 2 ){
+					
+					try{
+						String lhs = bits[0].trim().toLowerCase( Locale.US );
+						String rhs = URLDecoder.decode( bits[1].trim(), Constants.DEFAULT_ENCODING);
+						
+						if ( lhs.equals( "xt" )){
+							
+							if ( rhs.toLowerCase( Locale.US ).startsWith( "urn:btih:" )){
+								
+								arg_map.put( lhs, rhs );
+								
+							}else{
+								
+								String existing = arg_map.get( "xt" );
+								
+								if ( 	existing == null ||
+										( !existing.toLowerCase( Locale.US ).startsWith( "urn:btih:" )  && rhs.startsWith( "urn:sha1:" ))){
+									
+									arg_map.put( lhs, rhs );
+								}
+							}
+						}else{
+							
+							arg_map.put( lhs, rhs );
+						}
+					}catch( Throwable e ){
+					}
+				}
+			}
+			
+			hash	= new byte[0];
+
+			String hash_str = arg_map.get( "xt" );
+			
+			if ( hash_str != null ){
+				
+				hash_str = hash_str.toLowerCase( Locale.US );
+				
+				if ( hash_str.startsWith( "urn:btih:" ) || hash_str.startsWith( "urn:sha1" )){
+					
+					hash = UrlUtils.decodeSHA1Hash( hash_str.substring( 9 ));
+				}
+			}
+			
+			name	= arg_map.get( "dn" );
+			
+			if ( name == null ){
+				
+				if ( hash == null ){
+					
+					name = _magnet.toExternalForm();
+					
+				}else{
+					
+					name = Base32.encode( hash );
+				}
+			}
+			
+			name = "Magnet download for '" + name + "'";
+			
+			getID( this, true );
+		}
+		
+		public boolean
+		isStub()
+		{
+			return( true );
+		}
+		
+		public Download
+		destubbify()
+		
+			throws DownloadException
+		{
+			throw( new DownloadException( "Not supported" ));
+		}
+		
+		public String
+		getName()
+		{
+			return( name );
+		}
+		
+		public byte[]
+		getTorrentHash()
+		{
+			return( hash );
+		}
+		
+		public long
+		getTorrentSize()
+		{
+			return( 0 );
+		}
+		
+		public String
+		getSavePath()
+		{
+			return( temp_dir );
+		}
+		
+		private void
+		setError(
+			Throwable e )
+		{
+			error	= e;
+		}
+		
+		private Throwable
+		getError()
+		{
+			return( error );
+		}
+		
+		public DownloadStubFile[]
+		getStubFiles()
+		{
+			return( new DownloadStubFile[0]);
+		}
+		
+		public long 
+		getLongAttribute(
+			TorrentAttribute 	attribute )
+		{
+			Long l = attributes.get( attribute );
+			
+			return( l==null?0:l );
+		}
+		  
+		public void 
+		setLongAttribute(
+			TorrentAttribute 	attribute, 
+			long 				value)
+		{
+			attributes.put( attribute, value );
+		}
+		  
+		public void
+		remove()
+		
+			throws DownloadException, DownloadRemovalVetoException
+		{
+			
 		}
 	}
 }
