@@ -103,8 +103,13 @@ TransmissionRemote.prototype =
 		remote._error = request.responseText
 		? request.responseText.trim().replace(/(<([^>]+)>)/ig,"")
 				: "";
-		if(!remote._error.length )
-			remote._error = 'Server not responding' + ' ( ' + String(error_string) + ': ' + String(exception) + ' )';
+		if(!remote._error.length ) {
+			remote._error = 'Server not responding' + ' (' + String(error_string);
+			if (String(exception).length > 0) {
+				remote._error += ': ' + String(exception);
+			}
+			remote._error += ');'
+		}
 
 		/* >> Vuze Added */
 		remote._lastCallWasError = true;
