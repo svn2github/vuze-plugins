@@ -235,17 +235,19 @@ vz.updateTorrentCount= function(total) {
 	}
 };
 
-vz.selectionChanged = function(selectedRows, haveActiveSel, havePausedSel) {
+vz.selectionChanged = function(selectedTorrents, haveActiveSel, havePausedSel) {
 
 	if (vz.hasExternalOSFunctions()) {
 		try {
-			var t = String(haveActiveSel) + String(havePausedSel) + selectedRows.join(",");
+			var t = String(haveActiveSel) + String(havePausedSel)
+					+ selectedTorrents.map(function(elem) {return elem.id;}).join(",");
 			if (t !== vz.lastSelectionChanged) {
 				vz.lastSelectionChanged = t;
-				externalOSFunctions.selectionChanged(selectedRows.length, haveActiveSel, havePausedSel);
+				externalOSFunctions.selectionChanged(JSON.stringify(selectedTorrents),
+						haveActiveSel, havePausedSel);
 			}
-			
-		} catch(e) {
+
+		} catch (e) {
 			console.log(e);
 		}
 	}
@@ -261,10 +263,10 @@ vz.updateSessionProperties = function(sessionProperties) {
 	}
 };
 
-vz.torrentInfoShown = function(id) {
+vz.torrentInfoShown = function(id, page) {
 	if (vz.hasExternalOSFunctions()) {
 		try {
-			externalOSFunctions.torrentInfoShown(id);
+			externalOSFunctions.torrentInfoShown(id, page);
 		} catch(e) {
 			console.log(e);
 		}

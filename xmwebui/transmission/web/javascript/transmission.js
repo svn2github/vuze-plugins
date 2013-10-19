@@ -1660,7 +1660,7 @@ Transmission.prototype =
 		    haveSel = false,
 		    haveActiveSel = false,
 		    havePausedSel = false,
-		    selectedRows = [];
+		    selectedTorrents = [];
 
 		clearTimeout(this.buttonRefreshTimer);
 		delete this.buttonRefreshTimer;
@@ -1668,14 +1668,16 @@ Transmission.prototype =
 		for (var i=0, row; row=this._rows[i]; ++i) {
 			var isStopped = row.getTorrent().isStopped();
 			var isSelected = row.isSelected();
-			if (isSelected) haveSel = true;
-			if (isSelected) selectedRows[selectedRows.length] = row.getTorrentId();
+			if (isSelected) {
+				haveSel = true;
+				selectedTorrents[selectedTorrents.length] = row.getTorrent().fields;
+			}
 			if (isSelected && !isStopped) haveActiveSel = true;
 			if (isSelected && isStopped) havePausedSel = true;
 		}
 		
 		// >> Vuze: callback
-		vz.selectionChanged(selectedRows, haveActiveSel, havePausedSel);
+		vz.selectionChanged(selectedTorrents, haveActiveSel, havePausedSel);
 		// << Vuze
 
 
