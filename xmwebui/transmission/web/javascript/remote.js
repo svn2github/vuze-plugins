@@ -108,7 +108,7 @@ TransmissionRemote.prototype =
 			if (String(exception).length > 0) {
 				remote._error += ': ' + String(exception);
 			}
-			remote._error += ');'
+			remote._error += ')';
 		}
 
 		/* >> Vuze Added */
@@ -174,9 +174,13 @@ TransmissionRemote.prototype =
 			beforeSend: function(XHR){ remote.appendSessionId(XHR); },
 			error: function(request, error_string, exception){
 				if (request.status !== 409) {
-					console.log(request);
-					console.log(error_string);
-					console.log(exception);
+					try {
+						console.log('ajax error for ' + JSON.stringify(request));
+						console.log('ajax error: ' + error_string);
+						console.log('ajax error: ' + exception);
+					} catch (err) {
+						// ignore
+					}
 				}
 				remote.ajaxError(request, error_string, exception, ajaxSettings);
 				},
