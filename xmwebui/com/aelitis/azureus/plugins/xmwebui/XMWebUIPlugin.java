@@ -1885,7 +1885,13 @@ XMWebUIPlugin
 			Download download = destubbify( download_stub );
 			
 			if (moveData) {
-				download.moveDataFiles(fSavePath);
+				Torrent torrent = download.getTorrent();
+				if (torrent == null || torrent.isSimpleTorrent()
+						|| fSavePath.getParentFile() == null) {
+					download.moveDataFiles(fSavePath);
+				} else {
+					download.moveDataFiles(fSavePath.getParentFile(), fSavePath.getName());
+				}
 			} else {
   			DownloadManager dm = PluginCoreUtils.unwrap(download);
   			
