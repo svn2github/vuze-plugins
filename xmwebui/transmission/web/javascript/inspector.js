@@ -62,6 +62,7 @@ function Inspector(controller) {
         // show this tab and hide the others
         $('#' + tab.id.replace('tab','page')).show().siblings('.inspector-page').hide();
 
+    	vz.torrentInfoShown(data.torrents[0].getId(), "Inspector-" + $(tab)[0].title);
         updateInspector();
     },
 
@@ -817,7 +818,12 @@ function Inspector(controller) {
         clearFileList();
         
         if (torrents.length > 0) {
-        	vz.torrentInfoShown(torrents[0].getId());
+        	var page = "Inspector";
+        	var selectedPage = $('.inspector-tab.selected');
+        	if (selectedPage.length > 0) {
+        		page += "-" + selectedPage[0].title;
+        	}
+        	vz.torrentInfoShown(torrents[0].getId(), page);
         }
 
         // update the inspector when a selected torrent's data changes.
