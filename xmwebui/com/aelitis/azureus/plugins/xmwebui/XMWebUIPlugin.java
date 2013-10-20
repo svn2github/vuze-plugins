@@ -3262,7 +3262,11 @@ XMWebUIPlugin
 						// RPC v4
 						// downloadDir                 | string                      | tr_torrent
 	
-						value = download.getSavePath();
+						if (t.isSimpleTorrent()) {
+							value = new File(download.getSavePath()).getParent();
+						} else {
+							value = download.getSavePath();
+						}
 	
 					}else if ( field.equals( "downloadedEver" )){
 						// RPC v0
