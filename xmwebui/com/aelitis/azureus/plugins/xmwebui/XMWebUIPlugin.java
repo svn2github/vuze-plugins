@@ -22,6 +22,7 @@
 package com.aelitis.azureus.plugins.xmwebui;
 
 import java.io.*;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.text.NumberFormat;
@@ -1122,6 +1123,10 @@ XMWebUIPlugin
 			
 			throw( e );
 			
+		}catch( TextualException e ){
+
+			response.put( "result", e.getMessage());
+		
 		}catch( Throwable e ){
 			log("processRequest", e);
 			response.put( "result", "error: " + Debug.getNestedExceptionMessage( e ));
@@ -2515,7 +2520,7 @@ XMWebUIPlugin
 	method_Torrent_Add(
 			final Map args, 
 			Map result) 
-	throws IOException, DownloadException
+	throws IOException, DownloadException, TextualException
  {
 		/*
 		   Request arguments:
@@ -2655,7 +2660,12 @@ XMWebUIPlugin
 				url = UrlUtils.parseTextForURL(url, true, true);
 			}
 
-			final URL torrent_url = new URL(url);
+			URL torrent_url;
+			try {
+			 torrent_url = new URL(url);
+			} catch (MalformedURLException mue) {
+				throw new TextualException("The torrent URI was not valid");
+			}
 
 			try{
 				final TorrentDownloader dl = torrentManager.getURLDownloader(torrent_url, null, null);
@@ -2677,7 +2687,7 @@ XMWebUIPlugin
 					
 					try{
 						final AESemaphore sem = new AESemaphore( "magnetsem" );
-						
+						final URL f_torrent_url = torrent_url;
 						magnet_event = SimpleTimer.addEvent(
 							"magnetcheck",
 							SystemTime.getOffsetTime( 10*1000 ),
@@ -2694,7 +2704,7 @@ XMWebUIPlugin
 											return;
 										}
 										
-										MagnetDownload magnet_download = new MagnetDownload( torrent_url );
+										MagnetDownload magnet_download = new MagnetDownload( f_torrent_url );
 										
 										byte[]	hash = magnet_download.getTorrentHash();
 										
