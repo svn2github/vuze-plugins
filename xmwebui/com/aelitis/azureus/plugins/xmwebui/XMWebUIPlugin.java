@@ -4991,6 +4991,8 @@ XMWebUIPlugin
 							
 							file_info.add( f_map );
 							
+							f_map.put( "index", f.getIndex());
+							
 							URL f_stream_url = PlayUtils.getMediaServerContentURL( f );
 
 							if ( f_stream_url != null ){
@@ -5011,6 +5013,8 @@ XMWebUIPlugin
 								Map f_map = new HashMap();
 								
 								file_info.add( f_map );
+								
+								f_map.put( "index", f.getIndex());
 								
 								URL f_stream_url = PlayUtils.getMediaServerContentURL( f );
 
