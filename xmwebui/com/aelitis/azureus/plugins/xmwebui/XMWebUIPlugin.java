@@ -47,6 +47,7 @@ import org.gudy.azureus2.core3.peer.PEPeer;
 import org.gudy.azureus2.core3.peer.PEPeerManager;
 import org.gudy.azureus2.core3.peer.PEPeerSource;
 import org.gudy.azureus2.core3.peer.PEPeerStats;
+import org.gudy.azureus2.core3.torrent.TOTorrent;
 import org.gudy.azureus2.core3.tracker.client.TRTrackerAnnouncer;
 import org.gudy.azureus2.core3.tracker.client.TRTrackerAnnouncerResponse;
 import org.gudy.azureus2.core3.tracker.client.TRTrackerScraper;
@@ -96,6 +97,7 @@ import com.aelitis.azureus.core.metasearch.ResultListener;
 import com.aelitis.azureus.core.metasearch.SearchParameter;
 import com.aelitis.azureus.core.pairing.PairingManager;
 import com.aelitis.azureus.core.pairing.PairingManagerFactory;
+import com.aelitis.azureus.core.torrent.PlatformTorrentUtils;
 import com.aelitis.azureus.core.tracker.TrackerPeerSource;
 import com.aelitis.azureus.core.util.MultiPartDecoder;
 import com.aelitis.azureus.plugins.dht.DHTPlugin;
@@ -105,6 +107,7 @@ import com.aelitis.azureus.plugins.remsearch.RemSearchPluginSearch;
 import com.aelitis.azureus.plugins.startstoprules.defaultplugin.DefaultRankCalculator;
 import com.aelitis.azureus.plugins.startstoprules.defaultplugin.StartStopRulesDefaultPlugin;
 import com.aelitis.azureus.util.JSONUtils;
+import com.aelitis.azureus.util.PlayUtils;
 
 @SuppressWarnings({
 	"unchecked",
@@ -731,10 +734,10 @@ XMWebUIPlugin
 				
 					log( "-> " + request_json_str );
 				}
-
+				
 				Map request_json = JSONUtils.decodeJSON( request_json_str.toString());
 								
-				Map response_json = processRequest( session_id_plus, request_json );
+				Map response_json = processRequest( request, session_id_plus, request_json );
 
 				String response_json_str = JSONUtils.encodeToJSON( response_json );
 				
@@ -769,7 +772,7 @@ XMWebUIPlugin
 				
 				Map request_json = JSONUtils.decodeJSON( request_json_str.toString());
 				
-				Map response_json = processRequest( session_id_plus, request_json );
+				Map response_json = processRequest( request, session_id_plus, request_json );
 					
 				String response_json_str = JSONUtils.encodeToJSON( response_json );
 				
@@ -789,6 +792,12 @@ XMWebUIPlugin
 				response.setGZIP( true );
 				
 				return( true );
+				
+			}else if ( url.startsWith( "/vuze/resource?json=" )){
+
+				Map request_json = JSONUtils.decodeJSON( UrlUtils.decode( url.substring( url.indexOf( '?' ) + 6 )));
+				
+				return( processResourceRequest( request, response, request_json ));
 				
 			}else if ( url.startsWith( "/transmission/upload" )){
 					
@@ -1075,8 +1084,9 @@ XMWebUIPlugin
 	
 	protected Map
 	processRequest(
-		String					session_id,
-		Map						request )
+		TrackerWebPageRequest		wp_request,
+		String						session_id,
+		Map							request )
 	
 		throws IOException
 	{
@@ -1097,7 +1107,7 @@ XMWebUIPlugin
 		}
 
 		try{
-			Map	result = processRequest( session_id, method, args );
+			Map	result = processRequest( wp_request, session_id, method, args );
 
 			if ( result == null ){
 				
@@ -1154,9 +1164,10 @@ XMWebUIPlugin
 	
 	protected Map
 	processRequest(
-		String					session_id,
-		String					method,
-		Map						args )
+		TrackerWebPageRequest		request,
+		String						session_id,
+		String						method,
+		Map							args )
 	
 		throws Exception
 	{
@@ -1504,7 +1515,10 @@ XMWebUIPlugin
 				
 				throw( new IOException( "Client version too old!" ));
 			}
-			
+		}else if ( method.equals( "vuze-torrent-get" )){
+
+			processVuzeTorrentGet( request, args, result );
+	
 		}else{
 			
 			System.out.println( "unhandled method: " + method + " - " + args );
@@ -4862,6 +4876,228 @@ XMWebUIPlugin
 		}
 		
 		return( az_mode );
+	}
+	
+	private void
+	processVuzeTorrentGet(
+		TrackerWebPageRequest		request,
+		Map 						args,
+		Map 						result)
+	{		
+		Object	ids = args.get( "ids" );
+				
+		List<DownloadStub>	downloads = getDownloads( ids, true );
+				
+		List<Map>	torrents = new ArrayList<Map>( downloads.size());
+		
+		result.put( "torrents", torrents );
+		
+		List<Number> requested_files 		= (List<Number>)args.get( "files" );
+
+		String host = (String)request.getHeaders().get( "host" );
+		
+		for ( DownloadStub download_stub: downloads ){
+						
+			Map<String,Object>	torrent = new HashMap<String, Object>();
+			
+			torrents.add( torrent );
+			
+			long id = getID( download_stub, true );
+
+			torrent.put( "id", id );
+			
+			if ( download_stub.isStub()){
+				
+				continue;
+			}
+			
+			try{
+				Download download = download_stub.destubbify();
+				
+				DownloadManager dm = PluginCoreUtils.unwrap( download );
+
+				if ( dm == null ){
+					
+					continue;
+				}
+									
+	
+				DiskManagerFileInfo file = null;
+				
+				try{
+					file = PluginCoreUtils.wrap(dm.getDownloadState().getPrimaryFile());
+					
+				}catch( DownloadException e ){
+					
+					continue;
+				}
+					
+				if ( file == null ){
+						
+					continue;
+				}
+														
+				URL stream_url = PlayUtils.getMediaServerContentURL( file );
+
+				if ( stream_url != null ){
+					
+					torrent.put( "contentURL", adjustURL( host, stream_url ));
+				}
+				
+				TOTorrent to_torrent = dm.getTorrent();
+				
+				if ( to_torrent != null ){
+					
+					String url = PlatformTorrentUtils.getContentThumbnailUrl( to_torrent );
+					
+					if ( url != null ){
+						
+						torrent.put( "thumbnailURL", url );
+						
+					}else{
+				
+						byte[] data = PlatformTorrentUtils.getContentThumbnail( to_torrent );
+						
+						if ( data != null ){
+							
+							torrent.put( "thumbnailURL", getThumbnailResourceURL( id ));
+						}
+					}
+				}
+				
+				if ( requested_files != null ){
+					
+					List<Map> file_info = new ArrayList<Map>();
+						
+					torrent.put( "files", file_info );
+					
+					DiskManagerFileInfo[] files = download.getDiskManagerFileInfo();
+					
+					if ( requested_files.size() == 0 ){
+						
+						for ( DiskManagerFileInfo f: files ){
+							
+							Map f_map = new HashMap();
+							
+							file_info.add( f_map );
+							
+							URL f_stream_url = PlayUtils.getMediaServerContentURL( f );
+
+							if ( f_stream_url != null ){
+								
+								f_map.put( "contentURL", adjustURL( host, f_stream_url ));
+							}
+						}
+					}else{
+						
+						for ( Number num: requested_files ){
+							
+							int	index = num.intValue();
+							
+							if ( index >= 0 && index < files.length ){
+								
+								DiskManagerFileInfo f = files[index];
+								
+								Map f_map = new HashMap();
+								
+								file_info.add( f_map );
+								
+								URL f_stream_url = PlayUtils.getMediaServerContentURL( f );
+
+								if ( f_stream_url != null ){
+									
+									f_map.put( "contentURL", adjustURL( host, f_stream_url ));
+								}
+							}
+						}
+					}
+				}
+			}catch( Throwable e ){
+				
+				Debug.out( e );
+			}
+		}
+	}
+	
+	private static final int RT_THUMBNAIL	= 0;
+	
+	private String
+	getThumbnailResourceURL(
+		long	id )
+	{
+		Map map = new HashMap();
+		
+		map.put( "type", RT_THUMBNAIL );
+		map.put( "id", id );
+		
+		String json = JSONUtils.encodeToJSON( map );
+		
+		return( "/vuze/resource?json=" + UrlUtils.encode( json ));
+	}
+	
+	private boolean
+	processResourceRequest(
+		TrackerWebPageRequest		request,
+		TrackerWebPageResponse		response,
+		Map							request_json )
+	
+		throws IOException
+	{
+		int	type = ((Number)request_json.get( "type" )).intValue();
+		
+		if ( type == RT_THUMBNAIL ){
+			
+			long id = ((Number)request_json.get( "id" )).longValue();
+			
+			List<DownloadStub> list = getDownloads( id, false );
+			
+			if ( list == null || list.size() != 1 ){
+				
+				throw( new IOException( "Unknown download id: " + id ));
+			}
+			
+			try{
+				Download download = list.get(0).destubbify();
+			
+				Torrent torrent = download.getTorrent();
+				
+				byte[] data = PlatformTorrentUtils.getContentThumbnail( PluginCoreUtils.unwrap( torrent ));
+				
+				response.setContentType( "image/jpg" );
+				
+				response.getOutputStream().write( data );
+
+			}catch( Throwable e ){
+				
+				throw( new IOException( "Failed to get thumbnail: " + Debug.getNestedExceptionMessage( e )));
+			}
+			
+			return( true );
+			
+		}else{
+			
+			throw( new IOException( "Unknown resource type: " + type ));
+		}
+	}
+	
+	private String
+	adjustURL(
+		String		host,
+		URL			url )
+	{
+		if ( host == null || host.length() == 0 ){
+			
+			return( url.toExternalForm());
+		}
+		
+		int	pos = host.indexOf( ':' );
+		
+		if ( pos != -1 ){
+		
+			host = host.substring( 0, pos ).trim();
+		}
+		
+		return( UrlUtils.setHost( url, host ).toExternalForm());
 	}
 	
 	private void
