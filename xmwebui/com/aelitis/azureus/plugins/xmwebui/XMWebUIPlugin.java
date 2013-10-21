@@ -5073,7 +5073,9 @@ XMWebUIPlugin
 				
 				byte[] data = PlatformTorrentUtils.getContentThumbnail( PluginCoreUtils.unwrap( torrent ));
 				
-				response.setContentType( "image/jpg" );
+					// TODO: handle image types
+				
+				response.setContentType( "image/jpeg" );
 				
 				response.getOutputStream().write( data );
 
