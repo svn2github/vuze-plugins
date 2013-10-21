@@ -23,6 +23,7 @@ package com.aelitis.azureus.plugins.xmwebui;
 
 import java.io.*;
 import java.net.MalformedURLException;
+import java.net.Socket;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.text.NumberFormat;
@@ -793,6 +794,51 @@ XMWebUIPlugin
 				response.setGZIP( true );
 				
 				return( true );
+				
+				/* example code to relay a stream
+			}else if ( url.startsWith( "/vuze/test.mkv" )){
+				
+				Map headers = request.getHeaders();
+								
+				OutputStream os = response.getRawOutputStream();
+				
+				Socket sock = new Socket( "127.0.0.1", 46409 );
+				
+				OutputStream sos = sock.getOutputStream();
+				
+				String req = "GET /Content/test.mkv HTTP/1.1\r\n";
+				
+				String range = (String)headers.get( "range" );
+				
+				if ( range != null ){
+					
+					req += "Range: " + range + "\r\n";
+				}
+				
+				req += "\r\n";
+				
+				sos.write( req.getBytes( "ISO-8859-1"));
+				
+				sos.flush();
+				
+				InputStream is = sock.getInputStream();
+				
+				byte[]	buffer = new byte[256*1024];
+				
+				while( true ){
+				
+					int	len = is.read( buffer );
+					
+					if ( len <= 0 ){
+						
+						break;
+					}
+					
+					os.write( buffer, 0, len );
+				}
+				
+				return( true );
+				*/
 				
 			}else if ( url.startsWith( "/vuze/resource?json=" )){
 
