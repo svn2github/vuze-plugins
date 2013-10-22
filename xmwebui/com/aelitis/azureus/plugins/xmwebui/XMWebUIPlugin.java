@@ -23,7 +23,6 @@ package com.aelitis.azureus.plugins.xmwebui;
 
 import java.io.*;
 import java.net.MalformedURLException;
-import java.net.Socket;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.text.NumberFormat;
@@ -3013,7 +3012,7 @@ XMWebUIPlugin
 					}
 					
 					created_by	= "Vuze";
-					create_date	= SystemTime.getCurrentTime()/1000;
+					create_date	= md.getCreateTime()/1000;
 					
 				}
 				
@@ -3022,7 +3021,7 @@ XMWebUIPlugin
 				Object[][] stub_defs = {
 				{ "activityDate", 0 },
 				{ "activityDateRelative",0 },
-				{ "addedDate", 0 },
+				{ "addedDate", is_magnet_download?create_date:0 },
 				{ "comment", is_magnet_download?"Metadata Download": "Download Archived" },
 				{ "corruptEver", 0 },
 				{ "creator", created_by },
@@ -3042,16 +3041,16 @@ XMWebUIPlugin
 				{ "isFinished", true },
 				{ "isPrivate", false },
 				{ "isStalled", false },
-				{ "leftUntilDone", 0 },
+				{ "leftUntilDone", is_magnet_download?download_stub.getTorrentSize():0 },	// leftUntilDone is used to mark downloads as incomplete
 				{ "metadataPercentComplete",md_comp },
 				//{ "name", "" },
 				{ "peers", new ArrayList() },
 				{ "peersConnected", 0 },
 				{ "peersGettingFromUs", 0 },
 				{ "peersSendingToUs", "" },
-				{ "percentDone", 100.0f },
+				{ "percentDone", is_magnet_download?0.0f:100.0f },
 				{ "pieceCount", 1 },
-				{ "pieceSize", 1 },
+				{ "pieceSize", download_stub.getTorrentSize() },
 				{ "queuePosition", 0 },
 				{ "rateDownload", 0 },
 				{ "rateUpload", 0 },
@@ -3174,7 +3173,7 @@ XMWebUIPlugin
 						
 					}else if ( field.equals( "haveValid" )){
 
-						value = size;
+						value = is_magnet_download?0:size;
 					
 					}else if ( field.equals( "name" )){
 
@@ -5900,6 +5899,7 @@ XMWebUIPlugin
 		private URL				magnet_url;
 		private String			name;
 		private byte[]			hash;
+		private long			create_time;
 		
 		private Map<TorrentAttribute,Long>	attributes = new HashMap<TorrentAttribute, Long>();
 		
@@ -5911,6 +5911,8 @@ XMWebUIPlugin
 		MagnetDownload(
 			URL		_magnet )
 		{
+			create_time	= SystemTime.getCurrentTime();
+			
 			magnet_url	= _magnet;
 			
 			String	str = magnet_url.toExternalForm();
@@ -5994,6 +5996,12 @@ XMWebUIPlugin
 			getID( this, true );
 		}
 		
+		private long
+		getCreateTime()
+		{
+			return( create_time );
+		}
+		
 		private URL
 		getMagnetURL()
 		{
@@ -6029,7 +6037,7 @@ XMWebUIPlugin
 		public long
 		getTorrentSize()
 		{
-			return( 0 );
+			return( 16*1024 );	// dont know the size
 		}
 		
 		public String
