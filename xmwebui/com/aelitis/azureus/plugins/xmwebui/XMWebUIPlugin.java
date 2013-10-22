@@ -3016,6 +3016,20 @@ XMWebUIPlugin
 					
 				}
 				
+				long	size = 0;
+				
+				if ( IS_5101_PLUS ){
+					
+					size = download_stub.getTorrentSize();
+					
+				}else{
+					
+					if ( is_magnet_download ){
+						
+						size = 16*1024;
+					}
+				}
+				
 				//System.out.println( fields );
 				
 				Object[][] stub_defs = {
@@ -3038,10 +3052,10 @@ XMWebUIPlugin
 				{ "haveUnchecked", 0 },
 				//{ "haveValid", "" },
 				//{ "id", "" },
-				{ "isFinished", true },
+				{ "isFinished", is_magnet_download?false:true },
 				{ "isPrivate", false },
 				{ "isStalled", false },
-				{ "leftUntilDone", is_magnet_download?download_stub.getTorrentSize():0 },	// leftUntilDone is used to mark downloads as incomplete
+				{ "leftUntilDone", is_magnet_download?size:0 },	// leftUntilDone is used to mark downloads as incomplete
 				{ "metadataPercentComplete",md_comp },
 				//{ "name", "" },
 				{ "peers", new ArrayList() },
@@ -3050,7 +3064,7 @@ XMWebUIPlugin
 				{ "peersSendingToUs", "" },
 				{ "percentDone", is_magnet_download?0.0f:100.0f },
 				{ "pieceCount", 1 },
-				{ "pieceSize", download_stub.getTorrentSize() },
+				{ "pieceSize", size==0?1:size },
 				{ "queuePosition", 0 },
 				{ "rateDownload", 0 },
 				{ "rateUpload", 0 },
@@ -3058,7 +3072,7 @@ XMWebUIPlugin
 				{ "seedRatioLimit", 1.0f },
 				{ "seedRatioMode", TransmissionVars.TR_RATIOLIMIT_GLOBAL },
 				//{ "sizeWhenDone", "" },
-				{ "startDate", 0 },
+				{ "startDate", is_magnet_download?create_date:0 },
 				{ "status", status },
 				//{ "totalSize", "" },
 				{ "trackerStats", new ArrayList() },
@@ -3074,13 +3088,6 @@ XMWebUIPlugin
 				
 				for ( Object[] d: stub_defs ){
 					stub_def_map.put( (String)d[0], d[1] );
-				}
-				
-				long	size = 0;
-				
-				if ( IS_5101_PLUS ){
-					
-					size = download_stub.getTorrentSize();
 				}
 				
 				for ( String field: fields ){
