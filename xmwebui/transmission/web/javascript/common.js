@@ -209,7 +209,7 @@ Prefs._Defaults =
 	'auto-start-torrents': true,
 	/* << Vuze */
 	'filter': 'all',
-	'refresh_rate' : 10,
+	'refresh_rate' : 15,
 	'sort_direction': 'ascending',
 	'sort_method': 'name',
 	'turtle-state' : false,
