@@ -1108,8 +1108,11 @@ Transmission.prototype =
 		                           this.updateFromTorrentGet, this);
 	},
 
-	refreshTorrents: function()
+	refreshTorrents: function(force)
 	{
+		if (typeof force != 'boolean') {
+			force = false;
+		}
 		var callback = $.proxy(this.refreshTorrents,this),
 		    msec = this[Prefs._RefreshRate] * 1000,
 		    fields = ['id'].concat(Torrent.Fields.Stats);
@@ -1119,7 +1122,7 @@ Transmission.prototype =
 
 		// schedule the next request
 		clearTimeout(this.refreshTorrentsTimeout);
-		if (!this.uiPaused && msec > 0) {
+		if (force || (!this.uiPaused && msec > 0)) {
 			this.refreshTorrentsTimeout = setTimeout(callback, msec);
 		}
 	},
