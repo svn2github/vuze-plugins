@@ -3009,6 +3009,17 @@ XMWebUIPlugin
 							
 							error_str = Character.toUpperCase( error_str.charAt(0)) + error_str.substring(1);
 						}
+						
+						if ( !IS_5101_PLUS ){
+							
+								// error handling was messy in 5100
+								// cover up the worst of it
+							
+							if ( error_str.contains( "bad header" )){
+								
+								error_str = "No sources found for torrent";
+							}
+						}
 					}
 					
 					created_by	= "Vuze";
