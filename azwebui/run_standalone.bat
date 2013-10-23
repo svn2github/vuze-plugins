@@ -1,1 +1,1 @@
-java -classpath "C:\Projects\Development\azureus2;webui_1.6.11.jar" org.gudy.azureus2.ui.webplugin.remoteui.applet.RemoteUIApplet http://localhost:6883/
+java -classpath "C:\Projects\Development\azureus2_svn;webui_1.7.3.jar" org.gudy.azureus2.ui.webplugin.remoteui.applet.RemoteUIApplet http://localhost:6883/
