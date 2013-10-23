@@ -261,7 +261,9 @@ TransmissionRemote.prototype =
 			arguments: args,
 			method: 'torrent-set'
 		}, function() {
-			remote._controller.refreshTorrents([torrentId]);
+			remote._controller.refreshTorrents(true);
+			// There was never a refreshTorrents that accepted an ID..
+			//remote._controller.refreshTorrents([torrentId]);
 		});
 	},
 
@@ -312,7 +314,7 @@ TransmissionRemote.prototype =
 			}
 		}
 		this.sendRequest(o, function() {
-			remote._controller.refreshTorrents();
+			remote._controller.refreshTorrents(true);
 		});
 	},
 	// >> Vuze
@@ -327,7 +329,7 @@ TransmissionRemote.prototype =
 		};
 
 		this.sendRequest(o, function() {
-			remote._controller.refreshTorrents();
+			remote._controller.refreshTorrents(true);
 		});
 	},
 	// << Vuze
@@ -364,7 +366,7 @@ TransmissionRemote.prototype =
 			if (result != "success") {
 				alert("Error adding torrent:\n\n" + result);
 			}
-			remote._controller.refreshTorrents();
+			remote._controller.refreshTorrents(true);
 		});
 	},
 	// >> Vuze
@@ -390,7 +392,7 @@ TransmissionRemote.prototype =
 			if (response.result != 'success') {
 				alert('Error adding torrent: ' + response.result);
 			}
-			remote._controller.refreshTorrents();
+			remote._controller.refreshTorrents(true);
 		});
 	},
 	// << Vuze
