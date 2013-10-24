@@ -226,7 +226,8 @@ Prefs.setValue = function(key, val)
 
 	var date = new Date();
 	date.setFullYear (date.getFullYear() + 1);
-	document.cookie = key+"="+val+"; expires="+date.toGMTString()+"; path=/";
+	var valStr = JSON.stringify([ val ]);
+	document.cookie = key+"="+valStr+"; expires="+date.toGMTString()+"; path=/";
 };
 
 /**
@@ -243,19 +244,30 @@ Prefs.getValue = function(key, fallback)
 		console.warn("unrecognized preference key '%s'", key);
 
 	var lines = document.cookie.split(';');
-	for (var i=0, len=lines.length; !val && i<len; ++i) {
+	for (var i=0, len=lines.length; i<len; ++i) {
 		var line = lines[i].trim();
 		var delim = line.indexOf('=');
-		if ((delim === key.length) && line.indexOf(key) === 0)
+		if ((delim === key.length) && line.indexOf(key) === 0) {
 			val = line.substring(delim + 1);
+			if (val.lastIndexOf("[", 0) === 0 && val.endsWith("]")) {
+				val = JSON.parse(val)[0];
+			}
+			break;
+		}
 	}
-
+	
 	// FIXME: we support strings and booleans... add number support too?
-	if (!val) val = fallback;
+	if (typeof val === "undefined") val = fallback;
 	else if (val === 'true') val = true;
 	else if (val === 'false') val = false;
 	return val;
 };
+
+if (typeof String.prototype.endsWith !== 'function') {
+    String.prototype.endsWith = function(suffix) {
+        return this.indexOf(suffix, this.length - suffix.length) !== -1;
+    };
+}
 
 /**
  * Get an object with all the Clutch preferences set
