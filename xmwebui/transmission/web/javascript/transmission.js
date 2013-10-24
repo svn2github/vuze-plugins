@@ -124,7 +124,7 @@ Transmission.prototype =
 		}
 		this.loadDaemonStats(async);
 		this.initializeTorrents();
-		this.refreshTorrents();
+		this.refreshTorrents(true);
 		this.togglePeriodicSessionRefresh(true);
 
 		this.updateButtonsSoon();
