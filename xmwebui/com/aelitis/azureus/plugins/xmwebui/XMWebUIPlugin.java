@@ -101,6 +101,9 @@ import com.aelitis.azureus.core.pairing.PairingManagerFactory;
 import com.aelitis.azureus.core.torrent.PlatformTorrentUtils;
 import com.aelitis.azureus.core.tracker.TrackerPeerSource;
 import com.aelitis.azureus.core.util.MultiPartDecoder;
+import com.aelitis.azureus.core.vuzefile.VuzeFile;
+import com.aelitis.azureus.core.vuzefile.VuzeFileComponent;
+import com.aelitis.azureus.core.vuzefile.VuzeFileHandler;
 import com.aelitis.azureus.plugins.dht.DHTPlugin;
 import com.aelitis.azureus.plugins.remsearch.RemSearchPluginPageGenerator;
 import com.aelitis.azureus.plugins.remsearch.RemSearchPluginPageGeneratorAdaptor;
@@ -2563,9 +2566,10 @@ XMWebUIPlugin
 
 	private void 
 	method_Torrent_Add(
-			final Map args, 
-			Map result) 
-	throws IOException, DownloadException, TextualException
+		final Map args, 
+		Map result) 
+				
+		throws IOException, DownloadException, TextualException
  {
 		/*
 		   Request arguments:
@@ -2599,13 +2603,59 @@ XMWebUIPlugin
 		 */
 		checkUpdatePermissions();
 
+		String metainfoString = (String) args.get("metainfo");
+
+		byte[]	metainfoBytes = null;
+		
+		if ( metainfoString != null ){
+		
+			metainfoBytes = Base64.decode( metainfoString );
+		
+			VuzeFileHandler vfh = VuzeFileHandler.getSingleton();
+	
+			if ( vfh != null ){
+				
+				VuzeFile vf = vfh.loadVuzeFile( metainfoBytes );
+	
+				if ( vf != null ){
+					
+		  			VuzeFileComponent[] comps = vf.getComponents();
+
+					for ( VuzeFileComponent comp: comps ){
+						
+						if ( comp.getType() != VuzeFileComponent.COMP_TYPE_METASEARCH_TEMPLATE ){
+							
+							throw( new TextualException( "Unsupported Vuze File component type: " + comp.getTypeName()));
+						}
+					}
+					
+		  			vfh.handleFiles( new VuzeFile[]{ vf }, VuzeFileComponent.COMP_TYPE_METASEARCH_TEMPLATE );
+		  					  			
+		  			String added_templates = "";
+		  					
+		  			for ( VuzeFileComponent comp: comps ){
+		  				
+		  				if ( comp.isProcessed()){
+		  				
+		  					Engine e = (Engine)comp.getData( Engine.VUZE_FILE_COMPONENT_ENGINE_KEY );
+		  					
+		  					if ( e != null ){
+		  						
+		  						added_templates += (added_templates==""?"":", ") + e.getName();
+		  					}
+		  				}
+		  			}
+		  			
+		  			throw( new TextualException( "Installed search template(s): " + added_templates ));
+				}
+			}
+		}
+		
 		Torrent 		torrent;
 		DownloadStub	download = null;
 		
 		String url = (String) args.get("filename");
-		
-		String metainfo = (String) args.get("metainfo");
-		
+				
 		final boolean add_stopped = getBoolean(args.get("paused"));
 		
 		String download_dir = (String) args.get("download-dir");
@@ -2674,9 +2724,9 @@ XMWebUIPlugin
 		
 		TorrentManager torrentManager = plugin_interface.getTorrentManager();
 
-		if (metainfo != null) {
+		if ( metainfoBytes != null ){
 			try {
-				torrent = torrentManager.createFromBEncodedData(Base64.decode(metainfo));
+				torrent = torrentManager.createFromBEncodedData( metainfoBytes);
 			} catch (Throwable e) {
 
 				e.printStackTrace();
