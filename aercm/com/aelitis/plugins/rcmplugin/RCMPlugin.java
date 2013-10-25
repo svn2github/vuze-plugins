@@ -31,6 +31,7 @@ import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.ipc.IPCException;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
+import org.gudy.azureus2.plugins.utils.Utilities;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.gudy.azureus2.plugins.utils.search.SearchProvider;
 import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
@@ -46,6 +47,10 @@ public class
 RCMPlugin 
 	implements UnloadablePlugin
 {
+	// following code to make plugin backwards compatible from 5101 to 5100
+	
+	private static final boolean IS_5101_PLUS = Constants.isCurrentVersionGE( "5.1.0.1" );
+
 	protected static final int MIN_SEARCH_RANK_DEFAULT = 0;
 
 	public static  final String PARAM_SOURCES_LIST = "Plugin.aercm.sources.setlist";
@@ -78,6 +83,7 @@ RCMPlugin
 	private boolean						source_map_wildcard;
 	private byte[]						source_vhdn = compressDomain( "vhdn.vuze.com" );
 	
+	private Object json_rpc_server;	// Object during migration
 	
 	private byte[]
 	compressDomain(
@@ -176,6 +182,59 @@ RCMPlugin
 					
 				}
 			});
+		
+		if ( IS_5101_PLUS ){
+
+			json_rpc_server = 
+				new Utilities.JSONServer() 
+				{
+					private List<String> methods = new ArrayList<String>();
+					
+					{
+						methods.add( "rcm-is-enabled" );
+					}
+					
+					public String 
+					getName() 
+					{
+						return( "SwarmDiscoveries" );
+					}
+
+					public List<String> 
+					getSupportedMethods() 
+					{
+						return( methods );
+					}				
+					
+					public Map 
+					call(
+						String 	method, 
+						Map 	args )
+								
+						throws PluginException 
+					{
+						if ( destroyed ){
+							
+							throw( new PluginException( "Plugin unloaded" ));
+						}
+						
+						Map result = new HashMap();
+						
+						if ( method.equals( "rcm-is-enabled" )){
+							
+							result.put( "enabled", isRCMEnabled());
+							
+						}else{
+							
+							throw( new PluginException( "Unsupported method" ));
+						}
+						
+						return( result );
+					}
+				};
+				
+			plugin_interface.getUtilities().registerJSONRPCServer((Utilities.JSONServer)json_rpc_server);
+		}
 	}
 	
 	protected void
@@ -437,6 +496,13 @@ RCMPlugin
 				
 				Debug.out( e );
 			}
+		}
+		
+		if ( json_rpc_server != null ){
+			
+			plugin_interface.getUtilities().unregisterJSONRPCServer((Utilities.JSONServer)json_rpc_server);
+			
+			json_rpc_server = null;
 		}
 	}
 	
