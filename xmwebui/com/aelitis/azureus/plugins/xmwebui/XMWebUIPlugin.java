@@ -81,6 +81,8 @@ import org.gudy.azureus2.plugins.update.Update;
 import org.gudy.azureus2.plugins.update.UpdateCheckInstance;
 import org.gudy.azureus2.plugins.update.UpdateCheckInstanceListener;
 import org.gudy.azureus2.plugins.update.UpdateManager;
+import org.gudy.azureus2.plugins.utils.Utilities;
+import org.gudy.azureus2.plugins.utils.Utilities.JSONServer;
 import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloader;
 import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloaderAdapter;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
@@ -201,6 +203,11 @@ XMWebUIPlugin
     private boolean			update_in_progress;
     
     private List<MagnetDownload>		magnet_downloads = new ArrayList<XMWebUIPlugin.MagnetDownload>();
+    
+    private Object json_rpc_client;	// Object during transition to core support
+    
+    private Object							json_server_method_lock 	= new Object();
+    private transient Map<String,Object>	json_server_methods 		= new HashMap<String, Object>();		// Object during transition to core support
     
     public
     XMWebUIPlugin()
@@ -434,6 +441,57 @@ XMWebUIPlugin
 				{
 				}
 			});
+		
+		if ( IS_5101_PLUS ){
+			
+			json_rpc_client = 
+				new Utilities.JSONClient() {
+					
+					public void 
+					serverRegistered(
+						JSONServer server ) 
+					{
+						List<String> methods = server.getSupportedMethods();
+
+						//System.out.println( "Registering methods: " + server.getName() + " -> " + methods );
+
+						synchronized( json_server_method_lock ){
+							
+							Map<String,Object> new_methods = new HashMap<String, Object>( json_server_methods );
+														
+							for ( String method: methods ){
+								
+								new_methods.put( method, server );
+							}
+							
+							json_server_methods = new_methods;
+						}
+					}
+					
+					public void 
+					serverUnregistered(
+						JSONServer server ) 
+					{
+						List<String> methods = server.getSupportedMethods();
+						
+						//System.out.println( "Unregistering methods: " + server.getName() + " -> " + methods );
+
+						synchronized( json_server_method_lock ){
+							
+							Map<String,Object> new_methods = new HashMap<String, Object>( json_server_methods );
+														
+							for ( String method: methods ){
+								
+								new_methods.remove( method );
+							}
+							
+							json_server_methods = new_methods;
+						}
+					}
+				};
+				
+			plugin_interface.getUtilities().registerJSONRPCClient((Utilities.JSONClient)json_rpc_client );
+		}
 	}
 	
 	private void
@@ -566,6 +624,18 @@ XMWebUIPlugin
 		
 		plugin_interface.getDownloadManager().removeListener( this );
 
+		if ( IS_5101_PLUS ){
+
+			if ( json_rpc_client != null ){
+			
+				plugin_interface.getUtilities().unregisterJSONRPCClient((Utilities.JSONClient)json_rpc_client);
+				
+				json_rpc_client = null;
+			}
+			
+			json_server_methods.clear();
+		}
+		
 		super.unloadPlugin();
 	}
 	
@@ -1573,6 +1643,16 @@ XMWebUIPlugin
 			processVuzeTorrentGet( request, args, result );
 	
 		}else{
+	
+			if ( IS_5101_PLUS ){
+
+				Utilities.JSONServer server = (Utilities.JSONServer)json_server_methods.get( method );
+				
+				if ( server != null ){
+					
+					return( server.call( method, args ));
+				}
+			}
 			
 			System.out.println( "unhandled method: " + method + " - " + args );
 		}
