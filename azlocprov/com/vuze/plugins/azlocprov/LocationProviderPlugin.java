@@ -43,7 +43,8 @@ LocationProviderPlugin
 	
 		throws PluginException 
 	{
-		applyPatch();
+		applyPatch1();
+		applyPatch2();
 		
 		plugin_interface = _pi;
 		
@@ -70,14 +71,14 @@ LocationProviderPlugin
 	}
 	
 	private void
-	applyPatch()
+	applyPatch1()
 	{
 		// 5100 bug with simple torrent being saved to a FILE named 'Vuze Downloads'
 		// installer has been fixed to create the folder to prevent the issue with new users
 		// for existing users look to see if the problem has been encountered and recover things a bit
 		
 		try{
-			if ( Constants.AZUREUS_VERSION.startsWith( "5.1.0." )){
+			if ( Constants.getCurrentVersion().startsWith( "5.1.0." )){
 				
 				if ( COConfigurationManager.getIntParameter( "azlocprov.patch5100.1.applied", 0 ) == 0 ){
 					
@@ -128,6 +129,55 @@ LocationProviderPlugin
 			}
 		}catch( Throwable e ){
 			
+		}
+	}
+	
+	private void
+	applyPatch2()
+	{
+		// OSX Mavericks Nap prevention
+		
+		try{
+			if ( Constants.getCurrentVersion().startsWith( "5.1.0." ) && Constants.isOSX ){
+				
+				if ( COConfigurationManager.getIntParameter( "azlocprov.patch5100.2.applied", 0 ) == 0 ){
+					
+					int	patch_result = 99;
+					
+					try{
+						
+				      	if ( new File( "/usr/bin/defaults" ).exists()){
+			        		
+				        	String[] command = {
+				        		"/usr/bin/defaults",
+				        		"write",
+				        		"com.azureus.vuze",
+				        		"NSAppSleepDisabled",
+				        		"-bool",
+				        		"YES"
+				        	};
+				        	
+				        	Runtime.getRuntime().exec( command );
+				        	
+				        	patch_result = 1;
+				        	
+			        	}else{
+			        		
+			        		patch_result = 2;
+			        	}
+					}catch( Throwable e ){
+						
+						patch_result = 3;
+						
+					}finally{
+						
+						COConfigurationManager.setParameter( "azlocprov.patch5100.2.applied", patch_result );
+						
+						COConfigurationManager.save();
+					}
+				}
+			}
+		}catch( Throwable e ){			
 		}
 	}
 }
