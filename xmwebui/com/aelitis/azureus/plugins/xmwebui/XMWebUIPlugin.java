@@ -2726,7 +2726,14 @@ XMWebUIPlugin
 		  				}
 		  			}
 		  			
-		  			throw( new TextualException( "Installed search template(s): " + added_templates ));
+		  			if ( added_templates.length() == 0 ){
+		  				
+		  				throw( new TextualException( "No search template(s) added" ));
+		  				
+		  			}else{
+		  				
+		  				throw( new TextualException( "Installed search template(s): " + added_templates ));
+		  			}
 				}
 			}
 		}
@@ -3527,7 +3534,7 @@ XMWebUIPlugin
 						// RPC v0
 						// eta                         | number                      | tr_stat
 	
-						value = torrentGet_eta(download, stats);
+						value = torrentGet_eta( core_download, download, stats);
 	
 					}else if ( field.equals( "etaIdle" )){
 						// RPC v15
@@ -4187,12 +4194,13 @@ XMWebUIPlugin
 	 * If downloading, estimated number of seconds left until the torrent is done.
 	 * If seeding, estimated number of seconds left until seed ratio is reached. 
 	 */
-	private Object torrentGet_eta(Download download, DownloadStats stats) {
+	private Object torrentGet_eta(DownloadManager core_download, Download download, DownloadStats stats ){
 		Object value;
 
 		int state = download.getState();
 		if (state == Download.ST_DOWNLOADING) {
-			long eta_secs = stats.getETASecs();
+			long eta_secs = core_download.getStats().getSmoothedETA();
+			//long eta_secs = stats.getETASecs();
 			
 			if (eta_secs == -1) {
 				value = TransmissionVars.TR_ETA_NOT_AVAIL;
