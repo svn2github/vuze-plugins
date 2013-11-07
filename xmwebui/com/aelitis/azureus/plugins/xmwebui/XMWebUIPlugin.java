@@ -23,6 +23,7 @@ package com.aelitis.azureus.plugins.xmwebui;
 
 import java.io.*;
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.text.NumberFormat;
@@ -86,6 +87,7 @@ import org.gudy.azureus2.plugins.utils.Utilities.JSONServer;
 import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloader;
 import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloaderAdapter;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
+import org.gudy.azureus2.pluginsimpl.local.utils.resourcedownloader.ResourceDownloaderFactoryImpl;
 import org.gudy.azureus2.ui.webplugin.WebPlugin;
 import org.json.simple.JSONObject;
 
@@ -1642,6 +1644,10 @@ XMWebUIPlugin
 
 			processVuzeTorrentGet( request, args, result );
 	
+		}else if ( method.equals( "vuze-file-add" )){
+			
+			processVuzeFileAdd( args, result );
+
 		}else{
 	
 			if ( IS_5101_PLUS ){
@@ -2643,7 +2649,132 @@ XMWebUIPlugin
 		}
 	}
 
+	private void
+	processVuzeFileAdd(
+		final 	Map args, 
+		Map 	result )
+	
+		throws IOException, TextualException
+	{
+		checkUpdatePermissions();
 
+		VuzeFileHandler vfh = VuzeFileHandler.getSingleton();
+
+		VuzeFile vf = null;
+		
+		String url = (String) args.get( "filename" );
+
+		Throwable last_error = null;
+				
+		if ( url != null ){
+
+			try{
+				File f = new File( new URI( url ));
+				
+				if ( f.exists()){
+					
+					vf = vfh.loadVuzeFile( f );
+					
+					if ( vf == null ){
+						
+						throw( new TextualException( "Decode failed - invalid Vuze file" ));
+					}
+				}
+			}catch( Throwable e ){
+				
+				last_error = e;
+			}
+			
+			if ( vf == null && last_error == null ){
+				
+				try{
+					vf = vfh.loadVuzeFile( new ResourceDownloaderFactoryImpl().create( new URL( url )).download());
+					
+				}catch( Throwable e ){
+					
+					last_error = e;
+				}
+			}
+		}
+		
+		if ( vf == null && last_error == null ){
+			
+			try{
+				String metainfoString = (String) args.get("metainfo");
+	
+				byte[]	metainfoBytes = null;
+			
+				if ( metainfoString != null ){
+			
+					metainfoBytes = Base64.decode( metainfoString );
+							
+					vf = vfh.loadVuzeFile( metainfoBytes );
+				
+					if ( vf == null ){
+						
+						throw( new TextualException( "Decode failed - invalid Vuze file" ));
+					}
+				}else{
+					
+					throw( new TextualException( "Missing parameter" ));
+				}
+			}catch( Throwable e ){
+				
+				last_error = e;
+			}
+		}
+		
+		if ( vf != null ){
+			
+  			VuzeFileComponent[] comps = vf.getComponents();
+
+			for ( VuzeFileComponent comp: comps ){
+				
+				if ( comp.getType() != VuzeFileComponent.COMP_TYPE_METASEARCH_TEMPLATE ){
+					
+					throw( new TextualException( "Unsupported Vuze File component type: " + comp.getTypeName()));
+				}
+			}
+			
+  			vfh.handleFiles( new VuzeFile[]{ vf }, VuzeFileComponent.COMP_TYPE_METASEARCH_TEMPLATE );
+  					  			
+  			String added_templates = "";
+  					
+  			for ( VuzeFileComponent comp: comps ){
+  				
+  				if ( comp.isProcessed()){
+  				
+  					Engine e = (Engine)comp.getData( Engine.VUZE_FILE_COMPONENT_ENGINE_KEY );
+  					
+  					if ( e != null ){
+  						
+  						added_templates += (added_templates==""?"":", ") + e.getName();
+  					}
+  				}
+  			}
+  			
+  			result.put( "msg", "Search templates added: " + added_templates );
+  			
+		}else{
+			
+			if ( last_error == null ){
+				
+				throw( new TextualException( "Unspecified error occurred" ));
+				
+			}else{
+				
+				if ( last_error instanceof TextualException ){
+					
+					throw((TextualException)last_error);
+					
+				}else{
+				
+					throw( new TextualException( "Vuze file addition failed: " + Debug.getNestedExceptionMessage( last_error )));
+				}
+			}
+		}
+	}
+	
 	private void 
 	method_Torrent_Add(
 		final Map args, 
