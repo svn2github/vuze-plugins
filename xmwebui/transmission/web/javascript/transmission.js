@@ -135,6 +135,10 @@ Transmission.prototype =
 	loadDaemonPrefs: function(async) {
 		this.remote.loadDaemonPrefs(function(data) {
 			var o = data['arguments'];
+			if (typeof o === "undefined") {
+				// if this wasn't async, we have a big problem.  hope the user refreshes!
+				return;
+			}
 			// data might be {"result":"error:some error"}
 			Prefs.getClutchPrefs(o);
 			this.updateGuiFromSession(o);
@@ -1519,7 +1523,9 @@ Transmission.prototype =
                     fmt = Transmission.fmt,
                     menu = $('#settings_menu');
 
-		this.serverVersion = o.version;
+		if ("version" in o) {
+			this.serverVersion = o.version;
+		}
 
 		this.prefsDialog.set(o);
 
