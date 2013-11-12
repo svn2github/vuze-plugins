@@ -1302,142 +1302,14 @@ XMWebUIPlugin
 		
 			// to get 271 working with this backend change remote.js RPC _Root to be
 			// _Root                   : './transmission/rpc',
-		
-		if ( method.equals( "session-get" ) || method.equals( "session-set" )){
-							
-			PluginConfig pc = plugin_interface.getPluginconfig();
-			
-			String 	save_dir 	= pc.getCoreStringParameter( PluginConfig.CORE_PARAM_STRING_DEFAULT_SAVE_PATH );
-			int		tcp_port 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_INCOMING_TCP_PORT );
-			//int		up_limit_normal 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_KBYTES_PER_SEC );
-			//int		up_limit_seedingOnly 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_SEEDING_KBYTES_PER_SEC );
-			int up_limit = pc.getCoreIntParameter( TransferSpeedValidator.getActiveUploadParameter(AzureusCoreFactory.getSingleton().getGlobalManager()));
-			int		down_limit 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_DOWNLOAD_SPEED_KBYTES_PER_SEC );
-			int		glob_con	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_CONNECTIONS_GLOBAL );
-			int		tor_con 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_CONNECTIONS_PER_TORRENT );
-			
-			
-			//boolean auto_speed_on = pc.getCoreBooleanParameter( PluginConfig.CORE_PARAM_BOOLEAN_AUTO_SPEED_ON ) ||
-			//						pc.getCoreBooleanParameter( PluginConfig.CORE_PARAM_BOOLEAN_AUTO_SPEED_SEEDING_ON );
-						
-			
-			boolean require_enc = COConfigurationManager.getBooleanParameter("network.transport.encrypted.require");
-			
-			if ( method.equals( "session-set" )){
-				method_Session_Set(args, result);
-			}		
-			
-			float stop_ratio = COConfigurationManager.getFloatParameter( "Stop Ratio" );
-			
-			String az_mode = getAZMode();
 
-			IpFilter ipFilter = IpFilterManagerFactory.getSingleton().getIPFilter();
-			String filter_url = COConfigurationManager.getStringParameter("Ip Filter Autoload File", "");
-			final PluginInterface dht_pi = 
-					plugin_interface.getPluginManager().getPluginInterfaceByClass(
-								DHTPlugin.class );
-			DHTPlugin dht = (DHTPlugin)dht_pi.getPlugin();
-			
-			PluginInterface piUTP = plugin_interface.getPluginManager().getPluginInterfaceByID("azutp");
-			boolean hasUTP = piUTP != null && piUTP.getPluginState().isOperational() && piUTP.getPluginconfig().getPluginBooleanParameter("utp.enabled", true);
-			
+		if ( method.equals( "session-set" )){
 
-	    result.put(TransmissionVars.TR_PREFS_KEY_BLOCKLIST_ENABLED, ipFilter.isEnabled() );
-	    result.put(TransmissionVars.TR_PREFS_KEY_BLOCKLIST_URL, filter_url );
-			// RPC v5, but no constant!
-			result.put( "blocklist-size", ipFilter.getNbRanges());           	// number     number of rules in the blocklist
-	    result.put(TransmissionVars.TR_PREFS_KEY_MAX_CACHE_SIZE_MB, 0 );  // TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_DHT_ENABLED, dht.isInitialising() || dht.isEnabled() );
-	    result.put(TransmissionVars.TR_PREFS_KEY_UTP_ENABLED, hasUTP );
-	    result.put(TransmissionVars.TR_PREFS_KEY_LPD_ENABLED, false );
-	    result.put(TransmissionVars.TR_PREFS_KEY_DOWNLOAD_DIR, save_dir);
-	    // RPC 12 to 14
-	    result.put("download-dir-free-space", -1);
+			method_Session_Set(args, result);
 
-	    result.put(TransmissionVars.TR_PREFS_KEY_DSPEED_KBps, down_limit > 0 ? down_limit : pc.getUnsafeIntParameter("config.ui.speed.partitions.manual.download.last"));
-	    result.put(TransmissionVars.TR_PREFS_KEY_DSPEED_ENABLED, down_limit != 0 );
-	    result.put(TransmissionVars.TR_PREFS_KEY_ENCRYPTION, require_enc?"required":"preferred" );               		// string     "required", "preferred", "tolerated"
-	    result.put(TransmissionVars.TR_PREFS_KEY_IDLE_LIMIT, 30 ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_IDLE_LIMIT_ENABLED, false );//TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_INCOMPLETE_DIR, save_dir );
-	    result.put(TransmissionVars.TR_PREFS_KEY_INCOMPLETE_DIR_ENABLED, false );//TODO
-	    //result.put(TransmissionVars.TR_PREFS_KEY_MSGLEVEL, TR_MSG_INF );//TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_DOWNLOAD_QUEUE_SIZE, 5 );//TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_DOWNLOAD_QUEUE_ENABLED, true ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_PEER_LIMIT_GLOBAL, glob_con );
-	    result.put(TransmissionVars.TR_PREFS_KEY_PEER_LIMIT_TORRENT, tor_con );
-	    result.put(TransmissionVars.TR_PREFS_KEY_PEER_PORT, tcp_port );
-	    result.put(TransmissionVars.TR_PREFS_KEY_PEER_PORT_RANDOM_ON_START, false ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_PEER_PORT_RANDOM_LOW, 49152 ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_PEER_PORT_RANDOM_HIGH, 65535 ); //TODO
-	    //result.put(TransmissionVars.TR_PREFS_KEY_PEER_SOCKET_TOS, TR_DEFAULT_PEER_SOCKET_TOS_STR ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_PEX_ENABLED, true ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_PORT_FORWARDING, false ); //TODO
-	    //result.put(TransmissionVars.TR_PREFS_KEY_PREALLOCATION, TR_PREALLOCATE_SPARSE ); //TODO
-	    //result.put(TransmissionVars.TR_PREFS_KEY_PREFETCH_ENABLED, DEFAULT_PREFETCH_ENABLED ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_QUEUE_STALLED_ENABLED, true ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_QUEUE_STALLED_MINUTES, 30 ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_RATIO, 2.0 ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_RATIO_ENABLED, false ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_RENAME_PARTIAL_FILES, true ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_RPC_AUTH_REQUIRED, false ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_RPC_BIND_ADDRESS, "0.0.0.0" ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_RPC_ENABLED, false ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_RPC_PASSWORD, "" ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_RPC_USERNAME, "" ); //TODO
-	    //result.put(TransmissionVars.TR_PREFS_KEY_RPC_WHITELIST, TR_DEFAULT_RPC_WHITELIST ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_RPC_WHITELIST_ENABLED, true ); //TODO
-	    //result.put(TransmissionVars.TR_PREFS_KEY_RPC_PORT, atoi( TR_DEFAULT_RPC_PORT_STR ) ); //TODO
-	    //result.put(TransmissionVars.TR_PREFS_KEY_RPC_URL, TR_DEFAULT_RPC_URL_STR ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_SCRAPE_PAUSED_TORRENTS, true ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_SCRIPT_TORRENT_DONE_FILENAME, "" ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_SCRIPT_TORRENT_DONE_ENABLED, false ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_SEED_QUEUE_SIZE, 10 ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_SEED_QUEUE_ENABLED, false ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_ALT_SPEED_ENABLED, false ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_ALT_SPEED_UP_KBps, 50 );  //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_ALT_SPEED_DOWN_KBps, 50 );  //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_ALT_SPEED_TIME_BEGIN, 540 ); /* 9am */  //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_ALT_SPEED_TIME_ENABLED, false ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_ALT_SPEED_TIME_END, 1020 ); /* 5pm */ //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_ALT_SPEED_TIME_DAY, TransmissionVars.TR_SCHED_ALL ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_USPEED_KBps, up_limit > 0 ? up_limit :pc.getUnsafeIntParameter("config.ui.speed.partitions.manual.upload.last"));
-	    result.put(TransmissionVars.TR_PREFS_KEY_USPEED_ENABLED, up_limit != 0);
-	    result.put(TransmissionVars.TR_PREFS_KEY_UMASK, 022 ); //TODO
-	    result.put(TransmissionVars.TR_PREFS_KEY_UPLOAD_SLOTS_PER_TORRENT, 14 ); //TODO
-	    //result.put(TransmissionVars.TR_PREFS_KEY_BIND_ADDRESS_IPV4, TR_DEFAULT_BIND_ADDRESS_IPV4 ); //TODO
-	    //result.put(TransmissionVars.TR_PREFS_KEY_BIND_ADDRESS_IPV6, TR_DEFAULT_BIND_ADDRESS_IPV6 ); //TODO
-	    
-	    boolean startStopped = COConfigurationManager.getBooleanParameter("Default Start Torrents Stopped");
-	    result.put(TransmissionVars.TR_PREFS_KEY_START, !startStopped ); //TODO
-	    
-			boolean renamePartial = COConfigurationManager.getBooleanParameter("Rename Incomplete Files");
-	    result.put(TransmissionVars.TR_PREFS_KEY_RENAME_PARTIAL_FILES, renamePartial); 
-			
+		} else if ( method.equals( "session-get" ) ){
 
-	    result.put(TransmissionVars.TR_PREFS_KEY_TRASH_ORIGINAL, false ); //TODO
-
-	    String az_version = Constants.AZUREUS_VERSION;
-	    
-	    try{
-	    		// get the actual version instead of cached constant; since 5001
-	    	
-	    	az_version = Constants.getCurrentVersion();
-	    	
-	    }catch( Throwable e ){
-	    }
-
-			result.put( "port", new Long( tcp_port ) );                	// number     port number
-			result.put( "rpc-version", new Long( 14 ));              	// number     the current RPC API version
-			result.put( "rpc-version-minimum", new Long( 6 ));      	// number     the minimum RPC API version supported
-			result.put( "seedRatioLimit", new Double(stop_ratio) );          	// double     the default seed ratio for torrents to use
-			result.put( "seedRatioLimited", stop_ratio>0 );         			// boolean    true if seedRatioLimit is honored by default
-
-			String version = plugin_interface.getPluginVersion();
-			result.put( "version",  version == null ? "Source" : version);           // string     
-			result.put( "az-rpc-version", VUZE_RPC_VERSION);
-			result.put( "az-version", az_version );                  // string     
-			result.put( "az-mode", az_mode );										// string
+			method_Session_Get(args, result);
 			
 		}else if ( method.equals( "session-stats" )){
 
@@ -1666,6 +1538,7 @@ XMWebUIPlugin
 		return( result );
 	}
 
+
 	private void method_Free_Space(Map args, Map result) {
 		// RPC v15
 /*
@@ -1777,6 +1650,142 @@ XMWebUIPlugin
 		List<DownloadManager>	dms = getDownloadManagerListFromIDs( gm, ids );
 
 		gm.moveTop(dms.toArray(new DownloadManager[0]));
+	}
+
+	
+	private void method_Session_Get(Map args, Map result) {
+		
+		PluginConfig pc = plugin_interface.getPluginconfig();
+		
+		String 	save_dir 	= pc.getCoreStringParameter( PluginConfig.CORE_PARAM_STRING_DEFAULT_SAVE_PATH );
+		int		tcp_port 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_INCOMING_TCP_PORT );
+		//int		up_limit_normal 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_KBYTES_PER_SEC );
+		//int		up_limit_seedingOnly 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_SEEDING_KBYTES_PER_SEC );
+		int up_limit = pc.getCoreIntParameter( TransferSpeedValidator.getActiveUploadParameter(AzureusCoreFactory.getSingleton().getGlobalManager()));
+		int		down_limit 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_DOWNLOAD_SPEED_KBYTES_PER_SEC );
+		int		glob_con	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_CONNECTIONS_GLOBAL );
+		int		tor_con 	= pc.getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_CONNECTIONS_PER_TORRENT );
+		
+		
+		//boolean auto_speed_on = pc.getCoreBooleanParameter( PluginConfig.CORE_PARAM_BOOLEAN_AUTO_SPEED_ON ) ||
+		//						pc.getCoreBooleanParameter( PluginConfig.CORE_PARAM_BOOLEAN_AUTO_SPEED_SEEDING_ON );
+					
+		
+		boolean require_enc = COConfigurationManager.getBooleanParameter("network.transport.encrypted.require");
+		
+		
+		float stop_ratio = COConfigurationManager.getFloatParameter( "Stop Ratio" );
+		
+		String az_mode = getAZMode();
+
+		IpFilter ipFilter = IpFilterManagerFactory.getSingleton().getIPFilter();
+		String filter_url = COConfigurationManager.getStringParameter("Ip Filter Autoload File", "");
+		final PluginInterface dht_pi = 
+				plugin_interface.getPluginManager().getPluginInterfaceByClass(
+							DHTPlugin.class );
+		DHTPlugin dht = (DHTPlugin)dht_pi.getPlugin();
+		
+		PluginInterface piUTP = plugin_interface.getPluginManager().getPluginInterfaceByID("azutp");
+		boolean hasUTP = piUTP != null && piUTP.getPluginState().isOperational() && piUTP.getPluginconfig().getPluginBooleanParameter("utp.enabled", true);
+		
+
+    result.put(TransmissionVars.TR_PREFS_KEY_BLOCKLIST_ENABLED, ipFilter.isEnabled() );
+    result.put(TransmissionVars.TR_PREFS_KEY_BLOCKLIST_URL, filter_url );
+		// RPC v5, but no constant!
+		result.put( "blocklist-size", ipFilter.getNbRanges());           	// number     number of rules in the blocklist
+    result.put(TransmissionVars.TR_PREFS_KEY_MAX_CACHE_SIZE_MB, 0 );  // TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_DHT_ENABLED, dht.isInitialising() || dht.isEnabled() );
+    result.put(TransmissionVars.TR_PREFS_KEY_UTP_ENABLED, hasUTP );
+    result.put(TransmissionVars.TR_PREFS_KEY_LPD_ENABLED, false );
+    result.put(TransmissionVars.TR_PREFS_KEY_DOWNLOAD_DIR, save_dir);
+    // RPC 12 to 14
+    result.put("download-dir-free-space", -1);
+
+    result.put(TransmissionVars.TR_PREFS_KEY_DSPEED_KBps, down_limit > 0 ? down_limit : pc.getUnsafeIntParameter("config.ui.speed.partitions.manual.download.last"));
+    result.put(TransmissionVars.TR_PREFS_KEY_DSPEED_ENABLED, down_limit != 0 );
+    result.put(TransmissionVars.TR_PREFS_KEY_ENCRYPTION, require_enc?"required":"preferred" );               		// string     "required", "preferred", "tolerated"
+    result.put(TransmissionVars.TR_PREFS_KEY_IDLE_LIMIT, 30 ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_IDLE_LIMIT_ENABLED, false );//TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_INCOMPLETE_DIR, save_dir );
+    result.put(TransmissionVars.TR_PREFS_KEY_INCOMPLETE_DIR_ENABLED, false );//TODO
+    //result.put(TransmissionVars.TR_PREFS_KEY_MSGLEVEL, TR_MSG_INF );//TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_DOWNLOAD_QUEUE_SIZE, 5 );//TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_DOWNLOAD_QUEUE_ENABLED, true ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_PEER_LIMIT_GLOBAL, glob_con );
+    result.put(TransmissionVars.TR_PREFS_KEY_PEER_LIMIT_TORRENT, tor_con );
+    result.put(TransmissionVars.TR_PREFS_KEY_PEER_PORT, tcp_port );
+    result.put(TransmissionVars.TR_PREFS_KEY_PEER_PORT_RANDOM_ON_START, false ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_PEER_PORT_RANDOM_LOW, 49152 ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_PEER_PORT_RANDOM_HIGH, 65535 ); //TODO
+    //result.put(TransmissionVars.TR_PREFS_KEY_PEER_SOCKET_TOS, TR_DEFAULT_PEER_SOCKET_TOS_STR ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_PEX_ENABLED, true ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_PORT_FORWARDING, false ); //TODO
+    //result.put(TransmissionVars.TR_PREFS_KEY_PREALLOCATION, TR_PREALLOCATE_SPARSE ); //TODO
+    //result.put(TransmissionVars.TR_PREFS_KEY_PREFETCH_ENABLED, DEFAULT_PREFETCH_ENABLED ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_QUEUE_STALLED_ENABLED, true ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_QUEUE_STALLED_MINUTES, 30 ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_RATIO, 2.0 ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_RATIO_ENABLED, false ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_RENAME_PARTIAL_FILES, true ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_RPC_AUTH_REQUIRED, false ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_RPC_BIND_ADDRESS, "0.0.0.0" ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_RPC_ENABLED, false ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_RPC_PASSWORD, "" ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_RPC_USERNAME, "" ); //TODO
+    //result.put(TransmissionVars.TR_PREFS_KEY_RPC_WHITELIST, TR_DEFAULT_RPC_WHITELIST ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_RPC_WHITELIST_ENABLED, true ); //TODO
+    //result.put(TransmissionVars.TR_PREFS_KEY_RPC_PORT, atoi( TR_DEFAULT_RPC_PORT_STR ) ); //TODO
+    //result.put(TransmissionVars.TR_PREFS_KEY_RPC_URL, TR_DEFAULT_RPC_URL_STR ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_SCRAPE_PAUSED_TORRENTS, true ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_SCRIPT_TORRENT_DONE_FILENAME, "" ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_SCRIPT_TORRENT_DONE_ENABLED, false ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_SEED_QUEUE_SIZE, 10 ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_SEED_QUEUE_ENABLED, false ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_ALT_SPEED_ENABLED, false ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_ALT_SPEED_UP_KBps, 50 );  //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_ALT_SPEED_DOWN_KBps, 50 );  //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_ALT_SPEED_TIME_BEGIN, 540 ); /* 9am */  //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_ALT_SPEED_TIME_ENABLED, false ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_ALT_SPEED_TIME_END, 1020 ); /* 5pm */ //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_ALT_SPEED_TIME_DAY, TransmissionVars.TR_SCHED_ALL ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_USPEED_KBps, up_limit > 0 ? up_limit :pc.getUnsafeIntParameter("config.ui.speed.partitions.manual.upload.last"));
+    result.put(TransmissionVars.TR_PREFS_KEY_USPEED_ENABLED, up_limit != 0);
+    result.put(TransmissionVars.TR_PREFS_KEY_UMASK, 022 ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_UPLOAD_SLOTS_PER_TORRENT, 14 ); //TODO
+    //result.put(TransmissionVars.TR_PREFS_KEY_BIND_ADDRESS_IPV4, TR_DEFAULT_BIND_ADDRESS_IPV4 ); //TODO
+    //result.put(TransmissionVars.TR_PREFS_KEY_BIND_ADDRESS_IPV6, TR_DEFAULT_BIND_ADDRESS_IPV6 ); //TODO
+    
+    boolean startStopped = COConfigurationManager.getBooleanParameter("Default Start Torrents Stopped");
+    result.put(TransmissionVars.TR_PREFS_KEY_START, !startStopped ); //TODO
+    
+		boolean renamePartial = COConfigurationManager.getBooleanParameter("Rename Incomplete Files");
+    result.put(TransmissionVars.TR_PREFS_KEY_RENAME_PARTIAL_FILES, renamePartial); 
+		
+
+    result.put(TransmissionVars.TR_PREFS_KEY_TRASH_ORIGINAL, false ); //TODO
+
+    String az_version = Constants.AZUREUS_VERSION;
+    
+    try{
+    		// get the actual version instead of cached constant; since 5001
+    	
+    	az_version = Constants.getCurrentVersion();
+    	
+    }catch( Throwable e ){
+    }
+
+		result.put( "port", new Long( tcp_port ) );                	// number     port number
+		result.put( "rpc-version", new Long( 14 ));              	// number     the current RPC API version
+		result.put( "rpc-version-minimum", new Long( 6 ));      	// number     the minimum RPC API version supported
+		result.put( "seedRatioLimit", new Double(stop_ratio) );          	// double     the default seed ratio for torrents to use
+		result.put( "seedRatioLimited", stop_ratio>0 );         			// boolean    true if seedRatioLimit is honored by default
+
+		String version = plugin_interface.getPluginVersion();
+		result.put( "version",  version == null ? "Source" : version);           // string     
+		result.put( "az-rpc-version", VUZE_RPC_VERSION);
+		result.put( "az-version", az_version );                  // string     
+		result.put( "az-mode", az_mode );										// string
+		
 	}
 
 	private void method_Session_Set(Map args, Map result)
