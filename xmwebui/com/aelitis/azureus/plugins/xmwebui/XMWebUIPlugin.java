@@ -1988,6 +1988,13 @@ XMWebUIPlugin
 
 					COConfigurationManager.setParameter("Stop Ratio", ratio);
 
+				} else if (key.equals("seedRatioLimited")) {
+					// RPC v5
+
+					boolean limit = getBoolean(val);
+
+					COConfigurationManager.setParameter("Stop Ratio", limit ? 2f : 0f); // 2f is made up; sharing is caring
+
 				} else {
 
 					System.out.println("Unhandled session-set field: " + key);
