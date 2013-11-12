@@ -1873,8 +1873,11 @@ Transmission.prototype =
 				// Vuze: tap is 'fuzzy' and seems to prefer the element it binds on,
 				// Bind directly on torrent_info button, otherwise it's really
 				// hard to tap the button.
-				$(e).find(".torrent_info")[0].row = row;
-				$(e).find(".torrent_info").bind('tap', $.proxy(this.onRowClicked,this));
+				ti = $(e).find(".torrent_info");
+				if (ti.length > 0) {
+					ti[0].row = row;
+					ti.bind('tap', $.proxy(this.onRowClicked,this));
+				}
 			}
 		}
 
