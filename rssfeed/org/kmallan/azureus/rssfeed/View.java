@@ -1132,7 +1132,7 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
     String default_path = "";
     if(itemStoreDir.getText().length() > 0) {
       default_path = itemStoreDir.getText();
-    } else if(COConfigurationManager.getBooleanParameter("Use default data dir", true)) {
+    } else{
       default_path = COConfigurationManager.getStringParameter("Default save path", "");
     }
     if(default_path.length() > 0) {
@@ -1715,7 +1715,7 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
         String default_path = new String("");
         if(urlBean.getStoreDir().length() > 0) {
           default_path = urlBean.getStoreDir();
-        } else if(COConfigurationManager.getBooleanParameter("Use default data dir", true)) {
+        } else{
           default_path = COConfigurationManager.getStringParameter("Default save path", "");
         }
 

@@ -239,6 +239,8 @@ public class Downloader extends InputStream {
 	            fileName = temp.getName();
 	          }
 	        }
+	        
+	        break;
           }catch( SSLException e ){
         	  
         	  if ( i == 0 ){
@@ -346,7 +348,14 @@ public class Downloader extends InputStream {
   protected void finalize() {
     try {
       in.close();
-    } catch(Exception e) {}
+    } catch(Throwable e) {}
+    
+    try{
+    	if ( con instanceof HttpURLConnection ){
+    		((HttpURLConnection)con).disconnect();
+    		
+    	}
+    }catch( Throwable e ){}
     done();
   }
 
@@ -370,10 +379,13 @@ public class Downloader extends InputStream {
   }
 
   // InputStream Filtered Stuff
-  public int read() {
+  public int read() throws IOException{
     try {
       synchronized(listeners) {
         int read = in.read();
+        if ( read == -1 ){
+        	return( -1 );
+        }
         readTotal += read;
         if(this.size > 0) {
           this.percentDone = (100 * this.readTotal) / this.size;
@@ -381,18 +393,21 @@ public class Downloader extends InputStream {
         } else fireDownloaderUpdate(state, 0, readTotal, "");
         return read;
       }
-    } catch(IOException e) {}
+    } catch(IOException e) {error( e.getMessage());}
     return -1;
   }
 
-  public int read(byte b[]) {
+  public int read(byte b[]) throws IOException{
     return read(b, 0, b.length);
   }
 
-  public int read(byte b[], int off, int len) {
+  public int read(byte b[], int off, int len) throws IOException {
     try {
       synchronized(listeners) {
         int read = in.read(b, off, len);
+        if ( read == -1 ){
+        	return( -1 );
+        }
         this.readTotal += read;
         if(this.size > 0) {
           this.percentDone = (100 * this.readTotal) / this.size;
@@ -401,6 +416,7 @@ public class Downloader extends InputStream {
         return read;
       }
     } catch(IOException e) {
+    	error( e.getMessage());
     }
     return -1;
   }

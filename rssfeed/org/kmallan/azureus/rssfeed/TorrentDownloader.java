@@ -108,7 +108,7 @@ public class TorrentDownloader {
 	          defaultPath = filterBean.getStoreDir();
 	        } else if(urlBean != null && urlBean.getStoreDir().length() > 0) {
 	          defaultPath = urlBean.getStoreDir();
-	        } else if(COConfigurationManager.getBooleanParameter("Use default data dir", true)) {
+	        } else{
 	          defaultPath = COConfigurationManager.getStringParameter("Default save path", "");
 	        }
 	
@@ -299,6 +299,10 @@ public class TorrentDownloader {
 
       } else {
 
+    	if ( torrentLocation.length() == 0 ){
+    			// when a magnet link fails to download the result is a zero length file
+    		throw( new IOException( "Torrent download failed" ));
+    	}
         Torrent torrent = torrentManager.createFromBEncodedFile(torrentLocation);
         String name = torrent.getName() + ".torrent";
         File newFile = new File(directoryName, name);
