@@ -22,10 +22,7 @@
 package com.aelitis.azureus.plugins.xmwebui;
 
 import java.io.*;
-import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URL;
-import java.net.URLDecoder;
+import java.net.*;
 import java.text.NumberFormat;
 import java.text.ParseException;
 import java.util.*;
@@ -37,6 +34,7 @@ import org.gudy.azureus2.core3.disk.DiskManager;
 import org.gudy.azureus2.core3.disk.DiskManagerPiece;
 import org.gudy.azureus2.core3.download.DownloadManager;
 import org.gudy.azureus2.core3.download.DownloadManagerState;
+import org.gudy.azureus2.core3.download.DownloadManagerStats;
 import org.gudy.azureus2.core3.global.GlobalManager;
 import org.gudy.azureus2.core3.global.GlobalManagerStats;
 import org.gudy.azureus2.core3.internat.MessageText;
@@ -45,43 +43,24 @@ import org.gudy.azureus2.core3.ipfilter.IpFilterManagerFactory;
 import org.gudy.azureus2.core3.ipfilter.impl.IpFilterAutoLoaderImpl;
 import org.gudy.azureus2.core3.logging.LogAlert;
 import org.gudy.azureus2.core3.logging.Logger;
-import org.gudy.azureus2.core3.peer.PEPeer;
-import org.gudy.azureus2.core3.peer.PEPeerManager;
-import org.gudy.azureus2.core3.peer.PEPeerSource;
-import org.gudy.azureus2.core3.peer.PEPeerStats;
+import org.gudy.azureus2.core3.peer.*;
 import org.gudy.azureus2.core3.torrent.TOTorrent;
-import org.gudy.azureus2.core3.tracker.client.TRTrackerAnnouncer;
-import org.gudy.azureus2.core3.tracker.client.TRTrackerAnnouncerResponse;
-import org.gudy.azureus2.core3.tracker.client.TRTrackerScraper;
-import org.gudy.azureus2.core3.tracker.client.TRTrackerScraperResponse;
+import org.gudy.azureus2.core3.tracker.client.*;
 import org.gudy.azureus2.core3.util.*;
-import org.gudy.azureus2.plugins.PluginAdapter;
-import org.gudy.azureus2.plugins.PluginConfig;
-import org.gudy.azureus2.plugins.PluginEvent;
-import org.gudy.azureus2.plugins.PluginEventListener;
-import org.gudy.azureus2.plugins.PluginException;
-import org.gudy.azureus2.plugins.PluginInterface;
-import org.gudy.azureus2.plugins.PluginManager;
-import org.gudy.azureus2.plugins.UnloadablePlugin;
+import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.config.ConfigParameter;
 import org.gudy.azureus2.plugins.config.ConfigParameterListener;
 import org.gudy.azureus2.plugins.disk.DiskManagerFileInfo;
 import org.gudy.azureus2.plugins.download.*;
 import org.gudy.azureus2.plugins.download.DownloadStub.DownloadStubFile;
-import org.gudy.azureus2.plugins.torrent.Torrent;
-import org.gudy.azureus2.plugins.torrent.TorrentAttribute;
-import org.gudy.azureus2.plugins.torrent.TorrentDownloader;
-import org.gudy.azureus2.plugins.torrent.TorrentManager;
+import org.gudy.azureus2.plugins.torrent.*;
 import org.gudy.azureus2.plugins.tracker.web.TrackerWebPageRequest;
 import org.gudy.azureus2.plugins.tracker.web.TrackerWebPageResponse;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
 import org.gudy.azureus2.plugins.ui.config.BooleanParameter;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
-import org.gudy.azureus2.plugins.update.Update;
-import org.gudy.azureus2.plugins.update.UpdateCheckInstance;
-import org.gudy.azureus2.plugins.update.UpdateCheckInstanceListener;
-import org.gudy.azureus2.plugins.update.UpdateManager;
+import org.gudy.azureus2.plugins.update.*;
 import org.gudy.azureus2.plugins.utils.Utilities;
 import org.gudy.azureus2.plugins.utils.Utilities.JSONServer;
 import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloader;
@@ -93,13 +72,7 @@ import org.json.simple.JSONObject;
 
 import com.aelitis.azureus.core.AzureusCore;
 import com.aelitis.azureus.core.AzureusCoreFactory;
-import com.aelitis.azureus.core.metasearch.Engine;
-import com.aelitis.azureus.core.metasearch.MetaSearch;
-import com.aelitis.azureus.core.metasearch.MetaSearchManager;
-import com.aelitis.azureus.core.metasearch.MetaSearchManagerFactory;
-import com.aelitis.azureus.core.metasearch.Result;
-import com.aelitis.azureus.core.metasearch.ResultListener;
-import com.aelitis.azureus.core.metasearch.SearchParameter;
+import com.aelitis.azureus.core.metasearch.*;
 import com.aelitis.azureus.core.pairing.PairingManager;
 import com.aelitis.azureus.core.pairing.PairingManagerFactory;
 import com.aelitis.azureus.core.torrent.PlatformTorrentUtils;
@@ -1942,13 +1915,16 @@ XMWebUIPlugin
 					pc.setCoreBooleanParameter(
 							PluginConfig.CORE_PARAM_BOOLEAN_AUTO_SPEED_SEEDING_ON, false);
 
+					int up_limit = pc.getCoreIntParameter(PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_KBYTES_PER_SEC);
+					int up_limit_seeding = pc.getCoreIntParameter(PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_SEEDING_KBYTES_PER_SEC);
+
 					if (!enable) {
 						pc.setCoreIntParameter(
 								PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_KBYTES_PER_SEC, 0);
 						pc.setCoreIntParameter(
 								PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_SEEDING_KBYTES_PER_SEC,
 								0);
-					} else {
+					} else if (enable && (up_limit == 0 || up_limit_seeding == 0)) {
 						int lastRate = pc.getUnsafeIntParameter("config.ui.speed.partitions.manual.upload.last");
 						if (lastRate <= 0) {
 							lastRate = 10;
@@ -2001,8 +1977,20 @@ XMWebUIPlugin
 					// RPC v5
 
 					boolean limit = getBoolean(val);
+					
+					float ratio;
+					if (limit) {
+						// 2f is made up; sharing is caring
+						if (args.containsKey("seedRatioLimit")) {
+							ratio = getNumber(args.get("seedRatioLimit"), 2f).floatValue();
+						} else {
+							ratio = 2f;
+						}
+					} else {
+						ratio = 0f;
+					}
 
-					COConfigurationManager.setParameter("Stop Ratio", limit ? 2f : 0f); // 2f is made up; sharing is caring
+					COConfigurationManager.setParameter("Stop Ratio", ratio);
 
 				} else {
 
@@ -3214,860 +3202,9 @@ XMWebUIPlugin
 		for ( DownloadStub download_stub: downloads ){
 			
 			if ( download_stub.isStub()){
-				
-				Map torrent = new HashMap();
-				
-				long download_id = getID( download_stub, true );
-				
-				torrent_info.put( download_id, torrent );
-
-				boolean	is_magnet_download = download_stub instanceof MagnetDownload;
-				
-				long 	status		= 0;
-				long 	error 		= TransmissionVars.TR_STAT_OK;
-				String 	error_str 	= "";
-				String	created_by	= "";
-				long	create_date	= 0;
-				float	md_comp		= 1.0f;
-				
-				if ( is_magnet_download ){
-					
-					MagnetDownload md = (MagnetDownload)download_stub;
-					
-					Throwable e = md.getError();
-					
-					if ( e == null ){
-						
-						status = 4;
-						
-						md_comp		= 0.0f;
-						
-					}else{
-						
-						status		= 0;
-						
-						error 		= TransmissionVars.TR_STAT_LOCAL_ERROR;
-						
-						Throwable temp = e;
-						
-						while( temp.getCause() != null ){
-							
-							temp = temp.getCause();
-						}
-						
-						String last_msg = temp.getMessage();
-						
-						if ( last_msg != null && last_msg.length() > 0 ){
-							
-							error_str = last_msg;
-							
-						}else{
-							
-							error_str = Debug.getNestedExceptionMessage( e );
-						}
-						
-						String magnet_url = md.getMagnetURL().toExternalForm();
-						
-						int	pos = error_str.indexOf( magnet_url );
-						
-						// tidy up the most common error messages by removing magnet uri from them and
-						// trimming prefix of 'Error:'
-						
-						if ( pos != -1 ){
-							
-							error_str = error_str.substring(0,pos) + error_str.substring( pos+magnet_url.length());
-						}
-						
-						error_str = error_str.trim();
-						
-						pos = error_str.indexOf( "rror:");
-						
-						if ( pos != -1 ){
-							
-							error_str = error_str.substring( pos+5 ).trim();
-						}
-						
-						if ( error_str.length() > 0 ){
-							
-								// probably not great for right-left languages but derp
-							
-							error_str = Character.toUpperCase( error_str.charAt(0)) + error_str.substring(1);
-						}
-						
-						if ( !IS_5101_PLUS ){
-							
-								// error handling was messy in 5100
-								// cover up the worst of it
-							
-							if ( error_str.contains( "bad header" )){
-								
-								error_str = "No sources found for torrent";
-							}
-						}
-					}
-					
-					created_by	= "Vuze";
-					create_date	= md.getCreateTime()/1000;
-					
-				}
-				
-				long	size = 0;
-				
-				if ( IS_5101_PLUS ){
-					
-					size = download_stub.getTorrentSize();
-					
-				}else{
-					
-					if ( is_magnet_download ){
-						
-						size = 16*1024;
-					}
-				}
-				
-				//System.out.println( fields );
-				
-				Object[][] stub_defs = {
-				{ "activityDate", 0 },
-				{ "activityDateRelative",0 },
-				{ "addedDate", is_magnet_download?create_date:0 },
-				{ "comment", is_magnet_download?"Metadata Download": "Download Archived" },
-				{ "corruptEver", 0 },
-				{ "creator", created_by },
-				{ "dateCreated", create_date },
-				{ "desiredAvailable", 0 },
-				//{ "downloadDir", "" },
-				{ "downloadedEver", 0 },
-				{ "error", error },
-				{ "errorString", error_str },
-				{ "eta", TransmissionVars.TR_ETA_NOT_AVAIL },
-				//{ "fileStats", "" },
-				//{ "files", "" },
-				//{ "hashString", "" },
-				{ "haveUnchecked", 0 },
-				//{ "haveValid", "" },
-				//{ "id", "" },
-				{ "isFinished", is_magnet_download?false:true },
-				{ "isPrivate", false },
-				{ "isStalled", false },
-				{ "leftUntilDone", is_magnet_download?size:0 },	// leftUntilDone is used to mark downloads as incomplete
-				{ "metadataPercentComplete",md_comp },
-				//{ "name", "" },
-				{ "peers", new ArrayList() },
-				{ "peersConnected", 0 },
-				{ "peersGettingFromUs", 0 },
-				{ "peersSendingToUs", "" },
-				{ "percentDone", is_magnet_download?0.0f:100.0f },
-				{ "pieceCount", 1 },
-				{ "pieceSize", size==0?1:size },
-				{ "queuePosition", 0 },
-				{ "rateDownload", 0 },
-				{ "rateUpload", 0 },
-				{ "recheckProgress", 0.0f },
-				{ "seedRatioLimit", 1.0f },
-				{ "seedRatioMode", TransmissionVars.TR_RATIOLIMIT_GLOBAL },
-				//{ "sizeWhenDone", "" },
-				{ "startDate", is_magnet_download?create_date:0 },
-				{ "status", status },
-				//{ "totalSize", "" },
-				{ "trackerStats", new ArrayList() },
-				{ "trackers", new ArrayList() },
-				{ "uploadRatio", 0.0f },
-				{ "uploadedEver", 0 },
-				{ "webseedsSendingToUs", 0 },
-				};
-				
-				
-				
-				Map<String,Object>	stub_def_map = new HashMap<String, Object>();
-				
-				for ( Object[] d: stub_defs ){
-					stub_def_map.put( (String)d[0], d[1] );
-				}
-				
-				for ( String field: fields ){
-					
-					Object	value = stub_def_map.get( field );
-					
-					if ( field.equals( "id" )){
-						
-						value = download_id;
-						
-					}else if ( field.equals( "downloadDir" )){
-						
-						if ( IS_5101_PLUS ){
-							
-							value = download_stub.getSavePath();
-							
-						}else{
-							
-							value = "";
-						}
-					
-					}else if ( field.equals( "files" )){
-
-						DownloadStubFile[] files = download_stub.getStubFiles();
-						
-						List<Map>	l_files = new ArrayList<Map>();
-						
-						for ( DownloadStubFile sf: files ){
-						
-							Map	map = new HashMap();
-							
-							l_files.add( map );
-							
-							long	len = sf.getLength();
-							
-							long	downloaded;
-							
-							if ( len < 0 ){
-								
-								downloaded 	= 0;
-								len			= -len;
-								
-							}else{
-								
-								downloaded	= len;
-							}
-							
-							map.put( "bytesCompleted",downloaded );	// this must be a spec error...
-							map.put( "length",  len);
-							map.put( "name", sf.getFile().getAbsolutePath());
-						}
-						
-						value = l_files;				
-						
-					}else if ( field.equals( "fileStats" )){
-
-						DownloadStubFile[] files = download_stub.getStubFiles();
-						
-						List<Map>	l_files = new ArrayList<Map>();
-						
-						for ( DownloadStubFile sf: files ){
-						
-							Map	map = new HashMap();
-							
-							l_files.add( map );
-							
-							long	len = sf.getLength();
-							
-							long	downloaded;
-							
-							if ( len < 0 ){
-								
-								downloaded 	= 0;
-								
-							}else{
-								
-								downloaded	= len;
-							}
-							
-							map.put( "bytesCompleted", downloaded );
-							map.put( "wanted", len >= 0 );
-							map.put( "priority", TransmissionVars.convertVuzePriority(0));
-						}
-						
-						value = l_files;
-						
-					}else if ( field.equals( "hashString" )){
-						
-						value = ByteFormatter.encodeString( download_stub.getTorrentHash());
-						
-					}else if ( field.equals( "haveValid" )){
-
-						value = is_magnet_download?0:size;
-					
-					}else if ( field.equals( "name" )){
-
-						value = download_stub.getName();
-						
-					}else if ( field.equals( "sizeWhenDone" )){
-
-						value = size;
-						
-					}else if ( field.equals( "totalSize" )){
-
-						value = size;
-					}
-					
-					if ( value != null ){
-					
-						if ( value instanceof String ){
-						
-							value = escapeXML((String)value);
-						}
-						
-						torrent.put( field, value );
-						
-					}else{
-						
-						System.out.println( "Unknown field: " + field );
-					}
-				}
+				method_Torrent_Get_Stub(args, fields, torrent_info, download_stub);
 			}else{
-				
-				Download download = (Download)download_stub;
-			
-				Torrent t = download.getTorrent();
-				
-				if ( t == null ){
-					
-					continue;
-				}
-				
-				long download_id = getID( download, true );
-				
-				DownloadManager	core_download = PluginCoreUtils.unwrap( download );
-				
-				PEPeerManager pm = core_download.getPeerManager();
-				
-				DownloadStats	stats = download.getStats();
-				
-				Map torrent = new HashMap( fields.size()+8);
-				
-				torrent_info.put( download_id, torrent );
-				
-				int	peers_from_us 	= 0;
-				int	peers_to_us		= 0;
-				
-				if ( pm != null ){
-					
-					List<PEPeer> peers = pm.getPeers();
-					
-					for ( PEPeer peer: peers ){
-						
-						PEPeerStats pstats = peer.getStats();
-						
-						if ( pstats.getDataReceiveRate() > 0 ){
-							
-							peers_to_us++;
-						}
-						
-						if ( pstats.getDataSendRate() > 0 ){
-							
-							peers_from_us++;
-						}
-					}
-				}
-				
-				for ( String field: fields ){
-	
-					Object	value = null;
-					
-					if ( field.equals( "activityDate" )){
-						// RPC v0
-						// activityDate                | number                      | tr_stat
-						value = torrentGet_activityDate(core_download, false);
-	
-					} else if ( field.equals( "activityDateRelative" )){
-							// RPC v0
-							// activityDate                | number                      | tr_stat
-							value = torrentGet_activityDate(core_download, true);
-	
-					}else if ( field.equals( "addedDate" )){
-						// RPC v0
-						// addedDate                   | number                      | tr_stat
-						/** When the torrent was first added. */
-						value = core_download.getDownloadState().getLongParameter(DownloadManagerState.PARAM_DOWNLOAD_ADDED_TIME)/1000;
-	
-					}else if ( field.equals( "announceURL" )){
-						// Removed in RPC v7
-	
-						value = t.getAnnounceURL().toExternalForm();
-	
-					}else if ( field.equals( "bandwidthPriority" )){ 
-						// RPC v5: Not Supported
-						// bandwidthPriority           | number                      | tr_priority_t
-						/** torrent's bandwidth priority. */
-						value = TransmissionVars.TR_PRI_NORMAL;
-						
-					}else if ( field.equals( "comment" )){
-						// RPC v0
-						// comment                     | string                      | tr_info
-	
-						value = t.getComment();
-						
-					}else if ( field.equals( "corruptEver" )){
-						// RPC v0 TODO: Do we want just hash fails?
-						// corruptEver                 | number                      | tr_stat
-						/** 
-						 * Byte count of all the corrupt data you've ever downloaded for
-						 * this torrent. If you're on a poisoned torrent, this number can
-						 * grow very large. 
-						 */
-						value = stats.getDiscarded() + stats.getHashFails();
-	
-					}else if ( field.equals( "creator" )){	
-						// RPC v0
-						// creator                     | string                      | tr_info
-						value = t.getCreatedBy();
-	
-					}else if ( field.equals( "dateCreated" )){	
-	
-						// RPC v0
-						// dateCreated                 | number                      | tr_info
-						value = t.getCreationDate();
-	
-					}else if ( field.equals( "desiredAvailable" )){
-						// RPC v0 TODO: stats.getRemainingAvailable() ?
-						// desiredAvailable            | number                      | tr_stat
-						 /** 
-						  * Byte count of all the piece data we want and don't have yet,
-						  * but that a connected peer does have. [0...leftUntilDone] 
-						  */
-						value = stats.getRemaining();
-	
-					}else if ( field.equals( "doneDate" )){
-						// RPC v0
-						// doneDate                    | number                      | tr_stat
-				    /** When the torrent finished downloading. */
-						if (core_download.isDownloadComplete(false)) {
-							value = core_download.getDownloadState().getLongParameter(
-									DownloadManagerState.PARAM_DOWNLOAD_COMPLETED_TIME) / 1000;
-						} else {
-							// TODO: Verify what value to send when not complete
-							value = 0;
-						}
-						
-					}else if ( field.equals( "downloadDir" )){
-						// RPC v4
-						// downloadDir                 | string                      | tr_torrent
-	
-						if (t.isSimpleTorrent()) {
-							value = new File(download.getSavePath()).getParent();
-						} else {
-							value = download.getSavePath();
-						}
-	
-					}else if ( field.equals( "downloadedEver" )){
-						// RPC v0
-						// downloadedEver              | number                      | tr_stat
-	
-						/** 
-						 * Byte count of all the non-corrupt data you've ever downloaded
-						 * for this torrent. If you deleted the files and downloaded a second
-						 * time, this will be 2*totalSize.. 
-						 */
-						value = stats.getDownloaded();
-	
-					}else if ( field.equals( "downloadLimit" ) || field.equals("speed-limit-down")){
-						// RPC v5 (alternate is from 'set' prior to v5 -- added for rogue clients)
-						// downloadLimit               | number                      | tr_torrent
-						
-						/** maximum download speed (KBps) */
-						value = download.getMaximumDownloadKBPerSecond();
-	
-					}else if ( field.equals( "downloadLimited" ) || field.equals("speed-limit-down-enabled")){
-						// RPC v5 (alternate is from 'set' prior to v5 -- added for rogue clients)
-						// downloadLimited             | boolean                     | tr_torrent
-	
-						/** true if "downloadLimit" is honored */
-						value = download.getDownloadRateLimitBytesPerSecond() > 0;
-	
-					}else if ( field.equals( "error" )){
-						// RPC v0
-						// error                       | number                      | tr_stat
-						/** Defines what kind of text is in errorString. TR_STAT_* */
-						
-						value = torrentGet_error(core_download, download);
-	
-					}else if ( field.equals( "errorString" )){
-						// RPC v0
-						// errorString                 | string                      | tr_stat
-	
-						value = torrentGet_errorString(core_download, download);
-	
-					}else if ( field.equals( "eta" )){
-						// RPC v0
-						// eta                         | number                      | tr_stat
-	
-						value = torrentGet_eta( core_download, download, stats);
-	
-					}else if ( field.equals( "etaIdle" )){
-						// RPC v15
-						/** If seeding, number of seconds left until the idle time limit is reached. */
-						// TODO: No idea what etaIdle description means! What happens at idle time?
-	
-						value = TransmissionVars.TR_ETA_UNKNOWN;
-	
-					}else if ( field.equals( "files" )){
-						// RPC v0
-	
-						value = torrentGet_files(core_download);
-						
-					}else if ( field.equals( "fileStats" )){
-						// RPC v5
-						
-						value = torrentGet_fileStats(download);
-						
-					}else if ( field.equals( "hashString" )){
-						// RPC v0
-						// hashString                  | string                      | tr_info
-						value = ByteFormatter.encodeString( t.getHash());
-	
-					}else if ( field.equals( "haveUnchecked" )){	
-						// haveUnchecked               | number                      | tr_stat
-				    /** Byte count of all the partial piece data we have for this torrent.
-		        As pieces become complete, this value may decrease as portions of it
-		        are moved to `corrupt' or `haveValid'. */
-						// TODO: set when ST_CHECKING?
-						value = 0;
-	
-					}else if ( field.equals( "haveValid" )){
-						// haveValid                   | number                      | tr_stat
-				    /** Byte count of all the checksum-verified data we have for this torrent.
-				      */
-						value = stats.getDownloaded();
-	
-					}else if ( field.equals( "honorsSessionLimits" )){
-						// TODO RPC v5
-						// honorsSessionLimits         | boolean                     | tr_torrent
-						/** true if session upload limits are honored */
-						value = false;
-	
-					}else if ( field.equals( "id" )){
-						// id                          | number                      | tr_torrent
-						value = download_id;
-	
-					}else if ( field.equals( "isFinished" )){
-						// RPC v9: TODO
-						// isFinished                  | boolean                     | tr_stat
-				    /** A torrent is considered finished if it has met its seed ratio.
-		        As a result, only paused torrents can be finished. */
-	
-						value = false;
-						
-					}else if ( field.equals( "isPrivate" )){
-						// RPC v0
-						// isPrivate                   | boolean                     | tr_torrent
-						value = t.isPrivate();
-	
-					}else if ( field.equals( "isStalled" )){
-						// RPC v14
-						// isStalled                   | boolean                     | tr_stat
-	
-						value = torrentGet_isStalled(download);
-						
-					}else if ( field.equals( "leechers" )){
-						// Removed in RPC v7
-						value = pm == null ? 0 : pm.getNbPeers();
-	
-					}else if ( field.equals( "leftUntilDone" )){	
-						// RPC v0
-						// leftUntilDone               | number                      | tr_stat
-	
-						/** Byte count of how much data is left to be downloaded until we've got
-		        all the pieces that we want. [0...tr_info.sizeWhenDone] */
-	
-						value = stats.getRemaining();
-	
-					}else if ( field.equals( "magnetLink" )){ 
-						// TODO RPC v7
-						// magnetLink                  | number                      | n/a
-						// NOTE: I assume spec is wrong and it's a string..
-						
-						value = UrlUtils.getMagnetURI(download.getName(), t);
-						
-					}else if ( field.equals( "manualAnnounceTime" )){ 
-						// manualAnnounceTime          | number                      | tr_stat
-						// spec is time_t, although it should be relative time. :(
-						
-						value = torrentGet_manualAnnounceTime(core_download);
-						
-					}else if ( field.equals( "maxConnectedPeers" )){ 
-						// maxConnectedPeers           | number                      | tr_torrent
-						// TODO: Some sort of Peer Limit (tr_torrentSetPeerLimit )
-	
-					}else if ( field.equals( "metadataPercentComplete" )){ 
-						// RPC v7: TODO
-						// metadataPercentComplete     | double                      | tr_stat
-				    /** 
-				     * How much of the metadata the torrent has.
-				     * For torrents added from a .torrent this will always be 1.
-				     * For magnet links, this number will from from 0 to 1 as the metadata is downloaded.
-				     * Range is [0..1] 
-				     */
-						// RPC v7
-						value = 1.0f;
-	
-					}else if ( field.equals( "name" )){	
-	
-						value = download.getName();
-	
-					}else if ( field.equals( "peer-limit" )){
-						// peer-limit                  | number                      | tr_torrent
-						// TODO
-						/** how many peers this torrent can connect to */
-						value = -1;
-	
-					}else if ( field.equals( "peers" )){
-						// RPC v2
-	
-						value = torrentGet_peers(core_download);
-						
-					}else if ( field.equals( "peersConnected" )){	
-						// peersConnected              | number                      | tr_stat
-						
-						/** Number of peers that we're connected to */
-						value = pm == null ? 0 : pm.getNbPeers() + pm.getNbSeeds();
-	
-					}else if ( field.equals( "peersFrom" )){	
-						
-						value = torrentGet_peersFrom(pm);
-	
-					}else if ( field.equals( "peersGettingFromUs" )){	
-						// peersGettingFromUs          | number                      | tr_stat
-	
-						value = peers_from_us;
-	
-					}else if ( field.equals( "peersSendingToUs" )){
-						// peersSendingToUs            | number                      | tr_stat
-	
-						value = peers_to_us;
-	
-					}else if ( field.equals( "percentDone" )){
-						// RPC v5
-						// percentDone                 | double                      | tr_stat
-	          /** 
-	           * How much has been downloaded of the files the user wants. This differs
-	           * from percentComplete if the user wants only some of the torrent's files.
-	           * Range is [0..1]
-	           */
-						// TODO: getRemaining only excludes DND when diskmanager exists..
-	  				value = 1.0f - ((float) stats.getRemaining() / t.getSize());
-	
-					} else if ( field.equals( "pieces")) {
-						// RPC v5
-						value = torrentGet_pieces(core_download);
-					}else if ( field.equals( "pieceCount" )){
-						// pieceCount                  | number                      | tr_info
-						value = t.getPieceCount();
-	
-					}else if ( field.equals( "pieceSize" )){
-						// pieceSize                   | number                      | tr_info
-						value = t.getPieceSize();
-	
-					}else if ( field.equals( "priorities" )){
-						
-						value = torrentGet_priorities(download);
-	
-					}else if ( field.equals( "queuePosition" )){
-						// RPC v14
-						// "queuePosition"       | number     position of this torrent in its queue [0...n)
-						
-						value = core_download.getPosition();
-						
-					}else if ( field.equals( "rateDownload" )){	
-						// rateDownload (B/s)          | number                      | tr_stat
-						value = stats.getDownloadAverage();
-	
-					}else if ( field.equals( "rateUpload" )){
-						// rateUpload (B/s)            | number                      | tr_stat
-						value = stats.getUploadAverage();
-	
-					}else if ( field.equals( "recheckProgress" )){
-						// recheckProgress             | double                      | tr_stat
-						value = torrentGet_recheckProgress(core_download, stats);
-	
-					}else if ( field.equals( "secondsDownloading")){
-						// secondsDownloading          | number                      | tr_stat
-						/** Cumulative seconds the torrent's ever spent downloading */
-						value = stats.getSecondsDownloading();
-	
-					}else if ( field.equals( "secondsSeeding")){
-						// secondsSeeding              | number                      | tr_stat
-				    /** Cumulative seconds the torrent's ever spent seeding */
-						// TODO: Want "only seeding" time, or seeding time (including downloading time)? 
-						value = stats.getSecondsOnlySeeding();
-	
-					}else if ( field.equals( "seedIdleLimit")){
-						// RPC v10
-						// "seedIdleLimit"       | number     torrent-level number of minutes of seeding inactivity
-						value = (int) stats.getSecondsSinceLastUpload() / 60;
-	
-					}else if ( field.equals( "seedIdleMode")){
-						// RPC v10: Not used, always TransmissionVars.TR_IDLELIMIT_GLOBAL
-					  // "seedIdleMode"        | number     which seeding inactivity to use.  See tr_inactvelimit
-						value = TransmissionVars.TR_IDLELIMIT_GLOBAL;
-	
-					}else if ( field.equals( "seedRatioLimit" )){
-						// RPC v5
-						// "seedRatioLimit"      | double     torrent-level seeding ratio
-	
-						value = COConfigurationManager.getFloatParameter( "Stop Ratio" );
-	
-					}else if ( field.equals( "seedRatioMode" )){
-						// RPC v5: Not used, always Global
-						// seedRatioMode               | number                      | tr_ratiolimit
-						value = TransmissionVars.TR_RATIOLIMIT_GLOBAL;
-	
-					}else if ( field.equals( "sizeWhenDone" )){	
-						// sizeWhenDone                | number                      | tr_stat
-				    /** 
-				     * Byte count of all the piece data we'll have downloaded when we're done,
-		         * whether or not we have it yet. This may be less than tr_info.totalSize
-		         * if only some of the torrent's files are wanted.
-		         * [0...tr_info.totalSize] 
-		         **/
-						value = t.getSize();	// TODO: excluded DND
-	
-					}else if ( field.equals( "startDate" )){
-						/** When the torrent was last started. */
-						value = stats.getTimeStarted() / 1000;
-	
-					}else if ( field.equals( "status" )){
-						
-						value = torrentGet_status(download);
-	
-					}else if ( field.equals( "trackers" )){
-	
-						value = torrentGet_trackers(core_download);
-	
-					}else if ( field.equals( "trackerStats" )){
-						// RPC v7
-						
-						value = torrentGet_trackerStats(core_download);
-	
-					}else if ( field.equals( "totalSize" )){
-	
-						value = t.getSize();
-	
-	
-					}else if ( field.equals( "torrentFile" )){
-						// torrentFile                 | string                      | tr_info
-						/** Path to torrent **/
-						value = core_download.getTorrentFileName();
-	
-					}else if ( field.equals( "uploadedEver" )){	
-						// uploadedEver                | number                      | tr_stat
-						value = stats.getUploaded();
-	
-					}else if ( field.equals( "uploadLimit" ) || field.equals("speed-limit-up")){
-						// RPC v5 (alternate is from 'set' prior to v5 -- added for rogue clients)
-	
-						/** maximum upload speed (KBps) */
-						int bps = download.getUploadRateLimitBytesPerSecond();
-						value = bps <= 0 ? bps : (bps < 1024 ? 1 : bps / 1024);
-	
-					}else if ( field.equals( "uploadLimited") || field.equals("speed-limit-up-enabled")){
-						// RPC v5 (alternate is from 'set' prior to v5 -- added for rogue clients)
-	
-						/** true if "uploadLimit" is honored */
-						value = download.getUploadRateLimitBytesPerSecond() > 0;
-	
-					}else if ( field.equals( "uploadRatio" )){
-						// uploadRatio                 | double                      | tr_stat
-						value = stats.getShareRatio() / 1000.0;
-	
-					}else if ( field.equals( "wanted" )){
-						
-						value = torrentGet_wanted(download);
-	
-					}else if ( field.equals( "webseeds" )){
-						value = torrentGet_webSeeds(t);
-	
-					}else if ( field.equals( "webseedsSendingToUs" )){
-						value = torrentGet_webseedsSendingToUs(core_download);
-	
-					}else if ( field.equals( "trackerSeeds" )){
-						// Vuze Specific?
-						DownloadScrapeResult scrape = download.getLastScrapeResult();
-						value = new Long( scrape==null?0:scrape.getSeedCount());
-	
-					}else if ( field.equals( "trackerLeechers" )){
-						// Vuze Specific?
-						DownloadScrapeResult scrape = download.getLastScrapeResult();
-						value = new Long( scrape==null?0:scrape.getNonSeedCount());
-	
-					}else if ( field.equals( "speedLimitDownload" )){	
-						// Vuze Specific?
-						value = new Long( download.getDownloadRateLimitBytesPerSecond());
-					}else if ( field.equals( "speedLimitUpload" )){
-						// Vuze Specific?
-						value = new Long( download.getUploadRateLimitBytesPerSecond());
-					}else if ( field.equals( "seeders" )){
-						// Removed in RPC v7
-						value = pm == null ? -1 : pm.getNbSeeds();
-	
-					}else if ( field.equals( "swarmSpeed" )){	
-						// Removed in RPC v7
-						value = new Long( core_download.getStats().getTotalAveragePerPeer());
-					}else if ( field.equals( "announceResponse" )){
-						// Removed in RPC v7
-						
-						TRTrackerAnnouncer trackerClient = core_download.getTrackerClient();
-						if (trackerClient != null) {
-							value = trackerClient.getStatusString();
-						} else {
-							value = "";
-						}
-	
-					}else if ( field.equals( "lastScrapeTime" )){
-						// Unsure of wanted format
-						// Removed in v7
-						
-						value = core_download.getTrackerTime();  
-	
-					}else if ( field.equals( "scrapeURL" )){
-						// Removed in v7
-						value = "";
-						TRTrackerScraperResponse trackerScrapeResponse = core_download.getTrackerScrapeResponse();
-						if (trackerScrapeResponse != null) {
-							URL url = trackerScrapeResponse.getURL();
-							if (url != null) {
-								value = url.toString();
-							}
-						}
-	
-					}else if ( field.equals( "nextScrapeTime" )){
-						// Removed in v7
-						
-						// Unsure of wanted format
-						TRTrackerAnnouncer trackerClient = core_download.getTrackerClient();
-						if (trackerClient != null) {
-							value = trackerClient.getTimeUntilNextUpdate();
-						} else {
-							value = 0;
-						}
-						
-					}else if ( field.equals( "nextAnnounceTime" )){
-						// Removed in v7
-	
-						// Unsure of wanted format
-						TRTrackerAnnouncer trackerClient = core_download.getTrackerClient();
-						if (trackerClient != null) {
-							value = trackerClient.getTimeUntilNextUpdate();
-						} else {
-							value = 0;
-						}
-	
-					} else if (field.equals("downloadLimitMode") || field.equals("uploadLimitMode")) {
-						// RPC < v5 -- Not supported -- ignore
-	
-					} else if (field.equals("downloaders") 
-							|| field.equals("lastAnnounceTime")
-							|| field.equals("lastScrapeTime")
-							|| field.equals("scrapeResponse")
-							|| field.equals("timesCompleted")
-							) {
-						// RPC < v7 -- Not Supported -- ignore
-	
-					} else if (field.equals("peersKnown")) {
-						// RPC < v13 -- Not Supported -- ignore
-						
-					}else{
-						System.out.println( "Unhandled get-torrent field: " + field );
-					}
-					
-					if ( value != null ){
-						
-						if ( value instanceof String ){
-							
-							value = escapeXML((String)value);
-						}
-						torrent.put( field, value );
-					}
-				} // for fields		
+				method_Torrent_Get_NonStub(args, fields, torrent_info, (Download) download_stub);
 			}
 		} // for downloads
 		
@@ -4133,6 +3270,878 @@ XMWebUIPlugin
 		torrents.addAll( torrent_info.values());
 				
 		return result;
+	}
+
+	private void method_Torrent_Get_NonStub(Map args, List<String> fields,
+			Map<Long, Map> torrent_info, Download download) {
+
+		Torrent t = download.getTorrent();
+
+		if (t == null) {
+
+			return;
+		}
+
+		long download_id = getID(download, true);
+
+		DownloadManager core_download = PluginCoreUtils.unwrap(download);
+
+		PEPeerManager pm = core_download.getPeerManager();
+
+		DownloadStats stats = download.getStats();
+
+		Map torrent = new HashMap(fields.size() + 8);
+
+		torrent_info.put(download_id, torrent);
+
+		int peers_from_us = 0;
+		int peers_to_us = 0;
+
+		if (pm != null) {
+
+			List<PEPeer> peers = pm.getPeers();
+
+			for (PEPeer peer : peers) {
+
+				PEPeerStats pstats = peer.getStats();
+
+				if (pstats.getDataReceiveRate() > 0) {
+
+					peers_to_us++;
+				}
+
+				if (pstats.getDataSendRate() > 0) {
+
+					peers_from_us++;
+				}
+			}
+		}
+
+		for (String field : fields) {
+
+			Object value = null;
+
+			if (field.equals("activityDate")) {
+				// RPC v0
+				// activityDate                | number                      | tr_stat
+				value = torrentGet_activityDate(core_download, false);
+
+			} else if (field.equals("activityDateRelative")) {
+				// RPC v0
+				// activityDate                | number                      | tr_stat
+				value = torrentGet_activityDate(core_download, true);
+
+			} else if (field.equals("addedDate")) {
+				// RPC v0
+				// addedDate                   | number                      | tr_stat
+				/** When the torrent was first added. */
+				value = core_download.getDownloadState().getLongParameter(
+						DownloadManagerState.PARAM_DOWNLOAD_ADDED_TIME) / 1000;
+
+			} else if (field.equals("announceURL")) {
+				// Removed in RPC v7
+
+				value = t.getAnnounceURL().toExternalForm();
+
+			} else if (field.equals("bandwidthPriority")) {
+				// RPC v5: Not Supported
+				// bandwidthPriority           | number                      | tr_priority_t
+				/** torrent's bandwidth priority. */
+				value = TransmissionVars.TR_PRI_NORMAL;
+
+			} else if (field.equals("comment")) {
+				// RPC v0
+				// comment                     | string                      | tr_info
+
+				value = t.getComment();
+
+			} else if (field.equals("corruptEver")) {
+				// RPC v0 TODO: Do we want just hash fails?
+				// corruptEver                 | number                      | tr_stat
+				/** 
+				 * Byte count of all the corrupt data you've ever downloaded for
+				 * this torrent. If you're on a poisoned torrent, this number can
+				 * grow very large. 
+				 */
+				value = stats.getDiscarded() + stats.getHashFails();
+
+			} else if (field.equals("creator")) {
+				// RPC v0
+				// creator                     | string                      | tr_info
+				value = t.getCreatedBy();
+
+			} else if (field.equals("dateCreated")) {
+
+				// RPC v0
+				// dateCreated                 | number                      | tr_info
+				value = t.getCreationDate();
+
+			} else if (field.equals("desiredAvailable")) {
+				// RPC v0 TODO: stats.getRemainingAvailable() ?
+				// desiredAvailable            | number                      | tr_stat
+				/** 
+				 * Byte count of all the piece data we want and don't have yet,
+				 * but that a connected peer does have. [0...leftUntilDone] 
+				 */
+				value = stats.getRemaining();
+
+			} else if (field.equals("doneDate")) {
+				// RPC v0
+				// doneDate                    | number                      | tr_stat
+				/** When the torrent finished downloading. */
+				if (core_download.isDownloadComplete(false)) {
+					value = core_download.getDownloadState().getLongParameter(
+							DownloadManagerState.PARAM_DOWNLOAD_COMPLETED_TIME) / 1000;
+				} else {
+					// TODO: Verify what value to send when not complete
+					value = 0;
+				}
+
+			} else if (field.equals("downloadDir")) {
+				// RPC v4
+				// downloadDir                 | string                      | tr_torrent
+
+				if (t.isSimpleTorrent()) {
+					value = new File(download.getSavePath()).getParent();
+				} else {
+					value = download.getSavePath();
+				}
+
+			} else if (field.equals("downloadedEver")) {
+				// RPC v0
+				// downloadedEver              | number                      | tr_stat
+
+				/** 
+				 * Byte count of all the non-corrupt data you've ever downloaded
+				 * for this torrent. If you deleted the files and downloaded a second
+				 * time, this will be 2*totalSize.. 
+				 */
+				value = stats.getDownloaded();
+
+			} else if (field.equals("downloadLimit")
+					|| field.equals("speed-limit-down")) {
+				// RPC v5 (alternate is from 'set' prior to v5 -- added for rogue clients)
+				// downloadLimit               | number                      | tr_torrent
+
+				/** maximum download speed (KBps) */
+				value = download.getMaximumDownloadKBPerSecond();
+
+			} else if (field.equals("downloadLimited")
+					|| field.equals("speed-limit-down-enabled")) {
+				// RPC v5 (alternate is from 'set' prior to v5 -- added for rogue clients)
+				// downloadLimited             | boolean                     | tr_torrent
+
+				/** true if "downloadLimit" is honored */
+				value = download.getDownloadRateLimitBytesPerSecond() > 0;
+
+			} else if (field.equals("error")) {
+				// RPC v0
+				// error                       | number                      | tr_stat
+				/** Defines what kind of text is in errorString. TR_STAT_* */
+
+				value = torrentGet_error(core_download, download);
+
+			} else if (field.equals("errorString")) {
+				// RPC v0
+				// errorString                 | string                      | tr_stat
+
+				value = torrentGet_errorString(core_download, download);
+
+			} else if (field.equals("eta")) {
+				// RPC v0
+				// eta                         | number                      | tr_stat
+
+				value = torrentGet_eta(core_download, download, stats);
+
+			} else if (field.equals("etaIdle")) {
+				// RPC v15
+				/** If seeding, number of seconds left until the idle time limit is reached. */
+				// TODO: No idea what etaIdle description means! What happens at idle time?
+
+				value = TransmissionVars.TR_ETA_UNKNOWN;
+
+			} else if (field.equals("files")) {
+				// RPC v0
+
+				value = torrentGet_files(core_download);
+
+			} else if (field.equals("fileStats")) {
+				// RPC v5
+
+				value = torrentGet_fileStats(download);
+
+			} else if (field.equals("hashString")) {
+				// RPC v0
+				// hashString                  | string                      | tr_info
+				value = ByteFormatter.encodeString(t.getHash());
+
+			} else if (field.equals("haveUnchecked")) {
+				// haveUnchecked               | number                      | tr_stat
+				/** Byte count of all the partial piece data we have for this torrent.
+				As pieces become complete, this value may decrease as portions of it
+				are moved to `corrupt' or `haveValid'. */
+				// TODO: set when ST_CHECKING?
+				value = 0;
+
+			} else if (field.equals("haveValid")) {
+				// haveValid                   | number                      | tr_stat
+				/** Byte count of all the checksum-verified data we have for this torrent.
+				  */
+				value = stats.getDownloaded();
+
+			} else if (field.equals("honorsSessionLimits")) {
+				// TODO RPC v5
+				// honorsSessionLimits         | boolean                     | tr_torrent
+				/** true if session upload limits are honored */
+				value = false;
+
+			} else if (field.equals("id")) {
+				// id                          | number                      | tr_torrent
+				value = download_id;
+
+			} else if (field.equals("isFinished")) {
+				// RPC v9: TODO
+				// isFinished                  | boolean                     | tr_stat
+				/** A torrent is considered finished if it has met its seed ratio.
+				As a result, only paused torrents can be finished. */
+
+				value = false;
+
+			} else if (field.equals("isPrivate")) {
+				// RPC v0
+				// isPrivate                   | boolean                     | tr_torrent
+				value = t.isPrivate();
+
+			} else if (field.equals("isStalled")) {
+				// RPC v14
+				// isStalled                   | boolean                     | tr_stat
+
+				value = torrentGet_isStalled(download);
+
+			} else if (field.equals("leechers")) {
+				// Removed in RPC v7
+				value = pm == null ? 0 : pm.getNbPeers();
+
+			} else if (field.equals("leftUntilDone")) {
+				// RPC v0
+				// leftUntilDone               | number                      | tr_stat
+
+				/** Byte count of how much data is left to be downloaded until we've got
+				all the pieces that we want. [0...tr_info.sizeWhenDone] */
+
+				value = stats.getRemaining();
+
+			} else if (field.equals("magnetLink")) {
+				// TODO RPC v7
+				// magnetLink                  | number                      | n/a
+				// NOTE: I assume spec is wrong and it's a string..
+
+				value = UrlUtils.getMagnetURI(download.getName(), t);
+
+			} else if (field.equals("manualAnnounceTime")) {
+				// manualAnnounceTime          | number                      | tr_stat
+				// spec is time_t, although it should be relative time. :(
+
+				value = torrentGet_manualAnnounceTime(core_download);
+
+			} else if (field.equals("maxConnectedPeers")) {
+				// maxConnectedPeers           | number                      | tr_torrent
+				// TODO: Some sort of Peer Limit (tr_torrentSetPeerLimit )
+
+			} else if (field.equals("metadataPercentComplete")) {
+				// RPC v7: TODO
+				// metadataPercentComplete     | double                      | tr_stat
+				/** 
+				 * How much of the metadata the torrent has.
+				 * For torrents added from a .torrent this will always be 1.
+				 * For magnet links, this number will from from 0 to 1 as the metadata is downloaded.
+				 * Range is [0..1] 
+				 */
+				// RPC v7
+				value = 1.0f;
+
+			} else if (field.equals("name")) {
+
+				value = download.getName();
+
+			} else if (field.equals("peer-limit")) {
+				// peer-limit                  | number                      | tr_torrent
+				// TODO
+				/** how many peers this torrent can connect to */
+				value = -1;
+
+			} else if (field.equals("peers")) {
+				// RPC v2
+
+				value = torrentGet_peers(core_download);
+
+			} else if (field.equals("peersConnected")) {
+				// peersConnected              | number                      | tr_stat
+
+				/** Number of peers that we're connected to */
+				value = pm == null ? 0 : pm.getNbPeers() + pm.getNbSeeds();
+
+			} else if (field.equals("peersFrom")) {
+
+				value = torrentGet_peersFrom(pm);
+
+			} else if (field.equals("peersGettingFromUs")) {
+				// peersGettingFromUs          | number                      | tr_stat
+
+				value = peers_from_us;
+
+			} else if (field.equals("peersSendingToUs")) {
+				// peersSendingToUs            | number                      | tr_stat
+
+				value = peers_to_us;
+
+			} else if (field.equals("percentDone")) {
+				// RPC v5
+				// percentDone                 | double                      | tr_stat
+				/** 
+				 * How much has been downloaded of the files the user wants. This differs
+				 * from percentComplete if the user wants only some of the torrent's files.
+				 * Range is [0..1]
+				 */
+				// TODO: getRemaining only excludes DND when diskmanager exists..
+				value = 1.0f - ((float) stats.getRemaining() / t.getSize());
+
+			} else if (field.equals("pieces")) {
+				// RPC v5
+				value = torrentGet_pieces(core_download);
+			} else if (field.equals("pieceCount")) {
+				// pieceCount                  | number                      | tr_info
+				value = t.getPieceCount();
+
+			} else if (field.equals("pieceSize")) {
+				// pieceSize                   | number                      | tr_info
+				value = t.getPieceSize();
+
+			} else if (field.equals("priorities")) {
+
+				value = torrentGet_priorities(download);
+
+			} else if (field.equals("queuePosition")) {
+				// RPC v14
+				// "queuePosition"       | number     position of this torrent in its queue [0...n)
+
+				value = core_download.getPosition();
+
+			} else if (field.equals("rateDownload")) {
+				// rateDownload (B/s)          | number                      | tr_stat
+				value = stats.getDownloadAverage();
+
+			} else if (field.equals("rateUpload")) {
+				// rateUpload (B/s)            | number                      | tr_stat
+				value = stats.getUploadAverage();
+
+			} else if (field.equals("recheckProgress")) {
+				// recheckProgress             | double                      | tr_stat
+				value = torrentGet_recheckProgress(core_download, stats);
+
+			} else if (field.equals("secondsDownloading")) {
+				// secondsDownloading          | number                      | tr_stat
+				/** Cumulative seconds the torrent's ever spent downloading */
+				value = stats.getSecondsDownloading();
+
+			} else if (field.equals("secondsSeeding")) {
+				// secondsSeeding              | number                      | tr_stat
+				/** Cumulative seconds the torrent's ever spent seeding */
+				// TODO: Want "only seeding" time, or seeding time (including downloading time)? 
+				value = stats.getSecondsOnlySeeding();
+
+			} else if (field.equals("seedIdleLimit")) {
+				// RPC v10
+				// "seedIdleLimit"       | number     torrent-level number of minutes of seeding inactivity
+				value = (int) stats.getSecondsSinceLastUpload() / 60;
+
+			} else if (field.equals("seedIdleMode")) {
+				// RPC v10: Not used, always TransmissionVars.TR_IDLELIMIT_GLOBAL
+				// "seedIdleMode"        | number     which seeding inactivity to use.  See tr_inactvelimit
+				value = TransmissionVars.TR_IDLELIMIT_GLOBAL;
+
+			} else if (field.equals("seedRatioLimit")) {
+				// RPC v5
+				// "seedRatioLimit"      | double     torrent-level seeding ratio
+
+				value = COConfigurationManager.getFloatParameter("Stop Ratio");
+
+			} else if (field.equals("seedRatioMode")) {
+				// RPC v5: Not used, always Global
+				// seedRatioMode               | number                      | tr_ratiolimit
+				value = TransmissionVars.TR_RATIOLIMIT_GLOBAL;
+
+			} else if (field.equals("sizeWhenDone")) {
+				// sizeWhenDone                | number                      | tr_stat
+				/** 
+				 * Byte count of all the piece data we'll have downloaded when we're done,
+				 * whether or not we have it yet. This may be less than tr_info.totalSize
+				 * if only some of the torrent's files are wanted.
+				 * [0...tr_info.totalSize] 
+				 **/
+				value = t.getSize(); // TODO: excluded DND
+
+			} else if (field.equals("startDate")) {
+				/** When the torrent was last started. */
+				value = stats.getTimeStarted() / 1000;
+
+			} else if (field.equals("status")) {
+
+				value = torrentGet_status(download);
+
+			} else if (field.equals("trackers")) {
+
+				value = torrentGet_trackers(core_download);
+
+			} else if (field.equals("trackerStats")) {
+				// RPC v7
+
+				value = torrentGet_trackerStats(core_download);
+
+			} else if (field.equals("totalSize")) {
+
+				value = t.getSize();
+
+			} else if (field.equals("torrentFile")) {
+				// torrentFile                 | string                      | tr_info
+				/** Path to torrent **/
+				value = core_download.getTorrentFileName();
+
+			} else if (field.equals("uploadedEver")) {
+				// uploadedEver                | number                      | tr_stat
+				value = stats.getUploaded();
+
+			} else if (field.equals("uploadLimit") || field.equals("speed-limit-up")) {
+				// RPC v5 (alternate is from 'set' prior to v5 -- added for rogue clients)
+
+				/** maximum upload speed (KBps) */
+				int bps = download.getUploadRateLimitBytesPerSecond();
+				value = bps <= 0 ? bps : (bps < 1024 ? 1 : bps / 1024);
+
+			} else if (field.equals("uploadLimited")
+					|| field.equals("speed-limit-up-enabled")) {
+				// RPC v5 (alternate is from 'set' prior to v5 -- added for rogue clients)
+
+				/** true if "uploadLimit" is honored */
+				value = download.getUploadRateLimitBytesPerSecond() > 0;
+
+			} else if (field.equals("uploadRatio")) {
+				// uploadRatio                 | double                      | tr_stat
+				value = stats.getShareRatio() / 1000.0;
+
+			} else if (field.equals("wanted")) {
+
+				value = torrentGet_wanted(download);
+
+			} else if (field.equals("webseeds")) {
+				value = torrentGet_webSeeds(t);
+
+			} else if (field.equals("webseedsSendingToUs")) {
+				value = torrentGet_webseedsSendingToUs(core_download);
+
+			} else if (field.equals("trackerSeeds")) {
+				// Vuze Specific?
+				DownloadScrapeResult scrape = download.getLastScrapeResult();
+				value = new Long(scrape == null ? 0 : scrape.getSeedCount());
+
+			} else if (field.equals("trackerLeechers")) {
+				// Vuze Specific?
+				DownloadScrapeResult scrape = download.getLastScrapeResult();
+				value = new Long(scrape == null ? 0 : scrape.getNonSeedCount());
+
+			} else if (field.equals("speedLimitDownload")) {
+				// Vuze Specific?
+				value = new Long(download.getDownloadRateLimitBytesPerSecond());
+			} else if (field.equals("speedLimitUpload")) {
+				// Vuze Specific?
+				value = new Long(download.getUploadRateLimitBytesPerSecond());
+			} else if (field.equals("seeders")) {
+				// Removed in RPC v7
+				value = pm == null ? -1 : pm.getNbSeeds();
+
+			} else if (field.equals("swarmSpeed")) {
+				// Removed in RPC v7
+				value = new Long(core_download.getStats().getTotalAveragePerPeer());
+			} else if (field.equals("announceResponse")) {
+				// Removed in RPC v7
+
+				TRTrackerAnnouncer trackerClient = core_download.getTrackerClient();
+				if (trackerClient != null) {
+					value = trackerClient.getStatusString();
+				} else {
+					value = "";
+				}
+
+			} else if (field.equals("lastScrapeTime")) {
+				// Unsure of wanted format
+				// Removed in v7
+
+				value = core_download.getTrackerTime();
+
+			} else if (field.equals("scrapeURL")) {
+				// Removed in v7
+				value = "";
+				TRTrackerScraperResponse trackerScrapeResponse = core_download.getTrackerScrapeResponse();
+				if (trackerScrapeResponse != null) {
+					URL url = trackerScrapeResponse.getURL();
+					if (url != null) {
+						value = url.toString();
+					}
+				}
+
+			} else if (field.equals("nextScrapeTime")) {
+				// Removed in v7
+
+				// Unsure of wanted format
+				TRTrackerAnnouncer trackerClient = core_download.getTrackerClient();
+				if (trackerClient != null) {
+					value = trackerClient.getTimeUntilNextUpdate();
+				} else {
+					value = 0;
+				}
+
+			} else if (field.equals("nextAnnounceTime")) {
+				// Removed in v7
+
+				// Unsure of wanted format
+				TRTrackerAnnouncer trackerClient = core_download.getTrackerClient();
+				if (trackerClient != null) {
+					value = trackerClient.getTimeUntilNextUpdate();
+				} else {
+					value = 0;
+				}
+
+			} else if (field.equals("downloadLimitMode")
+					|| field.equals("uploadLimitMode")) {
+				// RPC < v5 -- Not supported -- ignore
+
+			} else if (field.equals("downloaders")
+					|| field.equals("lastAnnounceTime") || field.equals("lastScrapeTime")
+					|| field.equals("scrapeResponse") || field.equals("timesCompleted")) {
+				// RPC < v7 -- Not Supported -- ignore
+
+			} else if (field.equals("peersKnown")) {
+				// RPC < v13 -- Not Supported -- ignore
+
+			} else if (field.equals("fileCount")) {
+				// azRPC
+
+				value = core_download.getNumFileInfos();
+
+			} else if (field.equals("speed-history")) {
+
+				DownloadManagerStats core_stats = core_download.getStats();
+				core_stats.setRecentHistoryRetention(true);
+				
+				// TODO
+
+			} else {
+				System.out.println("Unhandled get-torrent field: " + field);
+			}
+
+			if (value != null) {
+
+				if (value instanceof String) {
+
+					value = escapeXML((String) value);
+				}
+				torrent.put(field, value);
+			}
+		} // for fields		
+	}
+
+	private void method_Torrent_Get_Stub(Map args, List<String> fields,
+			Map<Long, Map> torrent_info, DownloadStub download_stub) {
+		
+		Map torrent = new HashMap();
+		
+		long download_id = getID( download_stub, true );
+		
+		torrent_info.put( download_id, torrent );
+
+		boolean	is_magnet_download = download_stub instanceof MagnetDownload;
+		
+		long 	status		= 0;
+		long 	error 		= TransmissionVars.TR_STAT_OK;
+		String 	error_str 	= "";
+		String	created_by	= "";
+		long	create_date	= 0;
+		float	md_comp		= 1.0f;
+		
+		if ( is_magnet_download ){
+			
+			MagnetDownload md = (MagnetDownload)download_stub;
+			
+			Throwable e = md.getError();
+			
+			if ( e == null ){
+				
+				status = 4;
+				
+				md_comp		= 0.0f;
+				
+			}else{
+				
+				status		= 0;
+				
+				error 		= TransmissionVars.TR_STAT_LOCAL_ERROR;
+				
+				Throwable temp = e;
+				
+				while( temp.getCause() != null ){
+					
+					temp = temp.getCause();
+				}
+				
+				String last_msg = temp.getMessage();
+				
+				if ( last_msg != null && last_msg.length() > 0 ){
+					
+					error_str = last_msg;
+					
+				}else{
+					
+					error_str = Debug.getNestedExceptionMessage( e );
+				}
+				
+				String magnet_url = md.getMagnetURL().toExternalForm();
+				
+				int	pos = error_str.indexOf( magnet_url );
+				
+				// tidy up the most common error messages by removing magnet uri from them and
+				// trimming prefix of 'Error:'
+				
+				if ( pos != -1 ){
+					
+					error_str = error_str.substring(0,pos) + error_str.substring( pos+magnet_url.length());
+				}
+				
+				error_str = error_str.trim();
+				
+				pos = error_str.indexOf( "rror:");
+				
+				if ( pos != -1 ){
+					
+					error_str = error_str.substring( pos+5 ).trim();
+				}
+				
+				if ( error_str.length() > 0 ){
+					
+						// probably not great for right-left languages but derp
+					
+					error_str = Character.toUpperCase( error_str.charAt(0)) + error_str.substring(1);
+				}
+				
+				if ( !IS_5101_PLUS ){
+					
+						// error handling was messy in 5100
+						// cover up the worst of it
+					
+					if ( error_str.contains( "bad header" )){
+						
+						error_str = "No sources found for torrent";
+					}
+				}
+			}
+			
+			created_by	= "Vuze";
+			create_date	= md.getCreateTime()/1000;
+			
+		}
+		
+		long	size = 0;
+		
+		if ( IS_5101_PLUS ){
+			
+			size = download_stub.getTorrentSize();
+			
+		}else{
+			
+			if ( is_magnet_download ){
+				
+				size = 16*1024;
+			}
+		}
+		
+		//System.out.println( fields );
+		
+		Object[][] stub_defs = {
+		{ "activityDate", 0 },
+		{ "activityDateRelative",0 },
+		{ "addedDate", is_magnet_download?create_date:0 },
+		{ "comment", is_magnet_download?"Metadata Download": "Download Archived" },
+		{ "corruptEver", 0 },
+		{ "creator", created_by },
+		{ "dateCreated", create_date },
+		{ "desiredAvailable", 0 },
+		//{ "downloadDir", "" },
+		{ "downloadedEver", 0 },
+		{ "error", error },
+		{ "errorString", error_str },
+		{ "eta", TransmissionVars.TR_ETA_NOT_AVAIL },
+		//{ "fileStats", "" },
+		//{ "files", "" },
+		//{ "hashString", "" },
+		{ "haveUnchecked", 0 },
+		//{ "haveValid", "" },
+		//{ "id", "" },
+		{ "isFinished", is_magnet_download?false:true },
+		{ "isPrivate", false },
+		{ "isStalled", false },
+		{ "leftUntilDone", is_magnet_download?size:0 },	// leftUntilDone is used to mark downloads as incomplete
+		{ "metadataPercentComplete",md_comp },
+		//{ "name", "" },
+		{ "peers", new ArrayList() },
+		{ "peersConnected", 0 },
+		{ "peersGettingFromUs", 0 },
+		{ "peersSendingToUs", "" },
+		{ "percentDone", is_magnet_download?0.0f:100.0f },
+		{ "pieceCount", 1 },
+		{ "pieceSize", size==0?1:size },
+		{ "queuePosition", 0 },
+		{ "rateDownload", 0 },
+		{ "rateUpload", 0 },
+		{ "recheckProgress", 0.0f },
+		{ "seedRatioLimit", 1.0f },
+		{ "seedRatioMode", TransmissionVars.TR_RATIOLIMIT_GLOBAL },
+		//{ "sizeWhenDone", "" },
+		{ "startDate", is_magnet_download?create_date:0 },
+		{ "status", status },
+		//{ "totalSize", "" },
+		{ "trackerStats", new ArrayList() },
+		{ "trackers", new ArrayList() },
+		{ "uploadRatio", 0.0f },
+		{ "uploadedEver", 0 },
+		{ "webseedsSendingToUs", 0 },
+		};
+		
+		
+		
+		Map<String,Object>	stub_def_map = new HashMap<String, Object>();
+		
+		for ( Object[] d: stub_defs ){
+			stub_def_map.put( (String)d[0], d[1] );
+		}
+		
+		for ( String field: fields ){
+			
+			Object	value = stub_def_map.get( field );
+			
+			if ( field.equals( "id" )){
+				
+				value = download_id;
+				
+			}else if ( field.equals( "downloadDir" )){
+				
+				if ( IS_5101_PLUS ){
+					
+					value = download_stub.getSavePath();
+					
+				}else{
+					
+					value = "";
+				}
+			
+			}else if ( field.equals( "files" )){
+
+				DownloadStubFile[] files = download_stub.getStubFiles();
+				
+				List<Map>	l_files = new ArrayList<Map>();
+				
+				for ( DownloadStubFile sf: files ){
+				
+					Map	map = new HashMap();
+					
+					l_files.add( map );
+					
+					long	len = sf.getLength();
+					
+					long	downloaded;
+					
+					if ( len < 0 ){
+						
+						downloaded 	= 0;
+						len			= -len;
+						
+					}else{
+						
+						downloaded	= len;
+					}
+					
+					map.put( "bytesCompleted",downloaded );	// this must be a spec error...
+					map.put( "length",  len);
+					map.put( "name", sf.getFile().getAbsolutePath());
+				}
+				
+				value = l_files;				
+				
+			}else if ( field.equals( "fileStats" )){
+
+				DownloadStubFile[] files = download_stub.getStubFiles();
+				
+				List<Map>	l_files = new ArrayList<Map>();
+				
+				for ( DownloadStubFile sf: files ){
+				
+					Map	map = new HashMap();
+					
+					l_files.add( map );
+					
+					long	len = sf.getLength();
+					
+					long	downloaded;
+					
+					if ( len < 0 ){
+						
+						downloaded 	= 0;
+						
+					}else{
+						
+						downloaded	= len;
+					}
+					
+					map.put( "bytesCompleted", downloaded );
+					map.put( "wanted", len >= 0 );
+					map.put( "priority", TransmissionVars.convertVuzePriority(0));
+				}
+				
+				value = l_files;
+				
+			}else if ( field.equals( "hashString" )){
+				
+				value = ByteFormatter.encodeString( download_stub.getTorrentHash());
+				
+			}else if ( field.equals( "haveValid" )){
+
+				value = is_magnet_download?0:size;
+			
+			}else if ( field.equals( "name" )){
+
+				value = download_stub.getName();
+				
+			}else if ( field.equals( "sizeWhenDone" )){
+
+				value = size;
+				
+			}else if ( field.equals( "totalSize" )){
+
+				value = size;
+			}
+			
+			if ( value != null ){
+			
+				if ( value instanceof String ){
+				
+					value = escapeXML((String)value);
+				}
+				
+				torrent.put( field, value );
+				
+			}else{
+				
+				System.out.println( "Unknown field: " + field );
+			}
+		}
 	}
 
 	/** Number of webseeds that are sending data to us. */
