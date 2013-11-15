@@ -870,9 +870,22 @@ RelatedContentUI
 		private void
 		doSearch()
 		{	
-			if ( current_rm == related_mode && current_dl == dl && current_file == dl_file ){
+			if ( current_rm == related_mode && current_dl == dl ){
 				
-				return;
+				if ( current_file == null && dl_file == null ){
+					
+					return;
+					
+				}else if ( current_file != null && dl_file != null ){
+				
+						// can't test on object equality for the files as the plugin interface
+						// generates wrappers on demand...
+					
+					if ( current_file.getIndex() == dl_file.getIndex()){
+						
+						return;
+					}
+				}
 			}
 			
 			current_rm 		= related_mode;
