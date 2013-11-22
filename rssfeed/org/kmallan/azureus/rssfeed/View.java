@@ -521,7 +521,7 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
     // Options Folder - Filter Params - End Rates
     urlSetRates();
 
-    setupLabel(filtParamComp, "RSSFeed.Options.Filter.filtCategory", 75);
+    setupLabel(filtParamComp, "RSSFeed.Options.Filter.filtCategory", 120);
     (filtCategory = new Text(filtParamComp, SWT.BORDER)).setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
 
     setupLabel(filtParamComp, "RSSFeed.Options.Filter.filtFeed", 75);
@@ -1786,7 +1786,7 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
               storeFile = slp[slp.length - 1];
               storeLoc = storeLoc.substring(0, storeLoc.lastIndexOf(rssfeedConfig.separator));
             }
-            success = torrentDownloader.addTorrent(curTorrent, torrentLocation, listBean, storeLoc, storeFile);
+            success = torrentDownloader.addTorrent(curTorrent, torrentLocation, listBean, storeLoc, storeFile, null );
             if(!success) listBean.setState(ListBean.DOWNLOAD_FAIL);
           }
         } catch(Exception e) {

@@ -20,12 +20,20 @@
 package org.kmallan.azureus.rssfeed;
 
 import org.eclipse.swt.widgets.Display;
+import org.gudy.azureus2.core3.category.CategoryManager;
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.util.Constants;
+import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.download.*;
 import org.gudy.azureus2.plugins.torrent.*;
+import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
+
+import com.aelitis.azureus.core.tag.Tag;
+import com.aelitis.azureus.core.tag.TagManagerFactory;
+import com.aelitis.azureus.core.tag.TagType;
 
 import javax.swing.text.html.parser.ParserDelegator;
+
 import java.io.*;
 import java.util.*;
 import java.net.*;
@@ -115,7 +123,49 @@ public class TorrentDownloader {
 	        if(defaultPath.length() > 0) {
 	          File dataLocation = setFile(defaultPath, storeFile);
 	
-	          final Download download = addTorrent(curTorrent, torrentLocation, dataLocation);
+	          DownloadWillBeAddedListener dwba =
+	        	new DownloadWillBeAddedListener()
+	          	{
+	        	  public void 
+	        	  initialised(
+	        			Download download) 
+	        	  {
+	        		  	// handle tags here so that any initial-download-location is taken account of
+	        		  
+	  	            if ( filterBean != null ){
+	  	            	
+	  	            	String category_or_tag_name = filterBean.getCategory();
+	  	            	
+						if ( category_or_tag_name.length() > 0 ){
+							
+							if ( CategoryManager.getCategory( category_or_tag_name ) == null ){
+							
+								TagType tt = TagManagerFactory.getTagManager().getTagType( TagType.TT_DOWNLOAD_MANUAL );
+								
+								Tag tag = tt.getTag( category_or_tag_name, true );
+								
+								if ( tag == null ){
+									
+									try{
+										tag = tt.createTag( category_or_tag_name, true );
+										
+									}catch( Throwable e ){
+										
+										Debug.out( e );
+									}
+								}
+
+								if ( tag != null ){
+									
+									tag.addTaggable( PluginCoreUtils.unwrap( download ));
+								}
+							}
+						}
+	  	            }
+	          	  }
+	          	};
+	          	
+	          final Download download = addTorrent(curTorrent, torrentLocation, dataLocation, dwba );
 	          ret = (download != null);
 	          Plugin.debugOut("ret: " + ret + " download: " + download);
 	
@@ -146,10 +196,17 @@ public class TorrentDownloader {
 											download.stop();
 											break;
 									}
-									if (filterBean.getRateUseCustom())
+									if (filterBean.getRateUseCustom()){
 										download.setMaximumDownloadKBPerSecond(filterBean.getRateDownload());
-									if (filterBean.getCategory().length() > 0)
-										download.setCategory(filterBean.getCategory());
+									}
+									
+									String category_or_tag_name = filterBean.getCategory();
+									if (category_or_tag_name.length() > 0){
+										if ( CategoryManager.getCategory( category_or_tag_name ) != null ){
+										
+											download.setCategory(filterBean.getCategory());
+										}
+									}
 								} catch (NoSuchMethodError e) {
 									/** < Azureus 2.1.0.5 **/
 								} catch (Exception e) {
@@ -185,22 +242,53 @@ public class TorrentDownloader {
     return ret;
   }
 
-  public boolean addTorrent(Torrent curTorrent, File torrentLocation, ListBean listBean, String storeLoc, String storeFile) throws Exception {
+  public boolean addTorrent(Torrent curTorrent, File torrentLocation, ListBean listBean, String storeLoc, String storeFile, DownloadWillBeAddedListener dwba ) throws Exception {
     File dataLocation = null;
     if(storeLoc != null && storeLoc.length() > 0) {
       dataLocation = setFile(storeLoc, storeFile);
     } else if(listBean != null && (listBean.getFeed()).getStoreDir().length() > 0) {
       dataLocation = setFile((listBean.getFeed()).getStoreDir(), null);
     }
-    Download download = addTorrent(curTorrent, torrentLocation, dataLocation);
+    Download download = addTorrent(curTorrent, torrentLocation, dataLocation,dwba);
     if(download != null) view.histAdd(listBean, download, dataLocation);
     return (download != null);
   }
 
-  private Download addTorrent(Torrent curTorrent, File torrentLocation, File dataLocation) throws Exception {
+  private Download addTorrent(final Torrent curTorrent, File torrentLocation, File dataLocation, final DownloadWillBeAddedListener _dwba) throws Exception {
     Download download = null;
     if(torrentLocation != null && dataLocation != null) {
-      download = downloadManager.addDownload(curTorrent, torrentLocation, dataLocation);
+    	
+		DownloadWillBeAddedListener dwba = null;
+
+    	try{
+    		if ( _dwba != null ){
+    			
+    			dwba = 
+    				new DownloadWillBeAddedListener() 
+	    			{	
+						public void 
+						initialised(
+							Download download) 
+						{
+							if ( Arrays.equals( download.getTorrent().getHash(), curTorrent.getHash())){
+								
+								_dwba.initialised( download );
+							}
+						}
+					};
+     		    			
+    			downloadManager.addDownloadWillBeAddedListener(dwba);
+    		}
+    		
+    		download = downloadManager.addDownload(curTorrent, torrentLocation, dataLocation);
+    		
+    	}finally{
+    		
+    		if ( dwba != null ){
+    			
+    			downloadManager.removeDownloadWillBeAddedListener(dwba);
+    		}
+    	}
     }
     return download;
   }

@@ -70,7 +70,7 @@ $
      Set the download speed in KB/s.
      Set the upload speed in KB/s (requires Azureus 2.2.0.0).
      Set the priority (not available with Azureus 2.2.0.0).
-     Set a category for the download.
+     Set a category/tag for the download.
    
 *Only download an item once
    When downloading a TVShow, it will utilize smart history as to not download an item more than once.
@@ -206,6 +206,6 @@ $
 *Priority
    When the download is added, it's priority will be automatically be set to this.
    This setting is no longer available in Azuerus 2.2.0.0
-*Set Category
-   When the download is added, it will automatically be assigned to this category.
+*Set Category/Tag
+   When the download is added, it will automatically be assigned to this category or tag.
 
