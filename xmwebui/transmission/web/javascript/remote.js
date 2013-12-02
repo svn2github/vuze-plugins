@@ -89,22 +89,22 @@ TransmissionRemote.prototype =
 	 * Display an error if an ajax request fails, and stop sending requests
 	 * or on a 409, globally set the X-Transmission-Session-Id and resend
 	 */
-	ajaxError: function(request, error_string, exception, ajaxObject) {
+	ajaxError: function(jqXHR, textStatus, exception, ajaxObject) {
 		var token,
 		   remote = this;
 
 		// set the Transmission-Session-Id on a 409
-		if (request.status === 409 && (token = request.getResponseHeader('X-Transmission-Session-Id'))){
+		if (jqXHR.status === 409 && (token = jqXHR.getResponseHeader('X-Transmission-Session-Id'))){
 			remote._token = token;
 			$.ajax(ajaxObject);
 			return;
 		}
 
-		remote._error = request.responseText
-		? request.responseText.trim().replace(/(<([^>]+)>)/ig,"")
+		remote._error = jqXHR.responseText
+		? jqXHR.responseText.trim().replace(/(<([^>]+)>)/ig,"")
 				: "";
 		if(!remote._error.length ) {
-			remote._error = 'Server not responding' + ' (' + String(error_string);
+			remote._error = 'Server not responding' + ' (' + String(textStatus);
 			if (String(exception).length > 0) {
 				remote._error += ': ' + String(exception);
 			}
@@ -119,7 +119,7 @@ TransmissionRemote.prototype =
 //			console.log("not a persistent error -- exit");
 //			return;
 //		}
-		if (vz.handleConnectionError(1, remote._error, error_string)) {
+		if (vz.handleConnectionError(jqXHR.status, remote._error, textStatus)) {
 			return;
 		}
    		/* << Vuze Added */
@@ -172,17 +172,17 @@ TransmissionRemote.prototype =
 			timeout: 60000,
 			data: JSON.stringify(data),
 			beforeSend: function(XHR){ remote.appendSessionId(XHR); },
-			error: function(request, error_string, exception){
+			error: function(request, textStatus, exception){
 				if (request.status !== 409) {
 					try {
 						console.log('ajax error for ' + JSON.stringify(request));
-						console.log('ajax error: ' + error_string);
+						console.log('ajax textStatus: ' + textStatus);
 						console.log('ajax error: ' + exception);
 					} catch (err) {
 						// ignore
 					}
 				}
-				remote.ajaxError(request, error_string, exception, ajaxSettings);
+				remote.ajaxError(request, textStatus, exception, ajaxSettings);
 				},
 			success: callback,
 			context: context,
@@ -318,12 +318,15 @@ TransmissionRemote.prototype =
 		});
 	},
 	// >> Vuze
-	removeTorrentAndDataById: function(id) {
+	removeTorrentById: function(id, deleteData) {
+		if (typeof deleteData != "boolean") {
+			deleteData = true;
+		}
 		var remote = this;
 		var o = {
 			method: 'torrent-remove',
 			arguments: {
-				'delete-local-data': true,
+				'delete-local-data': deleteData,
 				ids: [ id ]
 			}
 		};
