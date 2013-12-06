@@ -1210,7 +1210,8 @@ UPnPMediaServerContentDirectory
 			
 			addPersistentContainerIDs( old_id_map, root_container );
 			
-			map.put( "id_map", old_id_map );
+			// we can stop writing this potentially bad map as migration completed to id_map2
+			// map.put( "id_map", old_id_map );
 			
 				// issues with non-ascii keys here...
 			

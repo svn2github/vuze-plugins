@@ -41,6 +41,7 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.util.*;
 
+import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.util.*;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.disk.DiskManagerFileInfo;
@@ -53,7 +54,6 @@ import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
 import org.gudy.azureus2.plugins.tracker.Tracker;
 import org.gudy.azureus2.plugins.tracker.web.TrackerAuthenticationAdapter;
-import org.gudy.azureus2.plugins.tracker.web.TrackerAuthenticationListener;
 import org.gudy.azureus2.plugins.tracker.web.TrackerWebContext;
 import org.gudy.azureus2.plugins.tracker.web.TrackerWebPageGenerator;
 import org.gudy.azureus2.plugins.tracker.web.TrackerWebPageRequest;
@@ -91,7 +91,6 @@ import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloaderFact
 import org.gudy.azureus2.plugins.utils.xml.simpleparser.SimpleXMLParserDocument;
 import org.gudy.azureus2.plugins.utils.xml.simpleparser.SimpleXMLParserDocumentException;
 import org.gudy.azureus2.plugins.utils.xml.simpleparser.SimpleXMLParserDocumentNode;
-import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 
 import com.aelitis.azureus.core.content.AzureusContentDirectory;
 import com.aelitis.azureus.core.content.AzureusContentDirectoryListener;
@@ -104,7 +103,6 @@ import com.aelitis.azureus.core.util.UUIDGenerator;
 import com.aelitis.azureus.plugins.upnp.UPnPMapping;
 import com.aelitis.azureus.plugins.upnp.UPnPPlugin;
 import com.aelitis.azureus.plugins.upnpmediaserver.ui.UPnPMediaServerUI;
-import com.aelitis.azureus.plugins.upnpmediaserver.ui.swt.UPnPMediaServerUISWT;
 import com.aelitis.net.upnp.UPnP;
 import com.aelitis.net.upnp.UPnPAdapter;
 import com.aelitis.net.upnp.UPnPFactory;
@@ -112,7 +110,6 @@ import com.aelitis.net.upnp.UPnPListener;
 import com.aelitis.net.upnp.UPnPRootDevice;
 import com.aelitis.net.upnp.UPnPSSDP;
 import com.aelitis.net.upnp.UPnPSSDPListener;
-
 import com.aelitis.azureus.plugins.upnpmediaserver.UPnPMediaServerContentDirectory.*;
 
 public class 
@@ -298,6 +295,15 @@ UPnPMediaServer
 				UUID_rootdevice = "uuid:" + UUIDGenerator.generateUUIDString();
 			
 				config.setPluginParameter( "uuid", UUID_rootdevice );
+				
+				try{
+						// we want to request persistence now so we don't generate multiple device identities
+						// if something prevents a later save
+					
+					COConfigurationManager.setDirty();
+					
+				}catch( Throwable e ){
+				}
 			}
 				
 			upnp_entities = new String[]{
@@ -683,13 +689,19 @@ UPnPMediaServer
 					UIAttached(
 						UIInstance		instance )
 					{
-						if ( instance instanceof UISWTInstance ){	
+						if ( instance.getUIType() == UIInstance.UIT_SWT ){	
 					
 							ui_manager.removeUIListener( this );
 							
 							log( "SWT user interface bound" );
 							
-							media_server_ui = new UPnPMediaServerUISWT();													
+							try{
+								media_server_ui = (UPnPMediaServerUI)UPnPMediaServer.class.forName( "com.aelitis.azureus.plugins.upnpmediaserver.ui.swt.UPnPMediaServerUISWT" ).newInstance();
+								
+							}catch( Throwable e ){
+							
+								Debug.out( e );
+							}
 						}
 					}
 					
