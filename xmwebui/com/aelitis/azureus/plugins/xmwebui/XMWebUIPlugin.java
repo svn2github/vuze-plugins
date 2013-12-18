@@ -3727,7 +3727,8 @@ XMWebUIPlugin
 
 			} else if (field.equals("uploadRatio")) {
 				// uploadRatio                 | double                      | tr_stat
-				value = stats.getShareRatio() / 1000.0;
+				int shareRatio = stats.getShareRatio();
+				value = shareRatio <=0 ? shareRatio : stats.getShareRatio() / 1000.0;
 
 			} else if (field.equals("wanted")) {
 
@@ -3828,12 +3829,48 @@ XMWebUIPlugin
 
 				value = core_download.getNumFileInfos();
 
-			} else if (field.equals("speed-history")) {
+			} else if (field.equals("speedHistory")) {
 
 				DownloadManagerStats core_stats = core_download.getStats();
 				core_stats.setRecentHistoryRetention(true);
 				
 				// TODO
+				// [0] send [1] receive [2] swarm
+				int[][] recentHistory = core_stats.getRecentHistory();
+				long now = SystemTime.getCurrentTime();
+				
+				long sinceSecs = getNumber(args.get("speedHistorySinceSecs"), 0).longValue();
+				
+				long since = now - (sinceSecs * 1000);
+				
+				long curEntryTime = now - (recentHistory.length *1000);
+				
+				List listHistory = new ArrayList();
+				for (int i = 0; i < recentHistory.length; i++) {
+					if (curEntryTime > since) {
+  					int[] entry = recentHistory[i];
+  					Map mapHistory = new HashMap(3);
+  					mapHistory.put("upload", entry[0]);
+  					mapHistory.put("download", entry[1]);
+  					mapHistory.put("swarm", entry[2]);
+					
+  					listHistory.add(entry);
+					}
+					
+					curEntryTime += 1000;
+				}
+				
+				value = listHistory;
+				
+				/*
+				 * [
+				 *   {
+				 *   	upload: <upload speed>
+				 *   	download: <dl speed>
+				 *   	swarm: <swarm avg speed>
+				 *   }
+				 * }
+				 */
 
 			} else {
 				System.out.println("Unhandled get-torrent field: " + field);
