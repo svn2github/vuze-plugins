@@ -1320,7 +1320,7 @@ Transmission.prototype =
 					if (index > -1) {
 						var metainfo = contents.substring(index + key.length);
 						var arguments = {
-							'download-dir' : destination,
+							'destination' : destination,
 							'paused' : paused
 						};
 
