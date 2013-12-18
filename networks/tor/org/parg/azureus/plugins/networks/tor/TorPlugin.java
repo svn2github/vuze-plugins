@@ -72,6 +72,7 @@ TorPlugin
 	private boolean	start_on_demand;
 	private boolean	stop_on_idle;
 	private boolean	prompt_on_use;
+	private boolean	prompt_skip_vuze;
 	
 	private int		internal_control_port;
 	private int		internal_socks_port;
@@ -115,7 +116,9 @@ TorPlugin
 			final BooleanParameter start_on_demand_param 	= config_model.addBooleanParameter2( "start_on_demand", "aztorplugin.start_on_demand", true );
 			final BooleanParameter stop_on_idle_param	 	= config_model.addBooleanParameter2( "stop_on_idle", "aztorplugin.stop_on_idle", true );
 			final BooleanParameter prompt_on_use_param 		= config_model.addBooleanParameter2( "prompt_on_use", "aztorplugin.prompt_on_use", true );
+			final BooleanParameter prompt_skip_vuze_param 	= config_model.addBooleanParameter2( "prompt_skip_vuze", "aztorplugin.prompt_skip_vuze", true );
 
+			config_model.createGroup( "aztorplugin.prompt_options", new Parameter[]{ prompt_skip_vuze_param });
 			
 			final IntParameter control_port_param = config_model.addIntParameter2( "control_port", "aztorplugin.control_port", 0 ); 
 			
@@ -261,7 +264,9 @@ TorPlugin
 						
 						start_on_demand_param.setEnabled( plugin_enabled && !external_tor );
 						stop_on_idle_param.setEnabled( plugin_enabled && !external_tor && start_on_demand );
+						
 						prompt_on_use_param.setEnabled( plugin_enabled );
+						prompt_skip_vuze_param.setEnabled( plugin_enabled && prompt_on_use );
 						
 						control_port_param.setEnabled( plugin_enabled && !external_tor );
 						socks_port_param.setEnabled( plugin_enabled && !external_tor );
@@ -316,7 +321,7 @@ TorPlugin
 			
 				// see if server already running, unlikely due to the way we arrange for it to die if we do but you never know
 			
-			ControlConnection control = new ControlConnection( data_dir, internal_control_port );
+			ControlConnection control = new ControlConnection( data_dir, internal_control_port, internal_socks_port );
 		
 			if ( control.connect()){
 			
@@ -711,7 +716,7 @@ TorPlugin
 
 								while( !unloaded ){
 																	
-									ControlConnection control = new ControlConnection( data_dir, internal_control_port );
+									ControlConnection control = new ControlConnection( data_dir, internal_control_port, internal_socks_port );
 								
 									if ( control.connect()){
 										
@@ -835,61 +840,161 @@ TorPlugin
 		}
 	}
 	
-	private Proxy
-	getActiveProxy()
+	private boolean
+	hostAccepted(
+		String	host )
 	{
+		if ( host.equals( "127.0.0.1" )){
+
+			return( false );
+		}
 		
-		if ( !external_tor ){
+		String	lc_host = host.toLowerCase( Locale.US );
+		
+		if ( lc_host.endsWith( ".onion" )){
+
+			return( true );
+			
+		}else if ( lc_host.endsWith( ".i2p" )){
+			
+			return( false );
+		}
+		
+		if ( prompt_on_use ){
+
+			if ( prompt_skip_vuze && Constants.isAzureusDomain( host )){
+			
+				return( true );
+			}
+		}
+		
+		return( true );
+	}
 	
+	private String
+	rewriteHost(
+		String		host )
+	{
+		if ( host.equals( "version.vuze.com" )){
+			
+			return( "up33pjmm5bxgy7nb.onion" );
+		}
+		
+		return( null );
+	}
+	
+	private WeakHashMap<Proxy,String>	proxy_map = new WeakHashMap<Proxy, String>();
+	
+	private Proxy
+	getActiveProxy(
+		String		host )
+	{
+		if ( !hostAccepted( host )){
+			
+			return( null );
+		}
+				
+		int	socks_port;
+		
+		if ( external_tor ){
+
+			socks_port = active_socks_port;
+			
+		}else{
+			
 			ControlConnection con = getConnection();
 	
 			if ( con == null ){
 		
 				return( null );
 			}
+			
+			socks_port = con.getSOCKSPort();
 		}
 		
-		return( new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( "127.0.0.1", active_socks_port )));
+		Proxy proxy = new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( "127.0.0.1", socks_port ));
+		
+		synchronized( proxy_map ){
+		
+			proxy_map.put( proxy, host );
+		}
+		
+		return( proxy );
 	}
+	
 		// IPC stuff
 	
-	public Proxy
+	public void
+	setProxyStatus(
+		Proxy		proxy,
+		boolean		good )
+	{
+		String host;
+		
+		synchronized( proxy_map ){
+			
+			host = proxy_map.remove( proxy );
+		}
+		
+		if ( host != null ){
+				
+			System.out.println( host + " -> " + good );
+		}
+	}
+	
+	public Object[]
 	getProxy(
 		URL		url )
 	
 		throws IPCException
 	{
-		Proxy proxy = getActiveProxy();
+		String 	host = url.getHost();
+		
+		Proxy proxy = getActiveProxy( host );
 		
 		if ( proxy != null ){
 		
-			return( proxy );
+			String updated_host	= rewriteHost( host );
+			
+			if ( host != null ){
+				
+				url = UrlUtils.setHost( url, updated_host );
+			}
+			
+			return( new Object[]{ proxy, url });
 		}
 		
 		return( null );
 	}
 	
-	public Proxy
+	public Object[]
 	getProxy(
 		String		host,
 		int			port )
 	
 		throws IPCException
 	{
-		Proxy proxy = getActiveProxy();
+		Proxy proxy = getActiveProxy( host );
 		
 		if ( proxy != null ){
 		
-			return( proxy );
+			String updated_host	= rewriteHost( host );
+			
+			if ( updated_host != null ){
+				
+				host = updated_host;
+			}
+			
+			return( new Object[]{ proxy, host, port });
 		}
 		
-		return( null );
-	}
+		return( null );	}
 	
 	private class
 	ControlConnection
 	{
-		private int			port;
+		private int			control_port;
+		private int			socks_port;
 		private File		data_dir;
 	
 		private Socket				socket;
@@ -903,17 +1008,25 @@ TorPlugin
 		private 
 		ControlConnection(
 			File		_data_dir,
-			int			_port )
+			int			_control_port,
+			int			_socks_port )
 		{
-			data_dir	= _data_dir;
-			port		= _port;
+			data_dir		= _data_dir;
+			control_port	= _control_port;
+			socks_port		= _socks_port;
+		}
+		
+		private int
+		getSOCKSPort()
+		{
+			return( socks_port );
 		}
 		
 		private boolean
 		connect()
 		{
 			try{
-				socket = new Socket( "127.0.0.1", port );
+				socket = new Socket( "127.0.0.1", control_port );
 
 				did_connect = true;
 				
