@@ -41,7 +41,9 @@ import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.ipc.IPCException;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
+import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManager;
+import org.gudy.azureus2.plugins.ui.UIManagerListener;
 import org.gudy.azureus2.plugins.ui.config.*;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
@@ -58,7 +60,12 @@ TorPlugin
 	private BasicPluginConfigModel 	config_model;
 	private BasicPluginViewModel	view_model;
 	
-	private AESemaphore		init_sem = new AESemaphore( "TP:init" );
+	private volatile TorPluginUI		plugin_ui;
+	
+	private AESemaphore		init_sem 		= new AESemaphore( "TP:init" );
+	private AESemaphore		ui_attach_sem 	= new AESemaphore( "TP:UI" );
+	
+	private volatile long	init_time;
 	
 	private static final int	SOCKS_PORT_DEFAULT		= 29101;
 	private static final int	CONTROL_PORT_DEFAULT	= 29151;
@@ -118,7 +125,20 @@ TorPlugin
 			final BooleanParameter prompt_on_use_param 		= config_model.addBooleanParameter2( "prompt_on_use", "aztorplugin.prompt_on_use", true );
 			final BooleanParameter prompt_skip_vuze_param 	= config_model.addBooleanParameter2( "prompt_skip_vuze", "aztorplugin.prompt_skip_vuze", true );
 
-			config_model.createGroup( "aztorplugin.prompt_options", new Parameter[]{ prompt_skip_vuze_param });
+			final ActionParameter prompt_reset_param = config_model.addActionParameter2( "aztorplugin.ask.clear", "aztorplugin.ask.clear.button" );
+			
+			prompt_reset_param.addListener(
+				new ParameterListener()
+				{
+					public void 
+					parameterChanged(
+						Parameter param ) 
+					{
+						resetPromptDecisions();
+					}
+				});
+			
+			config_model.createGroup( "aztorplugin.prompt_options", new Parameter[]{ prompt_skip_vuze_param, prompt_reset_param });
 			
 			final IntParameter control_port_param = config_model.addIntParameter2( "control_port", "aztorplugin.control_port", 0 ); 
 			
@@ -176,6 +196,16 @@ TorPlugin
 								lines.add( "Testing connection via SOCKS proxy on port " + active_socks_port );
 								
 								try{
+									if ( !external_tor ){
+										
+										if ( !isConnected()){
+											
+											lines.add( "Server not running, starting it" );
+										}
+										
+										getConnection( 10*1000 );
+									}
+									
 									Proxy proxy = new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( "127.0.0.1", active_socks_port ));
 									
 									HttpURLConnection con = (HttpURLConnection)new URL( test_url_param.getValue()).openConnection( proxy );
@@ -241,11 +271,12 @@ TorPlugin
 					parameterChanged(
 						Parameter param )
 					{
-						plugin_enabled 	= enable_param.getValue();
-						external_tor	= ext_tor_param.getValue();
-						start_on_demand	= start_on_demand_param.getValue();
-						stop_on_idle	= stop_on_idle_param.getValue();
-						prompt_on_use	= prompt_on_use_param.getValue();
+						plugin_enabled 		= enable_param.getValue();
+						external_tor		= ext_tor_param.getValue();
+						start_on_demand		= start_on_demand_param.getValue();
+						stop_on_idle		= stop_on_idle_param.getValue();
+						prompt_on_use		= prompt_on_use_param.getValue();
+						prompt_skip_vuze	= prompt_skip_vuze_param.getValue();
 						
 						if ( plugin_enabled ){
 							
@@ -267,6 +298,7 @@ TorPlugin
 						
 						prompt_on_use_param.setEnabled( plugin_enabled );
 						prompt_skip_vuze_param.setEnabled( plugin_enabled && prompt_on_use );
+						prompt_reset_param.setEnabled( plugin_enabled && prompt_on_use );
 						
 						control_port_param.setEnabled( plugin_enabled && !external_tor );
 						socks_port_param.setEnabled( plugin_enabled && !external_tor );
@@ -444,6 +476,8 @@ TorPlugin
 					public void
 					initializationComplete()
 					{
+						init_time = SystemTime.getMonotonousTime();
+						
 						init_sem.releaseForever();
 						
 						if ( plugin_enabled ){
@@ -470,8 +504,54 @@ TorPlugin
 						}	
 					}
 				});
-		}catch( Throwable e ){
 			
+			pi.getUIManager().addUIListener(
+				new UIManagerListener()
+				{
+					public void
+					UIAttached(
+						final UIInstance		instance )
+					{
+						if ( instance.getUIType() == UIInstance.UIT_SWT ){
+								
+							try{
+								synchronized( TorPlugin.this ){
+									
+									if ( unloaded ){
+										
+										return;
+									}
+								
+									try{
+										plugin_ui = 
+											(TorPluginUI)Class.forName( "org.parg.azureus.plugins.networks.tor.swt.TorPluginUISWT").getConstructor(
+													new Class[]{ TorPlugin.class } ).newInstance( new Object[]{ TorPlugin.this } );
+										
+									}catch( Throwable e ){
+									
+										Debug.out( e );
+									}
+								}
+							}finally{
+								
+								ui_attach_sem.releaseForever();
+							}
+						}
+					}
+					
+					public void
+					UIDetached(
+						UIInstance		instance )
+					{
+						
+					}
+				});
+			
+
+		}catch( Throwable e ){
+				
+			init_time = SystemTime.getMonotonousTime();
+
 			synchronized( TorPlugin.this ){
 				
 				unloaded = true;
@@ -630,7 +710,7 @@ TorPlugin
 			public void
 			run()
 			{
-				getConnection();
+				getConnection(0);
 			}
 		}.start();
 	}
@@ -664,9 +744,13 @@ TorPlugin
 	}
 		
 	private ControlConnection
-	getConnection()
+	getConnection(
+		int	max_wait_millis )
 	{
-		init_sem.reserve();
+		if ( !init_sem.reserve( max_wait_millis )){
+			
+			return( null );
+		}
 		
 		final AESemaphore sem;
 		
@@ -768,7 +852,7 @@ TorPlugin
 			}
 		}
 		
-		sem.reserve();
+		sem.reserve( max_wait_millis );
 		
 		synchronized( this ){
 
@@ -825,6 +909,13 @@ TorPlugin
 				
 				current_connection = null;
 			}
+			
+			if ( plugin_ui != null ){
+				
+				plugin_ui.destroy();
+				
+				plugin_ui = null;
+			}
 		}
 		
 		if ( config_model != null ){
@@ -838,6 +929,49 @@ TorPlugin
 			
 			view_model.destroy();
 		}
+	}
+	
+	private void
+	resetPromptDecisions()
+	{
+		Debug.out( "TODO" );
+	}
+	
+	private boolean
+	promptUser(
+		String		host )
+	{	
+		boolean	wait_for_ui = false;
+		
+		synchronized( this ){
+			
+			if ( unloaded ){
+				
+				return( false );
+			}
+			
+			if ( !ui_attach_sem.isReleasedForever()){
+				
+				if ( init_time != 0 && SystemTime.getMonotonousTime() - init_time > 60*1000 ){
+					
+					return( false );
+				}
+			}
+			
+			wait_for_ui = plugin_ui == null;
+		}
+		
+		if ( wait_for_ui ){
+			
+			ui_attach_sem.reserve( 30*1000 );
+			
+			if ( plugin_ui == null ){
+				
+				return( false );
+			}
+		}
+		
+		return( plugin_ui.promptForHost( host ));
 	}
 	
 	private boolean
@@ -860,15 +994,21 @@ TorPlugin
 			return( false );
 		}
 		
+			// TODO: check failure rate limits
+		
 		if ( prompt_on_use ){
 
 			if ( prompt_skip_vuze && Constants.isAzureusDomain( host )){
 			
 				return( true );
 			}
+			
+			return( promptUser( host ));
+			
+		}else{
+				
+			return( true );
 		}
-		
-		return( true );
 	}
 	
 	private String
@@ -902,7 +1042,7 @@ TorPlugin
 			
 		}else{
 			
-			ControlConnection con = getConnection();
+			ControlConnection con = getConnection( 30*1000 );
 	
 			if ( con == null ){
 		
@@ -988,7 +1128,14 @@ TorPlugin
 			return( new Object[]{ proxy, host, port });
 		}
 		
-		return( null );	}
+		return( null );
+	}
+	
+	public PluginInterface
+	getPluginInterface()
+	{
+		return( plugin_interface );
+	}
 	
 	private class
 	ControlConnection
