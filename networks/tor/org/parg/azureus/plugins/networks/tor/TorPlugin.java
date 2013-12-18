@@ -26,34 +26,23 @@ import java.util.*;
 import java.lang.management.RuntimeMXBean;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
+import java.net.Proxy;
 import java.net.Socket;
+import java.net.URL;
 import java.nio.channels.ServerSocketChannel;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
-import org.gudy.azureus2.core3.util.AESemaphore;
-import org.gudy.azureus2.core3.util.AEThread2;
-import org.gudy.azureus2.core3.util.ByteFormatter;
-import org.gudy.azureus2.core3.util.Constants;
-import org.gudy.azureus2.core3.util.Debug;
-import org.gudy.azureus2.core3.util.FileUtil;
-import org.gudy.azureus2.core3.util.RandomUtils;
-import org.gudy.azureus2.core3.util.SimpleTimer;
-import org.gudy.azureus2.core3.util.SystemTime;
-import org.gudy.azureus2.core3.util.TimerEvent;
-import org.gudy.azureus2.core3.util.TimerEventPerformer;
-import org.gudy.azureus2.core3.util.TimerEventPeriodic;
+import org.gudy.azureus2.core3.util.*;
 import org.gudy.azureus2.plugins.*;
+import org.gudy.azureus2.plugins.ipc.IPCException;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
 import org.gudy.azureus2.plugins.ui.UIManager;
-import org.gudy.azureus2.plugins.ui.config.BooleanParameter;
-import org.gudy.azureus2.plugins.ui.config.IntParameter;
-import org.gudy.azureus2.plugins.ui.config.Parameter;
-import org.gudy.azureus2.plugins.ui.config.ParameterListener;
+import org.gudy.azureus2.plugins.ui.config.*;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
@@ -78,18 +67,30 @@ TorPlugin
 	private File	config_file;
 	private File	data_dir;
 	
-	private int		control_port;
-	private int		socks_port;
+	private boolean	plugin_enabled;
+	private boolean	external_tor;
+	private boolean	start_on_demand;
+	private boolean	stop_on_idle;
+	private boolean	prompt_on_use;
 	
-	private ControlConnection		current_connection;
+	private int		internal_control_port;
+	private int		internal_socks_port;
+	
+	private int		active_socks_port;
 	
 	private long	MIN_RECONNECT_TIME		= 60*1000;
-	private long	MAX_CONNECT_WAIT_TIME	= 120*1000;
+	private long	MAX_CONNECT_WAIT_TIME	= 2*60*1000;
+	private long	STOP_ON_IDLE_TIME		= 10*60*1000;
+
+	
+	private ControlConnection		current_connection;
+	private AESemaphore 			connection_sem;
+	private long					last_connect_time;
+	
+	private long					last_use_time;
 	
 	private volatile boolean		unloaded;
 	
-	private AESemaphore connection_sem;
-	private long		last_connect_time;
 	
 	public void
 	initialize(
@@ -102,7 +103,7 @@ TorPlugin
 			
 			log	= plugin_interface.getLogger().getChannel( "TorHelper");
 			
-			UIManager	ui_manager = plugin_interface.getUIManager();
+			final UIManager	ui_manager = plugin_interface.getUIManager();
 			
 			config_model = ui_manager.createBasicPluginConfigModel( "plugins", "aztorplugin.name" );
 
@@ -111,6 +112,11 @@ TorPlugin
 			
 			final BooleanParameter enable_param = config_model.addBooleanParameter2( "enable", "aztorplugin.enable", true );
 
+			final BooleanParameter start_on_demand_param 	= config_model.addBooleanParameter2( "start_on_demand", "aztorplugin.start_on_demand", true );
+			final BooleanParameter stop_on_idle_param	 	= config_model.addBooleanParameter2( "stop_on_idle", "aztorplugin.stop_on_idle", true );
+			final BooleanParameter prompt_on_use_param 		= config_model.addBooleanParameter2( "prompt_on_use", "aztorplugin.prompt_on_use", true );
+
+			
 			final IntParameter control_port_param = config_model.addIntParameter2( "control_port", "aztorplugin.control_port", 0 ); 
 			
 			if ( control_port_param.getValue() == 0 ){
@@ -118,7 +124,7 @@ TorPlugin
 				control_port_param.setValue( allocatePort( CONTROL_PORT_DEFAULT ));
 			}
 			
-			control_port = control_port_param.getValue();
+			internal_control_port = control_port_param.getValue();
 			
 			final IntParameter socks_port_param = config_model.addIntParameter2( "socks_port", "aztorplugin.socks_port", 0 ); 
 			
@@ -127,12 +133,103 @@ TorPlugin
 				socks_port_param.setValue( allocatePort( SOCKS_PORT_DEFAULT ));
 			}
 			
-			socks_port = socks_port_param.getValue();
+			internal_socks_port = socks_port_param.getValue();
 			
 			final BooleanParameter ext_tor_param = config_model.addBooleanParameter2( "ext_tor", "aztorplugin.use_external", false );
 			
 			final IntParameter ext_socks_port_param = config_model.addIntParameter2( "ext_socks_port", "aztorplugin.ext_socks_port", 9050 ); 
 
+			ext_socks_port_param.addListener(
+				new ParameterListener()
+				{	
+					public void 
+					parameterChanged(
+						Parameter param) 
+					{
+						active_socks_port = ext_socks_port_param.getValue();
+					}
+				});
+			
+			final StringParameter test_url_param	= config_model.addStringParameter2( "test_url", "aztorplugin.test_url", "http://www.vuze.com/" );
+			
+			final ActionParameter test_param = config_model.addActionParameter2( "aztorplugin.test_text", "aztorplugin.test_button" );
+			
+			test_param.addListener(
+				new ParameterListener()
+				{
+					public void 
+					parameterChanged(
+						Parameter param ) 
+					{
+						test_param.setEnabled( false );
+						
+						new AEThread2( "tester" )
+						{
+							public void
+							run()
+							{
+								List<String>	lines = new ArrayList<String>();
+								
+								lines.add( "Testing connection via SOCKS proxy on port " + active_socks_port );
+								
+								try{
+									Proxy proxy = new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( "127.0.0.1", active_socks_port ));
+									
+									HttpURLConnection con = (HttpURLConnection)new URL( test_url_param.getValue()).openConnection( proxy );
+									
+									con.setConnectTimeout( 30*1000 );
+									con.setReadTimeout( 30*1000 );
+								
+									con.getResponseCode();
+									
+									InputStream is = con.getInputStream();
+									
+									try{
+										lines.add( "Connection succeeded, response=" + con.getResponseCode() + "/" + con.getResponseMessage());
+										
+										try{
+											String text = FileUtil.readInputStreamAsString( is, 1024 );
+											
+											lines.add( "Start of response: " );
+											lines.add( text );
+											
+										}catch( Throwable e ){
+											
+										}
+									}finally{
+										
+										try{										
+											is.close();
+											
+										}catch( Throwable e ){
+										}
+									}
+									
+								}catch( Throwable e ){
+									
+									lines.add( "Test failed: " + Debug.getNestedExceptionMessage( e ));
+	
+								}finally{
+									
+									test_param.setEnabled( true );
+								}
+								
+								String text = "";
+								
+								for ( String str: lines ){
+									text += str + "\r\n";
+								}
+								
+								ui_manager.showTextMessage(
+										"aztorplugin.test.msg.title",
+										null,
+										text );
+																	
+
+							}
+						}.start();
+					}
+				});
 			
 			ParameterListener enabler_listener =
 				new ParameterListener()
@@ -141,18 +238,46 @@ TorPlugin
 					parameterChanged(
 						Parameter param )
 					{
-						boolean	enable 	= enable_param.getValue();
-						boolean	ext_tor = ext_tor_param.getValue();
+						plugin_enabled 	= enable_param.getValue();
+						external_tor	= ext_tor_param.getValue();
+						start_on_demand	= start_on_demand_param.getValue();
+						stop_on_idle	= stop_on_idle_param.getValue();
+						prompt_on_use	= prompt_on_use_param.getValue();
 						
-						control_port_param.setEnabled( enable && !ext_tor );
-						socks_port_param.setEnabled( enable && !ext_tor );
-						ext_tor_param.setEnabled( enable );
-						ext_socks_port_param.setEnabled( enable && ext_tor );
+						if ( plugin_enabled ){
+							
+							if ( external_tor ){
+								
+								active_socks_port = ext_socks_port_param.getValue();
+								
+							}else{
+								
+								active_socks_port = internal_socks_port;
+							}
+						}else{
+							
+							active_socks_port = 0;
+						}
+						
+						start_on_demand_param.setEnabled( plugin_enabled && !external_tor );
+						stop_on_idle_param.setEnabled( plugin_enabled && !external_tor && start_on_demand );
+						prompt_on_use_param.setEnabled( plugin_enabled );
+						
+						control_port_param.setEnabled( plugin_enabled && !external_tor );
+						socks_port_param.setEnabled( plugin_enabled && !external_tor );
+						ext_tor_param.setEnabled( plugin_enabled );
+						ext_socks_port_param.setEnabled( plugin_enabled && external_tor );
+						
+						test_url_param.setEnabled( plugin_enabled );
+						test_param.setEnabled( plugin_enabled );
 					}
 				};
 				
-				
 			enable_param.addListener( enabler_listener );
+			start_on_demand_param.addListener( enabler_listener );
+			stop_on_idle_param.addListener( enabler_listener );
+			prompt_on_use_param.addListener( enabler_listener );
+
 			ext_tor_param.addListener( enabler_listener );
 			
 			enabler_listener.parameterChanged( null );
@@ -189,12 +314,9 @@ TorPlugin
 			
 			data_dir 	= new File( plugin_dir, "data" );
 			
-			
-			
-			
 				// see if server already running, unlikely due to the way we arrange for it to die if we do but you never know
 			
-			ControlConnection control = new ControlConnection( data_dir, control_port );
+			ControlConnection control = new ControlConnection( data_dir, internal_control_port );
 		
 			if ( control.connect()){
 			
@@ -207,8 +329,8 @@ TorPlugin
 			
 			List<String>	required_config_lines = new ArrayList<String>();
 			
-			required_config_lines.add( "SocksPort 127.0.0.1:" + socks_port );
-			required_config_lines.add( "ControlPort " + control_port );
+			required_config_lines.add( "SocksPort 127.0.0.1:" + internal_socks_port );
+			required_config_lines.add( "ControlPort " + internal_control_port );
 			required_config_lines.add( "CookieAuthentication 1" );
 			required_config_lines.add( "DataDirectory ." + File.separator + data_dir.getName());
 			
@@ -319,14 +441,10 @@ TorPlugin
 					{
 						init_sem.releaseForever();
 						
-						new AEThread2( "init" )
-						{
-							public void
-							run()
-							{
-								getConnection();
-							}
-						}.start();
+						if ( plugin_enabled ){
+							
+							init();
+						}
 					}
 					
 					public void
@@ -370,8 +488,7 @@ TorPlugin
 			
 			ServerSocketChannel ssc = null;
 
-			try{
-				
+			try{	
 				ssc = ServerSocketChannel.open();
 				
 				ssc.socket().bind( new InetSocketAddress( "127.0.0.1", port ));
@@ -396,6 +513,69 @@ TorPlugin
 		
 		return( def );
 	}
+	
+	private void
+	init()
+	{
+			// see if we should connect at start of day
+		
+		if ( plugin_enabled && !( unloaded || external_tor || start_on_demand )){
+			
+			asyncGetConnection();
+		}
+		
+		SimpleTimer.addPeriodicEvent(
+			"TP:checker",
+			30*1000,
+			new TimerEventPerformer()
+			{	
+				public void 
+				perform(
+					TimerEvent event ) 
+				{
+					boolean	should_be_disconnected 	= true;
+					boolean	should_be_connected 	= false;
+					
+					synchronized( TorPlugin.this ){
+						
+						if ( plugin_enabled && !( unloaded || external_tor )){
+							
+							if ( start_on_demand ){
+								
+								if ( stop_on_idle ){
+									
+									should_be_disconnected = SystemTime.getMonotonousTime() - last_use_time > STOP_ON_IDLE_TIME;
+										
+								}else{
+										// leave it in whatever state it is in
+									
+									should_be_disconnected = false; 
+								}
+							}else{
+									// should always be running
+							
+								should_be_disconnected = false;
+								
+								if ( !isConnected()){
+								
+									should_be_connected = true;
+								}
+							}
+						}
+					}
+					
+					if ( should_be_disconnected ){
+						
+						closeConnection();
+						
+					}else if ( should_be_connected ){
+						
+						asyncGetConnection();
+					}
+				}
+			});
+	}
+	
 	
 	private boolean
 	startServer()
@@ -437,6 +617,47 @@ TorPlugin
 		}
 	}
 	
+	private void
+	asyncGetConnection()
+	{
+		new AEThread2( "init" )
+		{
+			public void
+			run()
+			{
+				getConnection();
+			}
+		}.start();
+	}
+	
+	private boolean
+	isConnected()
+	{
+		synchronized( this ){
+			
+			return( current_connection != null && current_connection.isConnected());
+		}
+	}
+	
+	private void
+	closeConnection()
+	{
+		synchronized( this ){
+			
+			if ( current_connection != null ){
+						
+				if ( current_connection.isConnected()){
+					
+					current_connection.close( "Close requested" );
+				}
+				
+				current_connection = null;
+			}
+			
+			last_connect_time = 0;		// explicit close so reset connect rate limiter
+		}
+	}
+		
 	private ControlConnection
 	getConnection()
 	{
@@ -490,13 +711,15 @@ TorPlugin
 
 								while( !unloaded ){
 																	
-									ControlConnection control = new ControlConnection( data_dir, control_port );
+									ControlConnection control = new ControlConnection( data_dir, internal_control_port );
 								
 									if ( control.connect()){
 										
 										log( "Server initialised" );
 										
 										current_connection = control;
+										
+										last_use_time	= SystemTime.getMonotonousTime();
 										
 										break;
 										
@@ -611,6 +834,19 @@ TorPlugin
 			view_model.destroy();
 		}
 	}
+	
+		// IPC stuff
+	
+	public HttpURLConnection
+	getProxyHTTPURLConnection(
+		URL		url )
+	
+		throws IPCException
+	{
+		throw( new IPCException( "derp" ));
+	}
+	
+	
 	
 	private class
 	ControlConnection
