@@ -835,18 +835,56 @@ TorPlugin
 		}
 	}
 	
+	private Proxy
+	getActiveProxy()
+	{
+		
+		if ( !external_tor ){
+	
+			ControlConnection con = getConnection();
+	
+			if ( con == null ){
+		
+				return( null );
+			}
+		}
+		
+		return( new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( "127.0.0.1", active_socks_port )));
+	}
 		// IPC stuff
 	
-	public HttpURLConnection
-	getProxyHTTPURLConnection(
+	public Proxy
+	getProxy(
 		URL		url )
 	
 		throws IPCException
 	{
-		throw( new IPCException( "derp" ));
+		Proxy proxy = getActiveProxy();
+		
+		if ( proxy != null ){
+		
+			return( proxy );
+		}
+		
+		return( null );
 	}
 	
+	public Proxy
+	getProxy(
+		String		host,
+		int			port )
 	
+		throws IPCException
+	{
+		Proxy proxy = getActiveProxy();
+		
+		if ( proxy != null ){
+		
+			return( proxy );
+		}
+		
+		return( null );
+	}
 	
 	private class
 	ControlConnection
