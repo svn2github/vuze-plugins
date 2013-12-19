@@ -74,6 +74,7 @@ TorPluginUISWT
 	
 	public PromptResponse
 	promptForHost(
+		final String	reason,
 		final String	host )
 	{
 		final boolean[]		result  	= {false};
@@ -166,12 +167,16 @@ TorPluginUISWT
 						label.setText( lu.getLocalisedMessageText( "aztorplugin.ask.info1", new String[]{ host } ));
 						
 						label = new Label( shell, SWT.NULL );
-						label.setText( lu.getLocalisedMessageText( "aztorplugin.ask.info2" ));
+						label.setText( lu.getLocalisedMessageText( "aztorplugin.ask.info2", new String[]{ reason } ));
+
+						label = new Label( shell, SWT.NULL );
+						label.setText( lu.getLocalisedMessageText( "aztorplugin.ask.info3" ));
 						
 						Composite remember_comp = new Composite( shell, SWT.NULL );
 						
 						GridLayout rc_layout = new GridLayout();
 						rc_layout.numColumns = 4;
+						rc_layout.marginTop = 16;
 						rc_layout.marginHeight = 0;
 						rc_layout.marginWidth = 0;
 						remember_comp.setLayout( rc_layout);

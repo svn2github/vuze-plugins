@@ -26,6 +26,7 @@ TorPluginUI
 {
 	public PromptResponse
 	promptForHost(
+		String	reason,
 		String	host );
 	
 	public void

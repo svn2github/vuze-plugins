@@ -1187,6 +1187,7 @@ TorPlugin
 	
 	private boolean
 	promptUser(
+		final String		reason,
 		final String		host )
 	{	
 			// maintain a queue of prompt requests so things don't get out of control
@@ -1249,7 +1250,7 @@ TorPlugin
 								prepareConnection( "About to prompt" );
 							}
 							
-							PromptResponse response = plugin_ui.promptForHost( host );
+							PromptResponse response = plugin_ui.promptForHost( reason, host );
 							
 							boolean	accepted = response.getAccepted();
 		
@@ -1276,7 +1277,8 @@ TorPlugin
 	
 	private boolean
 	hostAccepted(
-		String	host )
+		String		reason,
+		String		host )
 	{
 		if ( host.equals( "127.0.0.1" )){
 
@@ -1304,7 +1306,7 @@ TorPlugin
 			
 		}else if ( decision == 1 ){
 			
-			return( promptUser( host ));
+			return( promptUser( reason, host ));
 			
 		}else{
 				
@@ -1328,6 +1330,7 @@ TorPlugin
 	
 	private Proxy
 	getActiveProxy(
+		String		reason,
 		String		host )
 	{
 		if ( !plugin_enabled || unloaded ){
@@ -1335,7 +1338,7 @@ TorPlugin
 			return( null );
 		}
 		
-		if ( !hostAccepted( host )){
+		if ( !hostAccepted( reason, host )){
 			
 			return( null );
 		}
@@ -1407,13 +1410,14 @@ TorPlugin
 	
 	public Object[]
 	getProxy(
-		URL		url )
+		String		reason,
+		URL			url )
 	
 		throws IPCException
 	{
 		String 	host = url.getHost();
 		
-		Proxy proxy = getActiveProxy( host );
+		Proxy proxy = getActiveProxy( reason, host );
 		
 		if ( proxy != null ){
 		
@@ -1432,12 +1436,13 @@ TorPlugin
 	
 	public Object[]
 	getProxy(
+		String		reason,
 		String		host,
 		int			port )
 	
 		throws IPCException
 	{
-		Proxy proxy = getActiveProxy( host );
+		Proxy proxy = getActiveProxy( reason, host );
 		
 		if ( proxy != null ){
 		
