@@ -23,6 +23,7 @@ package org.parg.azureus.plugins.networks.tor;
 
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.lang.management.RuntimeMXBean;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -57,6 +58,7 @@ TorPlugin
 	implements UnloadablePlugin
 {
 	private PluginInterface			plugin_interface;
+	private PluginConfig			plugin_config;
 	private LoggerChannel 			log;
 	private BasicPluginConfigModel 	config_model;
 	private BasicPluginViewModel	view_model;
@@ -74,6 +76,8 @@ TorPlugin
 	private File	plugin_dir;
 	private File	config_file;
 	private File	data_dir;
+	
+	private BooleanParameter prompt_on_use_param;
 	
 	private boolean	plugin_enabled;
 	private boolean	external_tor;
@@ -96,7 +100,14 @@ TorPlugin
 	private AESemaphore 			connection_sem;
 	private long					last_connect_time;
 	
+	private Set<String>				prompt_decisions 	= new HashSet<String>();
+	private String					last_decision_log	= "";
+	
 	private long					last_use_time;
+	
+	private AtomicLong	proxy_request_count		= new AtomicLong();
+	private AtomicLong	proxy_request_ok		= new AtomicLong();
+	private AtomicLong	proxy_request_failed	= new AtomicLong();
 	
 	private volatile boolean		unloaded;
 	
@@ -113,7 +124,35 @@ TorPlugin
 			log	= plugin_interface.getLogger().getChannel( "TorHelper");
 			
 			final UIManager	ui_manager = plugin_interface.getUIManager();
+
+			view_model = ui_manager.createBasicPluginViewModel( loc_utils.getLocalisedMessageText( "aztorplugin.name" ));
+
+			view_model.getActivity().setVisible( false );
+			view_model.getProgress().setVisible( false );
 			
+			log.addListener(
+					new LoggerChannelListener()
+					{
+						public void
+						messageLogged(
+							int		type,
+							String	content )
+						{
+							view_model.getLogArea().appendText( content + "\n" );
+						}
+						
+						public void
+						messageLogged(
+							String		str,
+							Throwable	error )
+						{
+							view_model.getLogArea().appendText( str + "\n" );
+							view_model.getLogArea().appendText( error.toString() + "\n" );
+						}
+					});
+						
+			plugin_config = plugin_interface.getPluginconfig();
+						
 			config_model = ui_manager.createBasicPluginConfigModel( "plugins", "aztorplugin.name" );
 
 			config_model.addLabelParameter2( "aztorplugin.info1" );
@@ -123,7 +162,7 @@ TorPlugin
 
 			final BooleanParameter start_on_demand_param 	= config_model.addBooleanParameter2( "start_on_demand", "aztorplugin.start_on_demand", true );
 			final BooleanParameter stop_on_idle_param	 	= config_model.addBooleanParameter2( "stop_on_idle", "aztorplugin.stop_on_idle", true );
-			final BooleanParameter prompt_on_use_param 		= config_model.addBooleanParameter2( "prompt_on_use", "aztorplugin.prompt_on_use", true );
+			prompt_on_use_param 							= config_model.addBooleanParameter2( "prompt_on_use", "aztorplugin.prompt_on_use", true );
 			final BooleanParameter prompt_skip_vuze_param 	= config_model.addBooleanParameter2( "prompt_skip_vuze", "aztorplugin.prompt_skip_vuze", true );
 
 			final ActionParameter prompt_reset_param = config_model.addActionParameter2( "aztorplugin.ask.clear", "aztorplugin.ask.clear.button" );
@@ -204,7 +243,7 @@ TorPlugin
 											lines.add( "Server not running, starting it" );
 										}
 										
-										getConnection( 10*1000 );
+										getConnection( 10*1000, false );
 									}
 									
 									Proxy proxy = new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( "127.0.0.1", active_socks_port ));
@@ -308,6 +347,11 @@ TorPlugin
 						
 						test_url_param.setEnabled( plugin_enabled );
 						test_param.setEnabled( plugin_enabled );
+						
+						if ( param != null ){
+						
+							logPromptDecisions();
+						}
 					}
 				};
 				
@@ -315,37 +359,13 @@ TorPlugin
 			start_on_demand_param.addListener( enabler_listener );
 			stop_on_idle_param.addListener( enabler_listener );
 			prompt_on_use_param.addListener( enabler_listener );
-
+			prompt_skip_vuze_param.addListener( enabler_listener );
 			ext_tor_param.addListener( enabler_listener );
 			
 			enabler_listener.parameterChanged( null );
 			
-			view_model = ui_manager.createBasicPluginViewModel( loc_utils.getLocalisedMessageText( "aztorplugin.name" ));
+			readPromptDecisions();
 
-			view_model.getActivity().setVisible( false );
-			view_model.getProgress().setVisible( false );
-			
-			log.addListener(
-					new LoggerChannelListener()
-					{
-						public void
-						messageLogged(
-							int		type,
-							String	content )
-						{
-							view_model.getLogArea().appendText( content + "\n" );
-						}
-						
-						public void
-						messageLogged(
-							String		str,
-							Throwable	error )
-						{
-							view_model.getLogArea().appendText( str + "\n" );
-							view_model.getLogArea().appendText( error.toString() + "\n" );
-						}
-					});
-			
 			config_file = pi.getPluginconfig().getPluginUserFile( "config.txt" );
 			
 			plugin_dir 	= config_file.getParentFile();
@@ -607,7 +627,7 @@ TorPlugin
 		
 		if ( plugin_enabled && !( unloaded || external_tor || start_on_demand )){
 			
-			asyncGetConnection();
+			prepareConnection( "Startup" );
 		}
 		
 		SimpleTimer.addPeriodicEvent(
@@ -615,10 +635,21 @@ TorPlugin
 			30*1000,
 			new TimerEventPerformer()
 			{	
+				private String	last_stats = "";
+				
 				public void 
 				perform(
 					TimerEvent event ) 
 				{
+					String stats = "Requests=" + proxy_request_count.get() + ", ok=" + proxy_request_ok.get() + ", failed=" + proxy_request_failed.get();
+					
+					if ( !stats.equals( last_stats )){
+						
+						last_stats = stats;
+						
+						log( stats );
+					}
+					
 					boolean	should_be_disconnected 	= true;
 					boolean	should_be_connected 	= false;
 					
@@ -652,11 +683,11 @@ TorPlugin
 					
 					if ( should_be_disconnected ){
 						
-						closeConnection();
+						closeConnection( "Close on idle" );
 						
 					}else if ( should_be_connected ){
 						
-						asyncGetConnection();
+						prepareConnection( "Start on demand disabled" );
 					}
 				}
 			});
@@ -703,19 +734,6 @@ TorPlugin
 		}
 	}
 	
-	private void
-	asyncGetConnection()
-	{
-		new AEThread2( "init" )
-		{
-			public void
-			run()
-			{
-				getConnection(0);
-			}
-		}.start();
-	}
-	
 	private boolean
 	isConnected()
 	{
@@ -725,8 +743,18 @@ TorPlugin
 		}
 	}
 	
+	private boolean
+	isConnectedOrConnecting()
+	{	
+		synchronized( this ){
+		
+			return( isConnected() || connection_sem != null );
+		}
+	}
+	
 	private void
-	closeConnection()
+	closeConnection(
+		String	reason )
 	{
 		synchronized( this ){
 			
@@ -734,7 +762,7 @@ TorPlugin
 						
 				if ( current_connection.isConnected()){
 					
-					current_connection.close( "Close requested" );
+					current_connection.close( "Close requested: " + reason );
 				}
 				
 				current_connection = null;
@@ -744,9 +772,35 @@ TorPlugin
 		}
 	}
 		
+	private void
+	prepareConnection(
+		final String	reason )
+	{
+		if ( isConnectedOrConnecting()){
+			
+			return;
+		}
+		
+		new AEThread2( "init" )
+		{
+			public void
+			run()
+			{
+				
+				if ( !isConnectedOrConnecting()){
+				
+					log( "Preparing connection: " + reason );
+					
+					getConnection( 0, true );
+				}
+			}
+		}.start();
+	}
+	
 	private ControlConnection
 	getConnection(
-		int	max_wait_millis )
+		int			max_wait_millis,
+		boolean		async )
 	{
 		if ( !init_sem.reserve( max_wait_millis )){
 			
@@ -787,7 +841,7 @@ TorPlugin
 				
 				last_connect_time  = now;
 				
-				// kick off async con
+					// kick off async con
 				
 				new AEThread2( "ControlPortCon")
 				{
@@ -853,11 +907,17 @@ TorPlugin
 			}
 		}
 		
-		sem.reserve( max_wait_millis );
-		
-		synchronized( this ){
-
-			return( current_connection );
+		if ( async ){
+			
+			return( null );
+			
+		}else{
+			sem.reserve( max_wait_millis );
+			
+			synchronized( this ){
+	
+				return( current_connection );
+			}
 		}
 	}
 	
@@ -933,59 +993,285 @@ TorPlugin
 	}
 	
 	private void
-	resetPromptDecisions()
+	logPromptDecisions()
 	{
-		Debug.out( "TODO" );
+		String	msg;
+		
+		if ( prompt_on_use ){
+		
+			msg = (prompt_skip_vuze?"Allow Vuze; ":"") + prompt_decisions;
+			
+		}else{
+			
+			msg = "Disabled";
+		}
+		
+		if ( !last_decision_log.equals( msg )){
+			
+			last_decision_log = msg;
+			
+			log( "Prompt decisions: " + msg );
+		}
 	}
 	
-	private boolean
-	promptUser(
-		String		host )
-	{	
-		boolean	wait_for_ui = false;
-		
+	private void
+	resetPromptDecisions()
+	{
 		synchronized( this ){
 			
-			if ( unloaded ){
-				
-				return( false );
-			}
+			if ( prompt_decisions.size() > 0 ){
 			
-			if ( !ui_attach_sem.isReleasedForever()){
+				prompt_decisions.clear();
+			
+				writePromptDecisions();
+			}
+		}
+	}
+	
+	private void
+	readPromptDecisions()
+	{
+		synchronized( this ){
+			
+			String	str = plugin_config.getPluginStringParameter( "prompt.decisions", "" );
+			
+			String[] bits = str.split( "," );
+			
+			prompt_decisions.clear();
+			
+			for ( String bit: bits ){
 				
-				if ( init_time != 0 && SystemTime.getMonotonousTime() - init_time > 60*1000 ){
-					
-					return( false );
+				bit = bit.trim();
+				
+				if ( bit.length() > 0 ){
+				
+					prompt_decisions.add( bit );
 				}
 			}
 			
-			wait_for_ui = plugin_ui == null;
+			logPromptDecisions();
 		}
-		
-		if ( wait_for_ui ){
+	}
+	
+	private void
+	writePromptDecisions()
+	{
+		synchronized( this ){
 			
-			ui_attach_sem.reserve( 30*1000 );
+			String str = "";
 			
-			if ( plugin_ui == null ){
+			for ( String s: prompt_decisions ){
 				
-				return( false );
+				str += (str.length()==0?"":",") + s;
+			}
+			
+			plugin_config.setPluginParameter( "prompt.decisions", str );
+			
+			logPromptDecisions();
+		}
+	}
+	
+		/**
+		 * @param host
+		 * @return 0 = no prompt, do it; 1 = prompt; 2 = don't do it
+		 */
+
+	private int
+	getPromptDecision(
+		String		host )
+	{
+		synchronized( this ){
+			
+			if ( prompt_on_use ){
+	
+				if ( prompt_skip_vuze && Constants.isAzureusDomain( host )){
+				
+					return( 0 );
+					
+				}else{
+				
+					if ( prompt_decisions.contains( "^*" )){
+					
+						return( 2 );
+						
+					}else if ( prompt_decisions.contains( host )){
+						
+						return( 0 );
+					
+					}else if ( prompt_decisions.contains( "^" + host )){
+						
+						return( 2 );
+					}
+					
+					
+					String[] bits = host.split( "\\." );
+					
+					int	bits_num = bits.length;
+					
+					if ( bits_num > 2 ){
+						
+						String wild =  "*." + bits[bits_num-2] + "." + bits[bits_num-1];
+						
+						if ( prompt_decisions.contains( wild )){
+							
+							return( 0 );
+						
+						}else if ( prompt_decisions.contains( "^" + wild )){
+							
+							return( 2 );
+						}
+					}
+				}
+				
+				return( 1 );
+				
+			}else{
+				
+				return( 0 );
 			}
 		}
+	}
+	
+	private void
+	setPromptDecision(
+		String		host,
+		boolean		accepted )
+	{
+		boolean	all_domains = host.equals( "*" );
 		
-		PromptResponse response = plugin_ui.promptForHost( host );
-		
-		boolean	accepted = response.getAccepted();
-
-		String remembered = response.getRemembered();
-		
-		if ( remembered != null ){
+		synchronized( this ){
 			
-			boolean	all_domains = remembered.equals( "*" );
-		}
-		
-		System.out.println( remembered + " -> " + accepted );
+			if ( all_domains ){
 				
-		return( accepted );
+				if ( accepted ){
+					
+					prompt_on_use_param.setValue( false );
+					
+					resetPromptDecisions();
+					
+				}else{
+					
+					prompt_decisions.clear();
+					
+					prompt_decisions.add( "^*" );
+					
+					writePromptDecisions();
+				}
+			}else{
+				
+				if ( host.startsWith( "*" )){
+					
+					String term = host.substring( 1 );
+					
+					Iterator<String> it = prompt_decisions.iterator();
+					
+					while( it.hasNext()){
+						
+						String entry = it.next();
+						
+						if ( entry.endsWith( term )){
+							
+							it.remove();
+						}
+					}
+				}
+				
+				prompt_decisions.add( accepted?host:("^"+host));	
+				
+				writePromptDecisions();
+			}
+		}
+	}
+	
+	private AsyncDispatcher prompt_dispatcher = new AsyncDispatcher();
+	
+	private boolean
+	promptUser(
+		final String		host )
+	{	
+			// maintain a queue of prompt requests so things don't get out of control
+			// timeout callers to prevent hanging the core if user isn't present
+		
+		final AESemaphore sem = new AESemaphore( "promptAsync" );
+		
+		final boolean[] result = { false };
+		
+		prompt_dispatcher.dispatch(
+			new AERunnable() 
+			{
+				public void 
+				runSupport() 
+				{
+					try{
+						boolean	wait_for_ui = false;
+						
+						synchronized( this ){
+							
+							if ( unloaded ){
+								
+								return;
+							}
+							
+							if ( !ui_attach_sem.isReleasedForever()){
+								
+								if ( init_time != 0 && SystemTime.getMonotonousTime() - init_time > 60*1000 ){
+									
+									return;
+								}
+							}
+							
+							wait_for_ui = plugin_ui == null;
+						}
+						
+						if ( wait_for_ui ){
+							
+							ui_attach_sem.reserve( 30*1000 );
+							
+							if ( plugin_ui == null ){
+								
+								return;
+							}
+						}
+						
+						int recheck_decision = getPromptDecision( host );
+						
+						if ( recheck_decision == 0 ){
+							
+							result[0] = true;
+							
+						}else if ( recheck_decision == 1 ){
+							
+								// we're prompting the user, let's assume they're going to go ahead so
+								// we should warm up the server if not yet up
+							
+							if ( !external_tor ){
+								
+								prepareConnection( "About to prompt" );
+							}
+							
+							PromptResponse response = plugin_ui.promptForHost( host );
+							
+							boolean	accepted = response.getAccepted();
+		
+							String remembered = response.getRemembered();
+							
+							if ( remembered != null ){
+								
+								setPromptDecision( remembered, accepted );
+							}				
+							
+							result[0] = accepted;
+						}
+					}finally{
+						
+						sem.release();
+					}
+				}
+			});
+		
+		sem.reserve( 60*1000 );
+						
+		return( result[0] );
 	}
 	
 	private boolean
@@ -1010,18 +1296,19 @@ TorPlugin
 		
 			// TODO: check failure rate limits
 		
-		if ( prompt_on_use ){
-
-			if ( prompt_skip_vuze && Constants.isAzureusDomain( host )){
+		int decision = getPromptDecision( host );
+		
+		if ( decision == 0 ){
 			
-				return( true );
-			}
+			return( true );
+			
+		}else if ( decision == 1 ){
 			
 			return( promptUser( host ));
 			
 		}else{
 				
-			return( true );
+			return( false );
 		}
 	}
 	
@@ -1043,6 +1330,11 @@ TorPlugin
 	getActiveProxy(
 		String		host )
 	{
+		if ( !plugin_enabled || unloaded ){
+			
+			return( null );
+		}
+		
 		if ( !hostAccepted( host )){
 			
 			return( null );
@@ -1056,7 +1348,7 @@ TorPlugin
 			
 		}else{
 			
-			ControlConnection con = getConnection( 30*1000 );
+			ControlConnection con = getConnection( 30*1000, false );
 	
 			if ( con == null ){
 		
@@ -1072,6 +1364,10 @@ TorPlugin
 		
 			proxy_map.put( proxy, host );
 		}
+		
+		last_use_time	= SystemTime.getMonotonousTime();
+
+		proxy_request_count.incrementAndGet();
 		
 		return( proxy );
 	}
@@ -1092,7 +1388,20 @@ TorPlugin
 		
 		if ( host != null ){
 				
+			if ( good ){
+				
+				proxy_request_ok.incrementAndGet();
+				
+			}else{
+				
+				proxy_request_failed.incrementAndGet();
+			}
+			
 			System.out.println( host + " -> " + good );
+			
+		}else{
+			
+			Debug.out( "Proxy entry missing!" );
 		}
 	}
 	
