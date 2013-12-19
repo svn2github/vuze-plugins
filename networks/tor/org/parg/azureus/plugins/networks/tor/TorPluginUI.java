@@ -24,10 +24,20 @@ package org.parg.azureus.plugins.networks.tor;
 public interface 
 TorPluginUI 
 {
-	public boolean
+	public PromptResponse
 	promptForHost(
 		String	host );
 	
 	public void
 	destroy();
+	
+	interface
+	PromptResponse
+	{
+		public boolean
+		getAccepted();
+		
+		public String
+		getRemembered();
+	}
 }

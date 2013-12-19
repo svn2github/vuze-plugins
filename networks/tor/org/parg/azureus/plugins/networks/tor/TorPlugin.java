@@ -48,6 +48,7 @@ import org.gudy.azureus2.plugins.ui.config.*;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
+import org.parg.azureus.plugins.networks.tor.TorPluginUI.PromptResponse;
 
 import com.aelitis.azureus.core.util.GeneralUtils;
 
@@ -971,7 +972,20 @@ TorPlugin
 			}
 		}
 		
-		return( plugin_ui.promptForHost( host ));
+		PromptResponse response = plugin_ui.promptForHost( host );
+		
+		boolean	accepted = response.getAccepted();
+
+		String remembered = response.getRemembered();
+		
+		if ( remembered != null ){
+			
+			boolean	all_domains = remembered.equals( "*" );
+		}
+		
+		System.out.println( remembered + " -> " + accepted );
+				
+		return( accepted );
 	}
 	
 	private boolean
