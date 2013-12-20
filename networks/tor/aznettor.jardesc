@@ -11,8 +11,9 @@
         </sealing>
     </manifest>
     <selectedElements exportClassFiles="true" exportJavaFiles="true" exportOutputFolder="false">
+        <javaElement handleIdentifier="=aztor/&lt;dist"/>
+        <javaElement handleIdentifier="=aztor/&lt;org.parg.azureus.plugins.networks.tor.swt"/>
         <javaElement handleIdentifier="=aztor/&lt;org.parg.azureus.plugins.networks.tor.internat"/>
         <javaElement handleIdentifier="=aztor/&lt;org.parg.azureus.plugins.networks.tor"/>
-        <javaElement handleIdentifier="=aztor/&lt;dist"/>
     </selectedElements>
 </jardesc>

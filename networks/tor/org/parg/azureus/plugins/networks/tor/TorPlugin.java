@@ -28,15 +28,19 @@ import java.lang.management.RuntimeMXBean;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.HttpURLConnection;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.Socket;
 import java.net.URL;
+import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.gudy.azureus2.core3.tracker.protocol.PRHelpers;
 import org.gudy.azureus2.core3.util.*;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.ipc.IPCException;
@@ -51,6 +55,8 @@ import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.parg.azureus.plugins.networks.tor.TorPluginUI.PromptResponse;
 
+import com.aelitis.azureus.core.proxy.*;
+import com.aelitis.azureus.core.proxy.socks.*;
 import com.aelitis.azureus.core.util.GeneralUtils;
 
 public class 
@@ -96,6 +102,7 @@ TorPlugin
 	private long	MAX_CONNECT_WAIT_TIME	= 2*60*1000;
 	private long	STOP_ON_IDLE_TIME		= 10*60*1000;
 
+	private SOCKSProxy				socks_proxy;
 	
 	private ControlConnection		current_connection;
 	private AESemaphore 			connection_sem;
@@ -105,6 +112,9 @@ TorPlugin
 	private String					last_decision_log	= "";
 	
 	private long					last_use_time;
+	
+	private WeakHashMap<Proxy,ProxyMapEntry>	proxy_map 				= new WeakHashMap<Proxy, ProxyMapEntry>();
+	private Map<String,Object[]>				intermediate_host_map	= new HashMap<String, Object[]>();
 	
 	private AtomicLong	proxy_request_count		= new AtomicLong();
 	private AtomicLong	proxy_request_ok		= new AtomicLong();
@@ -164,10 +174,12 @@ TorPlugin
 							view_model.getLogArea().appendText( error.toString() + "\n" );
 						}
 					});
-						
+					
 			plugin_config = plugin_interface.getPluginconfig();
 						
 			config_model = ui_manager.createBasicPluginConfigModel( "plugins", "aztorplugin.name" );
+
+			view_model.setConfigSectionID( "aztorplugin.name" );
 
 			config_model.addLabelParameter2( "aztorplugin.info1" );
 			config_model.addLabelParameter2( "aztorplugin.info2" );
@@ -262,19 +274,34 @@ TorPlugin
 										getConnection( 10*1000, false );
 									}
 									
-									Proxy proxy = new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( "127.0.0.1", active_socks_port ));
+									URL original_url = new URL( test_url_param.getValue());
 									
-									HttpURLConnection con = (HttpURLConnection)new URL( test_url_param.getValue()).openConnection( proxy );
+									Object[] proxy_details = getActiveProxy( "Test", original_url.getHost(), true );
+									
+									if ( proxy_details == null ){
+										
+										throw( new Exception( "Failed to setup proxy" ));
+									}
+									
+									Proxy 	proxy 		= (Proxy)proxy_details[0];
+									String	temp_host	= (String)proxy_details[1];
+									
+									URL url = UrlUtils.setHost( original_url, temp_host );
+									
+									HttpURLConnection con = (HttpURLConnection)url.openConnection( proxy );
 									
 									con.setConnectTimeout( 30*1000 );
 									con.setReadTimeout( 30*1000 );
 								
+									con.setRequestProperty( "HOST", original_url.getHost() + (original_url.getPort()==-1?"":(":" + original_url.getPort())));
+									
 									con.getResponseCode();
 									
 									InputStream is = con.getInputStream();
 									
 									try{
 										lines.add( "Connection succeeded, response=" + con.getResponseCode() + "/" + con.getResponseMessage());
+										lines.add( "Headers: " + con.getHeaderFields());
 										
 										try{
 											String text = FileUtil.readInputStreamAsString( is, 1024 );
@@ -383,6 +410,8 @@ TorPlugin
 			ext_tor_param.addListener( enabler_listener );
 			
 			enabler_listener.parameterChanged( null );
+			
+			log( "Plugin enabled=" + plugin_enabled + ", server=" + (external_tor?"external":"internal") + ", socks port=" + active_socks_port );
 			
 			readPromptDecisions();
 
@@ -661,13 +690,16 @@ TorPlugin
 				perform(
 					TimerEvent event ) 
 				{
-					String stats = "Requests=" + proxy_request_count.get() + ", ok=" + proxy_request_ok.get() + ", failed=" + proxy_request_failed.get();
-					
-					if ( !stats.equals( last_stats )){
+					if ( proxy_request_count.get() > 0 ){
 						
-						last_stats = stats;
+						String stats = "Requests=" + proxy_request_count.get() + ", ok=" + proxy_request_ok.get() + ", failed=" + proxy_request_failed.get();
 						
-						log( stats );
+						if ( !stats.equals( last_stats )){
+							
+							last_stats = stats;
+							
+							log( stats );
+						}
 					}
 					
 					boolean	should_be_disconnected 	= true;
@@ -1052,6 +1084,13 @@ TorPlugin
 				
 				plugin_ui = null;
 			}
+			
+			if ( socks_proxy != null ){
+				
+				socks_proxy.destroy();
+				
+				socks_proxy = null;
+			}
 		}
 		
 		if ( config_model != null ){
@@ -1406,15 +1445,14 @@ TorPlugin
 			return( "bkhjas5ml57str7e.onion" );
 		}
 		
-		return( null );
+		return( host );
 	}
-	
-	private WeakHashMap<Proxy,String>	proxy_map = new WeakHashMap<Proxy, String>();
-	
-	private Proxy
+		
+	private Object[]
 	getActiveProxy(
 		String		reason,
-		String		host )
+		String		host,
+		boolean		force )
 	{
 		if ( !plugin_enabled || unloaded ){
 			
@@ -1423,7 +1461,10 @@ TorPlugin
 		
 		if ( !isHostAccepted( reason, host )){
 			
-			return( null );
+			if ( !force ){
+			
+				return( null );
+			}
 		}
 				
 		int	socks_port;
@@ -1444,18 +1485,57 @@ TorPlugin
 			socks_port = con.getSOCKSPort();
 		}
 		
-		Proxy proxy = new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( "127.0.0.1", socks_port ));
+		String 	intermediate_host;
+		int		intermediate_port;
+
+		synchronized( this ){
+			
+			if ( socks_proxy == null ){
+				
+				try{
+					if ( unloaded ){
+						
+						return( null );
+					}
+					
+					socks_proxy = new SOCKSProxy();
+				
+				}catch( Throwable e ){
+				
+					return( null );
+				}
+			}
+			
+			intermediate_port = socks_proxy.getPort();
+			
+			while( true ){
+				
+				int	address = 0x0a000000 + RandomUtils.nextInt( 0x00ffffff );
+								
+				intermediate_host = PRHelpers.intToAddress( address );
+				
+				if ( !intermediate_host_map.containsKey( intermediate_host )){
+					
+					intermediate_host_map.put( intermediate_host, new Object[]{ host, socks_port });
+					
+					break;
+				}
+			}
+		}
+		
+		Proxy proxy = new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( "127.0.0.1", intermediate_port ));
+		
 		
 		synchronized( proxy_map ){
-		
-			proxy_map.put( proxy, host );
+					
+			proxy_map.put( proxy, new ProxyMapEntry( host, intermediate_host ));
 		}
 		
 		last_use_time	= SystemTime.getMonotonousTime();
 
 		proxy_request_count.incrementAndGet();
-		
-		return( proxy );
+				
+		return( new Object[]{ proxy, intermediate_host });
 	}
 	
 	private boolean
@@ -1504,15 +1584,18 @@ TorPlugin
 		Proxy		proxy,
 		boolean		good )
 	{
-		String host;
+		ProxyMapEntry	entry;
 		
 		synchronized( proxy_map ){
 			
-			host = proxy_map.remove( proxy );
+			entry = proxy_map.remove( proxy );
 		}
 		
-		if ( host != null ){
+		if ( entry != null ){
 				
+			String 	host 				= entry.getHost();
+			String	intermediate_host	= entry.getIntermediateHost();
+			
 			if ( good ){
 				
 				proxy_request_ok.incrementAndGet();
@@ -1524,6 +1607,10 @@ TorPlugin
 			
 			updateProxyHistory( host, good );
 			
+			synchronized( this ){
+				
+				intermediate_host_map.remove( intermediate_host );
+			}
 		}else{
 			
 			Debug.out( "Proxy entry missing!" );
@@ -1539,18 +1626,13 @@ TorPlugin
 	{
 		String 	host = url.getHost();
 		
-		Proxy proxy = getActiveProxy( reason, host );
+		Object[] proxy_details = getActiveProxy( reason, host, false );
 		
-		if ( proxy != null ){
+		if ( proxy_details != null ){
+						
+			url = UrlUtils.setHost( url, (String)proxy_details[1] );
 		
-			String updated_host	= rewriteHost( host );
-			
-			if ( updated_host != null ){
-				
-				url = UrlUtils.setHost( url, updated_host );
-			}
-			
-			return( new Object[]{ proxy, url });
+			return( new Object[]{ proxy_details[0], url });
 		}
 		
 		return( null );
@@ -1564,18 +1646,11 @@ TorPlugin
 	
 		throws IPCException
 	{
-		Proxy proxy = getActiveProxy( reason, host );
+		Object[] proxy_details = getActiveProxy( reason, host, false );
 		
-		if ( proxy != null ){
-		
-			String updated_host	= rewriteHost( host );
+		if ( proxy_details != null ){
 			
-			if ( updated_host != null ){
-				
-				host = updated_host;
-			}
-			
-			return( new Object[]{ proxy, host, port });
+			return( new Object[]{ proxy_details[0], proxy_details[1], port });
 		}
 		
 		return( null );
@@ -2033,6 +2108,522 @@ TorPlugin
 					
 					log( "Failed to connect to '" + host + "' " + consec_fails + " in a row - backing off (ok=" + total_ok + ", fails=" + total_fails +")" );
 				}
+			}
+		}
+	}
+	
+	private class
+	SOCKSProxy
+		implements AESocksProxyPlugableConnectionFactory
+	{
+		private InetAddress local_address;
+		
+		private Set<SOCKSProxyConnection>		connections = new HashSet<SOCKSProxyConnection>();
+		
+		private ThreadPool	connect_pool = new ThreadPool( "TorConnect", 10 );
+
+		{
+			try{
+				local_address = InetAddress.getLocalHost();
+				
+			}catch( Throwable e ){
+				
+				Debug.printStackTrace(e);
+				
+				local_address = null;
+			}
+		}
+		
+		private AESocksProxy proxy;
+		
+		private
+		SOCKSProxy()
+		
+			throws AEProxyException
+		{
+			proxy = AESocksProxyFactory.create( 0, 120*1000, 120*1000, this );
+			
+			log( "Intermediate SOCKS proxy started on port " + proxy.getPort());
+		}
+		
+		private int
+		getPort()
+		{
+			return( proxy.getPort());
+		}
+		
+		public AESocksProxyPlugableConnection
+		create(
+			AESocksProxyConnection	connection )
+		
+			throws AEProxyException
+		{
+			synchronized( this ){
+				
+				if ( connections.size() > 32 ){
+					
+					try{
+						connection.close();
+						
+					}catch( Throwable e ){
+					}
+					
+					throw( new AEProxyException( "Too many connections" ));
+				}
+			
+				SOCKSProxyConnection con = new SOCKSProxyConnection( connection );
+				
+				connections.add( con );
+				
+				return( con );
+			}
+		}
+		
+		private void
+		closed(
+			SOCKSProxyConnection	connection )
+		{
+			synchronized( this ){
+				
+				connections.remove( connection );
+			}
+		}
+		
+		private void
+		destroy()
+		{
+			try{
+				proxy.destroy();
+				
+			}catch( Throwable e ){
+			}
+		}
+		
+		private class
+		SOCKSProxyConnection
+			implements AESocksProxyPlugableConnection
+		{
+			private AESocksProxyConnection	connection;
+			private Socket					tor_socket;
+			
+			private ProxyStateRelayData		relay_state;
+			
+			private boolean	socket_closed;
+			
+			private
+			SOCKSProxyConnection(
+				AESocksProxyConnection		_connection )
+			{
+				connection = _connection;
+				
+				connection.disableDNSLookups();
+			}
+			
+			public String
+			getName()
+			{
+				return( "TorPluginConnection" );
+			}
+			
+			private AESocksProxyConnection
+			getConnection()
+			{
+				return( connection );
+			}
+			
+			public InetAddress
+			getLocalAddress()
+			{
+				return( local_address );
+			}
+			
+			public int
+			getLocalPort()
+			{
+				return( -1 );
+			}
+
+			public void
+			connect(
+				AESocksProxyAddress		address )
+				
+				throws IOException
+			{
+				InetAddress target = address.getAddress();
+				
+				if ( target == null ){
+					
+					closed( this );
+					
+					throw( new IOException( "Address should be set" ));
+				}
+				
+				String intermediate_host = target.getHostAddress();
+				
+				Object[] entry;
+				
+				synchronized( TorPlugin.this ){
+					
+					entry = intermediate_host_map.get( intermediate_host );
+				}
+				
+				if ( entry == null ){
+					
+					closed( this );
+					
+					throw( new IOException( "Intermediate address not found" ));
+				}
+								
+				final Proxy proxy = new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( "127.0.0.1", (Integer)entry[1] ));
+
+				int final_port = address.getPort();
+								
+				String final_host = (String)entry[0];
+				
+				final_host = rewriteHost( final_host );
+						
+				final InetSocketAddress final_address = InetSocketAddress.createUnresolved( final_host, final_port );
+				
+				connect_pool.run(
+					new AERunnable()
+					{
+						public void 
+						runSupport() 
+						{
+							try{
+								Socket socket = new Socket( proxy );
+								
+								socket.connect( final_address );
+								
+								synchronized( SOCKSProxyConnection.this ){
+									
+									if ( socket_closed ){
+										
+										try{
+											socket.close();
+											
+										}catch( Throwable e ){
+										
+										}
+										
+										throw( new Exception( "Connection already closed" ));
+									}
+									
+									tor_socket = socket;
+								}
+								
+								connection.connected();
+								
+							}catch( Throwable e ){
+								
+								try{
+									connection.close();
+									
+								}catch( Throwable f ){
+									
+								}
+							}
+						}
+					});
+			}
+			
+			public void
+			relayData()
+			
+				throws IOException
+			{
+				synchronized( this ){
+				
+					if ( socket_closed ){
+						
+						throw( new IOException( "TorPluginConnection::relayData: socket already closed"));
+					}
+				
+					relay_state = new ProxyStateRelayData( connection.getConnection(), tor_socket );
+				}
+			}
+			
+			public void
+			close()
+			
+				throws IOException
+			{
+				synchronized( this ){
+				
+					if ( socket_closed ){
+						
+						return;
+					}
+					
+					socket_closed	= true;
+					
+					if ( relay_state != null ){
+							
+						relay_state.close();
+					}
+						
+					if ( tor_socket != null ){
+						
+						tor_socket.close();
+					}
+						
+					connection.close();
+				}	
+				
+				
+				closed( this );
+			}
+		}
+		
+		protected class
+		ProxyStateRelayData
+			implements AEProxyState
+		{
+			private final int	RELAY_BUFFER_SIZE = 32*1024;
+			
+			private AEProxyConnection		connection;
+			private Socket					tor_socket;
+			
+			private ByteBuffer				source_buffer;
+			private ByteBuffer				target_buffer;
+					
+			private SocketChannel			source_channel;
+
+			private InputStream				tor_input_stream;
+			private OutputStream			tor_output_stream;
+						
+			protected AESemaphore			write_sem = new AESemaphore( "TorSocket write sem" );
+						
+			protected
+			ProxyStateRelayData(
+				AEProxyConnection	_connection,
+				Socket				_tor_socket )
+			
+				throws IOException
+			{		
+				connection	= _connection;
+				tor_socket	= _tor_socket;
+								
+				source_buffer	= ByteBuffer.allocate( RELAY_BUFFER_SIZE );
+
+				source_channel	= connection.getSourceChannel();
+				
+				tor_input_stream 	= tor_socket.getInputStream();
+				tor_output_stream 	= tor_socket.getOutputStream();
+
+				connection.setReadState( this );
+				
+				connection.setWriteState( this );
+				
+				connection.requestReadSelect( source_channel );
+							
+				connection.setConnected();
+				
+				new AEThread2( "RelayRead" )
+				{			
+					public void
+					run()
+					{
+						byte[]	buffer = new byte[RELAY_BUFFER_SIZE];
+											
+						while( !connection.isClosed()){
+						
+							try{
+								int	len = tor_input_stream.read( buffer );
+								
+								if ( len <= 0 ){
+									
+									break;
+								}
+																																
+								target_buffer = ByteBuffer.wrap( buffer, 0, len );
+								
+								connection.setTimeStamp();
+								
+								if ( target_buffer.hasRemaining()){
+								
+									connection.requestWriteSelect( source_channel );
+									
+										// sem will only be released once write is complete
+									
+									write_sem.reserve();
+									
+								}else{
+								
+									target_buffer	= null;
+								}
+							}catch( Throwable e ){
+								
+								break;
+							}
+						}
+						
+						if ( !connection.isClosed()){
+							
+							connection.close();
+						}
+					}
+				}.start();
+			}
+			
+			protected void
+			close()
+			{						
+				write_sem.releaseForever();
+			}
+			
+			public boolean
+			read(
+				SocketChannel 		sc )
+			
+				throws IOException
+			{
+				if ( source_buffer.position() != 0 ){
+					
+					Debug.out( "TorPluginConnection: source buffer position invalid" );
+				}
+				
+					// data read from source
+				
+				connection.setTimeStamp();
+																
+				final int	len = sc.read( source_buffer );
+		
+				if ( len == 0 ){
+					
+					return( false );
+				}
+				
+				if ( len == -1 ){
+					
+					throw( new EOFException( "read channel shutdown" ));
+					
+				}else{
+					
+					if ( source_buffer.position() > 0 ){
+						
+						connection.cancelReadSelect( source_channel );
+												
+							// offload the write to separate thread as can't afford to block the
+							// proxy
+					
+						new AEThread2( "RelayWrite" )
+						{		
+							public void
+							run()
+							{
+								try{					
+									source_buffer.flip();
+																												
+									tor_output_stream.write( source_buffer.array(), 0, len );
+					
+									source_buffer.position( 0 );
+									
+									source_buffer.limit( source_buffer.capacity());
+									
+									tor_output_stream.flush();
+																													
+									connection.requestReadSelect( source_channel );								
+
+								}catch( Throwable e ){
+									
+									connection.failed( e );
+								}
+							}
+						}.start();			
+					}
+				}
+				
+				return( true );
+			}
+			
+			public boolean
+			write(
+				SocketChannel 		sc )
+			
+				throws IOException
+			{
+				try{
+					int written = source_channel.write( target_buffer );
+											
+					if ( target_buffer.hasRemaining()){
+										
+						connection.requestWriteSelect( source_channel );
+						
+					}else{
+						
+						target_buffer = null;
+						
+						write_sem.release();
+					}
+					
+					return( written > 0 );
+					
+				}catch( Throwable e ){
+					
+					target_buffer = null;
+					
+					write_sem.release();
+					
+					if ( e instanceof IOException ){
+						
+						throw((IOException)e);
+					}
+					
+					throw( new IOException( "write fails: " + Debug.getNestedExceptionMessage(e)));
+				}
+			}
+			
+			public boolean
+			connect(
+				SocketChannel	sc )
+			
+				throws IOException
+			{
+				throw( new IOException( "Not Supported" ));
+			}
+			
+			public String
+			getStateName()
+			{
+				return( "relay" );
+			}
+		}
+	}
+	
+	private class
+	ProxyMapEntry
+	{
+		private	String	host;
+		private String	intermediate_host;
+		
+		private
+		ProxyMapEntry(
+			String		_host,
+			String		_intermediate_host )
+		{
+			host				= _host;
+			intermediate_host	= _intermediate_host;
+		}
+		
+		private String
+		getHost()
+		{
+			return( host );
+		}
+		
+		private String
+		getIntermediateHost()
+		{
+			return( intermediate_host );
+		}
+		
+		public void
+		finalize()
+		{
+			synchronized( intermediate_host_map ){
+				
+				intermediate_host_map.remove( intermediate_host );
 			}
 		}
 	}
