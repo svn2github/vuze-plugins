@@ -88,6 +88,7 @@ TorPlugin
 	
 	private int		internal_control_port;
 	private int		internal_socks_port;
+	private boolean	debug_server;
 	
 	private int		active_socks_port;
 	
@@ -211,7 +212,9 @@ TorPlugin
 			
 			internal_socks_port = socks_port_param.getValue();
 			
-			final BooleanParameter ext_tor_param = config_model.addBooleanParameter2( "ext_tor", "aztorplugin.use_external", false );
+			final BooleanParameter debug_server_param 	= config_model.addBooleanParameter2( "debug_server", "aztorplugin.debug_server", false );
+			
+			final BooleanParameter ext_tor_param 		= config_model.addBooleanParameter2( "ext_tor", "aztorplugin.use_external", false );
 			
 			final IntParameter ext_socks_port_param = config_model.addIntParameter2( "ext_socks_port", "aztorplugin.ext_socks_port", 9050 ); 
 
@@ -330,6 +333,7 @@ TorPlugin
 						stop_on_idle		= stop_on_idle_param.getValue();
 						prompt_on_use		= prompt_on_use_param.getValue();
 						prompt_skip_vuze	= prompt_skip_vuze_param.getValue();
+						debug_server 		= debug_server_param.getValue();
 						
 						if ( plugin_enabled ){
 							
@@ -355,6 +359,8 @@ TorPlugin
 						
 						control_port_param.setEnabled( plugin_enabled && !external_tor );
 						socks_port_param.setEnabled( plugin_enabled && !external_tor );
+						debug_server_param.setEnabled( plugin_enabled && !external_tor );
+						
 						ext_tor_param.setEnabled( plugin_enabled );
 						ext_socks_port_param.setEnabled( plugin_enabled && external_tor );
 						
@@ -373,6 +379,7 @@ TorPlugin
 			stop_on_idle_param.addListener( enabler_listener );
 			prompt_on_use_param.addListener( enabler_listener );
 			prompt_skip_vuze_param.addListener( enabler_listener );
+			debug_server_param.addListener( enabler_listener );
 			ext_tor_param.addListener( enabler_listener );
 			
 			enabler_listener.parameterChanged( null );
@@ -387,7 +394,7 @@ TorPlugin
 			
 				// see if server already running, unlikely due to the way we arrange for it to die if we do but you never know
 			
-			ControlConnection control = new ControlConnection( data_dir, internal_control_port, internal_socks_port );
+			ControlConnection control = new ControlConnection( null, data_dir, internal_control_port, internal_socks_port );
 		
 			if ( control.connect()){
 			
@@ -707,7 +714,7 @@ TorPlugin
 	}
 	
 	
-	private boolean
+	private Process
 	startServer()
 	{
 		log( "Starting server" );
@@ -731,11 +738,64 @@ TorPlugin
 			
 			ProcessBuilder pb = GeneralUtils.createProcessBuilder( plugin_dir, cmd_list.toArray(new String[cmd_list.size()]), null );
 		
-			pb.start();
+			final Process proc = pb.start();
+			
+			new AEThread2( "procread" )
+			{
+				public void
+				run()
+				{
+					try{
+						LineNumberReader lnr = new LineNumberReader( new InputStreamReader( proc.getInputStream()));
+						
+						while( true ){
+						
+							String line = lnr.readLine();
+							
+							if ( line == null ){
+								
+								break;
+							}
+						
+							if ( debug_server ){
+							
+								log( "> " + line );
+							}
+						}
+					}catch( Throwable e ){
+						
+					}
+				}
+			}.start();
+				
+			new AEThread2( "procread" )
+			{
+				public void
+				run()
+				{
+					try{
+						LineNumberReader lnr = new LineNumberReader( new InputStreamReader( proc.getErrorStream()));
+						
+						while( true ){
+						
+							String line = lnr.readLine();
+							
+							if ( line == null ){
+								
+								break;
+							}
+						
+							log( "* " + line );
+						}
+					}catch( Throwable e ){
+						
+					}
+				}
+			}.start();
 			
 			log( "Server started" );
 			
-			return( true );
+			return( proc );
 			
 		}catch( Throwable e ){
 		
@@ -743,7 +803,7 @@ TorPlugin
 			
 			Debug.out( e );
 			
-			return( false );
+			return( null );
 		}
 	}
 	
@@ -862,13 +922,15 @@ TorPlugin
 					run()
 					{		
 						try{
-							if ( startServer()){
+							Process process = startServer();
+							
+							if ( process != null ){
 								
 								log( "Waiting for server to initialise" );
 
 								while( !unloaded ){
 																	
-									ControlConnection control = new ControlConnection( data_dir, internal_control_port, internal_socks_port );
+									ControlConnection control = new ControlConnection( process, data_dir, internal_control_port, internal_socks_port );
 								
 									if ( control.connect()){
 										
@@ -1338,6 +1400,10 @@ TorPlugin
 		if ( host.equals( "version.vuze.com" )){
 			
 			return( "up33pjmm5bxgy7nb.onion" );
+			
+		}else if ( host.equals( "plugins.vuze.com" )){
+
+			return( "bkhjas5ml57str7e.onion" );
 		}
 		
 		return( null );
@@ -1524,6 +1590,7 @@ TorPlugin
 	private class
 	ControlConnection
 	{
+		private Process		process;
 		private int			control_port;
 		private int			socks_port;
 		private File		data_dir;
@@ -1533,15 +1600,18 @@ TorPlugin
 		private OutputStream 		os;
 		
 		private boolean		did_connect;
+		private boolean		owns_process;
 	
 		private TimerEventPeriodic	timer;
 		
 		private 
 		ControlConnection(
+			Process		_process,
 			File		_data_dir,
 			int			_control_port,
 			int			_socks_port )
 		{
+			process			= _process;
 			data_dir		= _data_dir;
 			control_port	= _control_port;
 			socks_port		= _socks_port;
@@ -1693,6 +1763,8 @@ TorPlugin
 								}
 							});
 					
+				owns_process = true;
+				
 				return( true );
 				
 			}catch( Throwable e ){
@@ -1876,6 +1948,13 @@ TorPlugin
 				
 				socket = null;
 			}
+			
+			if ( owns_process && process != null ){
+				
+				process.destroy();
+				
+				process = null;
+			}
 		}
 	}
 	
@@ -1952,7 +2031,7 @@ TorPlugin
 				
 				if ( consec_fails > 2 ){
 					
-					log( "Failed to connect to '" + host + "' " + consec_fails + " in a row (ok=" + total_ok + ", fails=" + total_fails +")" );
+					log( "Failed to connect to '" + host + "' " + consec_fails + " in a row - backing off (ok=" + total_ok + ", fails=" + total_fails +")" );
 				}
 			}
 		}
