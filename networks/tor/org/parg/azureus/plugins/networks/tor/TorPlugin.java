@@ -109,6 +109,19 @@ TorPlugin
 	private AtomicLong	proxy_request_ok		= new AtomicLong();
 	private AtomicLong	proxy_request_failed	= new AtomicLong();
 	
+	private static final int MAX_HISTORY_RECORDS	= 4096;
+	
+	private Map<String,ProxyHistory>		proxy_history = 
+			new LinkedHashMap<String,ProxyHistory>(MAX_HISTORY_RECORDS,0.75f,true)
+			{
+				protected boolean 
+				removeEldestEntry(
+			   		Map.Entry<String,ProxyHistory> eldest) 
+				{
+					return size() > MAX_HISTORY_RECORDS;
+				}
+			};
+			
 	private volatile boolean		unloaded;
 	
 	
@@ -1276,7 +1289,7 @@ TorPlugin
 	}
 	
 	private boolean
-	hostAccepted(
+	isHostAccepted(
 		String		reason,
 		String		host )
 	{
@@ -1287,16 +1300,20 @@ TorPlugin
 		
 		String	lc_host = host.toLowerCase( Locale.US );
 		
-		if ( lc_host.endsWith( ".onion" )){
-
-			return( true );
-			
-		}else if ( lc_host.endsWith( ".i2p" )){
+		if ( lc_host.endsWith( ".i2p" )){
 			
 			return( false );
 		}
 		
-			// TODO: check failure rate limits
+		if ( !checkProxyHistoryOK( host )){
+			
+			return( false );
+		}
+		
+		if ( lc_host.endsWith( ".onion" )){
+
+			return( true );	
+		}
 		
 		int decision = getPromptDecision( host );
 		
@@ -1338,7 +1355,7 @@ TorPlugin
 			return( null );
 		}
 		
-		if ( !hostAccepted( reason, host )){
+		if ( !isHostAccepted( reason, host )){
 			
 			return( null );
 		}
@@ -1375,6 +1392,45 @@ TorPlugin
 		return( proxy );
 	}
 	
+	private boolean
+	checkProxyHistoryOK(
+		String		host )
+	{
+		synchronized( this ){
+
+			ProxyHistory history = proxy_history.get( host );
+
+			if ( history == null ){
+				
+				history = new ProxyHistory( host );
+				
+				proxy_history.put( host, history );
+			}
+			
+			return( history.canConnect());
+		}
+	}
+	
+	private void
+	updateProxyHistory(
+		String		host,
+		boolean		ok )
+	{
+		synchronized( this ){
+			
+			ProxyHistory history = proxy_history.get( host );
+			
+			if ( history == null ){
+				
+				history = new ProxyHistory( host );
+				
+				proxy_history.put( host, history );
+			}
+			
+			history.setOutcome( ok );
+		}
+	}
+	
 		// IPC stuff
 	
 	public void
@@ -1400,7 +1456,7 @@ TorPlugin
 				proxy_request_failed.incrementAndGet();
 			}
 			
-			System.out.println( host + " -> " + good );
+			updateProxyHistory( host, good );
 			
 		}else{
 			
@@ -1423,7 +1479,7 @@ TorPlugin
 		
 			String updated_host	= rewriteHost( host );
 			
-			if ( host != null ){
+			if ( updated_host != null ){
 				
 				url = UrlUtils.setHost( url, updated_host );
 			}
@@ -1819,6 +1875,85 @@ TorPlugin
 				}
 				
 				socket = null;
+			}
+		}
+	}
+	
+	private class
+	ProxyHistory
+	{
+		private String	host;
+		
+		private long	last_connect_time;
+		private int		total_fails;
+		private int		total_ok;
+		
+		private int		consec_fails;
+		
+		private
+		ProxyHistory(
+			String		_host )
+		{
+			host		= _host;
+		}
+		
+		private boolean
+		canConnect()
+		{
+			long now = SystemTime.getMonotonousTime();
+			
+			boolean ok = consec_fails < 3;
+			
+			if ( !ok ){
+				
+				int delay = 30*60*1000;
+				
+				for ( int i=3;i<consec_fails;i++){
+					
+					delay <<= 1;
+					
+					if ( delay > 24*60*60*1000 ){
+						
+						delay = 24*60*60*1000;
+						
+						break;
+					}
+				}
+				
+				if ( now - last_connect_time >= delay ){
+					
+					ok = true;
+				}
+			}
+			
+			if ( ok ){
+				
+				last_connect_time = now;
+			}
+			
+			return( ok );
+		}
+		
+		private void
+		setOutcome(
+			boolean		ok )
+		{
+			if ( ok ){
+				
+				total_ok++;
+				
+				consec_fails = 0;
+				
+			}else{
+				
+				total_fails++;
+				
+				consec_fails++;
+				
+				if ( consec_fails > 2 ){
+					
+					log( "Failed to connect to '" + host + "' " + consec_fails + " in a row (ok=" + total_ok + ", fails=" + total_fails +")" );
+				}
 			}
 		}
 	}
