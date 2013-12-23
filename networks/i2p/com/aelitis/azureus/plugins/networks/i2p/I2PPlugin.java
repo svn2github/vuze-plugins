@@ -61,7 +61,8 @@ public class I2PPlugin
 	
 	protected PluginInterface	plugin_interface;
 	
-	public static final String[]	I2P_JARS = { "i2p.jar", "streaming.jar", "mstreaming.jar", "jbigi.jar" };
+	public static final String[]	I2P_JARS 		= { "i2p.jar", "streaming.jar", "mstreaming.jar", "jbigi.jar" };
+	public static final boolean[]	I2P_JARS_REQS 	= { true, true, true, false };	// from 0.9.9 jbigi is optional
 	
 	public static final String 	CONFIG_ENABLE		= "enable";
 	public static final boolean CONFIG_ENABLE_DEFAULT	= true;
@@ -265,21 +266,27 @@ public class I2PPlugin
 				
 				File	lib = new File( loc, "lib" );
 				
-		   		URL[]	jars = new URL[I2P_JARS.length];
+		   		List<URL>	jars_list = new ArrayList<URL>();
 		   	
-		   		for (int i=0;i<jars.length;i++){
+		   		for (int i=0;i<I2P_JARS.length;i++){
 		   			
 		   			File	jar = new File(lib,I2P_JARS[i] );
 		   			
 		   			if ( !jar.exists()){
 		   				
-		   				bad	= true;
+		   				if ( I2P_JARS_REQS[i]){
 		   				
-		   				throw( new Exception( "I2P jar file '" + jar + "' not found" ));
-		   			}
+		   					bad	= true;
+		   				
+		   					throw( new Exception( "I2P jar file '" + jar + "' not found" ));
+		   				}
+		   			}else{
 		   			
-		   			jars[i] = jar.toURL();
+		   				jars_list.add( jar.toURL());
+		   			}
 		   		}
+		   		
+		   		URL[] jars = jars_list.toArray( new URL[jars_list.size()] );
 		   		
 		   		ClassLoader	class_loader = getClass().getClassLoader();
     				    		
