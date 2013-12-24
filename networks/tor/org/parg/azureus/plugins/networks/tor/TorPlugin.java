@@ -113,7 +113,7 @@ TorPlugin
 	
 	private long					last_use_time;
 	
-	private WeakHashMap<Proxy,ProxyMapEntry>	proxy_map 				= new WeakHashMap<Proxy, ProxyMapEntry>();
+	private Map<Proxy,ProxyMapEntry>			proxy_map 				= new IdentityHashMap<Proxy, ProxyMapEntry>();
 	private Map<String,Object[]>				intermediate_host_map	= new HashMap<String, Object[]>();
 	
 	private AtomicLong	proxy_request_count		= new AtomicLong();
@@ -145,7 +145,7 @@ TorPlugin
 			
 			LocaleUtilities loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
 			
-			log	= plugin_interface.getLogger().getChannel( "TorHelper");
+			log	= plugin_interface.getLogger().getTimeStampedChannel( "TorHelper");
 			
 			final UIManager	ui_manager = plugin_interface.getUIManager();
 
@@ -276,7 +276,7 @@ TorPlugin
 									
 									URL original_url = new URL( test_url_param.getValue());
 									
-									Object[] proxy_details = getActiveProxy( "Test", original_url.getHost(), true );
+									Object[] proxy_details = getActiveProxy( "Test", original_url.getHost(), true, true );
 									
 									if ( proxy_details == null ){
 										
@@ -286,41 +286,45 @@ TorPlugin
 									Proxy 	proxy 		= (Proxy)proxy_details[0];
 									String	temp_host	= (String)proxy_details[1];
 									
-									URL url = UrlUtils.setHost( original_url, temp_host );
-									
-									HttpURLConnection con = (HttpURLConnection)url.openConnection( proxy );
-									
-									con.setConnectTimeout( 30*1000 );
-									con.setReadTimeout( 30*1000 );
-								
-									con.setRequestProperty( "HOST", original_url.getHost() + (original_url.getPort()==-1?"":(":" + original_url.getPort())));
-									
-									con.getResponseCode();
-									
-									InputStream is = con.getInputStream();
+									boolean	ok = false;
 									
 									try{
-										lines.add( "Connection succeeded, response=" + con.getResponseCode() + "/" + con.getResponseMessage());
-										lines.add( "Headers: " + con.getHeaderFields());
+										URL url = UrlUtils.setHost( original_url, temp_host );
+										
+										HttpURLConnection con = (HttpURLConnection)url.openConnection( proxy );
+										
+										con.setConnectTimeout( 30*1000 );
+										con.setReadTimeout( 30*1000 );
+									
+										con.setRequestProperty( "HOST", original_url.getHost() + (original_url.getPort()==-1?"":(":" + original_url.getPort())));
+										
+										con.getResponseCode();
+										
+										InputStream is = con.getInputStream();
 										
 										try{
+											lines.add( "Connection succeeded, response=" + con.getResponseCode() + "/" + con.getResponseMessage());
+											lines.add( "Headers: " + con.getHeaderFields());
+										
 											String text = FileUtil.readInputStreamAsString( is, 1024 );
 											
 											lines.add( "Start of response: " );
 											lines.add( text );
 											
-										}catch( Throwable e ){
+											ok = true;
+																		
+										}finally{
 											
+											try{										
+												is.close();
+												
+											}catch( Throwable e ){
+											}
 										}
 									}finally{
 										
-										try{										
-											is.close();
-											
-										}catch( Throwable e ){
-										}
+										setProxyStatus( proxy, ok );
 									}
-									
 								}catch( Throwable e ){
 									
 									lines.add( "Test failed: " + Debug.getNestedExceptionMessage( e ));
@@ -728,6 +732,25 @@ TorPlugin
 								if ( !isConnected()){
 								
 									should_be_connected = true;
+								}
+							}
+						}
+						
+						if ( proxy_map.size() > 0 ){
+							
+							long now = SystemTime.getMonotonousTime();
+							
+							Iterator<ProxyMapEntry>	it = proxy_map.values().iterator();
+							
+							while( it.hasNext()){
+								
+								ProxyMapEntry entry = it.next();
+								
+								if ( now - entry.getCreateTime() > 3*60*1000 ){
+									
+									it.remove();
+									
+									Debug.out( "Removed orphaned proxy entry for " + entry.getHost());
 								}
 							}
 						}
@@ -1452,6 +1475,7 @@ TorPlugin
 	getActiveProxy(
 		String		reason,
 		String		host,
+		boolean		requires_intermediate,
 		boolean		force )
 	{
 		if ( !plugin_enabled || unloaded ){
@@ -1459,10 +1483,10 @@ TorPlugin
 			return( null );
 		}
 		
-		if ( !isHostAccepted( reason, host )){
-			
-			if ( !force ){
-			
+		if ( !force ){
+
+			if ( !isHostAccepted( reason, host )){
+						
 				return( null );
 			}
 		}
@@ -1485,57 +1509,74 @@ TorPlugin
 			socks_port = con.getSOCKSPort();
 		}
 		
-		String 	intermediate_host;
-		int		intermediate_port;
-
-		synchronized( this ){
-			
-			if ( socks_proxy == null ){
+		if ( requires_intermediate ){
+		
+			String 	intermediate_host;
+			int		intermediate_port;
+	
+			synchronized( this ){
 				
-				try{
-					if ( unloaded ){
+				if ( socks_proxy == null ){
+					
+					try{
+						if ( unloaded ){
+							
+							return( null );
+						}
 						
+						socks_proxy = new SOCKSProxy();
+					
+					}catch( Throwable e ){
+					
 						return( null );
 					}
+				}
+				
+				intermediate_port = socks_proxy.getPort();
+				
+				while( true ){
 					
-					socks_proxy = new SOCKSProxy();
-				
-				}catch( Throwable e ){
-				
-					return( null );
+					int	address = 0x0a000000 + RandomUtils.nextInt( 0x00ffffff );
+									
+					intermediate_host = PRHelpers.intToAddress( address );
+					
+					if ( !intermediate_host_map.containsKey( intermediate_host )){
+						
+						intermediate_host_map.put( intermediate_host, new Object[]{ host, socks_port });
+						
+						break;
+					}
 				}
 			}
+		
+			Proxy proxy = new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( "127.0.0.1", intermediate_port ));	
 			
-			intermediate_port = socks_proxy.getPort();
-			
-			while( true ){
-				
-				int	address = 0x0a000000 + RandomUtils.nextInt( 0x00ffffff );
-								
-				intermediate_host = PRHelpers.intToAddress( address );
-				
-				if ( !intermediate_host_map.containsKey( intermediate_host )){
-					
-					intermediate_host_map.put( intermediate_host, new Object[]{ host, socks_port });
-					
-					break;
-				}
+			synchronized( this ){
+						
+				proxy_map.put( proxy, new ProxyMapEntry( host, intermediate_host ));
 			}
-		}
 		
-		Proxy proxy = new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( "127.0.0.1", intermediate_port ));
-		
-		
-		synchronized( proxy_map ){
+			last_use_time	= SystemTime.getMonotonousTime();
+	
+			proxy_request_count.incrementAndGet();
 					
-			proxy_map.put( proxy, new ProxyMapEntry( host, intermediate_host ));
-		}
+			return( new Object[]{ proxy, intermediate_host });
+			
+		}else{
+			
+			Proxy proxy = new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( "127.0.0.1", socks_port ));	
+			
+			synchronized( this ){
+						
+				proxy_map.put( proxy, new ProxyMapEntry( host, null ));
+			}
 		
-		last_use_time	= SystemTime.getMonotonousTime();
-
-		proxy_request_count.incrementAndGet();
-				
-		return( new Object[]{ proxy, intermediate_host });
+			last_use_time	= SystemTime.getMonotonousTime();
+	
+			proxy_request_count.incrementAndGet();
+					
+			return( new Object[]{ proxy, rewriteHost( host ) });
+		}
 	}
 	
 	private boolean
@@ -1586,7 +1627,7 @@ TorPlugin
 	{
 		ProxyMapEntry	entry;
 		
-		synchronized( proxy_map ){
+		synchronized( this ){
 			
 			entry = proxy_map.remove( proxy );
 		}
@@ -1594,7 +1635,6 @@ TorPlugin
 		if ( entry != null ){
 				
 			String 	host 				= entry.getHost();
-			String	intermediate_host	= entry.getIntermediateHost();
 			
 			if ( good ){
 				
@@ -1607,9 +1647,14 @@ TorPlugin
 			
 			updateProxyHistory( host, good );
 			
-			synchronized( this ){
+			String	intermediate_host	= entry.getIntermediateHost();
+
+			if ( intermediate_host != null ){
 				
-				intermediate_host_map.remove( intermediate_host );
+				synchronized( this ){
+					
+					intermediate_host_map.remove( intermediate_host );
+				}
 			}
 		}else{
 			
@@ -1626,7 +1671,7 @@ TorPlugin
 	{
 		String 	host = url.getHost();
 		
-		Object[] proxy_details = getActiveProxy( reason, host, false );
+		Object[] proxy_details = getActiveProxy( reason, host, true, false );
 		
 		if ( proxy_details != null ){
 						
@@ -1646,7 +1691,7 @@ TorPlugin
 	
 		throws IPCException
 	{
-		Object[] proxy_details = getActiveProxy( reason, host, false );
+		Object[] proxy_details = getActiveProxy( reason, host, false, false );
 		
 		if ( proxy_details != null ){
 			
@@ -1702,7 +1747,9 @@ TorPlugin
 		connect()
 		{
 			try{
-				socket = new Socket( "127.0.0.1", control_port );
+				socket = new Socket( Proxy.NO_PROXY );
+
+				socket.connect( new InetSocketAddress( "127.0.0.1", control_port ), 30*1000 );
 
 				did_connect = true;
 				
@@ -2106,7 +2153,7 @@ TorPlugin
 				
 				if ( consec_fails > 2 ){
 					
-					log( "Failed to connect to '" + host + "' " + consec_fails + " in a row - backing off (ok=" + total_ok + ", fails=" + total_fails +")" );
+					log( "Failed to connect to '" + host + "' " + consec_fails + " times in a row - backing off (ok=" + total_ok + ", fails=" + total_fails +")" );
 				}
 			}
 		}
@@ -2223,12 +2270,6 @@ TorPlugin
 			getName()
 			{
 				return( "TorPluginConnection" );
-			}
-			
-			private AESocksProxyConnection
-			getConnection()
-			{
-				return( connection );
 			}
 			
 			public InetAddress
@@ -2594,6 +2635,8 @@ TorPlugin
 	private class
 	ProxyMapEntry
 	{
+		private long	created = SystemTime.getMonotonousTime();
+		
 		private	String	host;
 		private String	intermediate_host;
 		
@@ -2606,6 +2649,12 @@ TorPlugin
 			intermediate_host	= _intermediate_host;
 		}
 		
+		private long
+		getCreateTime()
+		{
+			return( created );
+		}
+		
 		private String
 		getHost()
 		{
@@ -2616,15 +2665,6 @@ TorPlugin
 		getIntermediateHost()
 		{
 			return( intermediate_host );
-		}
-		
-		public void
-		finalize()
-		{
-			synchronized( intermediate_host_map ){
-				
-				intermediate_host_map.remove( intermediate_host );
-			}
 		}
 	}
 }
