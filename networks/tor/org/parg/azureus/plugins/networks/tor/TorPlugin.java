@@ -116,6 +116,8 @@ TorPlugin
 	private Map<Proxy,ProxyMapEntry>			proxy_map 				= new IdentityHashMap<Proxy, ProxyMapEntry>();
 	private Map<String,Object[]>				intermediate_host_map	= new HashMap<String, Object[]>();
 	
+	private Map<String,String>					domain_rewrite_map	= new HashMap<String, String>();
+	
 	private AtomicLong	proxy_request_count		= new AtomicLong();
 	private AtomicLong	proxy_request_ok		= new AtomicLong();
 	private AtomicLong	proxy_request_failed	= new AtomicLong();
@@ -204,6 +206,17 @@ TorPlugin
 					}
 				});
 			
+			
+			final LabelParameter dr_info_param = config_model.addLabelParameter2( "aztorplugin.dr_info" );
+
+			final StringParameter dr_param = config_model.addStringParameter2( "domain_rewrites", "aztorplugin.dr", "" );
+			
+			try{
+				dr_param.setMultiLine( 5 );
+			}catch( Throwable e ){
+				// remove once released
+			}
+			
 			config_model.createGroup( "aztorplugin.prompt_options", new Parameter[]{ prompt_skip_vuze_param, prompt_reset_param });
 			
 			final IntParameter control_port_param = config_model.addIntParameter2( "control_port", "aztorplugin.control_port", 0 ); 
@@ -283,8 +296,9 @@ TorPlugin
 										throw( new Exception( "Failed to setup proxy" ));
 									}
 									
-									Proxy 	proxy 		= (Proxy)proxy_details[0];
-									String	temp_host	= (String)proxy_details[1];
+									Proxy 	proxy 			= (Proxy)proxy_details[0];
+									String	temp_host		= (String)proxy_details[1];
+									String	rewrite_host	= (String)proxy_details[2];
 									
 									boolean	ok = false;
 									
@@ -293,10 +307,12 @@ TorPlugin
 										
 										HttpURLConnection con = (HttpURLConnection)url.openConnection( proxy );
 										
+										con.setInstanceFollowRedirects( false );
+										
 										con.setConnectTimeout( 30*1000 );
 										con.setReadTimeout( 30*1000 );
 									
-										con.setRequestProperty( "HOST", original_url.getHost() + (original_url.getPort()==-1?"":(":" + original_url.getPort())));
+										con.setRequestProperty( "HOST", rewrite_host + (original_url.getPort()==-1?"":(":" + original_url.getPort())));
 										
 										con.getResponseCode();
 										
@@ -388,6 +404,47 @@ TorPlugin
 						prompt_skip_vuze_param.setEnabled( plugin_enabled && prompt_on_use );
 						prompt_reset_param.setEnabled( plugin_enabled && prompt_on_use );
 						
+						dr_info_param.setEnabled( plugin_enabled );
+						dr_param.setEnabled( plugin_enabled );
+						
+						String 	domain_rewrites = dr_param.getValue();
+						
+						synchronized( TorPlugin.this ){
+							
+							domain_rewrite_map.clear();
+							
+							String[] lines = domain_rewrites.split( "\n" );
+							
+							for ( String line: lines ){
+								
+								line = line.trim();
+								
+								if ( line.length() > 0 ){
+									
+									String[] bits = line.split( "=" );
+									
+									if ( bits.length != 2 ){
+										
+										log( "Invalid domain rewrite entry: " + line );
+										
+									}else{
+										
+										String from = bits[0].trim();
+										String to	= bits[1].trim();
+										
+										if ( ! ( from.contains( "." ) && to.contains( "." ))){
+											
+											log( "Invalid domain rewrite entry: " + line );
+											
+										}else{
+											
+											domain_rewrite_map.put( from, to );
+										}
+									}
+								}
+							}
+						}
+						
 						control_port_param.setEnabled( plugin_enabled && !external_tor );
 						socks_port_param.setEnabled( plugin_enabled && !external_tor );
 						debug_server_param.setEnabled( plugin_enabled && !external_tor );
@@ -410,12 +467,14 @@ TorPlugin
 			stop_on_idle_param.addListener( enabler_listener );
 			prompt_on_use_param.addListener( enabler_listener );
 			prompt_skip_vuze_param.addListener( enabler_listener );
+			dr_param.addListener( enabler_listener );
 			debug_server_param.addListener( enabler_listener );
 			ext_tor_param.addListener( enabler_listener );
 			
 			enabler_listener.parameterChanged( null );
 			
 			log( "Plugin enabled=" + plugin_enabled + ", server=" + (external_tor?"external":"internal") + ", socks port=" + active_socks_port );
+			log( "Domain rewrites: " + domain_rewrite_map );
 			
 			readPromptDecisions();
 
@@ -1457,15 +1516,55 @@ TorPlugin
 	
 	private String
 	rewriteHost(
-		String		host )
+		String		host,
+		boolean		do_onions )
 	{
-		if ( host.equals( "version.vuze.com" )){
+		if ( do_onions ){
 			
-			return( "up33pjmm5bxgy7nb.onion" );
+			if ( host.equals( "version.vuze.com" )){
+				
+				return( "up33pjmm5bxgy7nb.onion" );
+				
+			}else if ( host.equals( "plugins.vuze.com" )){
+	
+				return( "bkhjas5ml57str7e.onion" );
+			}
+		}
+					
+		String[]	bits = host.split( "\\." );
+		
+		synchronized( this ){
+		
+			for ( int i=bits.length-1; i >= 0; i-- ){
+				
+				String sub_host = "";
+				
+				for ( int j=i; j<=bits.length-1; j++ ){
+					
+					sub_host += (sub_host.length()==0?"":".") + bits[j];
+				}
 			
-		}else if ( host.equals( "plugins.vuze.com" )){
-
-			return( "bkhjas5ml57str7e.onion" );
+				String target = domain_rewrite_map.get( sub_host );
+				
+				if ( target != null ){
+					
+					if ( i > 0 ){
+						
+						String prefix = "";
+						
+						for ( int j=0;j<i;j++){
+							
+							prefix += (j==0?"":".") + bits[j];
+						}
+						
+						target = prefix + "." + target;
+					}
+											
+					// log( "Rewriting " + host + " to " + target );
+					
+					return( target );
+				}
+			}
 		}
 		
 		return( host );
@@ -1560,7 +1659,7 @@ TorPlugin
 	
 			proxy_request_count.incrementAndGet();
 					
-			return( new Object[]{ proxy, intermediate_host });
+			return( new Object[]{ proxy, intermediate_host, rewriteHost( host, false ) });
 			
 		}else{
 			
@@ -1575,7 +1674,7 @@ TorPlugin
 	
 			proxy_request_count.incrementAndGet();
 					
-			return( new Object[]{ proxy, rewriteHost( host ) });
+			return( new Object[]{ proxy, rewriteHost( host, true ) });
 		}
 	}
 	
@@ -1677,7 +1776,7 @@ TorPlugin
 						
 			url = UrlUtils.setHost( url, (String)proxy_details[1] );
 		
-			return( new Object[]{ proxy_details[0], url });
+			return( new Object[]{ proxy_details[0], url, proxy_details[2] });
 		}
 		
 		return( null );
@@ -2321,7 +2420,7 @@ TorPlugin
 								
 				String final_host = (String)entry[0];
 				
-				final_host = rewriteHost( final_host );
+				final_host = rewriteHost( final_host, true );
 						
 				final InetSocketAddress final_address = InetSocketAddress.createUnresolved( final_host, final_port );
 				
