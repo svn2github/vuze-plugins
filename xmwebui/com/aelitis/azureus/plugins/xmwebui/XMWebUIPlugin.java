@@ -53,6 +53,7 @@ import org.gudy.azureus2.plugins.config.ConfigParameterListener;
 import org.gudy.azureus2.plugins.disk.DiskManagerFileInfo;
 import org.gudy.azureus2.plugins.download.*;
 import org.gudy.azureus2.plugins.download.DownloadStub.DownloadStubFile;
+import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.torrent.*;
 import org.gudy.azureus2.plugins.tracker.web.TrackerWebPageRequest;
 import org.gudy.azureus2.plugins.tracker.web.TrackerWebPageResponse;
@@ -183,6 +184,8 @@ XMWebUIPlugin
     
     private Object							json_server_method_lock 	= new Object();
     private transient Map<String,Object>	json_server_methods 		= new HashMap<String, Object>();		// Object during transition to core support
+
+		private BooleanParameter logtofile_param;
     
     public
     XMWebUIPlugin()
@@ -257,6 +260,15 @@ XMWebUIPlugin
 		hide_ln_param = config.addBooleanParameter2( "xmwebui.hidelownoise", "xmwebui.hidelownoise", true );
 
 		trace_param = config.addBooleanParameter2( "xmwebui.trace", "xmwebui.trace", false );
+		
+		logtofile_param = config.addBooleanParameter2( "xmwebui.logtofile", "xmwebui.logtofile", false );
+		
+		changeLogToFile(logtofile_param.getValue());
+		logtofile_param.addConfigParameterListener(new ConfigParameterListener() {
+			public void configParameterChanged(ConfigParameter param) {
+				changeLogToFile(logtofile_param.getValue());
+			}
+		});
 		
 		ConfigParameter mode_parameter = plugin_interface.getPluginconfig().getPluginParameter( WebPlugin.CONFIG_MODE );
 
@@ -469,6 +481,20 @@ XMWebUIPlugin
 		}
 	}
 	
+	protected void changeLogToFile(boolean logToFile) {
+		org.gudy.azureus2.plugins.logging.Logger logger = plugin_interface.getLogger();
+		if (logger != null) {
+			LoggerChannel channel = logger.getChannel("WebPlugin");
+			if (channel != null) {
+				if (logToFile) {
+					channel.setDiagnostic(1024l * 1024l, true);
+				} else {
+					// no way of turning off :(
+				}
+			}
+		}
+	}
+
 	private void
 	checkViewMode()
 	{
