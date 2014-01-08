@@ -11,6 +11,7 @@
         </sealing>
     </manifest>
     <selectedElements exportClassFiles="true" exportJavaFiles="true" exportOutputFolder="false">
+        <javaElement handleIdentifier="=aztorbrowser/&lt;org.parg.azureus.plugins.networks.torbrowser.internat"/>
         <javaElement handleIdentifier="=aztorbrowser/&lt;org.parg.azureus.plugins.networks.torbrowser"/>
     </selectedElements>
 </jardesc>

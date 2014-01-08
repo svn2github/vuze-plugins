@@ -94,6 +94,9 @@ TorPlugin
 	
 	private int		internal_control_port;
 	private int		internal_socks_port;
+	
+	private int		external_socks_port;
+	
 	private boolean	debug_server;
 	
 	private int		active_socks_port;
@@ -250,7 +253,7 @@ TorPlugin
 					parameterChanged(
 						Parameter param) 
 					{
-						active_socks_port = ext_socks_port_param.getValue();
+						active_socks_port = external_socks_port = ext_socks_port_param.getValue();
 					}
 				});
 			
@@ -500,7 +503,7 @@ TorPlugin
 			List<String>	required_config_lines = new ArrayList<String>();
 			
 			required_config_lines.add( "SocksPort 127.0.0.1:" + internal_socks_port );
-			required_config_lines.add( "ControlPort " + internal_control_port );
+			required_config_lines.add( "ControlPort 127.0.0.1:" + internal_control_port );
 			required_config_lines.add( "CookieAuthentication 1" );
 			required_config_lines.add( "DataDirectory ." + File.separator + data_dir.getName());
 			
@@ -1718,6 +1721,24 @@ TorPlugin
 	}
 	
 		// IPC stuff
+	
+	public Map<String,Object>
+	getConfig()
+	{
+		Map<String,Object>	config = new HashMap<String,Object>();
+		
+		config.put( "socks_port", external_tor?external_socks_port:internal_socks_port );
+		
+		return( config );
+	}
+	
+	public boolean
+	requestActivation()
+	{
+		ControlConnection con = getConnection( 5*1000, true );
+		
+		return( con != null && con.isConnected());
+	}
 	
 	public void
 	setProxyStatus(
