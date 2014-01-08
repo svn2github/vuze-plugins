@@ -21,11 +21,7 @@
 
 package org.parg.azureus.plugins.networks.torbrowser;
 
-import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -255,7 +251,13 @@ TorBrowserPlugin
 					public void
 					initializationComplete()
 					{
-						checkConfig();
+						try{
+							checkConfig();
+							
+						}catch( Throwable e ){
+							
+							Debug.out( e );
+						}
 					}
 				});
 				
@@ -315,42 +317,205 @@ TorBrowserPlugin
 	
 	private void
 	checkConfig()
+	
+		throws Exception
 	{
-		/*
-		 * prefs.js
-		 * 
-			user_pref("browser.startup.homepage", "check.torproject.org");
-			user_pref("network.proxy.no_proxies_on", "127.0.0.1");
-			user_pref("network.proxy.socks_port", <port>);
-		*/
+		int	socks_port = 26699;
 		
-		/*
-		 * preferences/extension-overrides.js
-		 * 
-		 	pref("extensions.torbutton.fresh_install", true );
-			pref("extensions.torbutton.tor_enabled", true);
-			pref("extensions.torbutton.proxies_applied", false );
-			pref("extensions.torbutton.settings_applied", false );
-			pref("extensions.torbutton.socks_host", "127.0.0.1");
-			pref("extensions.torbutton.socks_port", <port> );
-			pref("extensions.torbutton.custom.socks_host", "127.0.0.1");
-			pref("extensions.torbutton.custom.socks_port", <port> );
-			pref("extensions.torbutton.settings_method", "custom");
-		 */
+		Map<String,Object> user_pref = new HashMap<String, Object>();
+		 
+		user_pref.put("browser.startup.homepage", "check.torproject.org");
+		user_pref.put("network.proxy.no_proxies_on", "127.0.0.1");
+		user_pref.put("network.proxy.socks_port", socks_port );
+		
+		Map<String,Object> ext_pref = new HashMap<String, Object>();
+
+		ext_pref.put("extensions.torbutton.fresh_install", true );
+		ext_pref.put("extensions.torbutton.tor_enabled", true);
+		ext_pref.put("extensions.torbutton.proxies_applied", false );
+		ext_pref.put("extensions.torbutton.settings_applied", false );
+		ext_pref.put("extensions.torbutton.socks_host", "127.0.0.1");
+		ext_pref.put("extensions.torbutton.socks_port", socks_port );
+		ext_pref.put("extensions.torbutton.custom.socks_host", "127.0.0.1");
+		ext_pref.put("extensions.torbutton.custom.socks_port", socks_port );
+		ext_pref.put("extensions.torbutton.settings_method", "custom");
+
 		
 		File	root = browser_dir;
 		
 		if ( root == null ){
 			
-			return;
+			throw( new Exception( "Browser not installed" ));
 		}
 		
 		char slash = File.separatorChar;
 		
-		File	prefs = new File( root, "Data" + slash + "Browser" + slash + "profile.default" + slash + "prefs.js" );
+		File	profile_dir = new File( root, "Data" + slash + "Browser" + slash + "profile.default" );
 		
-		if ( prefs.exists()){
+		File	user_prefs_file = new File( profile_dir, "prefs.js" );
+		
+		fixPrefs( user_prefs_file, "user_pref", user_pref );
+		
+		File	ext_prefs_file = new File( profile_dir, "preferences" + slash + "extension-overrides.js" );
+		
+		fixPrefs( ext_prefs_file, "pref", ext_pref );
+	}
+	
+	private void
+	fixPrefs(
+		File				file,
+		String				pref_key,
+		Map<String,Object>	prefs )
+	
+		throws Exception
+	{
+		List<String>	lines = new ArrayList<String>();
+		
+		boolean updated = false;
+		
+		Map<String,Object>	prefs_to_add = new HashMap<String, Object>( prefs );
+		
+		if ( file.exists()){
 			
+			LineNumberReader	lnr = null;
+			
+			try{
+				lnr = new LineNumberReader( new InputStreamReader( new FileInputStream( file ), "UTF-8" ));
+				
+				while( true ){
+					
+					String 	line = lnr.readLine();
+					
+					if ( line == null ){
+						
+						break;
+					}
+					
+					line = line.trim();
+					
+					boolean	handled = false;
+					
+					if ( line.startsWith( pref_key )){
+						
+						int	pos1 = line.indexOf( "\"" );
+						int	pos2 = line.indexOf( "\"", pos1+1 );
+						
+						if ( pos2 > pos1 ){
+							
+							String key = line.substring( pos1+1, pos2 );
+							
+							Object	required_value = prefs_to_add.remove( key );
+							
+							if ( required_value != null ){
+								
+								pos1 = line.indexOf( ",", pos2 + 1 );
+								pos2 = line.indexOf( ")", pos1+1 );
+								
+								if ( pos2 > pos1 ){
+									
+									String	current_str = line.substring( pos1+1, pos2 ).trim();
+									
+									String 	required_str;
+									
+									if ( required_value instanceof String ){
+										
+										required_str = "\"" + required_value + "\"";
+									}else{
+										
+										required_str = String.valueOf( required_value );
+									}
+									
+									if ( !current_str.equals( required_str )){
+										
+										lines.add( pref_key + "(\"" + key + "\", " + required_str + ");");
+										
+										updated	= true;
+										handled = true;
+									}
+								}else{
+									
+									throw( new Exception( "Couldn't parse line: " + line ));
+								}
+							}
+						}
+					}
+					
+					if ( !handled ){
+						
+						lines.add( line );
+					}
+				}
+			}finally{
+				
+				if ( lnr != null ){
+					
+					lnr.close();
+				}
+			}
+		}
+		
+		if ( prefs_to_add.size() > 0 ){
+		
+			for ( Map.Entry<String, Object> entry: prefs_to_add.entrySet()){
+				
+				Object val = entry.getValue();
+				
+				if ( val instanceof String ){
+					
+					val = "\"" + val + "\"";
+				}
+				
+				lines.add( pref_key + "(\"" + entry.getKey() + "\", " + val + ");");
+			}
+			
+			updated = true;
+		}
+		
+		if ( updated ){
+			
+			File temp_file 	= new File( file.getAbsolutePath() + ".tmp" );
+			File bak_file 	= new File( file.getAbsolutePath() + ".bak" );
+			
+			temp_file.delete();
+			
+			try{
+				PrintWriter writer = new PrintWriter( new OutputStreamWriter( new FileOutputStream( temp_file ), "UTF-8" ));
+				
+				try{
+					for ( String line: lines ){
+					
+						writer.println( line );
+					}
+				}finally{
+					
+					writer.close();
+				}
+				
+				bak_file.delete();
+				
+				if ( file.exists()){
+					
+					if ( !file.renameTo( bak_file )){
+						
+						throw( new Exception( "Rename of " + file + " to " + bak_file + " failed" ));
+					}
+				}
+					
+				if ( !temp_file.renameTo( file )){
+						
+					if ( bak_file.exists()){
+						
+						bak_file.renameTo( file );
+					}
+					
+					throw( new Exception( "Rename of " + temp_file + " to " + file + " failed" ));
+				}
+			}catch( Throwable e ){
+				
+				temp_file.delete();
+				
+				throw( new Exception( "Failed to udpate " + file, e ));
+			}	
 		}
 	}
 	
