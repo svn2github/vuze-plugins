@@ -26,6 +26,7 @@ import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.FileUtil;
@@ -33,12 +34,24 @@ import org.gudy.azureus2.plugins.PluginAdapter;
 import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.UnloadablePlugin;
+import org.gudy.azureus2.plugins.ui.UIManager;
+import org.gudy.azureus2.plugins.ui.config.ActionParameter;
+import org.gudy.azureus2.plugins.ui.config.LabelParameter;
+import org.gudy.azureus2.plugins.ui.config.Parameter;
+import org.gudy.azureus2.plugins.ui.config.ParameterListener;
+import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
+import org.gudy.azureus2.plugins.utils.LocaleUtilities;
+
+import com.aelitis.azureus.core.util.GeneralUtils;
 
 public class 
 TorBrowserPlugin
 	implements UnloadablePlugin
 {
-	private PluginInterface		plugin_interface;
+	private PluginInterface				plugin_interface;
+	private BasicPluginConfigModel 		config_model;
+
+	private String				init_error;
 	private File				browser_dir;
 	
 	public void
@@ -48,6 +61,44 @@ TorBrowserPlugin
 		throws PluginException 
 	{
 		plugin_interface = pi;
+
+		final LocaleUtilities loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
+
+		final UIManager	ui_manager = plugin_interface.getUIManager();
+
+		config_model = ui_manager.createBasicPluginConfigModel( "plugins", "aztorbrowserplugin.name" );
+
+		config_model.addLabelParameter2( "aztorbrowserplugin.info1" );
+		config_model.addLabelParameter2( "aztorbrowserplugin.info2" );
+		config_model.addHyperlinkParameter2( "aztorbrowserplugin.link", loc_utils.getLocalisedMessageText( "aztorbrowserplugin.link.url" ));
+		
+		final LabelParameter status_label = config_model.addLabelParameter2( "aztorbrowserplugin.status");
+		
+		config_model.addLabelParameter2( "aztorbrowserplugin.blank" );
+		
+			//view_model.setConfigSectionID( "aztorbrowserplugin.name" );
+
+		final ActionParameter prompt_reset_param = config_model.addActionParameter2( "aztorbrowserplugin.launch", "aztorbrowserplugin.launch.button" );
+		
+		prompt_reset_param.addListener(
+			new ParameterListener()
+			{
+				public void 
+				parameterChanged(
+					Parameter param ) 
+				{
+					try{
+						launchBrowser( null );
+						
+					}catch( Throwable e ){
+						
+						ui_manager.showTextMessage(
+								"aztorbrowserplugin.launch.fail.msg",
+								null,
+								"Browser launch failed: " + Debug.getNestedExceptionMessage(e));
+					}
+				}
+			});
 		
 		try{
 			File plugin_install_dir = new File( pi.getPluginDirectoryName());
@@ -72,7 +123,7 @@ TorBrowserPlugin
 				
 				if ( file.isFile() && name.startsWith( "browser-" ) && name.endsWith( ".zip" )){
 					
-					String version = name.substring( name.lastIndexOf( "_" ) + 1, name.length() - 4 );
+					String version = name.substring( name.lastIndexOf( "-" ) + 1, name.length() - 4 );
 					
 					if ( Constants.compareVersions( version, highest_version_zip ) > 0 ){
 						
@@ -230,9 +281,27 @@ TorBrowserPlugin
 					
 					old.delete();
 				}
+								
+				if ( Constants.isOSX ){
+					
+					String chmod = findCommand( "chmod" );
+					
+					if ( chmod == null ){
+						
+						throw( new Exception( "Failed to find 'chmod' command" ));
+					}
+					
+					Runtime.getRuntime().exec(
+						new String[]{
+							chmod,
+							"-R",
+							"+x",
+							target_data.getAbsolutePath()
+						});
+				}
 				
 				browser_dir = target_data;
-				
+
 			}else{
 				
 				File existing_data = new File( plugin_data_dir, "browser_" + highest_version_data );
@@ -254,14 +323,24 @@ TorBrowserPlugin
 						try{
 							checkConfig();
 							
+							status_label.setLabelText( loc_utils.getLocalisedMessageText( "aztorbrowserplugin.status.ok" ));
+							
 						}catch( Throwable e ){
 							
+							init_error = Debug.getNestedExceptionMessage( e );
+							
+							status_label.setLabelText( loc_utils.getLocalisedMessageText( "aztorbrowserplugin.status.fail", new String[]{ init_error }) );
+
 							Debug.out( e );
 						}
 					}
 				});
 				
 		}catch( Throwable e ){
+			
+			init_error = Debug.getNestedExceptionMessage( e );
+			
+			status_label.setLabelText( loc_utils.getLocalisedMessageText( "aztorbrowserplugin.status.fail", new String[]{ init_error }) );
 			
 			throw( new PluginException( "Initialisation failed: " + Debug.getNestedExceptionMessage( e )));
 		}
@@ -519,12 +598,154 @@ TorBrowserPlugin
 		}
 	}
 	
+	private void
+	launchBrowser(
+		String		url )
+	
+		throws Exception
+	{
+		File	root = browser_dir;
+
+		if ( root == null ){
+			
+			if ( init_error != null ){
+				
+				throw( new Exception( "Browser initialisation failed: " + init_error ));
+			}
+			
+			throw( new Exception( "Browser not installed" ));
+		}
+		
+		List<String>	cmd_list = new ArrayList<String>();
+	
+		String	browser_root = root.getAbsolutePath();
+		
+		String slash = File.separator;
+		
+		if ( Constants.isWindows ){
+	
+			cmd_list.add( browser_root + slash + "Browser" + slash + "firefox.exe" );
+			
+			cmd_list.add( "-profile" );
+			
+			cmd_list.add( browser_root + slash + "Data" + slash + "Browser" + slash + "profile.default" + slash );
+			
+		}else if ( Constants.isOSX ){
+			
+			cmd_list.add( browser_root + slash + "TorBrowser.app" + slash + "Contents" + slash + "MacOS" + slash + "firefox" );
+			
+			cmd_list.add( "-profile" );
+			
+			cmd_list.add( browser_root + slash + "Data" + slash + "Browser" + slash + "profile.default" );
+
+		}else{
+			
+			throw( new Exception( "Unsupported OS" ));
+		}
+		
+		if ( url != null ){
+		
+			cmd_list.add( url );
+		}
+		
+		ProcessBuilder pb = GeneralUtils.createProcessBuilder( root, cmd_list.toArray(new String[cmd_list.size()]), null );
+		
+		if ( Constants.isOSX ){
+			
+			pb.environment().put(
+				"DYLD_LIBRARY_PATH",
+				browser_root + slash + "TorBrowser.app" + slash + "Contents" + slash + "MacOS" );
+		}
+		
+		final Process proc = pb.start();
+
+		new AEThread2( "procread" )
+		{
+			public void
+			run()
+			{
+				try{
+					LineNumberReader lnr = new LineNumberReader( new InputStreamReader( proc.getInputStream()));
+					
+					while( true ){
+					
+						String line = lnr.readLine();
+						
+						if ( line == null ){
+							
+							break;
+						}
+					
+						System.out.println( "> " + line );
+					}
+				}catch( Throwable e ){
+					
+				}
+			}
+		}.start();
+			
+		new AEThread2( "procread" )
+		{
+			public void
+			run()
+			{
+				try{
+					LineNumberReader lnr = new LineNumberReader( new InputStreamReader( proc.getErrorStream()));
+					
+					while( true ){
+					
+						String line = lnr.readLine();
+						
+						if ( line == null ){
+							
+							break;
+						}
+					
+						System.out.println( "*" + line );
+					}
+				}catch( Throwable e ){
+					
+				}
+			}
+		}.start();
+		
+		proc.waitFor();
+		
+	}
+	
+	private String
+	findCommand(
+		String	name )
+	{
+		final String[]  locations = { "/bin", "/usr/bin" };
+
+		for ( String s: locations ){
+
+			File f = new File( s, name );
+
+			if ( f.exists() && f.canRead()){
+
+				return( f.getAbsolutePath());
+			}
+		}
+
+		return( name );
+	}
+	
 	public void 
 	unload() 
 			
 		throws PluginException 
 	{
 		browser_dir 		= null;
+		init_error			= null;
 		plugin_interface	= null;
+		
+		if ( config_model != null ){
+			
+			config_model.destroy();
+			
+			config_model = null;
+		}
 	}
 }
