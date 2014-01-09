@@ -48,6 +48,7 @@ import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManager;
+import org.gudy.azureus2.plugins.ui.UIManagerEvent;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
 import org.gudy.azureus2.plugins.ui.config.*;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
@@ -58,11 +59,15 @@ import org.parg.azureus.plugins.networks.tor.TorPluginUI.PromptResponse;
 import com.aelitis.azureus.core.proxy.*;
 import com.aelitis.azureus.core.proxy.socks.*;
 import com.aelitis.azureus.core.util.GeneralUtils;
+import com.aelitis.azureus.ui.UIFunctions;
+import com.aelitis.azureus.ui.UIFunctionsManager;
 
 public class 
 TorPlugin
 	implements UnloadablePlugin
 {
+	private static final String		BROWSER_PLUGIN_ID = "aznettorbrowser";
+	
 	private PluginInterface			plugin_interface;
 	private PluginConfig			plugin_config;
 	private LoggerChannel 			log;
@@ -84,6 +89,9 @@ TorPlugin
 	private File	data_dir;
 	
 	private BooleanParameter prompt_on_use_param;
+	
+	private ActionParameter browser_install_param; 
+	private ActionParameter browser_launch_param;
 	
 	private boolean	plugin_enabled;
 	private boolean	external_tor;
@@ -148,7 +156,7 @@ TorPlugin
 		try{
 			plugin_interface	= pi;
 			
-			LocaleUtilities loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
+			final LocaleUtilities loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
 			
 			log	= plugin_interface.getLogger().getTimeStampedChannel( "TorHelper");
 			
@@ -370,6 +378,137 @@ TorPlugin
 					}
 				});
 			
+			LabelParameter browser_info1 = config_model.addLabelParameter2( "aztorplugin.browser.info1" );
+			LabelParameter browser_info2 = config_model.addLabelParameter2( "aztorplugin.browser.info2" );
+			
+			browser_install_param = config_model.addActionParameter2( "aztorplugin.browser.install", "aztorplugin.browser.install.button" );
+			
+			browser_install_param.addListener(
+				new ParameterListener()
+				{
+					public void 
+					parameterChanged(
+						Parameter param ) 
+					{
+						browser_install_param.setEnabled( false );
+						
+						new AEThread2( "installer" )
+						{
+							public void
+							run()
+							{
+								boolean	ok = false;
+								
+								String	msg;
+								
+								try{
+									installBrowserPlugin();
+									
+									msg = loc_utils.getLocalisedMessageText( "aztorplugin.browser.install.ok.msg" );
+									
+									ok = true;
+									
+								}catch( Throwable e ){
+									
+									msg = loc_utils.getLocalisedMessageText( 
+												"aztorplugin.browser.install.fail.msg",
+												new String[]{ Debug.getNestedExceptionMessage( e )});
+									
+								}finally{
+									
+									if ( !checkBrowserPlugin()){
+										
+										if ( ok ){
+										
+												// something weird happened
+											
+											ok = false;
+											
+											msg = loc_utils.getLocalisedMessageText( 
+													"aztorplugin.browser.install.fail.msg",
+													new String[]{ "Unexpected error, check logs" });
+										}
+									}
+								}
+								
+								ui_manager.showMessageBox(
+									ok?"aztorplugin.browser.install.ok":"aztorplugin.browser.install.fail",
+									"!" + msg + "!",
+									UIManagerEvent.MT_OK );
+							}
+						}.start();
+					}
+				});
+			
+			
+			browser_launch_param = config_model.addActionParameter2( "aztorplugin.browser.launch", "aztorplugin.browser.launch.button" );
+			
+			browser_launch_param.addListener(
+				new ParameterListener()
+				{
+					public void 
+					parameterChanged(
+						Parameter param ) 
+					{
+						browser_launch_param.setEnabled( false );
+						
+						new AEThread2( "launcher" )
+						{
+							public void
+							run()
+							{
+								final AESemaphore sem = new AESemaphore( "launch:wait" );
+								
+								try{
+									PluginInterface pi = plugin_interface.getPluginManager().getPluginInterfaceByID( BROWSER_PLUGIN_ID );
+
+									if ( pi == null ){
+										
+										throw( new Exception( "Tor Browser plugin not found" ));
+									}
+									
+									pi.getIPC().invoke(
+										"launchURL",
+										new Object[]{ 
+											new URL( "https://check.torproject.org/" ), 
+											true,
+											new Runnable()
+											{
+												public void
+												run()
+												{
+													sem.release();
+												}
+											}
+										});
+									
+									sem.reserve();
+									
+								}catch( Throwable e ){
+									
+									e.printStackTrace();
+									
+									String msg = loc_utils.getLocalisedMessageText( 
+											"aztorplugin.browser.launch.fail.msg",
+											new String[]{ Debug.getNestedExceptionMessage(e)});
+									
+									ui_manager.showMessageBox(
+											"aztorplugin.browser.launch.fail",
+											"!" + msg + "!",
+											UIManagerEvent.MT_OK );
+									
+								}finally{
+									
+									browser_launch_param.setEnabled( true );
+								}
+							}
+						}.start();
+					}
+				});
+			
+			config_model.createGroup( "aztorplugin.browser.options", new Parameter[]{ browser_info1, browser_info2, browser_install_param, browser_launch_param });
+
+			
 			ParameterListener enabler_listener =
 				new ParameterListener()
 				{
@@ -457,6 +596,8 @@ TorPlugin
 						
 						test_url_param.setEnabled( plugin_enabled );
 						test_param.setEnabled( plugin_enabled );
+						
+						checkBrowserPlugin();
 						
 						if ( param != null ){
 						
@@ -683,7 +824,15 @@ TorPlugin
 					}
 				});
 			
-
+			pi.addListener(
+				new PluginAdapter()
+				{
+					public void 
+					initializationComplete() 
+					{
+						checkBrowserPlugin();
+					}
+				});
 		}catch( Throwable e ){
 				
 			init_time = SystemTime.getMonotonousTime();
@@ -696,6 +845,73 @@ TorPlugin
 			}
 			
 			Debug.out( e );
+		}
+	}
+
+	private boolean
+	isBrowserPluginInstalled()
+	{
+		PluginInterface pi = plugin_interface.getPluginManager().getPluginInterfaceByID( BROWSER_PLUGIN_ID );
+		
+		return( pi != null ); // && pi.getPluginState().isOperational());
+	}
+	
+	private boolean
+	checkBrowserPlugin()
+	{
+		boolean installed = isBrowserPluginInstalled();
+					
+		browser_install_param.setEnabled( plugin_enabled && !installed );
+		browser_launch_param.setEnabled( plugin_enabled && installed );
+		
+		return( installed );
+	}
+	
+	private void
+	installBrowserPlugin()
+	
+		throws Throwable
+	{
+		UIFunctions uif = UIFunctionsManager.getUIFunctions();
+		
+		if ( uif == null ){
+			
+			throw( new Exception( "UIFunctions unavailable - can't install plugin" ));
+		}
+		
+		
+		final AESemaphore sem = new AESemaphore( "installer_wait" );
+		
+		final Throwable[] error = { null };
+		
+		uif.installPlugin(
+				BROWSER_PLUGIN_ID,
+				"aztorplugin.browser.install",
+				new UIFunctions.actionListener()
+				{
+					public void
+					actionComplete(
+						Object		result )
+					{
+						try{
+							if ( result instanceof Boolean ){
+								
+							}else{
+								
+								error[0] = (Throwable)result;
+							}
+						}finally{
+							
+							sem.release();
+						}
+					}
+				});
+		
+		sem.reserve();
+		
+		if ( error[0] instanceof Throwable ){
+			
+			throw((Throwable)error[0] );
 		}
 	}
 	

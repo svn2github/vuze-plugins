@@ -49,6 +49,7 @@ import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
 import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.config.ActionParameter;
+import org.gudy.azureus2.plugins.ui.config.BooleanParameter;
 import org.gudy.azureus2.plugins.ui.config.LabelParameter;
 import org.gudy.azureus2.plugins.ui.config.Parameter;
 import org.gudy.azureus2.plugins.ui.config.ParameterListener;
@@ -73,6 +74,8 @@ TorBrowserPlugin
 	
 	private String				init_error;
 	private File				browser_dir;
+	
+	private boolean	debug_log;
 	
 	private AESemaphore					init_complete_sem = new AESemaphore( "tbp_init" );
 	
@@ -144,20 +147,20 @@ TorBrowserPlugin
 
 		final LabelParameter status_label = config_model.addLabelParameter2( "aztorbrowserplugin.status");
 		
-		config_model.addLabelParameter2( "aztorbrowserplugin.blank" );
+		LabelParameter sep3 = config_model.addLabelParameter2( "aztorbrowserplugin.blank" );
 		
 		view_model.setConfigSectionID( "aztorbrowserplugin.name" );
 
-		final ActionParameter prompt_reset_param = config_model.addActionParameter2( "aztorbrowserplugin.launch", "aztorbrowserplugin.launch.button" );
+		final ActionParameter launch_param = config_model.addActionParameter2( "aztorbrowserplugin.launch", "aztorbrowserplugin.launch.button" );
 		
-		prompt_reset_param.addListener(
+		launch_param.addListener(
 			new ParameterListener()
 			{
 				public void 
 				parameterChanged(
 					Parameter param ) 
 				{
-					prompt_reset_param.setEnabled( false );
+					launch_param.setEnabled( false );
 					
 					try{
 						launchBrowser( 
@@ -168,13 +171,13 @@ TorBrowserPlugin
 								public void
 								run()
 								{
-									prompt_reset_param.setEnabled( true );
+									launch_param.setEnabled( true );
 								}
 							});
 						
 					}catch( Throwable e ){
 						
-						prompt_reset_param.setEnabled( true );
+						launch_param.setEnabled( true );
 						
 						ui_manager.showTextMessage(
 								"aztorbrowserplugin.launch.fail.msg",
@@ -182,6 +185,27 @@ TorBrowserPlugin
 								"Browser launch failed: " + Debug.getNestedExceptionMessage(e));
 					}
 				}
+			});
+		
+		final BooleanParameter debug_log_param 	= config_model.addBooleanParameter2( "debug_log", "aztorbrowserplugin.debug_log", false );
+
+		debug_log = debug_log_param.getValue();
+		
+		debug_log_param.addListener(
+			new ParameterListener()
+			{
+				public void 
+				parameterChanged(
+					Parameter param ) 
+				{
+					debug_log = debug_log_param.getValue();
+				}
+			});
+		
+		config_model.createGroup( 
+			"aztorbrowserplugin.browser.group",
+			new Parameter[]{
+					status_label, sep3, launch_param, debug_log_param,
 			});
 		
 		try{
@@ -709,6 +733,8 @@ TorBrowserPlugin
 		
 		if ( updated ){
 			
+			logDebug( "Updating " + file );
+			
 			File temp_file 	= new File( file.getAbsolutePath() + ".tmp" );
 			File bak_file 	= new File( file.getAbsolutePath() + ".bak" );
 			
@@ -763,8 +789,15 @@ TorBrowserPlugin
 		final Runnable		run_when_done )
 	
 		throws Exception
-	{
+	{	
 		log( "Launch request for " + (url==null?"<default>":url) + ", new window=" + new_window );
+	
+		if ( !init_complete_sem.isReleasedForever()){
+			
+			log( "Waiting for initialisation to complete" );
+			
+			init_complete_sem.reserve(60*1000);
+		}
 		
 		if ( init_error != null ){
 			
@@ -1036,9 +1069,6 @@ TorBrowserPlugin
 				
 					browser_timer = null;
 				}
-				
-				
-				return;
 			}
 		}
 		
@@ -1094,16 +1124,14 @@ TorBrowserPlugin
 							}
 						}
 					}
-				}
-					
-			}catch( Throwable e ){
-				
+				}					
 			}finally{
 				
 				p.destroy();
 			}
 		}catch( Throwable e ){
 			
+			logDebug( "Failed to list tasks: " + Debug.getNestedExceptionMessage( e ));
 		}
 		
 		return( result );
@@ -1127,12 +1155,33 @@ TorBrowserPlugin
 	
 		throws IPCException
 	{
+		launchURL( url, false, null );
+	}
+	
+	public void
+	launchURL(
+		URL			url,
+		boolean		new_window,
+		Runnable	run_when_done )
+	
+		throws IPCException
+	{
 		try{
-			launchBrowser( url==null?null:url.toExternalForm(), new_window, null );
+			launchBrowser( url==null?null:url.toExternalForm(), new_window, run_when_done );
 			
 		}catch( Throwable e ){
 			
 			throw( new IPCException( "Launch url failed", e ));
+		}
+	}
+	
+	private void
+	logDebug(
+		String		str )
+	{
+		if ( debug_log ){
+			
+			log( str );
 		}
 	}
 	
@@ -1183,11 +1232,15 @@ TorBrowserPlugin
 				process = pb.start();
 			}
 					
-						
+					
 			try{
+				int	num_proc;
+				
 				synchronized( browser_instances ){
 					
 					browser_instances.add( this );
+					
+					num_proc = browser_instances.size();
 					
 					setUnloadable( false );
 					
@@ -1209,6 +1262,15 @@ TorBrowserPlugin
 					}
 				}
 
+				if ( num_proc == 1 ){
+					
+					logDebug( "Main browser process started" );
+					
+				}else{
+					
+					logDebug( "Sub-process started" );
+				}
+				
 				if ( browser_dir == null ){
 					
 					throw( new Exception( "Unloaded" ));
@@ -1231,9 +1293,9 @@ TorBrowserPlugin
 										
 										break;
 									}
-								
-									System.out.println( "> " + line );
-								}
+									
+									logDebug( "> " + line );
+														}
 							}catch( Throwable e ){
 								
 							}
@@ -1261,8 +1323,8 @@ TorBrowserPlugin
 										
 										break;
 									}
-								
-									System.out.println( "*" + line );
+																	
+									logDebug( "* " + line );
 								}
 							}catch( Throwable e ){
 								
@@ -1287,11 +1349,24 @@ TorBrowserPlugin
 								
 							}finally{
 								
+								int	num_proc;
+								
 								synchronized( browser_instances ){
 									
 									browser_instances.remove( BrowserInstance.this );
 									
-									setUnloadable( browser_instances.size() == 0 );
+									num_proc = browser_instances.size();
+									
+									setUnloadable( num_proc == 0 );
+								}
+								
+								if ( num_proc == 0 ){
+								
+									logDebug( "Main browser process exited" );
+									
+								}else{
+									
+									logDebug( "Sub-process exited" );
 								}
 							}
 						}
@@ -1309,6 +1384,8 @@ TorBrowserPlugin
 					
 					setUnloadable( browser_instances.size() == 0 );
 				}
+				
+				logDebug( "Process setup failed: " + Debug.getNestedExceptionMessage( e));
 				
 				destroy();
 			}
@@ -1330,6 +1407,8 @@ TorBrowserPlugin
 				process.destroy();
 				
 				if ( Constants.isWindows && process_id >= 0 ){
+					
+					logDebug( "Killing process " + process_id );
 					
 					Process p = Runtime.getRuntime().exec( new String[]{ "cmd", "/c", "taskkill", "/f", "/pid", String.valueOf( process_id ) });
 
