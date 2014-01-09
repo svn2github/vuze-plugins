@@ -22,6 +22,7 @@
 package org.parg.azureus.plugins.networks.torbrowser;
 
 import java.io.*;
+import java.net.URL;
 import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -42,6 +43,7 @@ import org.gudy.azureus2.plugins.PluginAdapter;
 import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.UnloadablePlugin;
+import org.gudy.azureus2.plugins.ipc.IPCException;
 import org.gudy.azureus2.plugins.ipc.IPCInterface;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
@@ -74,7 +76,7 @@ TorBrowserPlugin
 	
 	private AESemaphore					init_complete_sem = new AESemaphore( "tbp_init" );
 	
-	private Set<BrowserInstance>		browsers = new HashSet<BrowserInstance>();
+	private Set<BrowserInstance>		browser_instances = new HashSet<BrowserInstance>();
 	
 	private TimerEventPeriodic			browser_timer;
 	
@@ -95,6 +97,8 @@ TorBrowserPlugin
 	{
 		plugin_interface = pi;
 
+		setUnloadable( true );
+		
 		final LocaleUtilities loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
 
 		log	= plugin_interface.getLogger().getTimeStampedChannel( "TorBrowser");
@@ -158,6 +162,7 @@ TorBrowserPlugin
 					try{
 						launchBrowser( 
 							HOME_PAGE,
+							true,
 							new Runnable()
 							{
 								public void
@@ -754,11 +759,12 @@ TorBrowserPlugin
 	private void
 	launchBrowser(
 		final String		url,
+		final boolean		new_window,
 		final Runnable		run_when_done )
 	
 		throws Exception
 	{
-		log( "Launch request for " + (url == null?"new window":url));
+		log( "Launch request for " + (url==null?"<default>":url) + ", new window=" + new_window );
 		
 		if ( init_error != null ){
 			
@@ -779,7 +785,7 @@ TorBrowserPlugin
 				runSupport() 
 				{
 					try{
-						launchBrowserSupport( root, url, run_when_done );
+						launchBrowserSupport( root, url, new_window, run_when_done );
 						
 					}catch( Throwable e ){
 						
@@ -793,6 +799,7 @@ TorBrowserPlugin
 	launchBrowserSupport(
 		File			root,
 		String			url,
+		boolean			new_window,
 		Runnable		run_when_done ) 
 	
 		throws Exception
@@ -855,15 +862,15 @@ TorBrowserPlugin
 			
 			if ( url == null ){
 			
-				cmd_list.add( "-new-window"  );
-	
-				cmd_list.add( HOME_PAGE );
-				
 			}else{
 				
+				if ( new_window ){
+				
+					cmd_list.add( "-new-window"  );
+				}
+		
 				cmd_list.add( url );
 			}
-			
 			
 			ProcessBuilder pb = GeneralUtils.createProcessBuilder( root, cmd_list.toArray(new String[cmd_list.size()]), null );
 			
@@ -904,11 +911,31 @@ TorBrowserPlugin
 		return( name );
 	}
 	
+	private void
+	setUnloadable(
+		boolean	b )
+	{
+		PluginInterface pi = plugin_interface;
+		
+		if ( pi != null ){
+			
+			pi.getPluginProperties().put( "plugin.unload.disabled", String.valueOf( !b ));
+		}
+	}
+	
 	public void 
 	unload() 
 			
 		throws PluginException 
 	{
+		synchronized( browser_instances ){
+			
+			if ( browser_instances.size() > 0 ){
+				
+				throw( new PluginException( "Unload prevented as browsers are active" ));
+			}
+		}
+		
 		browser_dir 		= null;
 		init_error			= null;
 		plugin_interface	= null;
@@ -919,6 +946,15 @@ TorBrowserPlugin
 			
 			config_model = null;
 		}
+		
+		if ( view_model != null ){
+			
+			view_model.destroy();
+			
+			view_model = null;
+		}
+		
+			// should be null op due to above test, but leave here for completeness
 		
 		killBrowsers();
 	}
@@ -936,14 +972,16 @@ TorBrowserPlugin
 			run()
 			{
 				try{
-					synchronized( browsers ){
+					synchronized( browser_instances ){
 						
-						for ( BrowserInstance b: browsers ){
+						for ( BrowserInstance b: browser_instances ){
 							
 							b.destroy();
 						}
 						
-						browsers.clear();
+						browser_instances.clear();
+						
+						setUnloadable( true );
 						
 						if ( browser_timer != null ){
 							
@@ -986,9 +1024,9 @@ TorBrowserPlugin
 	{
 		int	num_active;
 		
-		synchronized( browsers ){
+		synchronized( browser_instances ){
 		
-			num_active = browsers.size();
+			num_active = browser_instances.size();
 			
 			if ( num_active == 0 ){
 			
@@ -1071,6 +1109,33 @@ TorBrowserPlugin
 		return( result );
 	}
 	
+		// IPC methods
+	
+	public void
+	launchURL(
+		URL			url )
+	
+		throws IPCException
+	{
+		launchURL( url, false );
+	}
+	
+	public void
+	launchURL(
+		URL			url,
+		boolean		new_window )
+	
+		throws IPCException
+	{
+		try{
+			launchBrowser( url==null?null:url.toExternalForm(), new_window, null );
+			
+		}catch( Throwable e ){
+			
+			throw( new IPCException( "Launch url failed", e ));
+		}
+	}
+	
 	private void
 	log(
 		String		str )
@@ -1120,9 +1185,11 @@ TorBrowserPlugin
 					
 						
 			try{
-				synchronized( browsers ){
+				synchronized( browser_instances ){
 					
-					browsers.add( this );
+					browser_instances.add( this );
+					
+					setUnloadable( false );
 					
 					if ( browser_timer == null ){
 						
@@ -1220,9 +1287,11 @@ TorBrowserPlugin
 								
 							}finally{
 								
-								synchronized( browsers ){
+								synchronized( browser_instances ){
 									
-									browsers.remove( BrowserInstance.this );
+									browser_instances.remove( BrowserInstance.this );
+									
+									setUnloadable( browser_instances.size() == 0 );
 								}
 							}
 						}
@@ -1234,9 +1303,11 @@ TorBrowserPlugin
 				
 			}catch( Throwable e ){
 				
-				synchronized( browsers ){
+				synchronized( browser_instances ){
 					
-					browsers.remove( this );
+					browser_instances.remove( this );
+					
+					setUnloadable( browser_instances.size() == 0 );
 				}
 				
 				destroy();
