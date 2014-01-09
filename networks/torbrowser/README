@@ -1,0 +1,54 @@
+The 'Tor Browser' components included in this plugin are derived directly from the release version of the product with the following removed:
+
+Windows:
+    .\Docs
+    .\Tor
+    .\Start Tor Browser.exe
+    .\Data\Tor
+    .\Data\Browser\profile.default\extensions\tor-launcher@torproject.org.xpi
+
+Mac:
+    .\Docs
+    .\Tor
+    .\Contents\MacOS\TorBrowser.app is moved to .\TorBrowser.app and everything else in '.\Contents deleted
+    .\Data\Tor
+    .\Data\Browser\profile.default\extensions\tor-launcher@torproject.org.xpi
+    
+There are no additions or changes beyond this to the 'Tor Browser' components.
+
+The result is a stand-alone Tor Browser that doesn't start/control a Tor instance. One side effect of this is that
+the 'new identify' feature of the TorButton is missing (as there is no control-connection)
+
+The Vuze plugin is responsible for managing the Tor instance lifecycle and setting the browser's SOCKS port configuration appropriately. 
+
+LICENSES
+
+Documentation on this obtained from https://www.torproject.org/docs/faq.html.en#DistributingTor
+
+To quote as of 2014/01/09:
+
+---- quote start ----
+
+The Tor software is free software. This means we give you the rights to redistribute the Tor software, 
+either modified or unmodified, either for a fee or gratis. You don't have to ask us for specific permission.
+
+However, if you want to redistribute the Tor software you must follow our LICENSE. Essentially this means that 
+you need to include our LICENSE file along with whatever part of the Tor software you're distributing.
+
+Most people who ask us this question don't want to distribute just the Tor software, though. 
+They want to distribute the Tor Browser. This includes Mozilla Aurora [https://www.mozilla.org/en-US/firefox/all-aurora.html] 
+and Vidalia [https://www.torproject.org/projects/vidalia.html.en]. You will need to follow the 
+licenses for those programs as well. Both of them are distributed under the GNU General Public License [https://www.fsf.org/licensing/licenses/gpl.html]. 
+The simplest way to obey their licenses is to include the source code for these programs everywhere you 
+include the bundles themselves. Look for "source" packages on the Vidalia page and Mozilla Aurora pages.
+
+---- quote end ----
+
+The Tor software itself is not included in this plugin, rather it can be found in the 'aznettor' plugin:  
+
+	http://plugins.vuze.com/plugin_details.php?plugin=aznettor
+
+When the above 'distributing tor' link was last consulted it still included references to Vidalia for the 
+bundle, which has been removed.
+
+The Mozilla browser is distributed exactly as found in the 'Tor Browser' product with the removals listed above. The sourcecode for this is thus available from the Tor Project.
