@@ -902,7 +902,7 @@ TorBrowserPlugin
 					cmd_list.add( "-new-window"  );
 				}
 		
-				cmd_list.add( url );
+				cmd_list.add( "\"" + url + "\"" );
 			}
 			
 			ProcessBuilder pb = GeneralUtils.createProcessBuilder( root, cmd_list.toArray(new String[cmd_list.size()]), null );
