@@ -16,6 +16,7 @@
         <javaElement handleIdentifier="=xmwebui/&lt;com.aelitis.azureus.plugins.xmwebui.client"/>
         <javaElement handleIdentifier="=xmwebui/&lt;com.aelitis.azureus.plugins.xmwebui.client.proxy"/>
         <javaElement handleIdentifier="=xmwebui/&lt;com.aelitis.azureus.plugins.xmwebui.client.rpc"/>
+        <javaElement handleIdentifier="=aeremsearchplugin/&lt;com.aelitis.azureus.plugins.remsearch{RemSearchPluginEngineReal.java"/>
         <javaElement handleIdentifier="=xmwebui/&lt;com.aelitis.azureus.plugins.xmwebui.client.connect"/>
         <javaElement handleIdentifier="=xmwebui/&lt;com.aelitis.azureus.plugins.xmwebui.swt"/>
         <javaElement handleIdentifier="=aeremsearchplugin/&lt;com.aelitis.azureus.plugins.remsearch{RemSearchPluginPageGeneratorAdaptor.java"/>
@@ -23,5 +24,4 @@
         <javaElement handleIdentifier="=aeremsearchplugin/&lt;com.aelitis.azureus.plugins.remsearch{RemSearchPluginEngine.java"/>
         <javaElement handleIdentifier="=aeremsearchplugin/&lt;com.aelitis.azureus.plugins.remsearch{RemSearchPluginPageGenerator.java"/>
     </selectedElements>
-    <fatjar builder="org.eclipse.jdt.ui.plain_jar_builder" launchConfig=""/>
 </jardesc>
