@@ -237,7 +237,16 @@ MLabPlugin
 						
 							});
 						
-						final Tcpbw100 test = Tcpbw100.mainSupport( new String[]{ "ndt.iupui.donar.measurement-lab.org" });
+						// String host = "ndt.iupui.donar.measurement-lab.org";
+						
+						// on 2014/01/14 (or maybe before) things stopped working with the above. Found server below
+						// still running 3.6.4. Unfortunately when I tested the latest client code against servers
+						// allegedly running compatible server code it didn't work... ;(
+						
+						
+						String host = "jlab4.jlab.org";
+						
+						final Tcpbw100 test = Tcpbw100.mainSupport( new String[]{ host });
 						
 						run.addListener(
 							new ToolRunListener()
