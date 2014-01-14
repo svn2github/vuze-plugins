@@ -1304,7 +1304,15 @@ XMWebUIPlugin
 
 		if ( method.equals( "session-set" )){
 
-			method_Session_Set(args, result);
+			try{
+				method_Session_Set(args, result);
+				
+			}finally{
+				
+					// assume something important was changed and persist it now 
+				
+				COConfigurationManager.save();
+			}
 
 		} else if ( method.equals( "session-get" ) ){
 
