@@ -21,8 +21,10 @@
 
 package com.vuze.plugins.mlab;
 
+import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.URL;
 import java.util.*;
 
 import org.gudy.azureus2.core3.util.AESemaphore;
@@ -30,6 +32,7 @@ import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.DisplayFormatters;
+import org.gudy.azureus2.core3.util.FileUtil;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.ipc.IPCException;
 import org.gudy.azureus2.plugins.ipc.IPCInterface;
@@ -44,6 +47,7 @@ import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.gudy.azureus2.ui.swt.Utils;
 
+import com.aelitis.azureus.util.JSONUtils;
 import com.vuze.plugins.mlab.tools.ndt.Tcpbw100;
 import com.vuze.plugins.mlab.tools.ndt.swingemu.Tcpbw100UIWrapper;
 import com.vuze.plugins.mlab.tools.ndt.swingemu.Tcpbw100UIWrapperListener;
@@ -238,15 +242,47 @@ MLabPlugin
 							});
 						
 						// String host = "ndt.iupui.donar.measurement-lab.org";
-						
+						// String host = "jlab4.jlab.org";
+
 						// on 2014/01/14 (or maybe before) things stopped working with the above. Found server below
 						// still running 3.6.4. Unfortunately when I tested the latest client code against servers
 						// allegedly running compatible server code it didn't work... ;(
 						
+						// reply on mailing list to above issue:
 						
-						String host = "jlab4.jlab.org";
+						// The first is to switch to our new name server, ns.measurementlab.net. For example: http://ns.measurementlab.net/ndt will return a JSON string with the closest NDT server. Example integration can be found on www.measurementlab.net/p/ndt.html
+						// The other option, discouraged, is to continue using donar which should still be resolving. It just uses ns.measurementlab.net on the backend now. However, this is currently down according to my tests, so we'll work on getting this back as soon as possible.
 						
-						final Tcpbw100 test = Tcpbw100.mainSupport( new String[]{ host });
+						String server_host = null;
+						
+						try{
+						
+							InputStream is = plugin_interface.getUtilities().getResourceDownloaderFactory().create( new URL( "http://ns.measurementlab.net/ndt?format=json" )).download();
+							
+							Map map = JSONUtils.decodeJSON( FileUtil.readInputStreamAsString( is, 32*1024, "UTF-8" ));
+							
+							URL url = new URL((String)map.get( "url" ));
+							
+							server_host = url.getHost();
+							
+							logger.log( "Selected server: " + server_host );
+							
+						}catch( Throwable e ){
+							
+							Debug.out( "Failed to get server", e );
+						}
+						
+						
+						if ( server_host == null ){
+						
+								// fallback to old, discouraged approach
+							
+							server_host = "ndt.iupui.donar.measurement-lab.org";
+							
+							logger.log( "Failed to select server, falling back to donar method" );
+						}
+						
+						final Tcpbw100 test = Tcpbw100.mainSupport( new String[]{ server_host });
 						
 						run.addListener(
 							new ToolRunListener()
