@@ -866,6 +866,13 @@ TorBrowserPlugin
 				}
 			}
 			
+			boolean	new_launch;
+			
+			synchronized( browser_instances ){
+			
+				new_launch = browser_instances.size() == 0;
+			}
+
 			List<String>	cmd_list = new ArrayList<String>();
 		
 			String	browser_root = root.getAbsolutePath();
@@ -881,13 +888,29 @@ TorBrowserPlugin
 				cmd_list.add( browser_root + slash + "Data" + slash + "Browser" + slash + "profile.default" + slash );
 				
 			}else if ( Constants.isOSX ){
-				
-				cmd_list.add( browser_root + slash + "TorBrowser.app" + slash + "Contents" + slash + "MacOS" + slash + "firefox" );
-				
-				cmd_list.add( "-profile" );
-				
-				cmd_list.add( browser_root + slash + "Data" + slash + "Browser" + slash + "profile.default" );
-	
+								
+				if ( new_launch ){
+										
+					cmd_list.add( browser_root + slash + "TorBrowser.app" + slash + "Contents" + slash + "MacOS" + slash + "firefox" );
+					
+					cmd_list.add( "-profile" );
+					
+					cmd_list.add( browser_root + slash + "Data" + slash + "Browser" + slash + "profile.default" );
+					
+				}else{
+					
+					cmd_list.add( "open" );
+					
+					cmd_list.add( "-a" );
+					
+					cmd_list.add( browser_root + slash + "TorBrowser.app" );
+					
+					cmd_list.add( "--args" );
+					
+					cmd_list.add( "-profile" );
+					
+					cmd_list.add( browser_root + slash + "Data" + slash + "Browser" + slash + "profile.default" );
+				}
 			}else{
 				
 				throw( new Exception( "Unsupported OS" ));
@@ -902,7 +925,14 @@ TorBrowserPlugin
 					cmd_list.add( "-new-window"  );
 				}
 		
-				cmd_list.add( "\"" + url + "\"" );
+				if ( Constants.isWindows ){
+				
+					cmd_list.add( "\"" + url + "\"" );
+					
+				}else{
+					
+					cmd_list.add( url );
+				}
 			}
 			
 			ProcessBuilder pb = GeneralUtils.createProcessBuilder( root, cmd_list.toArray(new String[cmd_list.size()]), null );
@@ -914,8 +944,17 @@ TorBrowserPlugin
 					browser_root + slash + "TorBrowser.app" + slash + "Contents" + slash + "MacOS" );
 			}
 					
-			new BrowserInstance( pb );	
+			BrowserInstance browser = new BrowserInstance( pb );	
 			
+			if ( Constants.isOSX && new_launch ){
+			
+				int	proc_id = browser.getProcessID();
+				
+				if ( proc_id > 0 ){
+				
+					Runtime.getRuntime().exec( new String[]{ "osascript", "-e", "tell application \"System Events\" to set frontmost of process \"" + browser.process_id + "\" to true\n" });
+				}
+			}
 		}finally{
 			
 			if ( run_when_done != null ){
@@ -1389,6 +1428,12 @@ TorBrowserPlugin
 				
 				destroy();
 			}
+		}
+		
+		private int
+		getProcessID()
+		{
+			return( process_id );
 		}
 		
 		private void
