@@ -952,7 +952,7 @@ TorBrowserPlugin
 				
 				if ( proc_id > 0 ){
 				
-					Runtime.getRuntime().exec( new String[]{ "osascript", "-e", "tell application \"System Events\" to set frontmost of process \"" + browser.process_id + "\" to true\n" });
+					Runtime.getRuntime().exec( new String[]{ findCommand( "osascript" ), "-e", "tell application \"System Events\" to set frontmost of process \"" + browser.process_id + "\" to true\n" });
 				}
 			}
 		}finally{
@@ -1127,7 +1127,20 @@ TorBrowserPlugin
 	}
 	
 	private Set<Integer>
-	getProcesses(
+	getProcesses()
+	{
+		if ( Constants.isWindows ){
+			
+			return( getWindowsProcesses( "firefox.exe" ));
+			
+		}else{
+			
+			return( getOSXProcesses( "TorBrowser.app" ));
+		}
+	}
+	
+	private Set<Integer>
+	getWindowsProcesses(
 		String	exe )
 	{
 		Set<Integer>	result = new HashSet<Integer>();
@@ -1155,11 +1168,17 @@ TorBrowserPlugin
 						if ( bits.length >= 2 ){
 							
 							String	exe_name 	= bits[0].trim();
-							int		pid 		= Integer.parseInt( bits[1].trim());
 							
 							if ( exe_name.equals( exe )){
 								
-								result.add( pid );
+								try{
+									int		pid 		= Integer.parseInt( bits[1].trim());
+								
+									result.add( pid );
+									
+								}catch( Throwable e ){
+									
+								}
 							}
 						}
 					}
@@ -1171,6 +1190,57 @@ TorBrowserPlugin
 		}catch( Throwable e ){
 			
 			logDebug( "Failed to list tasks: " + Debug.getNestedExceptionMessage( e ));
+		}
+		
+		return( result );
+	}
+	
+	private Set<Integer>
+	getOSXProcesses(
+		String	cmd  )
+	{
+		Set<Integer>	result = new HashSet<Integer>();
+		
+		try{
+			
+			Process p = Runtime.getRuntime().exec( new String[]{ findCommand( "bash" ), "-c", "ps ax" });
+			
+			try{
+				LineNumberReader lnr = new LineNumberReader( new InputStreamReader( p.getInputStream(), "UTF-8" ));
+				
+				while( true ){
+					
+					String line = lnr.readLine();
+					
+					if ( line == null ){
+						
+						break;
+					}
+					
+					if ( line.contains( cmd )){
+						
+						String[] bits = line.split( "\\s+" );
+						
+						if ( bits.length >= 1 ){
+							
+							try{
+								int		pid 		= Integer.parseInt( bits[0].trim());
+																
+								result.add( pid );
+								
+							}catch( Throwable e ){
+								
+							}
+						}
+					}
+				}					
+			}finally{
+				
+				p.destroy();
+			}
+		}catch( Throwable e ){
+			
+			logDebug( "Failed to list processes: " + Debug.getNestedExceptionMessage( e ));
 		}
 		
 		return( result );
@@ -1247,31 +1317,40 @@ TorBrowserPlugin
 		
 			throws IOException
 		{		
-			if ( Constants.isWindows ){
 				
-					// process.destroy doesn't work on Windows :( - rumour is it sends a SIG_TERM which is ignored
+				// process.destroy doesn't work on Windows :( - rumour is it sends a SIG_TERM which is ignored
 				
-				Set<Integer>	pre_procs = getProcesses( "firefox.exe" );
+			Set<Integer>	pre_procs = getProcesses();
 			
-				process = pb.start();
+			process = pb.start();	
 				
-				Set<Integer>	post_procs = getProcesses( "firefox.exe" );
+			long	now = SystemTime.getMonotonousTime();
+			
+			while( SystemTime.getMonotonousTime() - now < 5*1000 ){
+				
+				Set<Integer>	post_procs = getProcesses();
 				
 				for ( Integer s: pre_procs ){
-					
+						
 					post_procs.remove( s );
 				}
-				
-				if ( post_procs.size() == 1 ){
 					
+				if ( post_procs.size() > 0 ){
+						
 					process_id = post_procs.iterator().next();
-				}
-			}else{
+					
+					break;
+				}	
 				
-				process = pb.start();
+				try{
+					Thread.sleep(1000);
+					
+				}catch( Throwable e ){
+					
+					break;
+				}
 			}
-					
-					
+			
 			try{
 				int	num_proc;
 				
