@@ -879,6 +879,8 @@ TorBrowserPlugin
 			
 			String slash = File.separator;
 			
+			boolean is_osx_open = false;
+			
 			if ( Constants.isWindows ){
 		
 				cmd_list.add( browser_root + slash + "Browser" + slash + "firefox.exe" );
@@ -899,17 +901,14 @@ TorBrowserPlugin
 					
 				}else{
 					
+					is_osx_open = true;
+					
 					cmd_list.add( "open" );
 					
 					cmd_list.add( "-a" );
 					
 					cmd_list.add( browser_root + slash + "TorBrowser.app" );
 					
-					cmd_list.add( "--args" );
-					
-					cmd_list.add( "-profile" );
-					
-					cmd_list.add( browser_root + slash + "Data" + slash + "Browser" + slash + "profile.default" );
 				}
 			}else{
 				
@@ -935,6 +934,15 @@ TorBrowserPlugin
 				}
 			}
 			
+			if ( is_osx_open ){
+				
+				cmd_list.add( "--args" );
+				
+				cmd_list.add( "-profile" );
+				
+				cmd_list.add( browser_root + slash + "Data" + slash + "Browser" + slash + "profile.default" );
+			}
+			
 			ProcessBuilder pb = GeneralUtils.createProcessBuilder( root, cmd_list.toArray(new String[cmd_list.size()]), null );
 			
 			if ( Constants.isOSX ){
@@ -951,8 +959,18 @@ TorBrowserPlugin
 				int	proc_id = browser.getProcessID();
 				
 				if ( proc_id > 0 ){
-				
-					Runtime.getRuntime().exec( new String[]{ findCommand( "osascript" ), "-e", "tell application \"System Events\" to set frontmost of process \"" + browser.process_id + "\" to true\n" });
+					
+					String NL = "\n";
+					
+					String script =
+						"tell application \"System Events\"" + NL +
+						"  set theprocs to every process whose unix id is " + proc_id + NL +
+						"  repeat with proc in theprocs" + NL +
+						"     set the frontmost of proc to true" + NL +
+						"  end repeat" + NL +
+						"end tell" + NL;
+					
+					Runtime.getRuntime().exec( new String[]{ findCommand( "osascript" ), "-e", script });
 				}
 			}
 		}finally{
@@ -1221,16 +1239,25 @@ TorBrowserPlugin
 						
 						String[] bits = line.split( "\\s+" );
 						
-						if ( bits.length >= 1 ){
+						for ( int i=0;i<bits.length;i++ ){
+							
+							String bit = bits[i].trim();
+							
+							if ( bit.length() == 0 ){
+								
+								continue;
+							}
 							
 							try{
-								int		pid 		= Integer.parseInt( bits[0].trim());
+								int		pid 		= Integer.parseInt( bit );
 																
 								result.add( pid );
 								
 							}catch( Throwable e ){
 								
 							}
+							
+							break;
 						}
 					}
 				}					
