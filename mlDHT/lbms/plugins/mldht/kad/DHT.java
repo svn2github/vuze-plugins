@@ -104,7 +104,7 @@ public class DHT implements DHTBase {
 			public void log (String message) {
 				System.out.println(message);
 			};
-			public void log (Exception e) {
+			public void log (Throwable e) {
 				e.printStackTrace();
 			}
 		};
@@ -549,11 +549,15 @@ public class DHT implements DHTBase {
 		
 		scheduledActions.add(scheduler.scheduleAtFixedRate(new Runnable() {
 			public void run() {
-				// maintenance that should run all the time, before the first queries
-				tman.removeFinishedTasks(DHT.this);
-
-				if (running && hasStatsListeners())
-					onStatsUpdate();
+				try{
+					// maintenance that should run all the time, before the first queries
+					tman.removeFinishedTasks(DHT.this);
+	
+					if (running && hasStatsListeners())
+						onStatsUpdate();
+				}catch( Throwable e ){
+					log(e, LogLevel.Fatal);
+				}
 			}	
 		}, 5000, DHTConstants.DHT_UPDATE_INTERVAL, TimeUnit.MILLISECONDS));
 
@@ -629,6 +633,10 @@ public class DHT implements DHTBase {
 	 * @see lbms.plugins.mldht.kad.DHTBase#started()
 	 */
 	public void started () {
+		if ( stopped ){
+			return;
+		}
+		
 		bootstrapping = false;
 		bootstrap();
 		
@@ -645,7 +653,7 @@ public class DHT implements DHTBase {
 			public void run () {
 				try {
 					update();
-				} catch (RuntimeException e) {
+				} catch (Throwable e) {
 					log(e, LogLevel.Fatal);
 				}
 			}
@@ -660,7 +668,7 @@ public class DHT implements DHTBase {
 
 					db.expire(now);
 					cache.cleanup(now);					
-				} catch (Exception e)
+				} catch (Throwable e)
 				{
 					log(e, LogLevel.Fatal);
 				}
@@ -673,14 +681,14 @@ public class DHT implements DHTBase {
 				try {
 					for(RPCServer srv : servers)
 						findNode(Key.createRandomKey(), false, false, true, srv).setInfo("Random Refresh Lookup");
-				} catch (RuntimeException e) {
+				} catch (Throwable e) {
 					log(e, LogLevel.Fatal);
 				}
 				
 				try {
 					if(!node.isInSurvivalMode())
 						node.saveTable(table_file,false);
-				} catch (IOException e) {
+				} catch (Throwable e) {
 					e.printStackTrace();
 				}
 			}
@@ -1162,7 +1170,7 @@ public class DHT implements DHTBase {
 		}
 	}
 
-	public static void log (Exception e, LogLevel level) {
+	public static void log (Throwable e, LogLevel level) {
 		if (level.compareTo(logLevel) < 1) { // <=
 			logger.log(e);
 		}

@@ -21,6 +21,7 @@ import java.net.InetSocketAddress;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.LightHashMap;
 
 import lbms.plugins.mldht.DHTConfiguration;
@@ -613,6 +614,11 @@ public class Node {
 					+ "min old. Reusing old id = " + oldID.equals(getRootID()));
 
 			return;
+		}catch( Throwable e ){
+				// in case table is corrupted in some way
+			
+			DHT.logError( "Failed to load from cache: " + Debug.getNestedExceptionMessage(e));
+			
 		} finally {
 			if (!runDeferred && runWhenLoaded != null) {
 				runWhenLoaded.run();

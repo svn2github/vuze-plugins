@@ -138,62 +138,65 @@ public class RPCServer implements Runnable, RPCServerBase {
 	 * @see lbms.plugins.mldht.kad.RPCServerBase#run()
 	 */
 	public void run() {
-		
-		int delay = 1;
-		
-		byte[] buffer = new byte[DHTConstants.RECEIVE_BUFFER_SIZE];
-		
-		while (running)
-		{
-			DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+		try{
+			int delay = 1;
 			
-			try
+			byte[] buffer = new byte[DHTConstants.RECEIVE_BUFFER_SIZE];
+			
+			while (running)
 			{
-				if(sock.isClosed())
-				{ // don't try to receive on a closed socket, attempt to create a new one instead.
-					Thread.sleep(delay * 100);
-					if(delay < 256)
-						delay <<= 1;
-					if(createSocket())
-						continue;
-					else
-						break;
-				}
+				DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
 				
-				sock.receive(packet);
-			} catch (Exception e)
-			{
-				if (running)
+				try
 				{
-						// see occasional socket closed errors here, no idea why...
-					
-					if ( 	delay != 1 || 
-							e.getMessage() == null ||
-							!e.getMessage().toLowerCase().contains( "socket closed" )){
-					
-						DHT.log(e, LogLevel.Error);
+					if(sock.isClosed())
+					{ // don't try to receive on a closed socket, attempt to create a new one instead.
+						Thread.sleep(delay * 100);
+						if(delay < 256)
+							delay <<= 1;
+						if(createSocket())
+							continue;
+						else
+							break;
 					}
 					
-					sock.close();
+					sock.receive(packet);
+				} catch (Exception e)
+				{
+					if (running)
+					{
+							// see occasional socket closed errors here, no idea why...
+						
+						if ( 	delay != 1 || 
+								e.getMessage() == null ||
+								!e.getMessage().toLowerCase().contains( "socket closed" )){
+						
+							DHT.log(e, LogLevel.Error);
+						}
+						
+						sock.close();
+					}
+					continue;
 				}
-				continue;
+				
+				try
+				{
+					handlePacket(packet);
+					if(delay > 1)
+						delay--;
+				} catch (Exception e)
+				{
+					if (running)
+						DHT.log(e, LogLevel.Error);
+				}
+				
 			}
-			
-			try
-			{
-				handlePacket(packet);
-				if(delay > 1)
-					delay--;
-			} catch (Exception e)
-			{
-				if (running)
-					DHT.log(e, LogLevel.Error);
-			}
-			
+			// we fell out of the loop, make sure everything is cleaned up
+			destroy();
+			DHT.logInfo("Stopped RPC Server");
+		}catch( Throwable e ){
+			DHT.log(e, LogLevel.Fatal );
 		}
-		// we fell out of the loop, make sure everything is cleaned up
-		destroy();
-		DHT.logInfo("Stopped RPC Server");
 	}
 	
 	public Key getDerivedID() {

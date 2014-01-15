@@ -173,7 +173,7 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 			 * 
 			 * @see lbms.plugins.mldht.kad.DHTLogger#log(java.lang.Exception)
 			 */
-			public void log (Exception e) {
+			public void log (Throwable e) {
 				logChannel.log(e);
 			}
 		});
@@ -211,6 +211,7 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 							(org.gudy.azureus2.plugins.dht.mainline.MainlineDHTProvider) mlDHTProvider);
 		} catch (Throwable e) {
 
+			e.printStackTrace();
 		}
 
 		tracker = new Tracker(this);
@@ -439,7 +440,11 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 			//when getPublicAddress is called and the version server is offline
 			Thread t = new Thread(new Runnable() {
 				public void run () {
-					startDHT();
+					try{
+						startDHT();
+					}catch( Throwable e ){
+						e.printStackTrace();
+					}
 				}
 			});
 			t.setPriority(Thread.MIN_PRIORITY);
