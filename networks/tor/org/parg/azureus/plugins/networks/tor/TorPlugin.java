@@ -122,12 +122,14 @@ TorPlugin
 	private Set<String>				prompt_decisions 	= new HashSet<String>();
 	private String					last_decision_log	= "";
 	
-	private long					last_use_time;
+	private volatile long			last_use_time;
 	
 	private Map<Proxy,ProxyMapEntry>			proxy_map 				= new IdentityHashMap<Proxy, ProxyMapEntry>();
 	private Map<String,Object[]>				intermediate_host_map	= new HashMap<String, Object[]>();
 	
 	private Map<String,String>					domain_rewrite_map	= new HashMap<String, String>();
+	
+	private Map<String,TorPluginHTTPProxy>		http_proxy_map		= new HashMap<String, TorPluginHTTPProxy>();
 	
 	private AtomicLong	proxy_request_count		= new AtomicLong();
 	private AtomicLong	proxy_request_ok		= new AtomicLong();
@@ -135,6 +137,7 @@ TorPlugin
 	
 	private static final int MAX_HISTORY_RECORDS	= 4096;
 	
+	@SuppressWarnings( "serial" )
 	private Map<String,ProxyHistory>		proxy_history = 
 			new LinkedHashMap<String,ProxyHistory>(MAX_HISTORY_RECORDS,0.75f,true)
 			{
@@ -378,136 +381,193 @@ TorPlugin
 					}
 				});
 			
-			LabelParameter browser_info1 = config_model.addLabelParameter2( "aztorplugin.browser.info1" );
-			LabelParameter browser_info2 = config_model.addLabelParameter2( "aztorplugin.browser.info2" );
+			final ActionParameter test_http_proxy_param = config_model.addActionParameter2( "", "!Do It!" );
+
+			test_http_proxy_param.setLabelText( "Create HTTP Proxy" );
 			
-			browser_install_param = config_model.addActionParameter2( "aztorplugin.browser.install", "aztorplugin.browser.install.button" );
-			
-			browser_install_param.addListener(
-				new ParameterListener()
-				{
-					public void 
-					parameterChanged(
-						Parameter param ) 
+			test_http_proxy_param.addListener(
+					new ParameterListener()
 					{
-						browser_install_param.setEnabled( false );
+						private Proxy	current_proxy;
 						
-						new AEThread2( "installer" )
+						public void 
+						parameterChanged(
+							Parameter param ) 
 						{
-							public void
-							run()
+							test_http_proxy_param.setEnabled( false );
+							
+							new AEThread2( "launcher" )
 							{
-								boolean	ok = false;
-								
-								String	msg;
-								
-								try{
-									installBrowserPlugin();
-									
-									msg = loc_utils.getLocalisedMessageText( "aztorplugin.browser.install.ok.msg" );
-									
-									ok = true;
-									
-								}catch( Throwable e ){
-									
-									msg = loc_utils.getLocalisedMessageText( 
-												"aztorplugin.browser.install.fail.msg",
-												new String[]{ Debug.getNestedExceptionMessage( e )});
-									
-								}finally{
-									
-									if ( !checkBrowserPlugin()){
+								public void
+								run()
+								{
+									try{
+										if ( current_proxy == null ){
 										
-										if ( ok ){
+											current_proxy = createHTTPPseudoProxy( new URL( "https://client.vuze.com/" ), "parp" );
 										
-												// something weird happened
+											System.out.println( "Proxy: " + current_proxy );
 											
-											ok = false;
+											if ( current_proxy != null ){
+												
+												test_http_proxy_param.setLabelText( "Destroy HTTP Proxy" );
+											}
+										}else{
 											
-											msg = loc_utils.getLocalisedMessageText( 
+											destroyHTTPPseudoProxy( current_proxy );
+											
+											current_proxy = null;
+											
+											test_http_proxy_param.setLabelText( "Create HTTP Proxy" );
+											
+										}
+									}catch( Throwable e ){
+										
+										e.printStackTrace();
+										
+										
+										
+									}finally{
+										
+										test_http_proxy_param.setEnabled( true );
+									}
+								}
+							}.start();
+						}
+					});
+			
+			if ( Constants.isWindows || Constants.isOSX ){
+				
+				LabelParameter browser_info1 = config_model.addLabelParameter2( "aztorplugin.browser.info1" );
+				LabelParameter browser_info2 = config_model.addLabelParameter2( "aztorplugin.browser.info2" );
+				
+				browser_install_param = config_model.addActionParameter2( "aztorplugin.browser.install", "aztorplugin.browser.install.button" );
+				
+				browser_install_param.addListener(
+					new ParameterListener()
+					{
+						public void 
+						parameterChanged(
+							Parameter param ) 
+						{
+							browser_install_param.setEnabled( false );
+							
+							new AEThread2( "installer" )
+							{
+								public void
+								run()
+								{
+									boolean	ok = false;
+									
+									String	msg;
+									
+									try{
+										installBrowserPlugin();
+										
+										msg = loc_utils.getLocalisedMessageText( "aztorplugin.browser.install.ok.msg" );
+										
+										ok = true;
+										
+									}catch( Throwable e ){
+										
+										msg = loc_utils.getLocalisedMessageText( 
 													"aztorplugin.browser.install.fail.msg",
-													new String[]{ "Unexpected error, check logs" });
+													new String[]{ Debug.getNestedExceptionMessage( e )});
+										
+									}finally{
+										
+										if ( !checkBrowserPlugin()){
+											
+											if ( ok ){
+											
+													// something weird happened
+												
+												ok = false;
+												
+												msg = loc_utils.getLocalisedMessageText( 
+														"aztorplugin.browser.install.fail.msg",
+														new String[]{ "Unexpected error, check logs" });
+											}
 										}
 									}
-								}
-								
-								ui_manager.showMessageBox(
-									ok?"aztorplugin.browser.install.ok":"aztorplugin.browser.install.fail",
-									"!" + msg + "!",
-									UIManagerEvent.MT_OK );
-							}
-						}.start();
-					}
-				});
-			
-			
-			browser_launch_param = config_model.addActionParameter2( "aztorplugin.browser.launch", "aztorplugin.browser.launch.button" );
-			
-			browser_launch_param.addListener(
-				new ParameterListener()
-				{
-					public void 
-					parameterChanged(
-						Parameter param ) 
-					{
-						browser_launch_param.setEnabled( false );
-						
-						new AEThread2( "launcher" )
-						{
-							public void
-							run()
-							{
-								final AESemaphore sem = new AESemaphore( "launch:wait" );
-								
-								try{
-									PluginInterface pi = plugin_interface.getPluginManager().getPluginInterfaceByID( BROWSER_PLUGIN_ID );
-
-									if ( pi == null ){
-										
-										throw( new Exception( "Tor Browser plugin not found" ));
-									}
-									
-									pi.getIPC().invoke(
-										"launchURL",
-										new Object[]{ 
-											new URL( "https://check.torproject.org/" ), 
-											true,
-											new Runnable()
-											{
-												public void
-												run()
-												{
-													sem.release();
-												}
-											}
-										});
-									
-									sem.reserve();
-									
-								}catch( Throwable e ){
-									
-									e.printStackTrace();
-									
-									String msg = loc_utils.getLocalisedMessageText( 
-											"aztorplugin.browser.launch.fail.msg",
-											new String[]{ Debug.getNestedExceptionMessage(e)});
 									
 									ui_manager.showMessageBox(
-											"aztorplugin.browser.launch.fail",
-											"!" + msg + "!",
-											UIManagerEvent.MT_OK );
-									
-								}finally{
-									
-									browser_launch_param.setEnabled( true );
+										ok?"aztorplugin.browser.install.ok":"aztorplugin.browser.install.fail",
+										"!" + msg + "!",
+										UIManagerEvent.MT_OK );
 								}
-							}
-						}.start();
-					}
-				});
-			
-			config_model.createGroup( "aztorplugin.browser.options", new Parameter[]{ browser_info1, browser_info2, browser_install_param, browser_launch_param });
-
+							}.start();
+						}
+					});
+				
+				
+				browser_launch_param = config_model.addActionParameter2( "aztorplugin.browser.launch", "aztorplugin.browser.launch.button" );
+				
+				browser_launch_param.addListener(
+					new ParameterListener()
+					{
+						public void 
+						parameterChanged(
+							Parameter param ) 
+						{
+							browser_launch_param.setEnabled( false );
+							
+							new AEThread2( "launcher" )
+							{
+								public void
+								run()
+								{
+									final AESemaphore sem = new AESemaphore( "launch:wait" );
+									
+									try{
+										PluginInterface pi = plugin_interface.getPluginManager().getPluginInterfaceByID( BROWSER_PLUGIN_ID );
+	
+										if ( pi == null ){
+											
+											throw( new Exception( "Tor Browser plugin not found" ));
+										}
+										
+										pi.getIPC().invoke(
+											"launchURL",
+											new Object[]{ 
+												new URL( "https://check.torproject.org/" ), 
+												true,
+												new Runnable()
+												{
+													public void
+													run()
+													{
+														sem.release();
+													}
+												}
+											});
+										
+										sem.reserve();
+										
+									}catch( Throwable e ){
+										
+										e.printStackTrace();
+										
+										String msg = loc_utils.getLocalisedMessageText( 
+												"aztorplugin.browser.launch.fail.msg",
+												new String[]{ Debug.getNestedExceptionMessage(e)});
+										
+										ui_manager.showMessageBox(
+												"aztorplugin.browser.launch.fail",
+												"!" + msg + "!",
+												UIManagerEvent.MT_OK );
+										
+									}finally{
+										
+										browser_launch_param.setEnabled( true );
+									}
+								}
+							}.start();
+						}
+					});
+				
+				config_model.createGroup( "aztorplugin.browser.options", new Parameter[]{ browser_info1, browser_info2, browser_install_param, browser_launch_param });
+			}
 			
 			ParameterListener enabler_listener =
 				new ParameterListener()
@@ -597,7 +657,12 @@ TorPlugin
 						test_url_param.setEnabled( plugin_enabled );
 						test_param.setEnabled( plugin_enabled );
 						
-						checkBrowserPlugin();
+						if ( param != null ){
+						
+								// don't run this initially, it will be run on plugin init-complete
+							
+							checkBrowserPlugin();
+						}
 						
 						if ( param != null ){
 						
@@ -859,6 +924,11 @@ TorPlugin
 	private boolean
 	checkBrowserPlugin()
 	{
+		if ( browser_install_param == null ){
+			
+			return( false );
+		}
+		
 		boolean installed = isBrowserPluginInstalled();
 					
 		browser_install_param.setEnabled( plugin_enabled && !installed );
@@ -972,9 +1042,14 @@ TorPlugin
 				perform(
 					TimerEvent event ) 
 				{
-					if ( proxy_request_count.get() > 0 ){
+					if ( proxy_request_count.get() > 0 || http_proxy_map.size() > 0 ){
 						
 						String stats = "Requests=" + proxy_request_count.get() + ", ok=" + proxy_request_ok.get() + ", failed=" + proxy_request_failed.get();
+						
+						if ( http_proxy_map.size() > 0 ){
+							
+							stats += "; HTTP proxies=" +  http_proxy_map.size();
+						}
 						
 						if ( !stats.equals( last_stats )){
 							
@@ -984,7 +1059,7 @@ TorPlugin
 						}
 					}
 					
-					boolean	should_be_disconnected 	= true;
+					boolean	should_be_disconnected 	= false;
 					boolean	should_be_connected 	= false;
 					
 					synchronized( TorPlugin.this ){
@@ -995,23 +1070,22 @@ TorPlugin
 								
 								if ( stop_on_idle ){
 									
-									should_be_disconnected = SystemTime.getMonotonousTime() - last_use_time > STOP_ON_IDLE_TIME;
-										
-								}else{
-										// leave it in whatever state it is in
+									if ( http_proxy_map.size() == 0 ){
 									
-									should_be_disconnected = false; 
+										should_be_disconnected = SystemTime.getMonotonousTime() - last_use_time > STOP_ON_IDLE_TIME;
+									}
 								}
 							}else{
 									// should always be running
-							
-								should_be_disconnected = false;
-								
+															
 								if ( !isConnected()){
 								
 									should_be_connected = true;
 								}
 							}
+						}else{
+							
+							should_be_disconnected = true;
 						}
 						
 						if ( proxy_map.size() > 0 ){
@@ -1320,6 +1394,7 @@ TorPlugin
 			return( null );
 			
 		}else{
+			
 			sem.reserve( max_wait_millis );
 			
 			synchronized( this ){
@@ -1788,7 +1863,18 @@ TorPlugin
 		
 		return( host );
 	}
+	
+	private int
+	getActiveSocksPort()
+	{
+		if ( !external_tor ){
+			
+			getConnection( 30*1000, false );
+		}
 		
+		return( active_socks_port );
+	}
+	
 	private Object[]
 	getActiveProxy(
 		String		reason,
@@ -1953,7 +2039,14 @@ TorPlugin
 	{
 		ControlConnection con = getConnection( 5*1000, true );
 		
-		return( con != null && con.isConnected());
+		boolean active = con != null && con.isConnected();
+		
+		if ( active ){
+			
+			last_use_time	= SystemTime.getMonotonousTime();
+		}
+		
+		return( active );
 	}
 	
 	public void
@@ -2036,6 +2129,118 @@ TorPlugin
 		
 		return( null );
 	}
+	
+	public Proxy
+	createHTTPPseudoProxy(
+		URL			url,
+		String		reason )
+	
+		throws IPCException
+	{
+		if ( !plugin_enabled || unloaded ){
+			
+			return( null );
+		}
+		
+		String	host = url.getHost();
+				
+		if ( !isHostAccepted( reason, host )){
+			
+			return( null );
+		}
+		
+		String key = url.getProtocol() + ":" + host + ":" + url.getPort();
+		
+		TorPluginHTTPProxy	proxy;
+		
+		boolean				is_new = false;
+		
+		int	socks_port = getActiveSocksPort();
+		
+		synchronized( this ){
+			
+			proxy =  http_proxy_map.get( key );
+			
+			if ( proxy == null ){
+				
+				is_new = true;
+				
+				proxy = new TorPluginHTTPProxy( url, new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( "127.0.0.1", socks_port )));
+				
+				http_proxy_map.put( key, proxy );
+				
+			}else{
+				
+				proxy.incRefCount();
+			}
+		}
+		
+		if ( is_new ){
+			
+			final AESemaphore	sem = new AESemaphore( "start_wait" );
+			
+			final TorPluginHTTPProxy	f_proxy = proxy;
+			
+			final IPCException[] error = { null };
+			
+			new AEThread2( "proxystart" )
+			{
+				public void
+				run()
+				{
+					try{
+						f_proxy.start();
+						
+					}catch( Throwable e ){
+						
+						error[0] = new IPCException( "Failed to start proxy", e );
+						
+					}finally{
+						
+						sem.release();
+					}
+				}
+			}.start();
+			
+			sem.reserve( 5*1000 );
+			
+			if ( error[0] != null ){
+				
+				throw( error[0] );
+			}
+		}
+		
+		return( new Proxy( Proxy.Type.HTTP, new InetSocketAddress( "127.0.0.1", proxy.getPort())));
+	}
+	
+	public void
+	destroyHTTPPseudoProxy(
+		Proxy		proxy )
+	{
+		synchronized( this ){
+
+			Iterator<TorPluginHTTPProxy> it =  http_proxy_map.values().iterator();
+			
+			while( it.hasNext()){
+				
+				TorPluginHTTPProxy http_proxy = it.next();
+				
+				if ( http_proxy.getPort() == ((InetSocketAddress)proxy.address()).getPort()){
+					
+					if ( http_proxy.decRefCount() == 0 ){
+					
+						it.remove();
+						
+						http_proxy.destroy();
+					}
+					
+					break;
+				}
+			}
+		}
+	}
+	
+		// end IPC
 	
 	public PluginInterface
 	getPluginInterface()
@@ -2203,7 +2408,7 @@ TorPlugin
 										run()
 										{
 											try{
-												String info = getInfo();
+												getInfo();
 												
 												//System.out.println( info );
 												
