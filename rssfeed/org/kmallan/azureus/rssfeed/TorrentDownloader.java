@@ -140,24 +140,38 @@ public class TorrentDownloader {
 							
 							if ( CategoryManager.getCategory( category_or_tag_name ) == null ){
 							
+								category_or_tag_name = category_or_tag_name.replace( ';', ',' );
+								
+								String[] tags = category_or_tag_name.split( "," );
+								
 								TagType tt = TagManagerFactory.getTagManager().getTagType( TagType.TT_DOWNLOAD_MANUAL );
-								
-								Tag tag = tt.getTag( category_or_tag_name, true );
-								
-								if ( tag == null ){
-									
-									try{
-										tag = tt.createTag( category_or_tag_name, true );
-										
-									}catch( Throwable e ){
-										
-										Debug.out( e );
-									}
-								}
 
-								if ( tag != null ){
+								for ( String tag_name: tags ){
 									
-									tag.addTaggable( PluginCoreUtils.unwrap( download ));
+									tag_name = tag_name.trim();
+											
+									if ( tag_name.length() == 0 ){
+										
+										continue;
+									}
+																	
+									Tag tag = tt.getTag( tag_name, true );
+									
+									if ( tag == null ){
+										
+										try{
+											tag = tt.createTag( tag_name, true );
+											
+										}catch( Throwable e ){
+											
+											Debug.out( e );
+										}
+									}
+	
+									if ( tag != null ){
+										
+										tag.addTaggable( PluginCoreUtils.unwrap( download ));
+									}
 								}
 							}
 						}
@@ -200,11 +214,14 @@ public class TorrentDownloader {
 										download.setMaximumDownloadKBPerSecond(filterBean.getRateDownload());
 									}
 									
+										// don't need to handle tags here as they are handled above in the 
+										// will-be-added listener
+									
 									String category_or_tag_name = filterBean.getCategory();
 									if (category_or_tag_name.length() > 0){
 										if ( CategoryManager.getCategory( category_or_tag_name ) != null ){
 										
-											download.setCategory(filterBean.getCategory());
+											download.setCategory( category_or_tag_name );
 										}
 									}
 								} catch (NoSuchMethodError e) {
