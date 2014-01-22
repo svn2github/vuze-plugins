@@ -39,6 +39,10 @@ import java.nio.channels.SocketChannel;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import javax.net.ssl.HandshakeCompletedEvent;
+import javax.net.ssl.HandshakeCompletedListener;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 
 import org.gudy.azureus2.core3.tracker.protocol.PRHelpers;
 import org.gudy.azureus2.core3.util.*;
@@ -158,6 +162,8 @@ TorPlugin
 	{
 		try{
 			plugin_interface	= pi;
+			
+			setUnloadable( true );
 			
 			final LocaleUtilities loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
 			
@@ -404,7 +410,7 @@ TorPlugin
 									try{
 										if ( current_proxy == null ){
 										
-											current_proxy = createHTTPPseudoProxy( new URL( "https://client.vuze.com/" ), "parp" );
+											current_proxy = createHTTPPseudoProxy( "test proxy", new URL( "https://client.vuze.com/" ));
 										
 											System.out.println( "Proxy: " + current_proxy );
 											
@@ -913,6 +919,18 @@ TorPlugin
 		}
 	}
 
+	private void
+	setUnloadable(
+		boolean	b )
+	{
+		PluginInterface pi = plugin_interface;
+		
+		if ( pi != null ){
+			
+			pi.getPluginProperties().put( "plugin.unload.disabled", String.valueOf( !b ));
+		}
+	}
+	
 	private boolean
 	isBrowserPluginInstalled()
 	{
@@ -1046,9 +1064,21 @@ TorPlugin
 						
 						String stats = "Requests=" + proxy_request_count.get() + ", ok=" + proxy_request_ok.get() + ", failed=" + proxy_request_failed.get();
 						
-						if ( http_proxy_map.size() > 0 ){
+						List<TorPluginHTTPProxy>	proxies;
+						
+						synchronized( TorPlugin.this ){
 							
-							stats += "; HTTP proxies=" +  http_proxy_map.size();
+							proxies = new ArrayList<TorPluginHTTPProxy>( http_proxy_map.values());
+						}
+						
+						if ( proxies.size() > 0 ){
+							
+							stats += "; HTTP proxies=" +  proxies.size();
+							
+							for ( TorPluginHTTPProxy proxy: proxies ){
+								
+								stats += " {" + proxy.getString() + "}";
+							}
 						}
 						
 						if ( !stats.equals( last_stats )){
@@ -1687,6 +1717,10 @@ TorPlugin
 		
 		final boolean[] result = { false };
 		
+		final Thread calling_thread = Thread.currentThread();
+		
+		final boolean[] bad_thread = { false };
+		
 		prompt_dispatcher.dispatch(
 			new AERunnable() 
 			{
@@ -1696,7 +1730,7 @@ TorPlugin
 					try{
 						boolean	wait_for_ui = false;
 						
-						synchronized( this ){
+						synchronized( TorPlugin.this ){
 							
 							if ( unloaded ){
 								
@@ -1724,6 +1758,13 @@ TorPlugin
 							}
 						}
 						
+						if ( plugin_ui.isUIThread( calling_thread )){
+							
+							bad_thread[0] = true;
+							
+							return;
+						}
+
 						int recheck_decision = getPromptDecision( host );
 						
 						if ( recheck_decision == 0 ){
@@ -1739,7 +1780,7 @@ TorPlugin
 								
 								prepareConnection( "About to prompt" );
 							}
-							
+														
 							PromptResponse response = plugin_ui.promptForHost( reason, host );
 							
 							boolean	accepted = response.getAccepted();
@@ -1761,7 +1802,12 @@ TorPlugin
 			});
 		
 		sem.reserve( 60*1000 );
-						
+			
+		if ( bad_thread[0] ){
+			
+			Debug.out( "Invocation on UI thread not supported" );
+		}
+		
 		return( result[0] );
 	}
 	
@@ -2130,11 +2176,132 @@ TorPlugin
 		return( null );
 	}
 	
+	public Boolean
+	testHTTPPseudoProxy(
+		URL			url )
+	{
+		final int TIMEOUT = 30*1000;
+		
+		String 	host 	= url.getHost();
+		int		port	= 443;
+		
+		try{
+			String[]	host_bits = host.split( "\\." );
+			
+			final String host_match = "." + host_bits[host_bits.length-2] + "." + host_bits[host_bits.length-1];
+			
+			SSLSocketFactory factory = (SSLSocketFactory)SSLSocketFactory.getDefault();
+	
+			final SSLSocket socket = (SSLSocket)factory.createSocket();
+			
+			final boolean[] result = { false };
+			
+			final AESemaphore sem = new AESemaphore( "ssl:wait" );
+			
+			try{
+				socket.addHandshakeCompletedListener(
+					new HandshakeCompletedListener() 
+					{	
+						public void 
+						handshakeCompleted(
+							HandshakeCompletedEvent event ) 
+						{
+							try{
+								java.security.cert.Certificate[] serverCerts = socket.getSession().getPeerCertificates();
+								
+								if ( serverCerts.length == 0 ){
+													
+									// no certs :(
+									
+								}else{
+								
+									java.security.cert.Certificate	cert = serverCerts[0];
+												
+									java.security.cert.X509Certificate x509_cert;
+									
+									if ( cert instanceof java.security.cert.X509Certificate ){
+										
+										x509_cert = (java.security.cert.X509Certificate)cert;
+										
+									}else{
+										
+										java.security.cert.CertificateFactory cf = java.security.cert.CertificateFactory.getInstance("X.509");
+										
+										x509_cert = (java.security.cert.X509Certificate)cf.generateCertificate(new ByteArrayInputStream(cert.getEncoded()));
+									}
+									
+									Collection<List<?>> alt_names = x509_cert.getSubjectAlternativeNames();
+									
+									for ( List<?> alt_name: alt_names ){
+										
+										int	type = ((Number)alt_name.get(0)).intValue();
+										
+										if ( type == 2 ){		// DNS name
+											
+											String	dns_name = (String)alt_name.get(1);
+											
+											if ( dns_name.endsWith( host_match )){
+												
+												result[0] = true;
+												
+												break;
+											}
+										}
+									}
+								}
+							}catch( Throwable e ){
+								
+								e.printStackTrace();
+								
+							}finally{
+								
+								sem.releaseForever();
+							}
+						}
+					});
+		
+				long	start = SystemTime.getMonotonousTime();
+				
+				socket.setSoTimeout( TIMEOUT );
+				
+				socket.connect( new InetSocketAddress( host, port  ), TIMEOUT );
+			
+				OutputStream os = socket.getOutputStream();
+				
+				os.write( "HEAD / HTTP/1.1\r\n\r\n".getBytes());
+				
+				os.flush();
+				
+				long so_far = SystemTime.getMonotonousTime() - start;
+				
+				long rem = TIMEOUT - so_far;
+				
+				if ( rem > 0 ){
+				
+					sem.reserve( TIMEOUT );
+				}
+			}finally{
+				
+				try{
+					socket.close();
+					
+				}catch( Throwable e ){
+				}
+			}
+						
+			return( result[0] );
+			
+		}catch( Throwable e ){
+			
+			return( false );
+		}
+	}
+	
 	public Proxy
 	createHTTPPseudoProxy(
-		URL			url,
-		String		reason )
-	
+		String		reason,
+		URL			url )
+
 		throws IPCException
 	{
 		if ( !plugin_enabled || unloaded ){
@@ -2148,6 +2315,8 @@ TorPlugin
 			
 			return( null );
 		}
+		
+		last_use_time	= SystemTime.getMonotonousTime();
 		
 		String key = url.getProtocol() + ":" + host + ":" + url.getPort();
 		
@@ -2173,6 +2342,8 @@ TorPlugin
 				
 				proxy.incRefCount();
 			}
+			
+			setUnloadable( false );
 		}
 		
 		if ( is_new ){
@@ -2190,6 +2361,8 @@ TorPlugin
 				{
 					try{
 						f_proxy.start();
+						
+						log( "Created proxy: " + f_proxy.getString());
 						
 					}catch( Throwable e ){
 						
@@ -2217,6 +2390,8 @@ TorPlugin
 	destroyHTTPPseudoProxy(
 		Proxy		proxy )
 	{
+		last_use_time	= SystemTime.getMonotonousTime();
+		
 		synchronized( this ){
 
 			Iterator<TorPluginHTTPProxy> it =  http_proxy_map.values().iterator();
@@ -2236,6 +2411,11 @@ TorPlugin
 					
 					break;
 				}
+			}
+			
+			if ( http_proxy_map.size() == 0 ){
+			
+				setUnloadable( true );
 			}
 		}
 	}

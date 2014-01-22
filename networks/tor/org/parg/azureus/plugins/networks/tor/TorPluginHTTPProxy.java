@@ -49,8 +49,8 @@ TorPluginHTTPProxy
 	public static final int	CONNECT_TIMEOUT		= 30*1000;
 	public static final int READ_TIMEOUT		= 30*1000;
 
-	private TorPluginHTTPProxy		parent;
-	private Map						children	= new HashMap();
+	private TorPluginHTTPProxy					parent;
+	private Map<String,TorPluginHTTPProxy>		children	= new HashMap<String, TorPluginHTTPProxy>();
 	
 	private URL						delegate_to;
 	private String					delegate_to_host;
@@ -65,11 +65,13 @@ TorPluginHTTPProxy
 	
 	private boolean			http_only_detected;
 	
-	private Map				cookie_names_set	= new HashMap();
+	private Map<String,String>				cookie_names_set	= new HashMap<String,String>();
 	
 	private ThreadPool		thread_pool = new ThreadPool("HTTPPseudoProxy", MAX_PROCESSORS, true );
 	
-	private List			processors = new ArrayList();
+	private AtomicInteger	request_count	= new AtomicInteger();
+	
+	private List<Processor>			processors = new ArrayList<Processor>();
 	
 	private AtomicInteger	ref_count = new AtomicInteger(1);
 	
@@ -150,7 +152,7 @@ TorPluginHTTPProxy
         							}
         						}else{
         							
-        							processor proc = new processor( socket );
+        							Processor proc = new Processor( socket );
         							
         							processors.add( proc );
         							
@@ -235,7 +237,7 @@ TorPluginHTTPProxy
 					throw( new Exception( "Destroyed" ));
 				}
 				
-				TorPluginHTTPProxy child = (TorPluginHTTPProxy)children.get( child_key );
+				TorPluginHTTPProxy child = children.get( child_key );
 				
 				if ( optional ){
 					
@@ -294,7 +296,7 @@ TorPluginHTTPProxy
 		
 				trace( "SetCookieName: " + name );
 				
-				String old_value = (String)cookie_names_set.put( name, value );
+				String old_value = cookie_names_set.put( name, value );
 				
 				new_entry = old_value==null || !old_value.equals( value );
 			}
@@ -327,8 +329,8 @@ TorPluginHTTPProxy
 	public void
 	destroy()
 	{
-		List	processors_to_destroy;
-		List	chidren_to_destroy;
+		List<Processor>				processors_to_destroy;
+		List<TorPluginHTTPProxy>	chidren_to_destroy;
 		
 		synchronized( this ){
 			
@@ -339,11 +341,11 @@ TorPluginHTTPProxy
 			
 			destroyed = true;
 				
-			chidren_to_destroy = new ArrayList( children.values());
+			chidren_to_destroy = new ArrayList<TorPluginHTTPProxy>( children.values());
 			
 			children.clear();
 			
-			processors_to_destroy = new ArrayList( processors );
+			processors_to_destroy = new ArrayList<Processor>( processors );
 			
 			processors.clear();
 			
@@ -357,7 +359,7 @@ TorPluginHTTPProxy
 		for (int i=0;i<chidren_to_destroy.size();i++){
 			
 			try{
-				((TorPluginHTTPProxy)chidren_to_destroy.get(i)).destroy();
+				chidren_to_destroy.get(i).destroy();
 				
 			}catch( Throwable e ){
 			}
@@ -366,15 +368,45 @@ TorPluginHTTPProxy
 		for (int i=0;i<processors_to_destroy.size();i++){
 			
 			try{
-				((processor)processors_to_destroy.get(i)).destroy();
+				processors_to_destroy.get(i).destroy();
 			
 			}catch( Throwable e ){
 			}
 		}
 	}
 	
+	private void
+	trace(
+		String		str )
+	{
+		if ( TRACE ){
+			
+			System.out.println( str );
+		}
+	}
+	
+	public String
+	getString()
+	{
+		String str = delegate_to_host + (delegate_is_https?" (https)":"") + ": reqs=" + request_count.get() + " [";
+		
+		String	kids = "";
+		
+		synchronized( this ){
+			
+			for ( TorPluginHTTPProxy child: children.values()){
+				
+				kids += (kids.length()==0?"":", " ) + child.getString();
+			}
+		}
+		
+		str += kids + "]";
+		
+		return( str );
+	}
+	
 	private class
-	processor
+	Processor
 	{
 		private static final String	NL = "\r\n";
 		
@@ -384,7 +416,7 @@ TorPluginHTTPProxy
 		private volatile boolean	destroyed;
 		
 		private
-		processor(
+		Processor(
 			Socket		_socket )
 		{
 			socket_in	= _socket;
@@ -406,7 +438,7 @@ TorPluginHTTPProxy
 													
 							synchronized( TorPluginHTTPProxy.this ){
 
-								processors.remove( processor.this );
+								processors.remove( Processor.this );
 							}
 						}
 					}
@@ -416,6 +448,8 @@ TorPluginHTTPProxy
 		private void
 		process()
 		{
+			request_count.incrementAndGet();
+			
 			try{
 				InputStream is = socket_in.getInputStream();
 				
@@ -580,7 +614,7 @@ TorPluginHTTPProxy
 
 			trace( "Page request for " + target_url );
 			
-			List	cookies_to_remove = new ArrayList();
+			List<String>	cookies_to_remove = new ArrayList<String>();
 
 			for (int i=0;i<request_lines.length;i++){
 				
@@ -1436,16 +1470,6 @@ TorPluginHTTPProxy
 				
 			}catch( Throwable e ){
 			}
-		}
-	}
-	
-	private void
-	trace(
-		String		str )
-	{
-		if ( TRACE ){
-			
-			System.out.println( str );
 		}
 	}
 	

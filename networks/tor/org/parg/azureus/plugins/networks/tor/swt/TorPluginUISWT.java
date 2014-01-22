@@ -42,6 +42,7 @@ import org.eclipse.swt.widgets.Canvas;
 import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
+import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Listener;
@@ -70,6 +71,22 @@ TorPluginUISWT
 		TorPlugin	_plugin )
 	{
 		lu	= _plugin.getPluginInterface().getUtilities().getLocaleUtilities();
+	}
+	
+	public boolean
+	isUIThread(
+		Thread	thread )
+	{
+		Display display = Utils.getDisplay();
+		
+		if ( display == null ){
+			
+			Debug.out( "eh? display is null" );
+			
+			return( true );
+		}
+		
+		return( display.getThread() == thread );
 	}
 	
 	public PromptResponse

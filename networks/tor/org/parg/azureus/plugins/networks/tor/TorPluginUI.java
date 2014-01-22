@@ -24,6 +24,10 @@ package org.parg.azureus.plugins.networks.tor;
 public interface 
 TorPluginUI 
 {
+	public boolean
+	isUIThread(
+		Thread	thread );
+	
 	public PromptResponse
 	promptForHost(
 		String	reason,
