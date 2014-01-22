@@ -71,7 +71,7 @@ TorPluginHTTPProxy
 	
 	private AtomicInteger	request_count	= new AtomicInteger();
 	
-	private List<Processor>			processors = new ArrayList<Processor>();
+	private List<Processor>	processors = new ArrayList<Processor>();
 	
 	private AtomicInteger	ref_count = new AtomicInteger(1);
 	
@@ -98,6 +98,11 @@ TorPluginHTTPProxy
 		delegate_to_host	= delegate_to.getHost();
 		delegate_is_https	= delegate_to.getProtocol().toLowerCase().equals( "https" );
 		delegate_to_port	= delegate_to.getPort()==-1?delegate_to.getDefaultPort():delegate_to.getPort();
+		
+		if ( parent != null ){
+		
+			delegate_to_proxy	= parent.delegate_to_proxy;
+		}
 	}
 	
 	public int
@@ -388,7 +393,7 @@ TorPluginHTTPProxy
 	public String
 	getString()
 	{
-		String str = delegate_to_host + (delegate_is_https?" (https)":"") + ": reqs=" + request_count.get() + " [";
+		String str = delegate_to_host + (delegate_is_https?" (https)":"") + ": port=" + port + ", reqs=" + request_count.get() + " [";
 		
 		String	kids = "";
 		
@@ -476,6 +481,17 @@ TorPluginHTTPProxy
 			throws IOException
 		{
 			try{
+				InetSocketAddress delegate_address;
+				
+				if ( delegate_to_proxy == null ){
+					
+					delegate_address = new InetSocketAddress( delegate_to_host, delegate_to_port );
+					
+				}else{
+					
+					delegate_address = InetSocketAddress.createUnresolved( delegate_to_host, delegate_to_port );
+				}
+
 				if ( delegate_is_https ){
 					
 					TrustManager[] trustAllCerts = new TrustManager[]{
@@ -497,19 +513,19 @@ TorPluginHTTPProxy
 					sc.init(null, trustAllCerts, RandomUtils.SECURE_RANDOM );
 				
 					SSLSocketFactory factory = sc.getSocketFactory();
-
+					
 					try{
 						if ( delegate_to_proxy == null ){
 							
 							socket_out = factory.createSocket();
 							
-							socket_out.connect( new InetSocketAddress( delegate_to_host, delegate_to_port ), CONNECT_TIMEOUT );
+							socket_out.connect( delegate_address, CONNECT_TIMEOUT );
 							
 						}else{
 							
 							Socket plain_socket = new Socket( delegate_to_proxy );
 							
-							plain_socket.connect( new InetSocketAddress( delegate_to_host, delegate_to_port ), CONNECT_TIMEOUT );
+							plain_socket.connect( delegate_address, CONNECT_TIMEOUT );
 							
 							socket_out = factory.createSocket( plain_socket, delegate_to_host, delegate_to_port, true );
 						}
@@ -531,16 +547,17 @@ TorPluginHTTPProxy
 							
 							socket_out = factory.createSocket();
 							
-							socket_out.connect( new InetSocketAddress( delegate_to_host, delegate_to_port ), CONNECT_TIMEOUT );
+							socket_out.connect( delegate_address, CONNECT_TIMEOUT );
 							
 						}else{
 							
 							Socket plain_socket = new Socket( delegate_to_proxy );
 							
-							plain_socket.connect( new InetSocketAddress( delegate_to_host, delegate_to_port ), CONNECT_TIMEOUT );
+							plain_socket.connect( delegate_address, CONNECT_TIMEOUT );
 							
 							socket_out = factory.createSocket( plain_socket, delegate_to_host, delegate_to_port, true );
-						}					}
+						}					
+					}
 				}else{
 					
 					if ( delegate_to_proxy == null ){
@@ -552,7 +569,7 @@ TorPluginHTTPProxy
 						socket_out = new Socket( delegate_to_proxy );
 					}
 					
-					socket_out.connect( new InetSocketAddress( delegate_to_host, delegate_to_port ), CONNECT_TIMEOUT );
+					socket_out.connect( delegate_address, CONNECT_TIMEOUT );
 				}
 			}catch( Throwable e ){
 				
