@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="WINDOWS-1252" standalone="no"?>
+<jardesc>
+    <jar path="azcron/AzCron.jar"/>
+    <options buildIfNeeded="true" compress="true" descriptionLocation="/azcron/AzCron.jardesc" exportErrors="true" exportWarnings="true" includeDirectoryEntries="false" overwrite="false" saveDescription="true" storeRefactorings="false" useSourceFolders="false"/>
+    <storedRefactorings deprecationInfo="true" structuralOnly="false"/>
+    <selectedProjects/>
+    <manifest generateManifest="true" manifestLocation="" manifestVersion="1.0" reuseManifest="false" saveManifest="false" usesManifest="true">
+        <sealing sealJar="false">
+            <packagesToSeal/>
+            <packagesToUnSeal/>
+        </sealing>
+    </manifest>
+    <selectedElements exportClassFiles="true" exportJavaFiles="false" exportOutputFolder="false">
+        <javaElement handleIdentifier="=azcron/&lt;lbms.plugins.azcron.azureus.gui.editors"/>
+        <javaElement handleIdentifier="=azcron/&lt;lbms.plugins.azcron.main"/>
+        <file path="/azcron/plugin.properties"/>
+        <javaElement handleIdentifier="=azcron/&lt;lbms.plugins.azcron.actions"/>
+        <javaElement handleIdentifier="=azcron/&lt;lbms.plugins.azcron.azureus"/>
+        <javaElement handleIdentifier="=azcron/&lt;lbms.plugins.azcron.azureus.service"/>
+        <javaElement handleIdentifier="=azcron/&lt;lbms.plugins.azcron.azureus.actions"/>
+        <javaElement handleIdentifier="=azcron/&lt;lbms.plugins.azcron.main.resources"/>
+        <javaElement handleIdentifier="=azcron/&lt;lbms.plugins.azcron.service"/>
+        <javaElement handleIdentifier="=azcron/&lt;lbms.plugins.azcron.azureus.gui"/>
+        <javaElement handleIdentifier="=azcron/&lt;lbms.plugins.azcron.main.editors"/>
+    </selectedElements>
+</jardesc>
