@@ -521,7 +521,7 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
     // Options Folder - Filter Params - End Rates
     urlSetRates();
 
-    setupLabel(filtParamComp, "RSSFeed.Options.Filter.filtCategory", 120);
+    setupLabel(filtParamComp, "RSSFeed.Options.Filter.filtCategory", 130);
     (filtCategory = new Text(filtParamComp, SWT.BORDER)).setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
 
     setupLabel(filtParamComp, "RSSFeed.Options.Filter.filtFeed", 75);
