@@ -124,6 +124,8 @@ TorPlugin
 	private AESemaphore 			connection_sem;
 	private long					last_connect_time;
 	
+	private boolean					permissions_checked;
+	
 	private Set<String>				prompt_decisions 	= new HashSet<String>();
 	private String					last_decision_log	= "";
 	
@@ -1161,6 +1163,8 @@ TorPlugin
 		
 		File exe_file = new File( plugin_dir, Constants.isWindows?"AzureusTor.exe":"AzureusTor" );
 		
+		checkPermissions( exe_file );
+		
 		int	pid = getPID();
 		
 		try{
@@ -1440,6 +1444,75 @@ TorPlugin
 			synchronized( this ){
 	
 				return( current_connection );
+			}
+		}
+	}
+	
+	private String
+	findCommand(
+		String	name )
+	{
+		final String[]  locations = { "/bin", "/usr/bin" };
+
+		for ( String s: locations ){
+
+			File f = new File( s, name );
+
+			if ( f.exists() && f.canRead()){
+
+				return( f.getAbsolutePath());
+			}
+		}
+
+		return( name );
+	}
+	
+	private void
+	checkPermissions(
+		File		exe )
+	{
+		if ( Constants.isOSX ){
+
+			synchronized( this ){
+				
+				if ( permissions_checked ){
+					
+					return;
+				}
+				
+				permissions_checked = true;
+			}
+			
+			try{
+				String chmod = findCommand( "chmod" );
+				
+				if ( chmod != null ){
+								
+					Runtime.getRuntime().exec(
+						new String[]{
+							chmod,
+							"+x",
+							exe.getAbsolutePath()
+						}).waitFor();
+					
+					File[] files = exe.getParentFile().listFiles();
+					
+					for ( File file: files ){
+						
+						if ( file.getName().endsWith( ".dylib" )){
+							
+							Runtime.getRuntime().exec(
+									new String[]{
+										chmod,
+										"+x",
+										file.getAbsolutePath()
+									}).waitFor();
+						}
+					}
+				}
+			}catch( Throwable e ){
+				
+				Debug.out( e );
 			}
 		}
 	}
