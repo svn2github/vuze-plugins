@@ -53,8 +53,11 @@ import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.gudy.azureus2.ui.swt.Utils;
 import org.gudy.azureus2.ui.swt.components.shell.ShellFactory;
+import org.gudy.azureus2.ui.swt.shells.MessageBoxShell;
 import org.parg.azureus.plugins.networks.tor.TorPlugin;
 import org.parg.azureus.plugins.networks.tor.TorPluginUI;
+
+import com.aelitis.azureus.ui.UserPrompterResultListener;
 
 public class 
 TorPluginUISWT
@@ -261,21 +264,64 @@ TorPluginUISWT
 						String[] buttons = { MessageText.getString("Button.yes"), MessageText.getString("Button.no") };
 						int defaultButtonPos = 0;
 						
-						Listener buttonListener = new Listener() {
-				
-							public void handleEvent(Event event) {
-								result[0] = ((Integer) event.widget.getData()).intValue() == 0;
-								if ( rc_check.getSelection()){
+						Listener buttonListener = 
+							new Listener() 
+							{
+								public void 
+								handleEvent(
+									Event event )
+								{
 									int index = options.getSelectionIndex();
-									if ( index == 0 ){
-										remembered[0] = "*";
+									
+									boolean	yes_selected 	= ((Integer) event.widget.getData()).intValue() == 0;
+									boolean	all_domains 	= index==0;
+									boolean remember		= rc_check.getSelection();
+									
+									if ( remember && all_domains && !yes_selected ){
+										
+							        	MessageBoxShell mb = new MessageBoxShell(
+							        			SWT.ICON_WARNING | SWT.YES | SWT.NO,
+							        			MessageText.getString("aztorplugin.ask.sure.title"),
+							        			MessageText.getString("aztorplugin.ask.sure.msg"));
+							        	
+							        	mb.setDefaultButtonUsingStyle(SWT.NO);
+							        	
+							        	mb.setParent( shell );
+	
+							        	mb.open(
+							        		new UserPrompterResultListener() 
+							        		{
+												public void 
+												prompterClosed(
+													int returnVal )
+												{
+													if (returnVal != SWT.YES) {
+												
+														return;
+													}
+														
+													result[0] 		= false;
+													remembered[0] 	= "*";
+														
+													shell.dispose();
+												}
+							        	});
+	
 									}else{
-										remembered[0] = options.getItem(index);
+										result[0] = yes_selected;
+										
+										if ( remember ){
+											
+											if ( all_domains ){
+												remembered[0] = "*";
+											}else{
+												remembered[0] = options.getItem(index);
+											}
+										}
+										shell.dispose();
 									}
 								}
-								shell.dispose();
-							}
-						};
+							};
 				
 						List<Button> swtButtons = new ArrayList<Button>();
 						

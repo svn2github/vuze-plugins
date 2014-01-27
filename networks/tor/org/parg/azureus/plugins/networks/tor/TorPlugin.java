@@ -94,6 +94,8 @@ TorPlugin
 	
 	private BooleanParameter prompt_on_use_param;
 	
+	private ActionParameter prompt_reset_param;
+	
 	private ActionParameter browser_install_param; 
 	private ActionParameter browser_launch_param;
 	
@@ -103,7 +105,6 @@ TorPlugin
 	private boolean	stop_on_idle;
 	private boolean	prompt_on_use;
 	private boolean	prompt_skip_vuze;
-	
 	private int		internal_control_port;
 	private int		internal_socks_port;
 	
@@ -213,7 +214,7 @@ TorPlugin
 			prompt_on_use_param 							= config_model.addBooleanParameter2( "prompt_on_use", "aztorplugin.prompt_on_use", true );
 			final BooleanParameter prompt_skip_vuze_param 	= config_model.addBooleanParameter2( "prompt_skip_vuze", "aztorplugin.prompt_skip_vuze", true );
 
-			final ActionParameter prompt_reset_param = config_model.addActionParameter2( "aztorplugin.ask.clear", "aztorplugin.ask.clear.button" );
+			prompt_reset_param = config_model.addActionParameter2( "aztorplugin.ask.clear", "aztorplugin.ask.clear.button" );
 			
 			prompt_reset_param.addListener(
 				new ParameterListener()
@@ -387,6 +388,7 @@ TorPlugin
 					}
 				});
 			
+			/*
 			final ActionParameter test_http_proxy_param = config_model.addActionParameter2( "", "!Do It!" );
 
 			test_http_proxy_param.setLabelText( "Create HTTP Proxy" );
@@ -441,6 +443,7 @@ TorPlugin
 							}.start();
 						}
 					});
+			*/
 			
 			if ( Constants.isWindows || Constants.isOSX ){
 				
@@ -610,7 +613,7 @@ TorPlugin
 						
 						prompt_on_use_param.setEnabled( plugin_enabled );
 						prompt_skip_vuze_param.setEnabled( plugin_enabled && prompt_on_use );
-						prompt_reset_param.setEnabled( plugin_enabled && prompt_on_use );
+						prompt_reset_param.setEnabled( plugin_enabled && prompt_on_use && prompt_decisions.size() > 0 );
 						
 						dr_info_param.setEnabled( plugin_enabled );
 						dr_param.setEnabled( plugin_enabled );
@@ -1175,6 +1178,13 @@ TorPlugin
 			
 			ProcessBuilder pb = GeneralUtils.createProcessBuilder( plugin_dir, cmd_list.toArray(new String[cmd_list.size()]), null );
 		
+			if ( Constants.isOSX ){
+				
+				pb.environment().put(
+						"DYLD_LIBRARY_PATH",
+						exe_file.getParentFile().getAbsolutePath());
+			}
+			
 			final Process proc = pb.start();
 			
 			new AEThread2( "procread" )
@@ -1569,6 +1579,8 @@ TorPlugin
 				}
 			}
 			
+			prompt_reset_param.setEnabled( prompt_decisions.size() > 0);
+			
 			logPromptDecisions();
 		}
 	}
@@ -1585,7 +1597,15 @@ TorPlugin
 				str += (str.length()==0?"":",") + s;
 			}
 			
+			prompt_reset_param.setEnabled( prompt_decisions.size() > 0);
+
 			plugin_config.setPluginParameter( "prompt.decisions", str );
+			
+			try{
+				plugin_config.save();
+				
+			}catch( Throwable e ){
+			}
 			
 			logPromptDecisions();
 		}
