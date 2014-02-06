@@ -44,6 +44,7 @@ import org.gudy.azureus2.core3.ipfilter.impl.IpFilterAutoLoaderImpl;
 import org.gudy.azureus2.core3.logging.LogAlert;
 import org.gudy.azureus2.core3.logging.Logger;
 import org.gudy.azureus2.core3.peer.*;
+import org.gudy.azureus2.core3.peer.util.PeerUtils;
 import org.gudy.azureus2.core3.torrent.TOTorrent;
 import org.gudy.azureus2.core3.tracker.client.*;
 import org.gudy.azureus2.core3.util.*;
@@ -104,7 +105,7 @@ XMWebUIPlugin
 	
 	private static final boolean IS_5101_PLUS = Constants.isCurrentVersionGE( "5.1.0.1" );
 	
-	private static final int VUZE_RPC_VERSION = 1;
+	private static final int VUZE_RPC_VERSION = 2;
 	
 	private static Download
 	destubbify(
@@ -3417,7 +3418,7 @@ XMWebUIPlugin
 				 * Byte count of all the piece data we want and don't have yet,
 				 * but that a connected peer does have. [0...leftUntilDone] 
 				 */
-				value = stats.getRemaining();
+				value = core_download.getStats().getRemainingExcludingDND();
 
 			} else if (field.equals("doneDate")) {
 				// RPC v0
@@ -3563,7 +3564,7 @@ XMWebUIPlugin
 				/** Byte count of how much data is left to be downloaded until we've got
 				all the pieces that we want. [0...tr_info.sizeWhenDone] */
 
-				value = stats.getRemaining();
+				value = core_download.getStats().getRemainingExcludingDND();
 
 			} else if (field.equals("magnetLink")) {
 				// TODO RPC v7
@@ -3637,8 +3638,8 @@ XMWebUIPlugin
 				 * from percentComplete if the user wants only some of the torrent's files.
 				 * Range is [0..1]
 				 */
-				// TODO: getRemaining only excludes DND when diskmanager exists..
-				value = 1.0f - ((float) stats.getRemaining() / t.getSize());
+				
+				value = core_download.getStats().getPercentDoneExcludingDND() / 1000.0f;
 
 			} else if (field.equals("pieces")) {
 				// RPC v5
@@ -3713,7 +3714,7 @@ XMWebUIPlugin
 				 * if only some of the torrent's files are wanted.
 				 * [0...tr_info.totalSize] 
 				 **/
-				value = t.getSize(); // TODO: excluded DND
+				value = core_download.getStats().getSizeExcludingDND();
 
 			} else if (field.equals("startDate")) {
 				/** When the torrent was last started. */
@@ -4968,6 +4969,11 @@ XMWebUIPlugin
 			}
 			map.put("flagStr", flagStr.toString());
 
+			// code, name
+			String[] countryDetails = PeerUtils.getCountryDetails(peer);
+			if (countryDetails != null && countryDetails.length > 0) {
+				map.put("cc", countryDetails[0]);
+			}
 			
 			map.put("isDownloadingFrom", isDownloadingFrom);
 			// peer.connection.getTransport().isEncrypted
