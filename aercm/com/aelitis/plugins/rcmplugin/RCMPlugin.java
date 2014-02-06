@@ -37,10 +37,13 @@ import org.gudy.azureus2.plugins.utils.search.SearchProvider;
 import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 
 import com.aelitis.azureus.core.cnetwork.ContentNetwork;
+import com.aelitis.azureus.core.content.ContentException;
 import com.aelitis.azureus.core.content.RelatedContent;
+import com.aelitis.azureus.core.content.RelatedContentManager;
 import com.aelitis.azureus.ui.UserPrompterResultListener;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinFactory;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinProperties;
+import com.aelitis.azureus.util.MapUtils;
 
 
 public class 
@@ -192,6 +195,7 @@ RCMPlugin
 					
 					{
 						methods.add( "rcm-is-enabled" );
+						methods.add( "rcm-get-list" );
 					}
 					
 					public String 
@@ -224,6 +228,9 @@ RCMPlugin
 							
 							result.put( "enabled", isRCMEnabled());
 							
+						} else if ( method.equals( "rcm-get-list" )){
+							rpcGetList(result, args);
+
 						}else{
 							
 							throw( new PluginException( "Unsupported method" ));
@@ -237,6 +244,51 @@ RCMPlugin
 		}
 	}
 	
+	protected void rpcGetList(Map result, Map args) {
+		long since = args == null ? 0 : MapUtils.getMapLong(args, "since", 0);
+		long until = 0;
+
+		List<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
+		result.put("related", list);
+		try {
+			RelatedContentManager manager = RelatedContentManager.getSingleton();
+			RelatedContent[] relatedContent = manager.getRelatedContent();
+			
+			for (RelatedContent item : relatedContent) {
+				HashMap<String, Object> map = new HashMap<String, Object>();
+				
+				long changedLocallyOn = item.getChangedLocallyOn();
+				if (changedLocallyOn < since) {
+					continue;
+				}
+				if (changedLocallyOn > until) {
+					until = changedLocallyOn;
+				}
+
+				map.put("changedOn", changedLocallyOn);
+				map.put("contentNetwork", item.getContentNetwork());
+				map.put("hash", ByteFormatter.encodeString(item.getHash()));
+				map.put("lastSeenSecs", item.getLastSeenSecs());
+				map.put("peers", item.getLeechers());
+				map.put("level", item.getLevel());
+				map.put("publishDate", item.getPublishDate());
+				map.put("rank", item.getRank());
+				map.put("relatedToHash", ByteFormatter.encodeString(item.getRelatedToHash()) );
+				map.put("seeds", item.getSeeds());
+				map.put("size", item.getSize());
+				map.put("tags", item.getTags());
+				map.put("title", item.getTitle());
+				map.put("tracker", item.getTracker());
+				map.put("unread", item.isUnread());
+				list.add(map);
+			}
+		} catch (ContentException e) {
+		}
+		
+		result.put("until", until);
+	}
+
+
 	protected void
 	updatePluginInfo()
 	{
