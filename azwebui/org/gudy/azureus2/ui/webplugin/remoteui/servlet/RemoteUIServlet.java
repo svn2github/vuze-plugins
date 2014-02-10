@@ -127,6 +127,7 @@ RemoteUIServlet
 		"core3/config/impl/ConfigurationManager.class",
 		"core3/config/impl/ConfigurationParameterNotFoundException.class",
 		"core3/config/ParameterListener.class",
+		"core3/util/ConcurrentHashMapWrapper.class",
 		"core3/util/Constants.class",
 		"core3/util/DisplayFormatters.class",
 		"core3/util/Debug.class",
