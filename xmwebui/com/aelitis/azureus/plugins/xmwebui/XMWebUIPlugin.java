@@ -77,6 +77,10 @@ import com.aelitis.azureus.core.AzureusCoreFactory;
 import com.aelitis.azureus.core.metasearch.*;
 import com.aelitis.azureus.core.pairing.PairingManager;
 import com.aelitis.azureus.core.pairing.PairingManagerFactory;
+import com.aelitis.azureus.core.tag.Tag;
+import com.aelitis.azureus.core.tag.TagManager;
+import com.aelitis.azureus.core.tag.TagManagerFactory;
+import com.aelitis.azureus.core.tag.TagType;
 import com.aelitis.azureus.core.torrent.PlatformTorrentUtils;
 import com.aelitis.azureus.core.tracker.TrackerPeerSource;
 import com.aelitis.azureus.core.util.MultiPartDecoder;
@@ -2842,6 +2846,11 @@ XMWebUIPlugin
 		   Either "filename" OR "metainfo" MUST be included.
 		   All other arguments are optional.
 
+		 	additional vuze specific parameters
+			
+			 "vuze_category"	| string (optional category name)
+			 "vuze_tags"		| array  (optional list of tags)
+			 
 		   The format of the "cookies" should be NAME=CONTENTS, where NAME is the
 		   cookie name and CONTENTS is what the cookie should contain.
 		   Set multiple cookies like this: "name1=content1; name2=content2;" etc. 
@@ -2924,7 +2933,7 @@ XMWebUIPlugin
 
 		// bandwidthPriority not used
 		//getNumber(args.get("bandwidthPriority"), TransmissionVars.TR_PRI_NORMAL);
-		
+				
 		final DownloadWillBeAddedListener add_listener =
 			new DownloadWillBeAddedListener() {
 				public void initialised(Download download) {
@@ -2975,6 +2984,67 @@ XMWebUIPlugin
 						}
 					}
 					// don't need priority-normal if they are normal by default.
+					
+					// handle initial categories/tags
+					
+					try{
+						String vuze_category = (String)args.get( "vuze_category" );
+	
+						if ( vuze_category != null ){
+							
+							vuze_category = vuze_category.trim();
+							
+							if ( vuze_category.length() > 0 ){
+								
+								TorrentAttribute	ta_category	= plugin_interface.getTorrentManager().getAttribute(TorrentAttribute.TA_CATEGORY);
+								
+								download.setAttribute( ta_category, vuze_category );
+							}
+						}
+						
+						List<String>	vuze_tags = (List<String>)args.get( "vuze_tags" );
+						
+						if ( vuze_tags != null ){
+							
+							TagManager tm = TagManagerFactory.getTagManager();
+							
+							if ( tm.isEnabled()){
+								
+								TagType tt = tm.getTagType( TagType.TT_DOWNLOAD_MANUAL );
+								
+								for ( String tag_name: vuze_tags ){
+									
+									tag_name = tag_name.trim();
+									
+									if ( tag_name.length() == 0 ){
+										
+										continue;
+									}
+									
+									Tag tag = tt.getTag( tag_name, true );
+									
+									if ( tag == null ){
+										
+										try{
+											tag = tt.createTag( tag_name, true );
+											
+										}catch( Throwable e ){
+											
+											Debug.out( e );
+										}
+									}
+	
+									if ( tag != null ){
+										
+										tag.addTaggable( PluginCoreUtils.unwrap( download ));
+									}
+								}
+							}
+						}				
+					}catch( Throwable e ){
+						
+						e.printStackTrace();
+					}
 				}
 			};
 		
