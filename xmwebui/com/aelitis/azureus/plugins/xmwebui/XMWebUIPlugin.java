@@ -21,6 +21,7 @@
 
 package com.aelitis.azureus.plugins.xmwebui;
 
+import static com.aelitis.azureus.plugins.xmwebui.TransmissionVars.*;
 import java.io.*;
 import java.net.*;
 import java.text.NumberFormat;
@@ -77,10 +78,7 @@ import com.aelitis.azureus.core.AzureusCoreFactory;
 import com.aelitis.azureus.core.metasearch.*;
 import com.aelitis.azureus.core.pairing.PairingManager;
 import com.aelitis.azureus.core.pairing.PairingManagerFactory;
-import com.aelitis.azureus.core.tag.Tag;
-import com.aelitis.azureus.core.tag.TagManager;
-import com.aelitis.azureus.core.tag.TagManagerFactory;
-import com.aelitis.azureus.core.tag.TagType;
+import com.aelitis.azureus.core.tag.*;
 import com.aelitis.azureus.core.torrent.PlatformTorrentUtils;
 import com.aelitis.azureus.core.tracker.TrackerPeerSource;
 import com.aelitis.azureus.core.util.MultiPartDecoder;
@@ -94,6 +92,7 @@ import com.aelitis.azureus.plugins.remsearch.RemSearchPluginSearch;
 import com.aelitis.azureus.plugins.startstoprules.defaultplugin.DefaultRankCalculator;
 import com.aelitis.azureus.plugins.startstoprules.defaultplugin.StartStopRulesDefaultPlugin;
 import com.aelitis.azureus.util.JSONUtils;
+import com.aelitis.azureus.util.MapUtils;
 import com.aelitis.azureus.util.PlayUtils;
 
 @SuppressWarnings({
@@ -109,7 +108,7 @@ XMWebUIPlugin
 	
 	private static final boolean IS_5101_PLUS = Constants.isCurrentVersionGE( "5.1.0.1" );
 	
-	private static final int VUZE_RPC_VERSION = 2;
+	private static final int VUZE_RPC_VERSION = 3;
 	
 	private static Download
 	destubbify(
@@ -1371,7 +1370,7 @@ XMWebUIPlugin
 			
 		}else if ( method.equals( "torrent-get" )){
 
-			method_Torrent_Get( session_id, args, result);
+			method_Torrent_Get(request, session_id, args, result);
 
 		}else if ( method.equals( "torrent-reannounce" )){
 			// RPC v5
@@ -1411,6 +1410,15 @@ XMWebUIPlugin
 		}else if ( method.equals( "free-space" )){
 			// RPC v15
 			method_Free_Space(args, result);
+
+		}else if ( method.equals( "tags-get-list" )){
+			// Vuze RPC v3
+			method_Tags_Get_List(args, result);
+
+		}else if ( method.equals( "torrent-files-get" )){
+			// Vuze RPC v3
+
+			method_Torrent_Files_Get(request, session_id, args, result);
 
 		}else if ( method.equals( "vuze-search-start" )){
 			
@@ -1550,6 +1558,46 @@ XMWebUIPlugin
 		return( result );
 	}
 
+	
+	private void method_Tags_Get_List(Map args, Map result) {
+		List<Map<String, Object>> listTags = new ArrayList<Map<String,Object>>();
+
+		TagManager tm = TagManagerFactory.getTagManager();
+
+		List<TagType> tagTypes = tm.getTagTypes();
+		
+		for (TagType tagType : tagTypes) {
+			List<Tag> tags = tagType.getTags();
+			
+			for (Tag tag : tags) {
+				Map<String, Object> map = new HashMap<String, Object>();
+				map.put("name", tag.getTagName(true));
+				//map.put("taggableTypes", tag.getTaggableTypes()); // com.aelitis.azureus.core.tag.Taggable
+				map.put("count", tag.getTaggedCount());
+				map.put("type", tag.getTagType().getTagType());
+				map.put("type-name", tag.getTagType().getTagTypeName(true));
+				map.put("uid", tag.getTagUID());
+				//map.put("id", tag.getTagID());
+				int[] color = tag.getColor();
+				if (color != null) {
+					String hexColor = "#";
+					for (int c : color) {
+						if (c < 0x10) {
+							hexColor += "0";
+						}
+						hexColor += Integer.toHexString(c);
+					}
+					map.put("color", hexColor);
+				}
+				map.put("canBePublic", tag.canBePublic());
+				map.put("public", tag.isPublic());
+				map.put("auto", tag.isTagAuto());
+				listTags.add(map);
+			}
+		}
+
+		result.put("tags", listTags);
+	}
 
 	private void method_Free_Space(Map args, Map result) {
 		// RPC v15
@@ -3285,6 +3333,7 @@ XMWebUIPlugin
 
 	private Map
 	method_Torrent_Get(
+		TrackerWebPageRequest request,
 		String		session_id,
 		Map 		args,
 		Map 		result)
@@ -3307,9 +3356,9 @@ XMWebUIPlugin
 		for ( DownloadStub download_stub: downloads ){
 			
 			if ( download_stub.isStub()){
-				method_Torrent_Get_Stub(args, fields, torrent_info, download_stub);
+				method_Torrent_Get_Stub(request, args, fields, torrent_info, download_stub);
 			}else{
-				method_Torrent_Get_NonStub(args, fields, torrent_info, (Download) download_stub);
+				method_Torrent_Get_NonStub(request, args, fields, torrent_info, (Download) download_stub);
 			}
 		} // for downloads
 		
@@ -3377,8 +3426,13 @@ XMWebUIPlugin
 		return result;
 	}
 
-	private void method_Torrent_Get_NonStub(Map args, List<String> fields,
-			Map<Long, Map> torrent_info, Download download) {
+	private void method_Torrent_Get_NonStub(
+			TrackerWebPageRequest request,
+			Map args,
+			List<String> fields,
+			Map<Long, Map> torrent_info,
+			Download download)
+	{
 
 		Torrent t = download.getTorrent();
 
@@ -3568,7 +3622,9 @@ XMWebUIPlugin
 			} else if (field.equals("files")) {
 				// RPC v0
 
-				value = torrentGet_files(core_download);
+				String host = (String)request.getHeaders().get( "host" );
+
+				value = torrentGet_files(host, download);
 
 			} else if (field.equals("fileStats")) {
 				// RPC v5
@@ -3935,6 +3991,7 @@ XMWebUIPlugin
 				value = core_download.getNumFileInfos();
 
 			} else if (field.equals("speedHistory")) {
+				// azRPC
 
 				DownloadManagerStats core_stats = core_download.getStats();
 				core_stats.setRecentHistoryRetention(true);
@@ -3976,6 +4033,18 @@ XMWebUIPlugin
 				 *   }
 				 * }
 				 */
+			} else if (field.equals("tag-uids")) {
+				// azRPC
+				List<Long> listTags = new ArrayList<Long>();
+				
+				TagManager tm = TagManagerFactory.getTagManager();
+				
+				List<Tag> tags = tm.getTagsForTaggable(core_download);
+				for (Tag tag : tags) {
+					listTags.add(tag.getTagUID());
+				}
+				
+				value = listTags;
 
 			} else {
 				System.out.println("Unhandled get-torrent field: " + field);
@@ -3992,8 +4061,12 @@ XMWebUIPlugin
 		} // for fields		
 	}
 
-	private void method_Torrent_Get_Stub(Map args, List<String> fields,
-			Map<Long, Map> torrent_info, DownloadStub download_stub) {
+	private void method_Torrent_Get_Stub(
+			TrackerWebPageRequest request,
+			Map args, List<String> fields,
+			Map<Long, Map> torrent_info,
+			DownloadStub download_stub) 
+	{
 		
 		Map torrent = new HashMap();
 		
@@ -4186,69 +4259,15 @@ XMWebUIPlugin
 			
 			}else if ( field.equals( "files" )){
 
-				DownloadStubFile[] files = download_stub.getStubFiles();
-				
-				List<Map>	l_files = new ArrayList<Map>();
-				
-				for ( DownloadStubFile sf: files ){
-				
-					Map	map = new HashMap();
-					
-					l_files.add( map );
-					
-					long	len = sf.getLength();
-					
-					long	downloaded;
-					
-					if ( len < 0 ){
-						
-						downloaded 	= 0;
-						len			= -len;
-						
-					}else{
-						
-						downloaded	= len;
-					}
-					
-					map.put( "bytesCompleted",downloaded );	// this must be a spec error...
-					map.put( "length",  len);
-					map.put( "name", sf.getFile().getAbsolutePath());
-				}
-				
-				value = l_files;				
-				
-			}else if ( field.equals( "fileStats" )){
+				String host = (String)request.getHeaders().get( "host" );
 
-				DownloadStubFile[] files = download_stub.getStubFiles();
-				
-				List<Map>	l_files = new ArrayList<Map>();
-				
-				for ( DownloadStubFile sf: files ){
-				
-					Map	map = new HashMap();
-					
-					l_files.add( map );
-					
-					long	len = sf.getLength();
-					
-					long	downloaded;
-					
-					if ( len < 0 ){
-						
-						downloaded 	= 0;
-						
-					}else{
-						
-						downloaded	= len;
-					}
-					
-					map.put( "bytesCompleted", downloaded );
-					map.put( "wanted", len >= 0 );
-					map.put( "priority", TransmissionVars.convertVuzePriority(0));
-				}
-				
-				value = l_files;
-				
+				value = torrentGet_files_stub(host, download_stub);
+
+			}else if ( field.equals( "fileStats" )){
+				// RPC v5
+
+				value = torrentGet_fileStats_stub(download_stub);
+
 			}else if ( field.equals( "hashString" )){
 				
 				value = ByteFormatter.encodeString( download_stub.getTorrentHash());
@@ -4285,6 +4304,85 @@ XMWebUIPlugin
 			}
 		}
 	}
+	
+	private void method_Torrent_Files_Get(TrackerWebPageRequest request,
+			String session_id, Map args, Map result) throws TextualException {
+		List<String>	fields = (List<String>)args.get( "fields" );
+		if (fields != null) {
+			Collections.sort(fields);
+		}
+		
+		long torrentID = MapUtils.getMapLong(args, "torrent-id", -1);
+		if (torrentID < 0) {
+			throw new TextualException("No torrent-id specified");
+		}
+
+		List<DownloadStub> downloads = getDownloads(torrentID, false);
+		if (downloads.size() == 0) {
+			throw new TextualException("No torrent-id " + torrentID + " exists");
+		}
+		
+		Object	file_ids = args.get( "file-ids" );
+		int[] file_indexes;
+		if (file_ids instanceof Number) {
+			file_indexes = new int[] { ((Number) file_ids).intValue() };
+		} else if (file_ids instanceof Number[]) {
+			Number[] numbers = (Number[]) file_ids;
+			file_indexes = new int[numbers.length];
+			for (int i = 0; i < numbers.length; i++) {
+				Number number = numbers[i];
+				file_indexes[i] = number.intValue();
+			}
+		} else {
+			throw new TextualException("Could not parse file-ids");
+		}
+		
+		List<Map<String, Object>> listFiles = new ArrayList<Map<String, Object>>();
+		String host = (String)request.getHeaders().get( "host" );
+
+		boolean isStub = downloads.get(0).isStub();
+		if (isStub) {
+  		DownloadStubFile[] stubFiles = downloads.get(0).getStubFiles();
+  		for (int file_index : file_indexes) {
+  			if (file_index < 0 || file_index >= stubFiles.length) {
+  				continue;
+  			}
+  			Map<String, Object> map = new HashMap<String, Object>();
+
+  			listFiles.add(map);
+  			
+  			map.put("id", file_index);
+				DownloadStubFile file = stubFiles[file_index];
+				torrentGet_fileStats_stub(map, fields, file);
+				torrentGet_file_stub(map, fields, host, file);
+  		}
+		} else {
+			try {
+				Download download = downloads.get(0).destubbify();
+				DiskManagerFileInfo[] fileInfos = download.getDiskManagerFileInfo();
+	  		for (int file_index : file_indexes) {
+	  			if (file_index < 0 || file_index >= fileInfos.length) {
+	  				continue;
+	  			}
+					
+	  			Map<String, Object> map = new HashMap<String, Object>();
+
+	  			listFiles.add(map);
+	  			
+	  			map.put("id", file_index);
+	  			DiskManagerFileInfo fileInfo = fileInfos[file_index];
+					torrentGet_fileStats(map, fields, fileInfo);
+					torrentGet_files(map, fields, host, download, fileInfo);
+				}
+			} catch (DownloadException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		
+		result.put("files", listFiles);
+	}
+
 
 	/** Number of webseeds that are sending data to us. */
   private Object torrentGet_webseedsSendingToUs(DownloadManager core_download) {
@@ -4830,19 +4928,80 @@ XMWebUIPlugin
 		
 		for ( DiskManagerFileInfo file: files ){
 			
-			Map obj = new HashMap(8);
+			Map map = new HashMap(8);
+
+			torrentGet_fileStats(map, null, file);
 			
-			stats_list.add( obj );
-			
-			obj.put( "bytesCompleted", file.getDownloaded());
-			obj.put( "wanted", !file.isSkipped());
-			obj.put( "priority", TransmissionVars.convertVuzePriority(file.getNumericPriorty()));
+			stats_list.add( map );
 		}
 		
 		return stats_list;
 	}
 
-	private Object torrentGet_files(DownloadManager core_download) {
+	private void torrentGet_fileStats(Map map, List<String> sortedFields,
+			DiskManagerFileInfo file) {
+		boolean all = sortedFields == null || sortedFields.size() == 0;
+
+		if (all
+				|| Collections.binarySearch(sortedFields,
+						FIELD_FILESTATS_BYTES_COMPLETED) >= 0) {
+			map.put(FIELD_FILESTATS_BYTES_COMPLETED, file.getDownloaded());
+		}
+		if (all
+				|| Collections.binarySearch(sortedFields, FIELD_FILESTATS_WANTED) >= 0) {
+			map.put(FIELD_FILESTATS_WANTED, !file.isSkipped());
+		}
+
+		if (all
+				|| Collections.binarySearch(sortedFields, FIELD_FILESTATS_PRIORITY) >= 0) {
+			map.put(FIELD_FILESTATS_PRIORITY,
+					TransmissionVars.convertVuzePriority(file.getNumericPriority()));
+		}
+	}
+
+	private Object torrentGet_fileStats_stub(DownloadStub download_stub) {
+		DownloadStubFile[] files = download_stub.getStubFiles();
+		
+		List<Map>	l_files = new ArrayList<Map>();
+		
+		for ( DownloadStubFile sf: files ){
+			
+			Map	map = new HashMap();
+			
+			torrentGet_fileStats_stub(map, null, sf);
+			
+			l_files.add( map );
+		}
+		
+		return l_files;
+	}
+
+	private void torrentGet_fileStats_stub(Map map, List<String> sortedFields,
+			DownloadStubFile sf) {
+		long len = sf.getLength();
+
+		boolean all = sortedFields == null || sortedFields.size() == 0;
+
+		if (all
+				|| Collections.binarySearch(sortedFields,
+						FIELD_FILESTATS_BYTES_COMPLETED) >= 0) {
+
+			long downloaded = len < 0 ? 0 : len;
+
+			map.put(FIELD_FILESTATS_BYTES_COMPLETED, downloaded);
+		}
+		if (all
+				|| Collections.binarySearch(sortedFields, FIELD_FILESTATS_WANTED) >= 0) {
+			map.put(FIELD_FILESTATS_WANTED, len >= 0);
+		}
+
+		if (all
+				|| Collections.binarySearch(sortedFields, FIELD_FILESTATS_PRIORITY) >= 0) {
+			map.put(FIELD_FILESTATS_PRIORITY, TransmissionVars.convertVuzePriority(0));
+		}
+	}
+
+	private Object torrentGet_files(String host, Download download) {
 		// | array of objects, each containing:   |
     // +-------------------------+------------+
     // | bytesCompleted          | number     | tr_torrent
@@ -4851,20 +5010,113 @@ XMWebUIPlugin
 
 		List<Map> file_list = new ArrayList<Map>();
 		
-		org.gudy.azureus2.core3.disk.DiskManagerFileInfo[] files = core_download.getDiskManagerFileInfoSet().getFiles();
+		DiskManagerFileInfo[] files = download.getDiskManagerFileInfo();
 		
-		for ( org.gudy.azureus2.core3.disk.DiskManagerFileInfo file: files ){
+		for ( DiskManagerFileInfo file: files ){
 			
 			Map obj = new HashMap(8);
 			
 			file_list.add( obj );
 			
-			obj.put( "bytesCompleted", file.getDownloaded());	// this must be a spec error...
-			obj.put( "length",  file.getLength());
-			obj.put( "name", file.getTorrentFile().getRelativePath());
+			torrentGet_files(obj, null, host, download, file);
 		}
 		
 		return file_list;
+	}
+
+	private void torrentGet_files(Map obj, List<String> sortedFields,
+			String host, Download download, DiskManagerFileInfo file) {
+		boolean all = sortedFields == null || sortedFields.size() == 0;
+
+		if (all
+				|| Collections.binarySearch(sortedFields,
+						FIELD_FILESTATS_BYTES_COMPLETED) >= 0) {
+			obj.put(FIELD_FILESTATS_BYTES_COMPLETED, file.getDownloaded()); // this must be a spec error...
+		}
+		if (all || Collections.binarySearch(sortedFields, FIELD_FILES_LENGTH) >= 0) {
+			obj.put(FIELD_FILES_LENGTH, file.getLength());
+		}
+		if (all || Collections.binarySearch(sortedFields, FIELD_FILES_NAME) >= 0) {
+			String absolutePath = file.getFile(true).getAbsolutePath();
+			String savePath = download.getSavePath();
+			Torrent torrent = download.getTorrent();
+			boolean simpleTorrent = torrent == null ? false : torrent.isSimpleTorrent();
+			if (simpleTorrent) {
+				obj.put(FIELD_FILES_NAME, file.getFile().getName());
+			} else {
+				if (absolutePath.startsWith(savePath)) {
+					// + 1 to remove the dir separator
+					obj.put(FIELD_FILES_NAME, absolutePath.substring(savePath.length() + 1));
+				} else {
+					obj.put(FIELD_FILES_NAME, absolutePath);
+				}
+			}
+		}
+
+		// not part of "all"
+		if (sortedFields != null
+				&& Collections.binarySearch(sortedFields, FIELD_FILES_CONTENT_URL) >= 0) {
+			URL f_stream_url = PlayUtils.getMediaServerContentURL(file);
+			if (f_stream_url != null) {
+				obj.put(FIELD_FILES_CONTENT_URL, adjustURL(host, f_stream_url));
+			}
+		}
+
+		if (sortedFields != null
+				&& Collections.binarySearch(sortedFields, FIELD_FILES_FULL_PATH) >= 0) {
+			obj.put(FIELD_FILES_FULL_PATH, file.getFile().toString());
+		}
+	}
+
+	private Object torrentGet_files_stub(String host, DownloadStub download_stub) {
+		DownloadStubFile[] files = download_stub.getStubFiles();
+		
+		List<Map>	l_files = new ArrayList<Map>();
+		
+		for ( DownloadStubFile sf: files ){
+		
+			Map	map = new HashMap();
+			
+			l_files.add( map );
+
+			torrentGet_file_stub(map, null, host, sf);
+		}
+		
+		return l_files;				
+	}
+
+	private void torrentGet_file_stub(Map map,List<String> sortedFields, String host, DownloadStubFile sf) {
+		long len = sf.getLength();
+
+		long downloaded;
+
+		if (len < 0) {
+
+			downloaded = 0;
+			len = -len;
+
+		} else {
+
+			downloaded = len;
+		}
+
+		boolean all = sortedFields == null || sortedFields.size() == 0;
+
+		if (all
+				|| Collections.binarySearch(sortedFields,
+						FIELD_FILESTATS_BYTES_COMPLETED) >= 0) {
+			map.put(FIELD_FILESTATS_BYTES_COMPLETED, downloaded); // this must be a spec error...
+		}
+		if (all || Collections.binarySearch(sortedFields, FIELD_FILES_LENGTH) >= 0) {
+			map.put(FIELD_FILES_LENGTH, len);
+		}
+		if (all || Collections.binarySearch(sortedFields, FIELD_FILES_NAME) >= 0) {
+			map.put(FIELD_FILES_NAME, sf.getFile().getName());
+		}
+		if (sortedFields != null
+				&& Collections.binarySearch(sortedFields, FIELD_FILES_FULL_PATH) >= 0) {
+			map.put(FIELD_FILES_FULL_PATH, sf.getFile().toString());
+		}
 	}
 
 	private Object torrentGet_errorString(DownloadManager core_download,

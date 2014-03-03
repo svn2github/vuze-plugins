@@ -239,6 +239,61 @@ public class TransmissionVars
 	public static final long TR_ETA_NOT_AVAIL = -1;
 	public static final long TR_ETA_UNKNOWN = -2;
 
+	//////////////////////////////////////////////////////////////////////////////
+
+	public static final String FIELD_TORRENT_WANTED = "wanted";
+
+	public static final String FIELD_TORRENT_PRIORITIES = "priorities";
+
+	public static final String FIELD_TORRENT_FILE_COUNT = "fileCount";
+
+	public static final String FIELD_TORRENT_ETA = "eta";
+
+	public static final String FIELD_TORRENT_ERROR_STRING = "errorString";
+
+	public static final String FIELD_TORRENT_ERROR = "error";
+
+	public static final String FIELD_TORRENT_STATUS = "status";
+
+	public static final String FIELD_TORRENT_RATE_DOWNLOAD = "rateDownload";
+
+	public static final String FIELD_TORRENT_RATE_UPLOAD = "rateUpload";
+
+	public static final String FIELD_TORRENT_SIZE_WHEN_DONE = "sizeWhenDone";
+
+	public static final String FIELD_TORRENT_PERCENT_DONE = "percentDone";
+
+	public static final String FIELD_TORRENT_NAME = "name";
+
+	public static final String FIELD_TORRENT_ID = "id";
+
+	public static final String FIELD_TORRENT_FILES_PRIORITY = "priority";
+
+	public static final String FIELD_TORRENT_POSITION = "queuePosition";
+
+	public static final String FIELD_TORRENT_UPLOAD_RATIO = "uploadRatio";
+
+	public static final String FIELD_TORRENT_DATE_ADDED = "addedDate";
+
+	//////////////////////////////////////////////////////////////////////////////
+
+	public static final String TR_SESSION_STATS_DOWNLOAD_SPEED = "downloadSpeed";
+
+	public static final String TR_SESSION_STATS_UPLOAD_SPEED = "uploadSpeed";
+
+	public static final String TR_SESSION_STATS_TORRENT_COUNT = "torrentCount";	
+
+	//////////////////////////////////////////////////////////////////////////////
+	
+	public static final String FIELD_FILESTATS_BYTES_COMPLETED = "bytesCompleted";	
+	public static final String FIELD_FILESTATS_WANTED = "wanted";
+	public static final String FIELD_FILESTATS_PRIORITY = "priority";
+	public static final String FIELD_FILES_LENGTH = "length";
+	public static final String FIELD_FILES_NAME = "name";
+	public static final String FIELD_FILES_CONTENT_URL = "contentURL";
+	public static final String FIELD_FILES_FULL_PATH = "fullPath";
+	
+	//////////////////////////////////////////////////////////////////////////////
 	
 	public static long convertVuzePriority(int priority) {
 		return priority == 0 ? TransmissionVars.TR_PRI_NORMAL
