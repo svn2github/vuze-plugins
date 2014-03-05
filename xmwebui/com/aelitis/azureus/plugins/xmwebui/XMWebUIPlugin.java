@@ -6410,11 +6410,6 @@ XMWebUIPlugin
 	 */
 	private long longHashSimpleMap(SortedMap<?, ?> map) {
 		long hash = 0;
-		// sort keys so we could persist over sessions, or allow the remote
-		// to build comparable hashcodes
-		// Alternatively, could just use a Map that auto-sorts..
-		ArrayList sortedKeys = new ArrayList(map.keySet());
-		Collections.sort(sortedKeys);
 
 		for (Object key : map.keySet()) {
 			Object value = map.get(key);
