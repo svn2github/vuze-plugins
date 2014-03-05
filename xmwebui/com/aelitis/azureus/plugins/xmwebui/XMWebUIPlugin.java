@@ -22,6 +22,7 @@
 package com.aelitis.azureus.plugins.xmwebui;
 
 import static com.aelitis.azureus.plugins.xmwebui.TransmissionVars.*;
+
 import java.io.*;
 import java.net.*;
 import java.text.NumberFormat;
@@ -1414,11 +1415,6 @@ XMWebUIPlugin
 		}else if ( method.equals( "tags-get-list" )){
 			// Vuze RPC v3
 			method_Tags_Get_List(args, result);
-
-		}else if ( method.equals( "torrent-files-get" )){
-			// Vuze RPC v3
-
-			method_Torrent_Files_Get(request, session_id, args, result);
 
 		}else if ( method.equals( "vuze-search-start" )){
 			
@@ -3337,7 +3333,27 @@ XMWebUIPlugin
 		String		session_id,
 		Map 		args,
 		Map 		result)
-	{		
+	{
+		
+		// When "file_indexes" key is present, returns:
+		// NOTE: Array position does not equal file index!  Use "index" key!
+		// {
+		// 	torrents : [
+		//               {
+		//                 <key> : <value>, 
+		//                 files : 
+		//                         [ 
+		//                           { 
+		//                             "index": <file-index>, 
+		//                             <other-fields>: <other-values>
+		//                           },
+		//                          <more file maps>
+		//                         ]
+		//                },
+		//               <more keys> : <move values>
+		//             ]
+		// }
+
 		List<String>	fields = (List<String>)args.get( "fields" );
 		
 		if ( fields == null ){
@@ -3350,15 +3366,39 @@ XMWebUIPlugin
 		boolean is_recently_active = handleRecentlyRemoved( session_id, args, result );
 		
 		List<DownloadStub>	downloads = getDownloads( ids, true );
+		
+		Object file_ids = args.get("file-indexes");
+		int[] file_indexes = null;
+		if (file_ids instanceof Number) {
+			file_indexes = new int[] {
+				((Number) file_ids).intValue()
+			};
+		} else if (file_ids instanceof List) {
+			List listFileIDs = (List) file_ids;
+			file_indexes = new int[listFileIDs.size()];
+			for (int i = 0; i < listFileIDs.size(); i++) {
+				Object o = listFileIDs.get(i);
+				if (o instanceof Number) {
+					file_indexes[i] = ((Number) o).intValue();
+				}
+			}
+		}
+		
+		List<String> file_fields = (List<String>) args.get("file-fields");
+		if (file_fields != null) {
+			Collections.sort(file_fields);
+		}
 				
 		Map<Long,Map>	torrent_info = new LinkedHashMap<Long, Map>();
 		
 		for ( DownloadStub download_stub: downloads ){
 			
-			if ( download_stub.isStub()){
-				method_Torrent_Get_Stub(request, args, fields, torrent_info, download_stub);
-			}else{
-				method_Torrent_Get_NonStub(request, args, fields, torrent_info, (Download) download_stub);
+			if (download_stub.isStub()) {
+				method_Torrent_Get_Stub(request, args, fields, torrent_info,
+						download_stub, file_indexes, file_fields);
+			} else {
+				method_Torrent_Get_NonStub(request, args, fields, torrent_info,
+						(Download) download_stub, file_indexes, file_fields);
 			}
 		} // for downloads
 		
@@ -3431,7 +3471,9 @@ XMWebUIPlugin
 			Map args,
 			List<String> fields,
 			Map<Long, Map> torrent_info,
-			Download download)
+			Download download,
+			int[] file_indexes,
+			List<String> file_fields)
 	{
 
 		Torrent t = download.getTorrent();
@@ -3624,12 +3666,12 @@ XMWebUIPlugin
 
 				String host = (String)request.getHeaders().get( "host" );
 
-				value = torrentGet_files(host, download);
+				value = torrentGet_files(host, download, file_indexes, file_fields, args);
 
 			} else if (field.equals("fileStats")) {
 				// RPC v5
 
-				value = torrentGet_fileStats(download);
+				value = torrentGet_fileStats(download, file_indexes, file_fields, args);
 
 			} else if (field.equals("hashString")) {
 				// RPC v0
@@ -4063,9 +4105,12 @@ XMWebUIPlugin
 
 	private void method_Torrent_Get_Stub(
 			TrackerWebPageRequest request,
-			Map args, List<String> fields,
+			Map args, 
+			List<String> fields,
 			Map<Long, Map> torrent_info,
-			DownloadStub download_stub) 
+			DownloadStub download_stub,
+			int[] file_indexes, 
+			List<String> file_fields) 
 	{
 		
 		Map torrent = new HashMap();
@@ -4261,12 +4306,14 @@ XMWebUIPlugin
 
 				String host = (String)request.getHeaders().get( "host" );
 
-				value = torrentGet_files_stub(host, download_stub);
+				value = torrentGet_files_stub(host, download_stub, file_indexes,
+						file_fields, args);
 
 			}else if ( field.equals( "fileStats" )){
 				// RPC v5
 
-				value = torrentGet_fileStats_stub(download_stub);
+				value = torrentGet_fileStats_stub(download_stub, file_indexes,
+						file_fields, args);
 
 			}else if ( field.equals( "hashString" )){
 				
@@ -4305,85 +4352,6 @@ XMWebUIPlugin
 		}
 	}
 	
-	private void method_Torrent_Files_Get(TrackerWebPageRequest request,
-			String session_id, Map args, Map result) throws TextualException {
-		List<String>	fields = (List<String>)args.get( "fields" );
-		if (fields != null) {
-			Collections.sort(fields);
-		}
-		
-		long torrentID = MapUtils.getMapLong(args, "torrent-id", -1);
-		if (torrentID < 0) {
-			throw new TextualException("No torrent-id specified");
-		}
-
-		List<DownloadStub> downloads = getDownloads(torrentID, false);
-		if (downloads.size() == 0) {
-			throw new TextualException("No torrent-id " + torrentID + " exists");
-		}
-		
-		Object	file_ids = args.get( "file-ids" );
-		int[] file_indexes;
-		if (file_ids instanceof Number) {
-			file_indexes = new int[] { ((Number) file_ids).intValue() };
-		} else if (file_ids instanceof Number[]) {
-			Number[] numbers = (Number[]) file_ids;
-			file_indexes = new int[numbers.length];
-			for (int i = 0; i < numbers.length; i++) {
-				Number number = numbers[i];
-				file_indexes[i] = number.intValue();
-			}
-		} else {
-			throw new TextualException("Could not parse file-ids");
-		}
-		
-		List<Map<String, Object>> listFiles = new ArrayList<Map<String, Object>>();
-		String host = (String)request.getHeaders().get( "host" );
-
-		boolean isStub = downloads.get(0).isStub();
-		if (isStub) {
-  		DownloadStubFile[] stubFiles = downloads.get(0).getStubFiles();
-  		for (int file_index : file_indexes) {
-  			if (file_index < 0 || file_index >= stubFiles.length) {
-  				continue;
-  			}
-  			Map<String, Object> map = new HashMap<String, Object>();
-
-  			listFiles.add(map);
-  			
-  			map.put("id", file_index);
-				DownloadStubFile file = stubFiles[file_index];
-				torrentGet_fileStats_stub(map, fields, file);
-				torrentGet_file_stub(map, fields, host, file);
-  		}
-		} else {
-			try {
-				Download download = downloads.get(0).destubbify();
-				DiskManagerFileInfo[] fileInfos = download.getDiskManagerFileInfo();
-	  		for (int file_index : file_indexes) {
-	  			if (file_index < 0 || file_index >= fileInfos.length) {
-	  				continue;
-	  			}
-					
-	  			Map<String, Object> map = new HashMap<String, Object>();
-
-	  			listFiles.add(map);
-	  			
-	  			map.put("id", file_index);
-	  			DiskManagerFileInfo fileInfo = fileInfos[file_index];
-					torrentGet_fileStats(map, fields, fileInfo);
-					torrentGet_files(map, fields, host, download, fileInfo);
-				}
-			} catch (DownloadException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		}
-		
-		result.put("files", listFiles);
-	}
-
-
 	/** Number of webseeds that are sending data to us. */
   private Object torrentGet_webseedsSendingToUs(DownloadManager core_download) {
   	PEPeerManager peerManager = core_download.getPeerManager();
@@ -4848,52 +4816,46 @@ XMWebUIPlugin
   	
   	int	status_int;
   	
-  	if ( download.isPaused()){
-  		
-  		status_int = STOPPED;
-  									
-  	}else{
-  		int state = download.getState();
-  		
-  		if ( state == Download.ST_DOWNLOADING ){
-  			
-  			status_int = DOWNLOADING;
-  			
-  		}else if ( state == Download.ST_SEEDING ){
-  			
-  			status_int = SEEDING;
-  			
-  		}else if ( state == Download.ST_QUEUED ){
-  
-  			if ( download.isComplete()){
-  				
-  				status_int = QUEUED_COMPLETE;
-  				
-  			}else{
-  				
-  				status_int = QUEUED_INCOMPLETE;
-  			}
-  		}else if ( state == Download.ST_STOPPED || state == Download.ST_STOPPING ){
-  			
-  			status_int = STOPPED;
-  			
-  		}else if ( state == Download.ST_ERROR ){
-  			
-  			status_int = ERROR;
-  			
-  		}else{
-  			
-  			DownloadManager	core_download = PluginCoreUtils.unwrap( download );
-  			if ( core_download.getState() == DownloadManager.STATE_CHECKING ){
-  			
-  				status_int = CHECKING;
-  				
-  			}else{
-  				
-  				status_int = CHECK_WAIT;
-  			}
-  		}
-  	}
+		int state = download.getState();
+		
+		if ( state == Download.ST_DOWNLOADING ){
+			
+			status_int = DOWNLOADING;
+			
+		}else if ( state == Download.ST_SEEDING ){
+			
+			status_int = SEEDING;
+			
+		}else if ( state == Download.ST_QUEUED ){
+
+			if ( download.isComplete()){
+				
+				status_int = QUEUED_COMPLETE;
+				
+			}else{
+				
+				status_int = QUEUED_INCOMPLETE;
+			}
+		}else if ( state == Download.ST_STOPPED || state == Download.ST_STOPPING ){
+			
+			status_int = STOPPED;
+			
+		}else if ( state == Download.ST_ERROR ){
+			
+			status_int = ERROR;
+			
+		}else{
+			
+			DownloadManager	core_download = PluginCoreUtils.unwrap( download );
+			if ( core_download.getState() == DownloadManager.STATE_CHECKING ){
+			
+				status_int = CHECKING;
+				
+			}else{
+				
+				status_int = CHECK_WAIT;
+			}
+		}
   	
   	return status_int;
 	}
@@ -4914,7 +4876,11 @@ XMWebUIPlugin
 		return list;
 	}
 
-	private Object torrentGet_fileStats(Download download) {
+	private Object torrentGet_fileStats(
+			Download download, 
+			int[] file_indexes, 
+			List<String> file_fields,
+			Map args) {
 		// | a file's non-constant properties.    |
     // | array of tr_info.filecount objects,  |
     // | each containing:                     |
@@ -4924,15 +4890,37 @@ XMWebUIPlugin
     // | priority                | number     | tr_info
 		List<Map> stats_list = new ArrayList<Map>();
 		
+		// Skip files that match these hashcodes
+		List listHCs = MapUtils.getMapList(args, "fileStats-hc", null);
+
 		DiskManagerFileInfo[] files = download.getDiskManagerFileInfo();
 		
-		for ( DiskManagerFileInfo file: files ){
-			
-			Map map = new HashMap(8);
+		if (file_indexes == null) {
+			for (int i = 0; i < files.length; i++) {
+				DiskManagerFileInfo file = files[i];
+  			
+				TreeMap map = new TreeMap();
+  
+				map.put("index", i);
+  			torrentGet_fileStats(map, file_fields, file);
+  			
+				hashAndAdd(map, stats_list, listHCs, i);
+  		}
+		} else {
+			for (int i = 0; i < file_indexes.length; i++) {
+				int file_index = file_indexes[i];
+				if (file_index < 0 || file_index >= files.length) {
+					continue;
+				}
 
-			torrentGet_fileStats(map, null, file);
-			
-			stats_list.add( map );
+				TreeMap<String, Object> map = new TreeMap<String, Object>();
+
+				map.put("index", file_index);
+				DiskManagerFileInfo file = files[file_index];
+				torrentGet_fileStats(map, file_fields, file);
+
+				hashAndAdd(map, stats_list, listHCs, i);
+			}
 		}
 		
 		return stats_list;
@@ -4959,21 +4947,48 @@ XMWebUIPlugin
 		}
 	}
 
-	private Object torrentGet_fileStats_stub(DownloadStub download_stub) {
-		DownloadStubFile[] files = download_stub.getStubFiles();
+	private Object torrentGet_fileStats_stub(
+			DownloadStub download_stub,
+			int[] file_indexes, 
+			List<String> file_fields,
+			Map args)
+	{
+		DownloadStubFile[] stubFiles = download_stub.getStubFiles();
 		
-		List<Map>	l_files = new ArrayList<Map>();
-		
-		for ( DownloadStubFile sf: files ){
-			
-			Map	map = new HashMap();
-			
-			torrentGet_fileStats_stub(map, null, sf);
-			
-			l_files.add( map );
+		List<Map>	stats_list = new ArrayList<Map>();
+	
+		// Skip files that match these hashcodes
+		List listHCs = MapUtils.getMapList(args, "fileStats-hc", null);
+
+		if (file_indexes == null) {
+			for (int i = 0; i < stubFiles.length; i++) {
+  			
+				TreeMap	map = new TreeMap();
+				map.put("index", i);
+
+				DownloadStubFile sf = stubFiles[i];
+  			torrentGet_fileStats_stub(map, null, sf);
+  			
+				hashAndAdd(map, stats_list, listHCs, i);
+  		}
+		} else {
+			for (int i = 0; i < file_indexes.length; i++) {
+				int file_index = file_indexes[i];
+				if (file_index < 0 || file_index >= stubFiles.length) {
+					continue;
+				}
+
+				TreeMap<String, Object> map = new TreeMap<String, Object>();
+				map.put("index", file_index);
+
+				DownloadStubFile file = stubFiles[file_index];
+				torrentGet_fileStats_stub(map, file_fields, file);
+
+				hashAndAdd(map, stats_list, listHCs, i);
+			}
 		}
 		
-		return l_files;
+		return stats_list;
 	}
 
 	private void torrentGet_fileStats_stub(Map map, List<String> sortedFields,
@@ -5001,24 +5016,58 @@ XMWebUIPlugin
 		}
 	}
 
-	private Object torrentGet_files(String host, Download download) {
+	private Object torrentGet_files(
+			String host,
+			Download download, 
+			int[] file_indexes, 
+			List<String> file_fields,
+			Map args)
+	{
 		// | array of objects, each containing:   |
     // +-------------------------+------------+
     // | bytesCompleted          | number     | tr_torrent
     // | length                  | number     | tr_info
     // | name                    | string     | tr_info
+		// Vuze, when file_indexes present:
+		// | index                   | number
+		// | hc                      | number     | hashcode to be later used to supress return of file map
 
 		List<Map> file_list = new ArrayList<Map>();
+
+		// Skip files that match these hashcodes
+		List listHCs = MapUtils.getMapList(args, "files-hc", null);
 		
 		DiskManagerFileInfo[] files = download.getDiskManagerFileInfo();
 		
-		for ( DiskManagerFileInfo file: files ){
-			
-			Map obj = new HashMap(8);
-			
-			file_list.add( obj );
-			
-			torrentGet_files(obj, null, host, download, file);
+		if (file_indexes == null) {
+			for (int i = 0; i < files.length; i++) {
+				DiskManagerFileInfo file = files[i];
+  			
+				TreeMap map = new TreeMap();
+  			
+				map.put("index", i);
+
+  			torrentGet_files(map, file_fields, host, download, file);
+
+  			hashAndAdd(map, file_list, listHCs, i);
+  		}
+		} else {
+
+			for (int i = 0; i < file_indexes.length; i++) {
+				int file_index = file_indexes[i];
+				if (file_index < 0 || file_index >= files.length) {
+					continue;
+				}
+
+				TreeMap<String, Object> map = new TreeMap<String, Object>();
+
+				map.put("index", file_index);
+				DiskManagerFileInfo fileInfo = files[file_index];
+				torrentGet_fileStats(map, file_fields, fileInfo);
+				torrentGet_files(map, file_fields, host, download, fileInfo);
+
+  			hashAndAdd(map, file_list, listHCs, i);
+			}
 		}
 		
 		return file_list;
@@ -5068,21 +5117,54 @@ XMWebUIPlugin
 		}
 	}
 
-	private Object torrentGet_files_stub(String host, DownloadStub download_stub) {
-		DownloadStubFile[] files = download_stub.getStubFiles();
+	private Object torrentGet_files_stub(
+			String host,
+			DownloadStub download_stub,
+			int[] file_indexes, 
+			List<String> file_fields,
+			Map args)
+	{
+		DownloadStubFile[] stubFiles = download_stub.getStubFiles();
 		
-		List<Map>	l_files = new ArrayList<Map>();
-		
-		for ( DownloadStubFile sf: files ){
-		
-			Map	map = new HashMap();
-			
-			l_files.add( map );
+		List<Map>	file_list = new ArrayList<Map>();
 
-			torrentGet_file_stub(map, null, host, sf);
+		// Skip files that match these hashcodes
+		List listHCs = MapUtils.getMapList(args, "files-hc", null);
+		
+		if (file_indexes == null) {
+  		
+			for (int i = 0; i < stubFiles.length; i++) {
+				DownloadStubFile sf = stubFiles[i];
+  		
+				TreeMap	map = new TreeMap();
+  			
+				map.put("index", i);
+
+  			torrentGet_file_stub(map, file_fields, host, sf);
+
+  			hashAndAdd(map, file_list, listHCs, i);
+			}
+		} else {
+			for (int i = 0; i < file_indexes.length; i++) {
+				int file_index = file_indexes[i];
+				if (file_index < 0 || file_index >= stubFiles.length) {
+					continue;
+				}
+
+				TreeMap<String, Object> map = new TreeMap<String, Object>();
+
+				file_list.add(map);
+
+				map.put("index", file_index);
+				DownloadStubFile file = stubFiles[file_index];
+				torrentGet_fileStats_stub(map, file_fields, file);
+				torrentGet_file_stub(map, file_fields, host, file);
+
+  			hashAndAdd(map, file_list, listHCs, i);
+			}
 		}
 		
-		return l_files;				
+		return file_list;				
 	}
 
 	private void torrentGet_file_stub(Map map,List<String> sortedFields, String host, DownloadStubFile sf) {
@@ -6308,6 +6390,80 @@ XMWebUIPlugin
 		}
 	}
 
+	private void hashAndAdd(SortedMap map, List<Map> addToList, List hcMatchList,
+			int i) {
+		long hashCode = longHashSimpleMap(map);
+		// hex string shorter than long in json, even with quotes
+		String hc = Long.toHexString(hashCode);
+
+		boolean remove = hcMatchList != null && i >= hcMatchList.size()
+				&& hc.equals(hcMatchList.get(i));
+		if (!remove) {
+			map.put("hc", hc);
+			addToList.add(map);
+		}
+	}
+
+	/**
+	 * Very simple 64 bit hash of a map's keys (assumed String, esp on JSON map),
+	 * and values.
+	 */
+	private long longHashSimpleMap(SortedMap<?, ?> map) {
+		long hash = 0;
+		// sort keys so we could persist over sessions, or allow the remote
+		// to build comparable hashcodes
+		// Alternatively, could just use a Map that auto-sorts..
+		ArrayList sortedKeys = new ArrayList(map.keySet());
+		Collections.sort(sortedKeys);
+
+		for (Object key : map.keySet()) {
+			Object value = map.get(key);
+			hash = (hash * 31) + hash(key.toString());
+			if (value instanceof String) {
+				hash = (hash * 31) + hash((String) value);
+			} else if (value instanceof Number) {
+				// not sure about this
+				hash = (hash * 31) + ((Number) value).hashCode();
+			} else if (value instanceof SortedMap) {
+				hash = (hash * 31) + longHashSimpleMap((SortedMap) value);
+			} else if (value instanceof Collection) {
+				hash = (hash * 31) + longHashSimpleList((List) value);
+			} // else skip all other values since we can't be sure how they hash
+		}
+		return hash;
+	}
+
+	private long longHashSimpleList(Collection<?> list) {
+		long hash = 0;
+		for (Object value : list) {
+			if (value instanceof String) {
+				hash = (hash * 31) + hash((String) value);
+			} else if (value instanceof Number) {
+				// not sure about this
+				hash = (hash * 31) + ((Number) value).hashCode();
+			} else if (value instanceof SortedMap) {
+				hash = (hash * 31) + longHashSimpleMap((SortedMap) value);
+			} else if (value instanceof Collection) {
+				hash = (hash * 31) + longHashSimpleList((Collection) value);
+			} // else skip all other values since we can't be sure how they hash
+		}
+		return hash;
+	}
+
+	// FROM http://stackoverflow.com/questions/1660501/what-is-a-good-64bit-hash-function-in-java-for-textual-strings
+	//adapted from String.hashCode()
+	public static long hash(String string) {
+		long h = 1125899906842597L; // prime
+		int len = string.length();
+
+		for (int i = 0; i < len; i++) {
+			h = 31 * h + string.charAt(i);
+		}
+		return h;
+	}
+
+	//////////////////////////////////////////////////////////////////////////////
+	
 	private class
 	SearchInstance
 		implements ResultListener
