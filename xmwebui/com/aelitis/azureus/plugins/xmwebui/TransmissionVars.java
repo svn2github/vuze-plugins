@@ -277,11 +277,19 @@ public class TransmissionVars
 
 	//////////////////////////////////////////////////////////////////////////////
 
+	public static final String TR_SESSION_STATS_ACTIVE_TORRENT_COUNT = "activeTorrentCount";
+
+	public static final String TR_SESSION_STATS_PAUSED_TORRENT_COUNT = "pausedTorrentCount";
+
 	public static final String TR_SESSION_STATS_DOWNLOAD_SPEED = "downloadSpeed";
 
 	public static final String TR_SESSION_STATS_UPLOAD_SPEED = "uploadSpeed";
 
 	public static final String TR_SESSION_STATS_TORRENT_COUNT = "torrentCount";	
+
+	public static final String TR_SESSION_STATS_CURRENT = "current-stats";	
+
+	public static final String TR_SESSION_STATS_CUMULATIVE = "cumulative-stats";	
 
 	//////////////////////////////////////////////////////////////////////////////
 	

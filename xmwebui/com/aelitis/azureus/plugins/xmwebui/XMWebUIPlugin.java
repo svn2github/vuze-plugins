@@ -2202,52 +2202,99 @@ XMWebUIPlugin
                               | sessionCount     | number     | tr_session_stats
                               | secondsActive    | number     | tr_session_stats
 		 */
+		
+		List<String> fields = (List<String>) args.get("fields");
+		boolean all = fields == null || fields.size() == 0;
+		if (!all) {
+			// sort so we can't use Collections.binarySearch
+			Collections.sort(fields);
+		}
+
 		AzureusCore core = AzureusCoreFactory.getSingleton();
 		GlobalManager gm = core.getGlobalManager();
 		GlobalManagerStats stats = gm.getStats();
-		
+
+		TagManager tm = TagManagerFactory.getTagManager();
+
 		// < RPC v4
-		result.put("activeTorrentCount", 0); //TODO
-		result.put("downloadSpeed", stats.getDataAndProtocolReceiveRate());
-		result.put("pausedTorrentCount", 0); //TODO
-		result.put("torrentCount", gm.getDownloadManagers().size());
-		result.put("uploadSpeed", stats.getDataAndProtocolSendRate());
-		
+		if (all
+				|| Collections.binarySearch(fields,
+						TR_SESSION_STATS_ACTIVE_TORRENT_COUNT) >= 0) {
+			// Could use 7 or "tag.type.ds.act" for tag_active
+			Tag tag = tm.getTagType(TagType.TT_DOWNLOAD_STATE).getTag(7);
+			result.put(TR_SESSION_STATS_ACTIVE_TORRENT_COUNT,
+					tag == null ? 0 : tag.getTaggedCount());
+		}
+
+		if (all
+				|| Collections.binarySearch(fields, TR_SESSION_STATS_DOWNLOAD_SPEED) >= 0) {
+			result.put(TR_SESSION_STATS_DOWNLOAD_SPEED,
+					stats.getDataAndProtocolReceiveRate());
+		}
+
+		if (all
+				|| Collections.binarySearch(fields,
+						TR_SESSION_STATS_PAUSED_TORRENT_COUNT) >= 0) {
+			// Could use 8 or "tag.type.ds.pau" for tag_pause
+			Tag tag = tm.getTagType(TagType.TT_DOWNLOAD_STATE).getTag(8);
+			result.put(TR_SESSION_STATS_PAUSED_TORRENT_COUNT,
+					tag == null ? 0 : tag.getTaggedCount());
+		}
+
+		if (all
+				|| Collections.binarySearch(fields, TR_SESSION_STATS_TORRENT_COUNT) >= 0) {
+			// XXX: This is size with low-noise torrents, which aren't normally shown
+			result.put(TR_SESSION_STATS_TORRENT_COUNT,
+					gm.getDownloadManagers().size());
+		}
+
+		if (all
+				|| Collections.binarySearch(fields, TR_SESSION_STATS_UPLOAD_SPEED) >= 0) {
+			result.put(TR_SESSION_STATS_UPLOAD_SPEED,
+					stats.getDataAndProtocolSendRate());
+		}
+
 		// RPC v4
-  	Map	current_stats = new HashMap();
-  	
-  	result.put( "current-stats", current_stats );
-  	
-  	current_stats.put( "uploadedBytes", stats.getTotalDataBytesSent() );
-  	current_stats.put( "downloadedBytes", stats.getTotalDataBytesReceived() );
-  	
-  	long sent 		= stats.getTotalDataBytesSent();
-  	long received	= stats.getTotalDataBytesReceived();
-  	
-  	float ratio;
-  	
-  	if ( received == 0 ){
-  	
-  		ratio = (sent==0?1:Float.MAX_VALUE);
-  		
-  	}else{
-  		
-  		ratio = ((float)sent)/received;
-  	}
-  	
-  	current_stats.put( "ratio", ratio );
-  	current_stats.put( "secondsActive", 0 );
-  	
-		// RPC v4
-  	Map	cumulative_stats = new HashMap();
-  	
-  	result.put( "cumulative-stats", cumulative_stats );
-  
-  	cumulative_stats.put( "uploadedBytes", 0 );
-  	cumulative_stats.put( "downloadedBytes", 0 );
-  	cumulative_stats.put( "ratio", 0 );
-  	cumulative_stats.put( "secondsActive", 0 );
-  	cumulative_stats.put( "sessionCount", 0 );
+		if (all || Collections.binarySearch(fields, TR_SESSION_STATS_CURRENT) >= 0) {
+			Map current_stats = new HashMap();
+
+			result.put(TR_SESSION_STATS_CURRENT, current_stats);
+
+			current_stats.put("uploadedBytes", stats.getTotalDataBytesSent());
+			current_stats.put("downloadedBytes", stats.getTotalDataBytesReceived());
+
+			long sent = stats.getTotalDataBytesSent();
+			long received = stats.getTotalDataBytesReceived();
+
+			float ratio;
+
+			if (received == 0) {
+
+				ratio = (sent == 0 ? 1 : Float.MAX_VALUE);
+
+			} else {
+
+				ratio = ((float) sent) / received;
+			}
+
+			current_stats.put("ratio", ratio);
+			current_stats.put("secondsActive", 0); // TODO
+		}
+
+
+		if (all
+				|| Collections.binarySearch(fields, TR_SESSION_STATS_CUMULATIVE) >= 0) {
+			// RPC v4
+			Map cumulative_stats = new HashMap();
+			result.put("cumulative-stats", cumulative_stats);
+
+			// TODO: ALL!
+			cumulative_stats.put("uploadedBytes", 0);
+			cumulative_stats.put("downloadedBytes", 0);
+			cumulative_stats.put("ratio", 0);
+			cumulative_stats.put("secondsActive", 0);
+			cumulative_stats.put("sessionCount", 0);
+		}
 	}
 
 	private void 
