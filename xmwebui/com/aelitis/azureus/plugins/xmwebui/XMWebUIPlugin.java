@@ -6453,7 +6453,7 @@ XMWebUIPlugin
 
 	/**
 	 * Very simple 64 bit hash of a map's keys (assumed String, esp on JSON map),
-	 * and values.
+	 * and values (JSON types -- String, Number, Map (object), List (array), Boolean.
 	 */
 	private long longHashSimpleMap(SortedMap<?, ?> map) {
 		long hash = 0;
@@ -6470,6 +6470,8 @@ XMWebUIPlugin
 				hash = (hash * 31) + longHashSimpleMap((SortedMap) value);
 			} else if (value instanceof Collection) {
 				hash = (hash * 31) + longHashSimpleList((List) value);
+			} else if (value instanceof Boolean) {
+				hash = (hash * 31) + ((Boolean) value ? 1231 : 1237);
 			} // else skip all other values since we can't be sure how they hash
 		}
 		return hash;
@@ -6487,6 +6489,8 @@ XMWebUIPlugin
 				hash = (hash * 31) + longHashSimpleMap((SortedMap) value);
 			} else if (value instanceof Collection) {
 				hash = (hash * 31) + longHashSimpleList((Collection) value);
+			} else if (value instanceof Boolean) {
+				hash = (hash * 31) + ((Boolean) value ? 1231 : 1237);
 			} // else skip all other values since we can't be sure how they hash
 		}
 		return hash;
