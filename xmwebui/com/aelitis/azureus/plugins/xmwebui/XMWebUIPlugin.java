@@ -5113,18 +5113,23 @@ XMWebUIPlugin
 			}
 		}
 
-		// not part of "all"
-		if (sortedFields != null
-				&& Collections.binarySearch(sortedFields, FIELD_FILES_CONTENT_URL) >= 0) {
-			URL f_stream_url = PlayUtils.getMediaServerContentURL(file);
-			if (f_stream_url != null) {
-				obj.put(FIELD_FILES_CONTENT_URL, adjustURL(host, f_stream_url));
-			}
-		}
+		// Vuze specific, don't clutter transmission clients with these (they don't
+		// have sortedFields param)
+		if (sortedFields != null) {
+			boolean showAllVuze = sortedFields.size() == 0;
 
-		if (sortedFields != null
-				&& Collections.binarySearch(sortedFields, FIELD_FILES_FULL_PATH) >= 0) {
-			obj.put(FIELD_FILES_FULL_PATH, file.getFile().toString());
+			if (showAllVuze
+					|| Collections.binarySearch(sortedFields, FIELD_FILES_CONTENT_URL) >= 0) {
+				URL f_stream_url = PlayUtils.getMediaServerContentURL(file);
+				if (f_stream_url != null) {
+					obj.put(FIELD_FILES_CONTENT_URL, adjustURL(host, f_stream_url));
+				}
+			}
+
+			if (showAllVuze
+					|| Collections.binarySearch(sortedFields, FIELD_FILES_FULL_PATH) >= 0) {
+				obj.put(FIELD_FILES_FULL_PATH, file.getFile().toString());
+			}
 		}
 	}
 
