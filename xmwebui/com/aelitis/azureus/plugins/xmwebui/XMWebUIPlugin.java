@@ -1860,8 +1860,10 @@ XMWebUIPlugin
 		Collections.addAll(listSupports, "rpc:receive-gzip", "field:files-hc",
 				"method:tags-get-list");
 
-		for (String key : json_server_methods.keySet()) {
-			listSupports.add("method:" + key);
+		synchronized( json_server_method_lock ){
+  		for (String key : json_server_methods.keySet()) {
+  			listSupports.add("method:" + key);
+  		}
 		}
 
 		result.put("rpc-supports", listSupports);
