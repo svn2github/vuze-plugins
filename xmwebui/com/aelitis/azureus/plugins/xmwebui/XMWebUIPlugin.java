@@ -28,6 +28,7 @@ import java.net.*;
 import java.text.NumberFormat;
 import java.text.ParseException;
 import java.util.*;
+import java.util.zip.GZIPInputStream;
 
 import org.bouncycastle.util.encoders.Base64;
 import org.gudy.azureus2.core3.config.COConfigurationManager;
@@ -763,10 +764,16 @@ XMWebUIPlugin
 			response.setHeader( "Set-Cookie", "X-Transmission-Session-Id=" + session_id + "; path=/; HttpOnly" );
 			// This is the actual spec for massing session-id
 			response.setHeader("X-Transmission-Session-Id", session_id );
-			
+
 			if (!isSessionValid(request)) {
 				log(request.getHeader());
-				LineNumberReader lnr = new LineNumberReader( new InputStreamReader( request.getInputStream(), "UTF-8" ));
+				LineNumberReader lnr;
+				if ("gzip".equals(request.getHeaders().get("content-encoding"))) {
+					GZIPInputStream gzipIS = new GZIPInputStream(request.getInputStream());
+					lnr = new LineNumberReader( new InputStreamReader( gzipIS, "UTF-8" ));
+				} else {
+					lnr = new LineNumberReader( new InputStreamReader( request.getInputStream(), "UTF-8" ));
+				}
 				while( true ){
 					String	line = lnr.readLine();
 					if ( line == null ){
@@ -780,7 +787,8 @@ XMWebUIPlugin
 			}
 			
 			String session_id_plus = session_id;
-			
+
+			// XXX getHeaders() keys are lowercase.. this line always null?
 			String tid = (String)request.getHeaders().get( "X-XMRPC-Tunnel-ID" );
 			
 			if ( tid != null ){
@@ -794,8 +802,14 @@ XMWebUIPlugin
 			
 			if ( url.equals( "/transmission/rpc" )){
 							
-				LineNumberReader lnr = new LineNumberReader( new InputStreamReader( request.getInputStream(), "UTF-8" ));
-				
+				LineNumberReader lnr;
+				if ("gzip".equals(request.getHeaders().get("content-encoding"))) {
+					GZIPInputStream gzipIS = new GZIPInputStream(request.getInputStream());
+					lnr = new LineNumberReader( new InputStreamReader( gzipIS, "UTF-8" ));
+				} else {
+					lnr = new LineNumberReader( new InputStreamReader( request.getInputStream(), "UTF-8" ));
+				}
+					
 				StringBuffer	request_json_str = new StringBuffer(2048);
 				
 				while( true ){
@@ -809,7 +823,7 @@ XMWebUIPlugin
 					
 					request_json_str.append( line );
 				}
-							
+				
 				if ( logit ){
 				
 					log( "-> " + request_json_str );
@@ -1842,6 +1856,15 @@ XMWebUIPlugin
 		result.put( "az-version", az_version );                  // string     
 		result.put( "az-mode", az_mode );										// string
 		
+		List listSupports = new ArrayList();
+		Collections.addAll(listSupports, "rpc:receive-gzip", "field:files-hc",
+				"method:tags-get-list");
+
+		for (String key : json_server_methods.keySet()) {
+			listSupports.add("method:" + key);
+		}
+
+		result.put("rpc-supports", listSupports);
 	}
 
 	private void method_Session_Set(Map args, Map result)
@@ -3414,23 +3437,6 @@ XMWebUIPlugin
 		
 		List<DownloadStub>	downloads = getDownloads( ids, true );
 		
-		Object file_ids = args.get("file-indexes");
-		int[] file_indexes = null;
-		if (file_ids instanceof Number) {
-			file_indexes = new int[] {
-				((Number) file_ids).intValue()
-			};
-		} else if (file_ids instanceof List) {
-			List listFileIDs = (List) file_ids;
-			file_indexes = new int[listFileIDs.size()];
-			for (int i = 0; i < listFileIDs.size(); i++) {
-				Object o = listFileIDs.get(i);
-				if (o instanceof Number) {
-					file_indexes[i] = ((Number) o).intValue();
-				}
-			}
-		}
-		
 		List<String> file_fields = (List<String>) args.get("file-fields");
 		if (file_fields != null) {
 			Collections.sort(file_fields);
@@ -3442,10 +3448,10 @@ XMWebUIPlugin
 			
 			if (download_stub.isStub()) {
 				method_Torrent_Get_Stub(request, args, fields, torrent_info,
-						download_stub, file_indexes, file_fields);
+						download_stub, file_fields);
 			} else {
 				method_Torrent_Get_NonStub(request, args, fields, torrent_info,
-						(Download) download_stub, file_indexes, file_fields);
+						(Download) download_stub, file_fields);
 			}
 		} // for downloads
 		
@@ -3519,7 +3525,6 @@ XMWebUIPlugin
 			List<String> fields,
 			Map<Long, Map> torrent_info,
 			Download download,
-			int[] file_indexes,
 			List<String> file_fields)
 	{
 
@@ -3713,12 +3718,12 @@ XMWebUIPlugin
 
 				String host = (String)request.getHeaders().get( "host" );
 
-				value = torrentGet_files(host, download, file_indexes, file_fields, args);
+				value = torrentGet_files(host, download, download_id, file_fields, args);
 
 			} else if (field.equals("fileStats")) {
 				// RPC v5
 
-				value = torrentGet_fileStats(download, file_indexes, file_fields, args);
+				value = torrentGet_fileStats(download, file_fields, args);
 
 			} else if (field.equals("hashString")) {
 				// RPC v0
@@ -4156,7 +4161,6 @@ XMWebUIPlugin
 			List<String> fields,
 			Map<Long, Map> torrent_info,
 			DownloadStub download_stub,
-			int[] file_indexes, 
 			List<String> file_fields) 
 	{
 		
@@ -4353,14 +4357,13 @@ XMWebUIPlugin
 
 				String host = (String)request.getHeaders().get( "host" );
 
-				value = torrentGet_files_stub(host, download_stub, file_indexes,
+				value = torrentGet_files_stub(host, download_stub, download_id,
 						file_fields, args);
 
 			}else if ( field.equals( "fileStats" )){
 				// RPC v5
 
-				value = torrentGet_fileStats_stub(download_stub, file_indexes,
-						file_fields, args);
+				value = torrentGet_fileStats_stub(download_stub, file_fields, args);
 
 			}else if ( field.equals( "hashString" )){
 				
@@ -4925,7 +4928,6 @@ XMWebUIPlugin
 
 	private Object torrentGet_fileStats(
 			Download download, 
-			int[] file_indexes, 
 			List<String> file_fields,
 			Map args) {
 		// | a file's non-constant properties.    |
@@ -4937,37 +4939,16 @@ XMWebUIPlugin
     // | priority                | number     | tr_info
 		List<Map> stats_list = new ArrayList<Map>();
 		
-		// Skip files that match these hashcodes
-		List listHCs = MapUtils.getMapList(args, "fileStats-hc", null);
-
 		DiskManagerFileInfo[] files = download.getDiskManagerFileInfo();
 		
-		if (file_indexes == null) {
-			for (int i = 0; i < files.length; i++) {
-				DiskManagerFileInfo file = files[i];
-  			
-				TreeMap map = new TreeMap();
-  
-				map.put("index", i);
-  			torrentGet_fileStats(map, file_fields, file);
-  			
-				hashAndAdd(map, stats_list, listHCs, i);
-  		}
-		} else {
-			for (int i = 0; i < file_indexes.length; i++) {
-				int file_index = file_indexes[i];
-				if (file_index < 0 || file_index >= files.length) {
-					continue;
-				}
+		for (int i = 0; i < files.length; i++) {
+			DiskManagerFileInfo file = files[i];
+			
+			TreeMap map = new TreeMap();
 
-				TreeMap<String, Object> map = new TreeMap<String, Object>();
+			stats_list.add(map);
 
-				map.put("index", file_index);
-				DiskManagerFileInfo file = files[file_index];
-				torrentGet_fileStats(map, file_fields, file);
-
-				hashAndAdd(map, stats_list, listHCs, i);
-			}
+			torrentGet_fileStats(map, file_fields, file);
 		}
 		
 		return stats_list;
@@ -4996,7 +4977,6 @@ XMWebUIPlugin
 
 	private Object torrentGet_fileStats_stub(
 			DownloadStub download_stub,
-			int[] file_indexes, 
 			List<String> file_fields,
 			Map args)
 	{
@@ -5004,35 +4984,13 @@ XMWebUIPlugin
 		
 		List<Map>	stats_list = new ArrayList<Map>();
 	
-		// Skip files that match these hashcodes
-		List listHCs = MapUtils.getMapList(args, "fileStats-hc", null);
+		for (int i = 0; i < stubFiles.length; i++) {
+			
+			TreeMap	map = new TreeMap();
+			stats_list.add(map);
 
-		if (file_indexes == null) {
-			for (int i = 0; i < stubFiles.length; i++) {
-  			
-				TreeMap	map = new TreeMap();
-				map.put("index", i);
-
-				DownloadStubFile sf = stubFiles[i];
-  			torrentGet_fileStats_stub(map, null, sf);
-  			
-				hashAndAdd(map, stats_list, listHCs, i);
-  		}
-		} else {
-			for (int i = 0; i < file_indexes.length; i++) {
-				int file_index = file_indexes[i];
-				if (file_index < 0 || file_index >= stubFiles.length) {
-					continue;
-				}
-
-				TreeMap<String, Object> map = new TreeMap<String, Object>();
-				map.put("index", file_index);
-
-				DownloadStubFile file = stubFiles[file_index];
-				torrentGet_fileStats_stub(map, file_fields, file);
-
-				hashAndAdd(map, stats_list, listHCs, i);
-			}
+			DownloadStubFile sf = stubFiles[i];
+			torrentGet_fileStats_stub(map, null, sf);
 		}
 		
 		return stats_list;
@@ -5066,7 +5024,7 @@ XMWebUIPlugin
 	private Object torrentGet_files(
 			String host,
 			Download download, 
-			int[] file_indexes, 
+			long download_id,
 			List<String> file_fields,
 			Map args)
 	{
@@ -5082,11 +5040,13 @@ XMWebUIPlugin
 		List<Map> file_list = new ArrayList<Map>();
 
 		// Skip files that match these hashcodes
-		List listHCs = MapUtils.getMapList(args, "files-hc", null);
+		List listHCs = MapUtils.getMapList(args, "files-hc-" + download_id, null);
 		
 		DiskManagerFileInfo[] files = download.getDiskManagerFileInfo();
 		
-		if (file_indexes == null) {
+		int[] file_indexes = getFileIndexes(args, download_id);
+		
+		if (file_indexes == null || file_indexes.length == 0) {
 			for (int i = 0; i < files.length; i++) {
 				DiskManagerFileInfo file = files[i];
   			
@@ -5095,11 +5055,13 @@ XMWebUIPlugin
 				map.put("index", i);
 
   			torrentGet_files(map, file_fields, host, download, file);
+  			if (file_fields != null && file_fields.size() == 0) {
+  				torrentGet_fileStats(map, file_fields, file);
+  			}
 
   			hashAndAdd(map, file_list, listHCs, i);
   		}
 		} else {
-
 			for (int i = 0; i < file_indexes.length; i++) {
 				int file_index = file_indexes[i];
 				if (file_index < 0 || file_index >= files.length) {
@@ -5167,7 +5129,7 @@ XMWebUIPlugin
 	private Object torrentGet_files_stub(
 			String host,
 			DownloadStub download_stub,
-			int[] file_indexes, 
+			long download_id,
 			List<String> file_fields,
 			Map args)
 	{
@@ -5176,9 +5138,11 @@ XMWebUIPlugin
 		List<Map>	file_list = new ArrayList<Map>();
 
 		// Skip files that match these hashcodes
-		List listHCs = MapUtils.getMapList(args, "files-hc", null);
+		List listHCs = MapUtils.getMapList(args, "files-hc" + download_id, null);
+
+		int[] file_indexes = getFileIndexes(args, download_id);
 		
-		if (file_indexes == null) {
+		if (file_indexes == null || file_indexes.length == 0) {
   		
 			for (int i = 0; i < stubFiles.length; i++) {
 				DownloadStubFile sf = stubFiles[i];
@@ -5188,6 +5152,9 @@ XMWebUIPlugin
 				map.put("index", i);
 
   			torrentGet_file_stub(map, file_fields, host, sf);
+  			if (file_fields != null && file_fields.size() == 0) {
+  				torrentGet_fileStats_stub(map, file_fields, sf);
+  			}
 
   			hashAndAdd(map, file_list, listHCs, i);
 			}
@@ -5212,6 +5179,26 @@ XMWebUIPlugin
 		}
 		
 		return file_list;				
+	}
+
+	private int[] getFileIndexes(Map args, long download_id) {
+		Object file_ids = args.get("file-indexes-" + download_id);
+		int[] file_indexes = null;
+		if (file_ids instanceof Number) {
+			file_indexes = new int[] {
+				((Number) file_ids).intValue()
+			};
+		} else if (file_ids instanceof List) {
+			List listFileIDs = (List) file_ids;
+			file_indexes = new int[listFileIDs.size()];
+			for (int i = 0; i < listFileIDs.size(); i++) {
+				Object o = listFileIDs.get(i);
+				if (o instanceof Number) {
+					file_indexes[i] = ((Number) o).intValue();
+				}
+			}
+		}
+		return file_indexes;
 	}
 
 	private void torrentGet_file_stub(Map map,List<String> sortedFields, String host, DownloadStubFile sf) {
@@ -6443,7 +6430,7 @@ XMWebUIPlugin
 		// hex string shorter than long in json, even with quotes
 		String hc = Long.toHexString(hashCode);
 
-		boolean remove = hcMatchList != null && i >= hcMatchList.size()
+		boolean remove = hcMatchList != null && i < hcMatchList.size()
 				&& hc.equals(hcMatchList.get(i));
 		if (!remove) {
 			map.put("hc", hc);
@@ -6457,6 +6444,11 @@ XMWebUIPlugin
 	 */
 	private long longHashSimpleMap(SortedMap<?, ?> map) {
 		long hash = 0;
+		
+		Object hc = map.get("hc");
+		if (hc instanceof String) {
+			return Long.parseLong((String) hc, 16);
+		}
 
 		for (Object key : map.keySet()) {
 			Object value = map.get(key);
