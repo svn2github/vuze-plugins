@@ -1588,6 +1588,9 @@ XMWebUIPlugin
 				map.put("count", tag.getTaggedCount());
 				map.put("type", tag.getTagType().getTagType());
 				map.put("type-name", tag.getTagType().getTagTypeName(true));
+				if (tag instanceof Category) {
+					map.put("category-type", ((Category) tag).getType());
+				}
 				map.put("uid", tag.getTagUID());
 				//map.put("id", tag.getTagID());
 				int[] color = tag.getColor();
@@ -1603,6 +1606,7 @@ XMWebUIPlugin
 				}
 				map.put("canBePublic", tag.canBePublic());
 				map.put("public", tag.isPublic());
+				map.put("visible", tag.isVisible());
 				map.put("auto", tag.isTagAuto());
 				listTags.add(map);
 			}
