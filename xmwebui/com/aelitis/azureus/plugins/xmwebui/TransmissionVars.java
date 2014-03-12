@@ -309,4 +309,13 @@ public class TransmissionVars
 						: TransmissionVars.TR_PRI_HIGH;
 	}
 
+	//////////////////////////////////////////////////////////////////////////////
+	
+	public static final int TR_STATUS_STOPPED        = 0; /* Torrent is stopped */
+	public static final int TR_STATUS_CHECK_WAIT     = 1; /* Queued to check files */
+	public static final int TR_STATUS_CHECK          = 2; /* Checking files */
+	public static final int TR_STATUS_DOWNLOAD_WAIT  = 3; /* Queued to download */
+	public static final int TR_STATUS_DOWNLOAD       = 4; /* Downloading */
+	public static final int TR_STATUS_SEED_WAIT      = 5; /* Queued to seed */
+	public static final int TR_STATUS_SEED           = 6; /* Seeding */
 }

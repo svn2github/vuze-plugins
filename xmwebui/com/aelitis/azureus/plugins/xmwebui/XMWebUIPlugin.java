@@ -31,6 +31,8 @@ import java.util.*;
 import java.util.zip.GZIPInputStream;
 
 import org.bouncycastle.util.encoders.Base64;
+import org.gudy.azureus2.core3.category.Category;
+import org.gudy.azureus2.core3.category.CategoryManager;
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.config.impl.TransferSpeedValidator;
 import org.gudy.azureus2.core3.disk.DiskManager;
@@ -4136,8 +4138,19 @@ XMWebUIPlugin
 				TagManager tm = TagManagerFactory.getTagManager();
 				
 				List<Tag> tags = tm.getTagsForTaggable(core_download);
-				for (Tag tag : tags) {
-					listTags.add(tag.getTagUID());
+				if (tags == null || tags.isEmpty()) {
+					Category catAll = CategoryManager.getCategory(Category.TYPE_ALL);
+					if (catAll != null) {
+						listTags.add(catAll.getTagUID());
+					}
+					Category catUncat = CategoryManager.getCategory(Category.TYPE_UNCATEGORIZED);
+					if (catUncat != null) {
+						listTags.add(catUncat.getTagUID());
+					}
+				} else {
+  				for (Tag tag : tags) {
+  					listTags.add(tag.getTagUID());
+  				}
 				}
 				
 				value = listTags;
@@ -4185,6 +4198,8 @@ XMWebUIPlugin
 			
 			MagnetDownload md = (MagnetDownload)download_stub;
 			
+			TagManager tm = TagManagerFactory.getTagManager();
+			
 			Throwable e = md.getError();
 			
 			if ( e == null ){
@@ -4192,7 +4207,22 @@ XMWebUIPlugin
 				status = 4;
 				
 				md_comp		= 0.0f;
-				
+
+				if (fields.contains("tag-uids")) {
+  				List listTags = new ArrayList();
+  				Tag tag = getTagFromState(Download.ST_DOWNLOADING, false);
+  				if (tag != null) {
+  					listTags.add(tag.getTagUID());
+  				}
+  				// 7, "tag.type.ds.act"
+  				tag = tm.getTagType(TagType.TT_DOWNLOAD_STATE).getTag(7);
+  				if (tag != null) {
+  					listTags.add(tag.getTagUID());
+  				}
+  				
+  				torrent.put("tag-uids", listTags);
+				}
+
 			}else{
 				
 				status		= 0;
@@ -4255,11 +4285,21 @@ XMWebUIPlugin
 						error_str = "No sources found for torrent";
 					}
 				}
+
+				if (fields.contains("tag-uids")) {
+					List listTags = new ArrayList();
+					Tag tag = getTagFromState(Download.ST_STOPPED, true);
+					if (tag != null) {
+						listTags.add(tag.getTagUID());
+					}
+					
+					torrent.put("tag-uids", listTags);
+				}
 			}
 			
 			created_by	= "Vuze";
 			create_date	= md.getCreateTime()/1000;
-			
+
 		}
 		
 		long	size = 0;
@@ -4386,7 +4426,45 @@ XMWebUIPlugin
 			}else if ( field.equals( "totalSize" )){
 
 				value = size;
+
+			} else if (field.equals("tag-uids")) {
+				// azRPC
+				List listTags = MapUtils.getMapList(torrent, field, new ArrayList());
+				
+				TagManager tm = TagManagerFactory.getTagManager();
+
+				if (listTags.size() == 0) {
+					Tag tag = getTagFromState(Download.ST_STOPPED, !is_magnet_download);
+					if (tag != null) {
+						listTags.add(tag.getTagUID());
+					}
+
+					//  9, "tag.type.ds.inact"
+					tag = tm.getTagType(TagType.TT_DOWNLOAD_STATE).getTag(9);
+					if (tag != null) {
+						listTags.add(tag.getTagUID());
+					}
+				}
+				
+				// 11, "tag.type.ds.incomp"
+				// 10, incomplete
+				Tag tag = tm.getTagType(TagType.TT_DOWNLOAD_STATE).getTag(is_magnet_download ? 11 : 10);
+				if (tag != null) {
+					listTags.add(tag.getTagUID());
+				}
+				
+				Category catAll = CategoryManager.getCategory(Category.TYPE_ALL);
+				if (catAll != null) {
+					listTags.add(catAll.getTagUID());
+				}
+				Category catUncat = CategoryManager.getCategory(Category.TYPE_UNCATEGORIZED);
+				if (catUncat != null) {
+					listTags.add(catUncat.getTagUID());
+				}
+				
+				value = listTags;
 			}
+
 			
 			if ( value != null ){
 			
@@ -4402,6 +4480,40 @@ XMWebUIPlugin
 				System.out.println( "Unknown field: " + field );
 			}
 		}
+	}
+	
+	private Tag getTagFromState(int state, boolean complete) {
+		/*
+		 	tag_initialising		= new MyTag( 0, "tag.type.ds.init",
+			tag_downloading			= new MyTag( 1, "tag.type.ds.down",
+			tag_seeding				= new MyTag( 2, "tag.type.ds.seed", 
+			tag_queued_downloading	= new MyTag( 3, "tag.type.ds.qford"
+			tag_queued_seeding		= new MyTag( 4, "tag.type.ds.qfors", 
+			tag_stopped				= new MyTag( 5, "tag.type.ds.stop", 
+			tag_error				= new MyTag( 6, "tag.type.ds.err", 
+	 */
+		int id = 0;
+
+		switch (state) {
+			case Download.ST_DOWNLOADING:
+				id = 1;
+				break;
+			case Download.ST_SEEDING:
+				id = 2;
+				break;
+			case Download.ST_QUEUED:
+				id = complete ? 4 : 3;
+				break;
+			case Download.ST_STOPPED:
+			case Download.ST_STOPPING:
+				id = 5;
+				break;
+			case Download.ST_ERROR:
+				id = 6;
+				break;
+		}
+		TagManager tm = TagManagerFactory.getTagManager();
+		return tm.getTagType(TagType.TT_DOWNLOAD_STATE).getTag(id);
 	}
 	
 	/** Number of webseeds that are sending data to us. */
