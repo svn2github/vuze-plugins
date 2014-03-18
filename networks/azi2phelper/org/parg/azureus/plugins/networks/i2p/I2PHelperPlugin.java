@@ -40,9 +40,12 @@ import net.i2p.data.Destination;
 import net.i2p.data.PrivateKeyFile;
 import net.i2p.router.Router;
 import net.i2p.router.RouterContext;
+import net.i2p.router.TunnelManagerFacade;
+import net.i2p.router.transport.FIFOBandwidthLimiter;
 import net.i2p.stat.RateStat;
 
 import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.DisplayFormatters;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.UnloadablePlugin;
 import org.klomp.snark.Snark;
@@ -202,14 +205,7 @@ I2PHelperPlugin
 					throw( new Exception( "Failed to create config dir '" + config_dir +"'" ));
 				}
 			}
-		
-				// config changes
-			
-				// router.config
-				// 		i2cp.port=17654
-				// 		i2np.upnp.enable=false
-				//		i2p.streaming.answerPings=true			- for testing
-			
+					
 				// setting this prevents stdout/stderr from being hijacked
 			
 			System.setProperty( "wrapper.version", "dummy" );
@@ -224,9 +220,16 @@ I2PHelperPlugin
 			
 			router_props.put( "i2cp.port", i2p_port );
 			router_props.put( "i2np.upnp.enable", false );
-			router_props.put( "i2p.streaming.answerPings", true );
+			router_props.put( "i2p.streaming.answerPings", true );		// testing
 			
+				// TODO: manage the external port + upnp where required
+				// Note that TCP defaults to the same as UDP port
+			
+			router_props.put( "i2np.udp.port", 27476 );
+			router_props.put( "i2np.udp.internalPort", 27476 );
+	
 				// router bandwidth
+				// TODO: review!
 			
 			router_props.put( "i2np.bandwidth.inboundBurstKBytes", 11000 );
 			router_props.put( "i2np.bandwidth.inboundBurstKBytesPerSecond", 550 );
@@ -234,7 +237,7 @@ I2PHelperPlugin
 			router_props.put( "i2np.bandwidth.outboundBurstKBytes", 11000 );
 			router_props.put( "i2np.bandwidth.outboundBurstKBytesPerSecond", 550 );
 			router_props.put( "i2np.bandwidth.outboundKBytesPerSecond", 500 );
-
+			
 				// router pools
 					
 			router_props.put( "router.inboundPool.backupQuantity", 0 );
@@ -245,12 +248,13 @@ I2PHelperPlugin
 			router_props.put( "router.outboundPool.length", 2 );
 			router_props.put( "router.outboundPool.lengthVariance", 0 );
 			router_props.put( "router.outboundPool.quantity", 2 );
-										
+			router_props.put( "router.sharePercentage", 30 );
+						
 			normalizeProperties( router_props );
 			
 			writeProperties( router_config, router_props );
 			
-			router_props.setProperty( "router.configLocation", config_dir.getAbsolutePath() + File.separator + "router.config" );
+			router_props.setProperty( "router.configLocation", router_config.getAbsolutePath());
 			router_props.setProperty( "i2p.dir.base" , config_dir.getAbsolutePath());
 			router_props.setProperty( "i2p.dir.config" , config_dir.getAbsolutePath());
 
@@ -427,13 +431,31 @@ I2PHelperPlugin
 
 				System.out.println( "Known routers=" + router_ctx.netDb().getKnownRouters() + ", lease-sets=" + router_ctx.netDb().getKnownLeaseSets());
 				
+				TunnelManagerFacade tunnel_manager = router_ctx.tunnelManager();
+				
+				int	exploratory_tunnels		= tunnel_manager.getFreeTunnelCount() + tunnel_manager.getOutboundTunnelCount();
+				int	client_tunnels			= tunnel_manager.getInboundClientTunnelCount()  + tunnel_manager.getOutboundClientTunnelCount();
+				int participating_tunnels	= tunnel_manager.getParticipatingCount();
+				
+				System.out.println( "Tunnels: exploratory=" + exploratory_tunnels + ", client=" + client_tunnels + ", participating=" + participating_tunnels ); 
+
 				System.out.println( "Throttle: msg_delay=" + router_ctx.throttle().getMessageDelay() + ", tunnel_lag=" + router_ctx.throttle().getTunnelLag() + ", tunnel_stat=" +  router_ctx.throttle().getTunnelStatus());
 				
-				RateStat sendRate = router_ctx.statManager().getRate("bw.sendRate");
-			    RateStat recvRate = router_ctx.statManager().getRate("bw.recvRate");
-			      
-			    System.out.println( "Rates: send=" + sendRate.getRate(60*1000).getAverageValue() + ", recv=" + recvRate.getRate(60*1000).getAverageValue());
+				FIFOBandwidthLimiter bwl = router_ctx.bandwidthLimiter();
+				
+				long recv_rate = (long)bwl.getReceiveBps();
+				long send_rate = (long)bwl.getSendBps();
+				
+				//RateStat sendRate = router_ctx.statManager().getRate("bw.sendRate");
+			    //RateStat recvRate = router_ctx.statManager().getRate("bw.recvRate"); 
+				//System.out.println( "Rates: send=" + sendRate.getRate(60*1000).getAverageValue() + ", recv=" + recvRate.getRate(60*1000).getAverageValue());
 			    
+				System.out.println( 
+					"Rates: send=" + DisplayFormatters.formatByteCountToKiBEtcPerSec(send_rate) +
+					", recv=" + DisplayFormatters.formatByteCountToKiBEtcPerSec(recv_rate) +
+					"; Limits: send=" + DisplayFormatters.formatByteCountToKiBEtcPerSec(bwl.getOutboundKBytesPerSecond()*1024) + 
+					", recv=" + DisplayFormatters.formatByteCountToKiBEtcPerSec(bwl.getInboundKBytesPerSecond()*1024));
+				
 				Thread.sleep(5000);
 			}
 			
