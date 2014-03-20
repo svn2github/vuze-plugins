@@ -25,9 +25,8 @@ import java.util.*;
 
 import net.i2p.data.Hash;
 
-import org.klomp.snark.dht.DHT;
-
 import org.gudy.azureus2.core3.util.SystemTime;
+import org.parg.azureus.plugins.networks.i2p.dht.DHT;
 
 
 public class 
