@@ -210,8 +210,8 @@ public class NodeInfo extends SimpleDataStructure {
         return this.port;
     }
 
-    public long lastSeen() {
-        return nID.lastSeen();
+    public long lastKnown() {
+        return nID.getLastKnown();
     }
 
     @Override

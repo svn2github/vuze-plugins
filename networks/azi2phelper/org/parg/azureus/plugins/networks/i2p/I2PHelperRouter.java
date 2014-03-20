@@ -194,8 +194,11 @@ I2PHelperRouter
 				// TODO: manage the external port + upnp where required
 				// Note that TCP defaults to the same as UDP port
 			
-			router_props.put( "i2np.udp.port", 27476 );
-			router_props.put( "i2np.udp.internalPort", 27476 );
+			if ( is_bootstrap_node ){
+			
+				router_props.put( "i2np.udp.port", 19817 );
+				router_props.put( "i2np.udp.internalPort", 19817 );
+			}
 	
 				// router bandwidth
 				// TODO: review!

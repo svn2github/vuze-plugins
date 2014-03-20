@@ -36,6 +36,9 @@ public interface DHT {
     public void
     crawl();
     
+    public void
+    print();
+    
     public NodeInfo heardAbout(NodeInfo nInfo);
     
     public Collection<Hash> getPeersAndNoAnnounce(byte[] ih, int max, long maxWait, int annMax, long annMaxWait);
@@ -109,7 +112,7 @@ public interface DHT {
     /**
      * Known nodes, not estimated total network size.
      */
-    public int size();
+    public int sizeInKAD();
 
     /**
      * Debug info, HTML formatted

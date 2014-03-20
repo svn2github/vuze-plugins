@@ -70,18 +70,21 @@ abstract class PersistDHT {
     /**
      *  @param saveAll if true, don't check last seen time
      */
-    public static synchronized void saveDHT(DHTNodes nodes, boolean saveAll, File file) {
-        if (nodes.size() <= 0)
+    public static synchronized void saveDHT(DHTNodes nodes,File file) {
+        if (nodes.sizeInKAD() <= 0)
             return;
         Log log = I2PAppContext.getGlobalContext().logManager().getLog(PersistDHT.class);
         int count = 0;
-        long maxAge = saveAll ? 0 : I2PAppContext.getGlobalContext().clock().now() - MAX_AGE;
+        
+        System.out.println( "Saving DHT: needs work to select best ones to save...." );
+        
+        long maxAge = 0; // saveAll ? 0 : I2PAppContext.getGlobalContext().clock().now() - MAX_AGE;
         PrintWriter out = null;
         try {
             out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(new SecureFileOutputStream(file), "ISO-8859-1")));
             out.println("# DHT nodes, format is NID:Hash:Destination:port");
-            for (NodeInfo ni : nodes.values()) {
-                 if (ni.lastSeen() < maxAge)
+            for (NodeInfo ni : nodes.valuesInKAD()) {
+                 if (ni.lastKnown() < maxAge)
                      continue;
                  // DHTNodes shouldn't contain us, if that changes check here
                  out.println(ni.toPersistentString());

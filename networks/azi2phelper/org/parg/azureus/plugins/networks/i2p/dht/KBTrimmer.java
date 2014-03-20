@@ -28,7 +28,7 @@ class KBTrimmer implements KBucketTrimmer<NID> {
             return false;
         Set<NID> entries = kbucket.getEntries();
         for (NID nid : entries) {
-            if (nid.lastSeen() < now - MAX_NODE_AGE) {
+            if (nid.getLastKnown() < now - MAX_NODE_AGE) {
                 if (kbucket.remove(nid))
                     return true;
             }

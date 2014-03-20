@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import net.i2p.I2PAppContext;
@@ -69,8 +70,9 @@ class DHTNodes {
     /**
      *  @return known nodes, not total net size
      */
-    public int size() {
-        return _nodeMap.size();
+    public int sizeInKAD() {
+       // return _nodeMap.size();
+    	return( _kad.size());
     }
 
     public void clear() {
@@ -100,10 +102,24 @@ class DHTNodes {
         return _nodeMap.remove(nid);
     }
 
-    public Collection<NodeInfo> values() {
-        return _nodeMap.values();
+    public Collection<NodeInfo> valuesInKAD() {
+    	Set<NID> nids = _kad.getAll();
+    	Collection<NodeInfo> result = new ArrayList<NodeInfo>(nids.size());
+    	for ( NID nid: nids ){
+    		NodeInfo ni = _nodeMap.get( nid );
+    		if ( ni != null ){
+    			result.add( ni );
+    		}
+    	}
+    	return( result );
     }
 
+    public Set<NID>
+    kadValues()
+    {
+    	return( _kad.getAll());
+    }
+    
     // end ConcurrentHashMap methods
 
     /**
@@ -153,9 +169,9 @@ class DHTNodes {
                 return;
             long now = _context.clock().now();
             int peerCount = 0;
-            for (Iterator<NodeInfo> iter = DHTNodes.this.values().iterator(); iter.hasNext(); ) {
+            for (Iterator<NodeInfo> iter = DHTNodes.this._nodeMap.values().iterator(); iter.hasNext(); ) {
                  NodeInfo peer = iter.next();
-                 if (peer.lastSeen() < now - _expireTime) {
+                 if (peer.lastKnown() < now - _expireTime) {
                      iter.remove();
                      _kad.remove(peer.getNID());
                  } else {

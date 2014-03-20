@@ -216,8 +216,8 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
     /**
      * Known nodes, not estimated total network size.
      */
-    public int size() {
-        return _knownNodes.size();
+    public int sizeInKAD() {
+        return _knownNodes.sizeInKAD();
     }
 
     /**
@@ -675,8 +675,8 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
         // clear the DHT and tracker
         _tracker.stop();
         // don't lose all our peers if we didn't have time to check them
-        boolean saveAll = _context.clock().now() - _started < 20*60*1000;
-        PersistDHT.saveDHT(_knownNodes, saveAll, _dhtFile);
+        //  boolean saveAll = _context.clock().now() - _started < 20*60*1000;
+        PersistDHT.saveDHT(_knownNodes, _dhtFile);
         _knownNodes.stop();
         for (Iterator<ReplyWaiter> iter = _sentQueries.values().iterator(); iter.hasNext(); ) {
             ReplyWaiter waiter = iter.next();
@@ -709,7 +709,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
                    "RX: ").append(_rxPkts.get()).append(" pkts / ")
            .append(DataHelper.formatSize2(_rxBytes.get())).append("B / ")
            .append(DataHelper.formatSize2(_rxBytes.get() * 1000 / uptime)).append("Bps<br>" +
-                   "DHT Peers: ").append( _knownNodes.size()).append("<br>" +
+                   "DHT Peers: ").append( _knownNodes.sizeInKAD()).append("<br>" +
                    "Blacklisted: ").append(_blacklist.size()).append("<br>" +
                    "Sent tokens: ").append(_outgoingTokens.size()).append("<br>" +
                    "Rcvd tokens: ").append(_incomingTokens.size()).append("<br>" +
@@ -1193,7 +1193,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
                 oldInfo.setDestination(nInfo.getDestination());
         }
         nID = oldInfo.getNID();
-        nID.setLastSeen();
+        nID.setAlive();
         if (_blacklist.remove(nID)) {
             if (_log.shouldLog(Log.INFO))
                 _log.info("UN-blacklisted: " + nID);
@@ -1215,7 +1215,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             rv = nInfo;
             // if we didn't know about it before, set the timestamp
             // so it isn't immediately removed by the DHTNodes cleaner
-            rv.getNID().setLastSeen();
+            // PARG - use creation data now // rv.getNID().setLastSeen( false );
         }
         return rv;
     }
@@ -1233,7 +1233,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             }
             if (!_blacklist.contains(nid)) {
                 // used as when-added time
-                nid.setLastSeen();
+                nid.resetCreated();
                 _blacklist.add(nid);
                 if (_log.shouldLog(Log.INFO))
                     _log.info("Blacklisted: " + nid);
@@ -1663,7 +1663,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             for (Iterator<NID> iter = _blacklist.iterator(); iter.hasNext(); ) {
                 NID nid = iter.next();
                 // lastSeen() is actually when-added
-                if (nid.lastSeen() < expire)
+                if (nid.getCreated() < expire)
                     iter.remove();
             }
             // TODO sent queries?
@@ -1672,13 +1672,12 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
                           _blacklist.size() + " in blacklist, " +
                           _outgoingTokens.size() + " sent Tokens, " +
                           _incomingTokens.size() + " rcvd Tokens, " +
-                          _knownNodes.size() + " known peers, " +
+                          _knownNodes.sizeInKAD() + " known peers, " +
                           _sentQueries.size() + " queries awaiting response");
             
             // PARG 
-            System.out.println( "Persisting DHT" );
-            boolean saveAll = _context.clock().now() - _started < 20*60*1000;
-            PersistDHT.saveDHT(_knownNodes, saveAll, _dhtFile);
+  
+            PersistDHT.saveDHT(_knownNodes, _dhtFile);
             
             schedule(CLEAN_TIME);
         }
@@ -1696,7 +1695,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
         public void timeReached() {
             if (!_isRunning)
                 return;
-            if (_knownNodes.size() > 0)
+            if (_knownNodes.sizeInKAD() > 0)
                 (new I2PAppThread(new ExplorerThread(), "DHT Explore", true)).start();
             else
                 schedule(60*1000);
@@ -1713,16 +1712,16 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
                 return;
             if (!_hasBootstrapped) {
                 if (_log.shouldLog(Log.INFO))
-                    _log.info("Bootstrap start, size: " + _knownNodes.size());
+                    _log.info("Bootstrap start, size: " + _knownNodes.sizeInKAD());
                 explore(_myNID, 8, 60*1000, 1);
                 if (_log.shouldLog(Log.INFO))
-                    _log.info("Bootstrap done, size: " + _knownNodes.size());
+                    _log.info("Bootstrap done, size: " + _knownNodes.sizeInKAD());
                 _hasBootstrapped = true;
             }
             if (!_isRunning)
                 return;
             if (_log.shouldLog(Log.INFO))
-                _log.info("Explore start. size: " + _knownNodes.size());
+                _log.info("Explore start. size: " + _knownNodes.sizeInKAD());
             List<NID> keys = _knownNodes.getExploreKeys();
             for (NID nid : keys) {
                 explore(nid, 8, 60*1000, 1);
@@ -1730,7 +1729,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
                     return;
             }
             if (_log.shouldLog(Log.INFO))
-                _log.info("Explore of " + keys.size() + " buckets done, new size: " + _knownNodes.size());
+                _log.info("Explore of " + keys.size() + " buckets done, new size: " + _knownNodes.sizeInKAD());
             new Explorer(EXPLORE_TIME);
         }
     }
@@ -1739,7 +1738,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
     public void
     crawl()
     {
-    	List<NodeInfo> all_nodes = new LinkedList<NodeInfo>(_knownNodes.values());
+    	List<NodeInfo> all_nodes = new LinkedList<NodeInfo>(_knownNodes.valuesInKAD());
     	
     	System.out.println( "Crawling " + all_nodes.size() + " nodes" );
     	
@@ -1822,7 +1821,22 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
     			sem.reserve();
     		}
     	}
+    }
+    
+    public void
+    print()
+    {
+    	List<NodeInfo> known_nodes = new LinkedList<NodeInfo>(_knownNodes.valuesInKAD());
     	
+       	Set<NID> kad_nids = _knownNodes.kadValues();
+
+    	System.out.println( "Printing " + known_nodes.size() + " nodes, nids=" + kad_nids.size());
     	
+     	for ( NodeInfo ni: known_nodes ){
+     		
+     		NID nid = ni.getNID();
+     		
+     		System.out.println( ni + ": in kad=" + kad_nids.contains( nid ));
+     	}
     }
 }

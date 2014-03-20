@@ -214,6 +214,10 @@ I2PHelperPlugin
 						
 						router.getDHT().crawl();
 						
+					}else if ( cmd.equals( "print" )){
+						
+						router.getDHT().print();
+						
 					}else{
 						
 						router.logInfo();

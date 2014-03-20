@@ -15,32 +15,82 @@ import net.i2p.util.Clock;
  */
 public class NID extends SHA1Hash {
 
-    private long lastSeen;
+    private long created;
+    private long lastAlive;
+    private long lastFailed;
+    
     private int fails;
 
     private static final int MAX_FAILS = 2;
 
     public NID() {
         super(null);
+        
+        created = Clock.getInstance().now();
     }
 
     public NID(byte[] data) {
         super(data);
+        
+        created = Clock.getInstance().now();
     }
 
-    public long lastSeen() {
-        return lastSeen;
+    public long 
+    getCreated() 
+    {
+        return created;
     }
 
-    public void setLastSeen() {
-        lastSeen = Clock.getInstance().now();
-        fails = 0;
+    public long
+    getLastKnown()
+    {
+    	return( lastAlive== 0?created:lastAlive );
     }
+    public long
+    getLastAlive()
+    {
+    	return( lastAlive );
+    }
+    
+    public long
+    getLastFailed()
+    {
+    	return( lastFailed );
+    }
+    
+    public int
+    getFailCount()
+    {
+    	return( fails );
+    }
+    
+    public void
+    setAlive()
+    {
+    	lastAlive = Clock.getInstance().now();
+    	fails = 0;
+    }
+    
+    public void
+    resetCreated()
+    {
+    	created = Clock.getInstance().now();
+    }
+
 
     /**
      *  @return if more than max timeouts
      */
     public boolean timeout() {
+    	lastFailed = Clock.getInstance().now();
         return ++fails > MAX_FAILS;
+    }
+    
+    public String
+    toString()
+    {
+    	long now = Clock.getInstance().now();
+    	
+    	return( super.toString() + "age=" + (now-created) + ",la=" + (lastAlive==0?"n":(now-lastAlive)) + ",lf=" + (lastFailed==0?"n":(now-lastFailed))+",f=" + fails );
     }
 }
