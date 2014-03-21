@@ -1204,6 +1204,11 @@ XMWebUIPlugin
 					
 					download = dm.addDownload( torrent, null, download_dir );
 				}
+			
+			
+					// particularly necessary for the android client as untidy closedown is common
+			
+				AzureusCoreFactory.getSingleton().saveState();
 			}
 			
 			return( download );
@@ -1316,258 +1321,285 @@ XMWebUIPlugin
 	
 		throws Exception
 	{
-		Map	result = new HashMap();
-				
-			// https://trac.transmissionbt.com/browser/trunk/extras/rpc-spec.txt
+		boolean	save_core_state = false;
 		
-			// to get 271 working with this backend change remote.js RPC _Root to be
-			// _Root                   : './transmission/rpc',
-
-		if ( method.equals( "session-set" )){
-
-			try{
-				method_Session_Set(args, result);
-				
-			}finally{
-				
-					// assume something important was changed and persist it now 
-				
-				COConfigurationManager.save();
-			}
-
-		} else if ( method.equals( "session-get" ) ){
-
-			method_Session_Get(args, result);
-			
-		}else if ( method.equals( "session-stats" )){
-
-			method_Session_Stats(args, result);
-			
-		}else if ( method.equals( "torrent-add" )){
-			
-			method_Torrent_Add(args, result);
-			
-		}else if ( method.equals( "torrent-start-all" )){
-
-			checkUpdatePermissions();
-			
-			plugin_interface.getDownloadManager().startAllDownloads();
-		
-		}else if ( method.equals( "torrent-stop-all" )){
-
-			checkUpdatePermissions();
-			
-			plugin_interface.getDownloadManager().stopAllDownloads();
-			 
-		}else if ( method.equals( "torrent-start" )){
-
-			method_Torrent_Start(args, result);
-
-		}else if ( method.equals( "torrent-start-now" )){
-			// RPC v14
-
-			method_Torrent_Start_Now(args, result);
-
-		}else if ( method.equals( "torrent-stop" )){
-
-			method_Torrent_Stop(args, result);
-
-		}else if ( method.equals( "torrent-verify" )){
-
-			method_Torrent_Verify(args, result);
-
-		}else if ( method.equals( "torrent-remove" )){
-			// RPC v3
-
-			method_Torrent_Remove(args, result);
-
-		}else if ( method.equals( "torrent-set" )){
-			
-			method_Torrent_Set( session_id, args, result);
-			
-		}else if ( method.equals( "torrent-get" )){
-
-			method_Torrent_Get(request, session_id, args, result);
-
-		}else if ( method.equals( "torrent-reannounce" )){
-			// RPC v5
-
-			method_Torrent_Reannounce(args, result);
-			
-		}else if ( method.equals( "torrent-set-location" )){
-			// RPC v6
-			
-			method_Torrent_Set_Location(args, result);
-
-		}else if ( method.equals( "blocklist-update" )){
-			// RPC v5
-			
-			method_Blocklist_Update(args, result);
-
-		}else if ( method.equals( "session-close" )){
-			// RPC v12
-			//TODO: This method tells the transmission session to shut down.
-
-		}else if ( method.equals( "queue-move-top" )){
-			// RPC v14
-			method_Queue_Move_Top(args, result);
-
-		}else if ( method.equals( "queue-move-up" )){
-			// RPC v14
-			method_Queue_Move_Up(args, result);
-
-		}else if ( method.equals( "queue-move-down" )){
-			// RPC v14
-			method_Queue_Move_Down(args, result);
-
-		}else if ( method.equals( "queue-move-bottom" )){
-			// RPC v14
-			method_Queue_Move_Bottom(args, result);
-
-		}else if ( method.equals( "free-space" )){
-			// RPC v15
-			method_Free_Space(args, result);
-
-		}else if ( method.equals( "tags-get-list" )){
-			// Vuze RPC v3
-			method_Tags_Get_List(args, result);
-
-		}else if ( method.equals( "vuze-search-start" )){
-			
-			MetaSearchManager ms_manager = MetaSearchManagerFactory.getSingleton();
-			
-			MetaSearch ms = ms_manager.getMetaSearch();
-			
-			List<SearchParameter>	sps = new ArrayList<SearchParameter>();
-			
-			String expression = (String)args.get( "expression" );
-			
-			if ( expression == null ){
-				
-				throw( new IOException( "Search expression missing" ));
-			}
-			
-			sps.add( new SearchParameter( "s", expression ));
-			
-			SearchParameter[] parameters = sps.toArray( new SearchParameter[ sps.size()]);
-
-			Map<String,String>	context = new HashMap();
-			
-			context.put( Engine.SC_SOURCE, 	"xmwebui" );
-			
-			context.put( Engine.SC_REMOVE_DUP_HASH, "true" );
-			
-	 		Engine[] engines = ms_manager.getMetaSearch().getEngines( true, true );
-
-	 		if ( engines.length == 0 ){
-	 			
-	 			throw( new IOException( "No search templates available" ));
-	 		}
-	 		
-	 		SearchInstance search_instance = new SearchInstance( engines );
-	 		
-	 		engines = 
-	 			ms.search( 
-	 				engines, 
-	 				search_instance,
-	 				parameters, 
-	 				null,
-	 				context, 
-	 				100 );
-	 		
-	 		if ( engines.length == 0 ){
-	 			
-	 			throw( new IOException( "No search templates available" ));
-	 		}
-	 		
-	 		synchronized( active_searches ){
-	 			
-	 			active_searches.put(search_instance.getSID(), search_instance );
-	 		}
-	 		
-	 		search_instance.setEngines( engines );
-	 		
-	 		result.put( "sid", search_instance.getSID());
-	 		
-	 		List<Map>	l_engines = new ArrayList<Map>();
-	 		
-	 		result.put( "engines", l_engines );
-	 		
-	 		for ( Engine engine: engines ){
-	 			
-	 			JSONObject map = new JSONObject();
-	 			
-	 			l_engines.add( map );
-	 			
-	 	 		map.put("name", engine.getName() );			
-	 	 		map.put("id", engine.getUID());
-	 	 		map.put("favicon", engine.getIcon());
-	 	 		map.put("dl_link_css", engine.getDownloadLinkCSS());
-	 	 		map.put("selected", Engine.SEL_STATE_STRINGS[ engine.getSelectionState()]);
-	 	 		map.put("type", Engine.ENGINE_SOURCE_STRS[ engine.getSource()]);
-	 		}
-		}else if ( method.equals( "vuze-search-get-results" )){
-									
-			String sid = (String)args.get( "sid" );
-			
-			if ( sid == null ){
-				
-				throw( new IOException( "SID missing" ));
-			}	
-						
-			synchronized( active_searches ){
-				
-				SearchInstance search_instance = active_searches.get( sid );
-				
-				if ( search_instance != null ){
+		try{
+			Map	result = new HashMap();
 					
-					if ( search_instance.getResults( result )){
+				// https://trac.transmissionbt.com/browser/trunk/extras/rpc-spec.txt
+			
+				// to get 271 working with this backend change remote.js RPC _Root to be
+				// _Root                   : './transmission/rpc',
+	
+			if ( method.equals( "session-set" )){
+	
+				try{
+					method_Session_Set(args, result);
+					
+				}finally{
+					
+						// assume something important was changed and persist it now 
+					
+					COConfigurationManager.save();
+				}
+	
+			} else if ( method.equals( "session-get" ) ){
+	
+				method_Session_Get(args, result);
+				
+			}else if ( method.equals( "session-stats" )){
+	
+				method_Session_Stats(args, result);
+				
+			}else if ( method.equals( "torrent-add" )){
+				
+				method_Torrent_Add(args, result);
+				
+				// this is handled within the torrent-add method: save_core_state = true;
+				
+			}else if ( method.equals( "torrent-start-all" )){
+	
+				checkUpdatePermissions();
+				
+				plugin_interface.getDownloadManager().startAllDownloads();
+			
+				save_core_state = true;
+				
+			}else if ( method.equals( "torrent-stop-all" )){
+	
+				checkUpdatePermissions();
+				
+				plugin_interface.getDownloadManager().stopAllDownloads();
+				
+				save_core_state = true;
+				
+			}else if ( method.equals( "torrent-start" )){
+	
+				method_Torrent_Start(args, result);
+	
+				save_core_state = true;
+				
+			}else if ( method.equals( "torrent-start-now" )){
+				// RPC v14
+	
+				method_Torrent_Start_Now(args, result);
+	
+				save_core_state = true;
+				
+			}else if ( method.equals( "torrent-stop" )){
+	
+				method_Torrent_Stop(args, result);
+				
+				save_core_state = true;
+				
+			}else if ( method.equals( "torrent-verify" )){
+	
+				method_Torrent_Verify(args, result);
+	
+			}else if ( method.equals( "torrent-remove" )){
+				// RPC v3
+	
+				method_Torrent_Remove(args, result);
+	
+				save_core_state = true;
+				
+			}else if ( method.equals( "torrent-set" )){
+				
+				method_Torrent_Set( session_id, args, result);
+				
+			}else if ( method.equals( "torrent-get" )){
+	
+				method_Torrent_Get(request, session_id, args, result);
+	
+			}else if ( method.equals( "torrent-reannounce" )){
+				// RPC v5
+	
+				method_Torrent_Reannounce(args, result);
+				
+			}else if ( method.equals( "torrent-set-location" )){
+				// RPC v6
+				
+				method_Torrent_Set_Location(args, result);
+	
+			}else if ( method.equals( "blocklist-update" )){
+				// RPC v5
+				
+				method_Blocklist_Update(args, result);
+	
+			}else if ( method.equals( "session-close" )){
+				// RPC v12
+				//TODO: This method tells the transmission session to shut down.
+	
+			}else if ( method.equals( "queue-move-top" )){
+				// RPC v14
+				method_Queue_Move_Top(args, result);
+	
+			}else if ( method.equals( "queue-move-up" )){
+				// RPC v14
+				method_Queue_Move_Up(args, result);
+	
+			}else if ( method.equals( "queue-move-down" )){
+				// RPC v14
+				method_Queue_Move_Down(args, result);
+	
+			}else if ( method.equals( "queue-move-bottom" )){
+				// RPC v14
+				method_Queue_Move_Bottom(args, result);
+	
+			}else if ( method.equals( "free-space" )){
+				// RPC v15
+				method_Free_Space(args, result);
+	
+			}else if ( method.equals( "tags-get-list" )){
+				// Vuze RPC v3
+				method_Tags_Get_List(args, result);
+	
+			}else if ( method.equals( "vuze-search-start" )){
+				
+				MetaSearchManager ms_manager = MetaSearchManagerFactory.getSingleton();
+				
+				MetaSearch ms = ms_manager.getMetaSearch();
+				
+				List<SearchParameter>	sps = new ArrayList<SearchParameter>();
+				
+				String expression = (String)args.get( "expression" );
+				
+				if ( expression == null ){
+					
+					throw( new IOException( "Search expression missing" ));
+				}
+				
+				sps.add( new SearchParameter( "s", expression ));
+				
+				SearchParameter[] parameters = sps.toArray( new SearchParameter[ sps.size()]);
+	
+				Map<String,String>	context = new HashMap();
+				
+				context.put( Engine.SC_SOURCE, 	"xmwebui" );
+				
+				context.put( Engine.SC_REMOVE_DUP_HASH, "true" );
+				
+		 		Engine[] engines = ms_manager.getMetaSearch().getEngines( true, true );
+	
+		 		if ( engines.length == 0 ){
+		 			
+		 			throw( new IOException( "No search templates available" ));
+		 		}
+		 		
+		 		SearchInstance search_instance = new SearchInstance( engines );
+		 		
+		 		engines = 
+		 			ms.search( 
+		 				engines, 
+		 				search_instance,
+		 				parameters, 
+		 				null,
+		 				context, 
+		 				100 );
+		 		
+		 		if ( engines.length == 0 ){
+		 			
+		 			throw( new IOException( "No search templates available" ));
+		 		}
+		 		
+		 		synchronized( active_searches ){
+		 			
+		 			active_searches.put(search_instance.getSID(), search_instance );
+		 		}
+		 		
+		 		search_instance.setEngines( engines );
+		 		
+		 		result.put( "sid", search_instance.getSID());
+		 		
+		 		List<Map>	l_engines = new ArrayList<Map>();
+		 		
+		 		result.put( "engines", l_engines );
+		 		
+		 		for ( Engine engine: engines ){
+		 			
+		 			JSONObject map = new JSONObject();
+		 			
+		 			l_engines.add( map );
+		 			
+		 	 		map.put("name", engine.getName() );			
+		 	 		map.put("id", engine.getUID());
+		 	 		map.put("favicon", engine.getIcon());
+		 	 		map.put("dl_link_css", engine.getDownloadLinkCSS());
+		 	 		map.put("selected", Engine.SEL_STATE_STRINGS[ engine.getSelectionState()]);
+		 	 		map.put("type", Engine.ENGINE_SOURCE_STRS[ engine.getSource()]);
+		 		}
+			}else if ( method.equals( "vuze-search-get-results" )){
+										
+				String sid = (String)args.get( "sid" );
+				
+				if ( sid == null ){
+					
+					throw( new IOException( "SID missing" ));
+				}	
+							
+				synchronized( active_searches ){
+					
+					SearchInstance search_instance = active_searches.get( sid );
+					
+					if ( search_instance != null ){
 						
-						active_searches.remove( sid );
+						if ( search_instance.getResults( result )){
+							
+							active_searches.remove( sid );
+						}
+					}else{
+						
+						throw( new IOException( "SID not found - already complete?" ));
 					}
+				}
+			}else if ( method.equals( "vuze-lifecycle" )){
+	
+				processVuzeLifecycle( args, result );
+				
+			}else if ( method.equals( "vuze-pairing" )){
+	
+				if ( IS_5101_PLUS ){
+					
+					processVuzePairing( args, result );
+				
 				}else{
 					
-					throw( new IOException( "SID not found - already complete?" ));
+					throw( new IOException( "Client version too old!" ));
 				}
-			}
-		}else if ( method.equals( "vuze-lifecycle" )){
-
-			processVuzeLifecycle( args, result );
-			
-		}else if ( method.equals( "vuze-pairing" )){
-
-			if ( IS_5101_PLUS ){
+			}else if ( method.equals( "vuze-torrent-get" )){
+	
+				processVuzeTorrentGet( request, args, result );
+		
+			}else if ( method.equals( "vuze-file-add" )){
 				
-				processVuzePairing( args, result );
-			
+				processVuzeFileAdd( args, result );
+	
 			}else{
-				
-				throw( new IOException( "Client version too old!" ));
-			}
-		}else if ( method.equals( "vuze-torrent-get" )){
-
-			processVuzeTorrentGet( request, args, result );
+		
+				if ( IS_5101_PLUS ){
 	
-		}else if ( method.equals( "vuze-file-add" )){
-			
-			processVuzeFileAdd( args, result );
-
-		}else{
-	
-			if ( IS_5101_PLUS ){
-
-				Utilities.JSONServer server = (Utilities.JSONServer)json_server_methods.get( method );
-				
-				if ( server != null ){
+					Utilities.JSONServer server = (Utilities.JSONServer)json_server_methods.get( method );
 					
-					return( server.call( method, args ));
+					if ( server != null ){
+						
+						return( server.call( method, args ));
+					}
 				}
+				
+				System.out.println( "unhandled method: " + method + " - " + args );
 			}
+	
+			return( result );
 			
-			System.out.println( "unhandled method: " + method + " - " + args );
+		}finally{
+			
+			if ( save_core_state ){
+				
+					// particularly necessary for the android client as untidy closedown is common
+				
+				AzureusCoreFactory.getSingleton().saveState();
+			}
 		}
-
-		return( result );
 	}
 
 	
