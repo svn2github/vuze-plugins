@@ -43,6 +43,7 @@ import net.i2p.client.streaming.I2PSocketManagerFactory;
 import net.i2p.client.streaming.I2PSocketOptions;
 import net.i2p.data.Base32;
 import net.i2p.data.Destination;
+import net.i2p.data.Hash;
 import net.i2p.data.PrivateKeyFile;
 import net.i2p.router.Router;
 import net.i2p.router.RouterContext;
@@ -59,6 +60,7 @@ I2PHelperRouter
 	private boolean		is_bootstrap_node;
 	
 	private Router 		router;
+	private I2PSession 	session;
 	private DHT			dht;
 	
 	private boolean		destroyed;
@@ -203,12 +205,18 @@ I2PHelperRouter
 				// router bandwidth
 				// TODO: review!
 			
-			router_props.put( "i2np.bandwidth.inboundBurstKBytes", 11000 );
-			router_props.put( "i2np.bandwidth.inboundBurstKBytesPerSecond", 550 );
-			router_props.put( "i2np.bandwidth.inboundKBytesPerSecond", 500 );
-			router_props.put( "i2np.bandwidth.outboundBurstKBytes", 11000 );
-			router_props.put( "i2np.bandwidth.outboundBurstKBytesPerSecond", 550 );
-			router_props.put( "i2np.bandwidth.outboundKBytesPerSecond", 500 );
+			int	base 		= is_bootstrap_node?500:50;
+			int burst_ks 	= base+(base/10);
+			int burst_k		= burst_ks*20;
+			
+			int share_pct	= is_bootstrap_node?75:25;
+			
+			router_props.put( "i2np.bandwidth.inboundBurstKBytes", burst_k );
+			router_props.put( "i2np.bandwidth.inboundBurstKBytesPerSecond", burst_ks );
+			router_props.put( "i2np.bandwidth.inboundKBytesPerSecond", base );
+			router_props.put( "i2np.bandwidth.outboundBurstKBytes", burst_k );
+			router_props.put( "i2np.bandwidth.outboundBurstKBytesPerSecond", burst_ks );
+			router_props.put( "i2np.bandwidth.outboundKBytesPerSecond", base );
 			
 				// router pools
 					
@@ -220,7 +228,8 @@ I2PHelperRouter
 			router_props.put( "router.outboundPool.length", 2 );
 			router_props.put( "router.outboundPool.lengthVariance", 0 );
 			router_props.put( "router.outboundPool.quantity", 2 );
-			router_props.put( "router.sharePercentage", 30 );
+			
+			router_props.put( "router.sharePercentage", share_pct );
 						
 			normalizeProperties( router_props );
 			
@@ -299,25 +308,27 @@ I2PHelperRouter
             //    opts.setProperty("i2p.streaming.writeTimeout", "90000");
             //if (opts.getProperty("i2p.streaming.readTimeout") == null)
             //    opts.setProperty("i2p.streaming.readTimeout", "120000");
-            if (opts.getProperty("i2p.streaming.maxConnsPerMinute") == null)
-                opts.setProperty("i2p.streaming.maxConnsPerMinute", "2");
-            if (opts.getProperty("i2p.streaming.maxTotalConnsPerMinute") == null)
-                opts.setProperty("i2p.streaming.maxTotalConnsPerMinute", "8");
-            if (opts.getProperty("i2p.streaming.maxConnsPerHour") == null)
-                opts.setProperty("i2p.streaming.maxConnsPerHour", "20");
+            //if (opts.getProperty("i2p.streaming.maxConnsPerMinute") == null)
+            //    opts.setProperty("i2p.streaming.maxConnsPerMinute", "2");
+            //if (opts.getProperty("i2p.streaming.maxTotalConnsPerMinute") == null)
+            //    opts.setProperty("i2p.streaming.maxTotalConnsPerMinute", "8");
+            //if (opts.getProperty("i2p.streaming.maxConnsPerHour") == null)
+            //    opts.setProperty("i2p.streaming.maxConnsPerHour", "20");
             if (opts.getProperty("i2p.streaming.enforceProtocol") == null)
                 opts.setProperty("i2p.streaming.enforceProtocol", "true");
-            if (opts.getProperty("i2p.streaming.disableRejectLogging") == null)
-                opts.setProperty("i2p.streaming.disableRejectLogging", "true");
+            //if (opts.getProperty("i2p.streaming.disableRejectLogging") == null)
+            //    opts.setProperty("i2p.streaming.disableRejectLogging", "true");
             if (opts.getProperty("i2p.streaming.answerPings") == null)
                 opts.setProperty("i2p.streaming.answerPings", "false");
             
+            opts.setProperty( "i2p.streaming.disableRejectLogging", "false");
+            opts.setProperty( "i2cp.dontPublishLeaseSet", "false" );
             opts.setProperty( "inbound.length", "2" );
             opts.setProperty( "inbound.lengthVariance", "0" );
             opts.setProperty( "outbound.length", "2" ); 
             opts.setProperty( "outbound.lengthVariance", "0" ); 
-            opts.setProperty( "inbound.quantity", "3" ); 
-            opts.setProperty( "outbound.quantity", "3" );
+            opts.setProperty( "inbound.quantity", "16" ); 
+            opts.setProperty( "outbound.quantity", "64" );
             
 			if ( !dest_key_file.exists() ){
                
@@ -337,8 +348,6 @@ I2PHelperRouter
             }
 			
 			System.out.println( "Waiting for socket manager startup" );
-			
-			I2PSession session;
 			
 			while( true ){
 				
@@ -393,7 +402,7 @@ I2PHelperRouter
 					
 				NodeInfo ninf = new NodeInfo( new NID( Base32.decode( boot_nid )), new Destination( boot_dest ), boot_port );
 					
-				dht.heardAbout( ninf );
+				dht.setBootstrapNode( ninf );
 			}
 			
 			System.out.println( "MyDest: " + session.getMyDestination().toBase64());
@@ -416,6 +425,15 @@ I2PHelperRouter
 				}
 			}
 		}
+	}
+	
+	public Destination
+	lookupDestination(
+		byte[]		hash )
+	
+		throws Exception
+	{
+		return( session.lookupDest( new Hash( hash ), 30*1000 ));
 	}
 	
 	protected DHT

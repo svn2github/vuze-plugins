@@ -39,6 +39,9 @@ public interface DHT {
     public void
     print();
     
+    public void
+    setBootstrapNode( NodeInfo ni );
+    
     public NodeInfo heardAbout(NodeInfo nInfo);
     
     public Collection<Hash> getPeersAndNoAnnounce(byte[] ih, int max, long maxWait, int annMax, long annMaxWait);

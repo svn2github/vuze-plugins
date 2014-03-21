@@ -25,6 +25,11 @@ import java.io.File;
 
 
 
+
+
+import net.i2p.data.Base64;
+import net.i2p.data.Destination;
+
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
@@ -204,11 +209,35 @@ I2PHelperPlugin
 						
 						break;
 						
+					}else if ( cmd.equals( "lookup" )){
+						
+						Destination dest = router.lookupDestination( Base64.decode( bits[1] ));
+						
+						if ( dest == null ){
+							
+							System.out.println( "lookup failed" );;
+							
+						}else{
+						
+							System.out.println( dest.toBase64());
+						}
 					}else if ( cmd.equals( "announce" )){
-												
+						
 						byte[] hash = bits.length==1?new byte[20]: ByteFormatter.decodeString( bits[1] );
 					
 						tracker.announce( hash );
+						
+					}else if ( cmd.equals( "ping" )){
+						
+						String dest_64 = bits[1];
+						
+						int		port 	= Integer.parseInt( bits[2] );
+						
+						Destination dest = new Destination();
+						
+						dest.fromBase64( dest_64 );
+						
+						router.getDHT().ping( dest, port );
 						
 					}else if ( cmd.equals( "crawl" )){
 						

@@ -163,6 +163,8 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
     private static final int SEND_CRYPTO_TAGS = 8;
     private static final int LOW_CRYPTO_TAGS = 4;
 
+    private NodeInfo	bootstrap_node;
+    
     /**
      *  @param baseName generally "i2psnark"
      */
@@ -248,6 +250,11 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
     getLog()
     {
     	return( _log );
+    }
+    
+    @Override
+    public void setBootstrapNode(NodeInfo ni) {
+    	bootstrap_node = ni;
     }
     /**
      *  Ping. We don't have a NID yet so the node is presumed
@@ -1153,6 +1160,8 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             nInfo = null;
         }
 
+        System.out.println( "Received inbound '" + method + "' from " + (nInfo==null?"<unknown>":nInfo));
+        
         if (method.equals("ping")) {
             receivePing(msgID, nInfo);
         } else if (method.equals("find_node")) {
@@ -1748,6 +1757,9 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
     
     private class Refresher extends SimpleTimer2.TimedEvent {
     	
+    	private long 	next_bootstrap;
+    	private int		consec_bootstraps;
+    	
         public Refresher() {
             super(SimpleTimer2.getInstance(), 15*1000 );
         }
@@ -1761,15 +1773,85 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             try{
             	System.out.println( "Refreshing" );
             	
+            	if ( bootstrap_node != null ){
+            		
+            			// in case it has found its way into the DHT
+            		
+            		_knownNodes.remove( bootstrap_node.getNID());
+            	}
+            	
+            	boolean 	all_failing 	= true;
+            	NodeInfo	fn_target 		= null;
+            	
             	List<NodeInfo> all_nodes = new ArrayList<NodeInfo>(_knownNodes.valuesInKAD());
             	
-            	if ( all_nodes.size() < 20 ){
+            	for ( NodeInfo node: all_nodes ){
+            		
+            		if ( node.getNID().getFailCount() == 0 ){
+            			
+            			all_failing = false;
+            		}
+            	}
+            	
+            	long now =_context.clock().now();
+            	
+            	if ( all_nodes.size() < 20 || all_failing ){
             		
             			// not enough nodes, see if we can grab some more from most recently heard from node
             			// track to ensure we don't keep hitting the same most recent one...
             			// boostrap if screwed
+            		
+            		if ( 	( all_failing || all_nodes.size() < 5 ) && 
+            				bootstrap_node != null &&
+            				( next_bootstrap == 0 || ( now > next_bootstrap ))){
+            			
+            			System.out.println( "Bootstrapping..." );
+            			            			
+            			int delay = 2*60*1000;
+            			
+            			for (int i=0;i<consec_bootstraps;i++){
+            				
+            				delay *= 2;
+            				
+            				if ( delay > 60*60*1000 ){
+            				
+            					break;
+            				}
+            			}
+            			
+            			next_bootstrap = now + delay;
+            			
+            			consec_bootstraps++;
+
+            			ReplyWaiter waiter = sendFindNode( bootstrap_node, new NID( RandomUtils.nextSecureHash()));
+
+						if ( waiter != null){
+						
+    						synchronized( waiter ){
+    							
+    							try{
+    								waiter.wait(60*1000);
+    								
+    							}catch (InterruptedException ie) {}
+    						}	
+    						
+    						if ( waiter.getReplyCode() == REPLY_NODES ){
+    							
+    							System.out.println( "Bootstrap worked" );
+    							
+    						}else{
+    							
+    							System.out.println( "Bootstrap failed" );
+    						}
+						}
+            		}else{
+            		
+            			consec_bootstraps = 0;
+            		}
+            		
             	}else{
-            	
+            		consec_bootstraps = 0;
+            		
 	            	Collections.shuffle( all_nodes );
 	            	
 	            	Collections.sort(
@@ -1836,9 +1918,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
 	            		}
 	            		
 	            		done++;
-	            		
-	            		System.out.println( "Pinging " + ni );
-	            		
+	            			            		
 	            		ReplyWaiter waiter = sendPing( ni );
 	            		
 	            		if ( waiter != null ){
@@ -1928,11 +2008,8 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
 	    							System.out.println("Got no reply");
 	    						} else if (replyType == REPLY_NODES) {
 	    							List<NodeInfo> reply = (List<NodeInfo>) waiter.getReplyObject();
-	    							// It seems like we are just going to get back ourselves all the time
+
 	    							System.out.println( "Got " + reply.size() + " nodes from " + nid.toString() + " in " + (SystemTime.getMonotonousTime() - start ));
-	    							for (NodeInfo ni : reply) {
-	    								heardAbout( ni );
-	    							}
 	
 	    						}else{
 	    							System.out.println( "Got derp" );
@@ -1962,11 +2039,44 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
 
     	System.out.println( "Printing " + known_nodes.size() + " nodes, nids=" + kad_nids.size());
     	
+    	int	alive 	= 0;
+    	int dead1	= 0;
+    	int	dead2	= 0;
+    	int	no_dest	= 0;
+    	int	unknown	= 0;
+    	
      	for ( NodeInfo ni: known_nodes ){
      		
      		NID nid = ni.getNID();
      		
      		System.out.println( ni );
+     		
+     		int fails = nid.getFailCount();
+     		
+     		if ( fails == 0 ){
+     			
+     			if ( nid.getLastAlive() > 0 ){
+     				
+     				alive++;
+     				
+     			}else{
+     				unknown++;
+     				
+     				if ( ni.getDestination() == null ){
+     					
+     					no_dest++;
+     				}
+     			}
+     		}else if ( fails == 1 ){
+     			
+     			dead1++;
+     			
+     		}else{
+     			
+     			dead2++;
+     		}
      	}
+     	
+     	System.out.println( "Alive=" + alive + ", dead1=" + dead1 + ", dead2=" + dead2 + ", unknown=" + unknown + ", no-dest=" + no_dest );
     }
 }
