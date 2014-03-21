@@ -8,6 +8,9 @@ import java.io.InputStreamReader;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 import net.i2p.I2PAppContext;
 import net.i2p.data.DataFormatException;
@@ -76,20 +79,59 @@ abstract class PersistDHT {
         Log log = I2PAppContext.getGlobalContext().logManager().getLog(PersistDHT.class);
         int count = 0;
         
-        System.out.println( "Saving DHT: needs work to select best ones to save...." );
+        System.out.println( "Saving DHT" );
         
         long maxAge = 0; // saveAll ? 0 : I2PAppContext.getGlobalContext().clock().now() - MAX_AGE;
         PrintWriter out = null;
         try {
             out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(new SecureFileOutputStream(file), "ISO-8859-1")));
             out.println("# DHT nodes, format is NID:Hash:Destination:port");
-            for (NodeInfo ni : nodes.valuesInKAD()) {
-                 if (ni.lastKnown() < maxAge)
-                     continue;
-                 // DHTNodes shouldn't contain us, if that changes check here
-                 out.println(ni.toPersistentString());
-                 count++;
+            
+            Collection<NodeInfo> kad_nodes = nodes.valuesInKAD();
+            
+            List<NodeInfo>	notFailed 	= new ArrayList<NodeInfo>(kad_nodes.size());
+            List<NodeInfo>	failed		= new ArrayList<NodeInfo>(kad_nodes.size());
+                       		
+            for (NodeInfo ni : kad_nodes ) {
+            	NID nid = ni.getNID();
+            	
+            	if ( nid.getLastAlive() > 0 && nid.getFailCount() == 0 ){
+                 
+            		out.println(ni.toPersistentString());
+            		count++;
+            		
+            	}else{
+            		
+            		if ( nid.getFailCount() == 0 ){
+            			
+            			notFailed.add( ni );
+            			
+            		}else{
+            			
+            			failed.add( ni );
+            		}
+            	}
             }
+            
+            if ( count < 50 ){
+                for (NodeInfo ni : notFailed ) {
+                	out.println(ni.toPersistentString());
+            		count++;
+            		if ( count > 50 ){
+            			break;
+            		}
+                }
+                if ( count < 20 ){
+                    for (NodeInfo ni : failed ) {
+                    	out.println(ni.toPersistentString());
+                		count++;
+                		if ( count > 20 ){
+                			break;
+                		}
+                    }
+                }
+            }
+            
         } catch (IOException ioe) {
             if (log.shouldLog(Log.WARN))
                 log.warn("Error writing the DHT File", ioe);

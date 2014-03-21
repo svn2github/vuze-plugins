@@ -17,7 +17,7 @@ public class NID extends SHA1Hash {
 
     private long created;
     private long lastAlive;
-    private long lastFailed;
+    private long firstFailed;
     
     private int fails;
 
@@ -53,9 +53,9 @@ public class NID extends SHA1Hash {
     }
     
     public long
-    getLastFailed()
+    getFirstFailed()
     {
-    	return( lastFailed );
+    	return( firstFailed );
     }
     
     public int
@@ -82,7 +82,9 @@ public class NID extends SHA1Hash {
      *  @return if more than max timeouts
      */
     public boolean timeout() {
-    	lastFailed = Clock.getInstance().now();
+    	if ( fails == 0 ){
+    		firstFailed = Clock.getInstance().now();
+    	}
         return ++fails > MAX_FAILS;
     }
     
@@ -91,6 +93,6 @@ public class NID extends SHA1Hash {
     {
     	long now = Clock.getInstance().now();
     	
-    	return( super.toString() + "age=" + (now-created) + ",la=" + (lastAlive==0?"n":(now-lastAlive)) + ",lf=" + (lastFailed==0?"n":(now-lastFailed))+",f=" + fails );
+    	return( super.toString() + "age=" + (now-created) + ",la=" + (lastAlive==0?"n":(now-lastAlive)) + ",ff=" + (firstFailed==0?"n":(now-firstFailed))+",f=" + fails );
     }
 }

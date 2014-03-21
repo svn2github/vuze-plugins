@@ -10,6 +10,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -654,6 +656,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
         // no need to keep ref, it will eventually stop
         new Cleaner();
         new Explorer(5*1000);
+        new Refresher();
         _txPkts.set(0);
         _rxPkts.set(0);
         _txBytes.set(0);
@@ -989,7 +992,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             // use a short timeout for now
             Destination dest = _session.lookupDest(nInfo.getHash(), DEST_LOOKUP_TIMEOUT);
             if (dest != null) {
-            	System.out.println( "destination lookup worked!" );
+            	System.out.println( "Destination lookup OK for " + nInfo.getNID());
                 nInfo.setDestination(dest);
                 if (_log.shouldLog(Log.INFO))
                     _log.info("lookup success for " + nInfo);
@@ -1001,6 +1004,8 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
         }
         if (_log.shouldLog(Log.INFO))
             _log.info("lookup fail for " + nInfo);
+        
+        System.out.println( "Destination lookup FAIL for " + nInfo.getNID());
         return false;
     }
 
@@ -1629,6 +1634,8 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
      */
     private class Cleaner extends SimpleTimer2.TimedEvent {
 
+    	private long last_save = _context.clock().now();
+    	
         public Cleaner() {
             super(SimpleTimer2.getInstance(), 7 * CLEAN_TIME);
         }
@@ -1677,7 +1684,12 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             
             // PARG 
   
-            PersistDHT.saveDHT(_knownNodes, _dhtFile);
+            now = _context.clock().now();
+            
+            if ( now - last_save >= 5*60*1000 ){
+            
+            	PersistDHT.saveDHT(_knownNodes, _dhtFile);
+            }
             
             schedule(CLEAN_TIME);
         }
@@ -1734,6 +1746,124 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
         }
     }
     
+    private class Refresher extends SimpleTimer2.TimedEvent {
+    	
+        public Refresher() {
+            super(SimpleTimer2.getInstance(), 15*1000 );
+        }
+
+        public void timeReached() {
+            if (!_isRunning){
+            	
+                return;
+            }
+            
+            try{
+            	System.out.println( "Refreshing" );
+            	
+            	List<NodeInfo> all_nodes = new ArrayList<NodeInfo>(_knownNodes.valuesInKAD());
+            	
+            	if ( all_nodes.size() < 20 ){
+            		
+            			// not enough nodes, see if we can grab some more from most recently heard from node
+            			// track to ensure we don't keep hitting the same most recent one...
+            			// boostrap if screwed
+            	}else{
+            	
+	            	Collections.shuffle( all_nodes );
+	            	
+	            	Collections.sort(
+	            		all_nodes,
+	            		new Comparator<NodeInfo>()
+	            		{
+	            			public int 
+	            			compare(
+	            				NodeInfo o1, 
+	            				NodeInfo o2) 
+	            			{
+	            					// failing nodes get lower attention
+	            				
+	            				NID n1 = o1.getNID();
+	            				NID n2 = o2.getNID();
+	            				
+	               				boolean n1_fail = n1.getFailCount() > 0;
+	               				boolean n2_fail = n2.getFailCount() > 0;
+	            				
+	               				if ( n1_fail && n2_fail ){
+	               					return( 0 );
+	               				}else if ( n1_fail ){
+	               					return( 1 );
+	               				}else if ( n2_fail ){
+	               					return( -1 );
+	               				}
+	               				
+	              				long n1_alive = n1.getLastAlive();
+	              				long n2_alive = n2.getLastAlive();
+	              				
+	              				if ( n1_alive == 0 && n2_alive == 0 ){
+	              					
+	              					return( 0 );
+	              					
+	              				}else if ( n1_alive == 0 ){
+	              					
+	              					return( -1 );
+	              					
+	              				}else if ( n2_alive == 0 ){
+	              					
+	              					return( 1 );
+	              				}
+	              				
+	              				if ( n1_alive < n2_alive ){
+	              					
+	              					return( -1 );
+	              					
+	              				}else if ( n1_alive > n2_alive ){
+	              					
+	              					return( 1 );
+	              				}
+	              				
+	              				return( 0 );
+	            			}
+	            		});
+	            	
+	            	int	done = 0;
+	            	
+	            	for ( NodeInfo ni: all_nodes ){
+	            	
+	            		if ( done > 10 ){
+	            			
+	            			break;
+	            		}
+	            		
+	            		done++;
+	            		
+	            		System.out.println( "Pinging " + ni );
+	            		
+	            		ReplyWaiter waiter = sendPing( ni );
+	            		
+	            		if ( waiter != null ){
+	            			
+		            		synchronized( waiter ){
+								try{
+									waiter.wait(30*1000);
+									
+									int replyType = waiter.getReplyCode();
+									
+									System.out.println( "Ping of " + ni + " -> " + ( replyType == REPLY_PONG ));
+		    						
+								}catch( InterruptedException ie ){
+								
+									
+								}
+							}
+	            		}
+	            	}
+            	}
+            }finally{
+            	schedule( 15*1000 );
+            }
+        }
+    }
     
     public void
     crawl()
@@ -1836,7 +1966,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
      		
      		NID nid = ni.getNID();
      		
-     		System.out.println( ni + ": in kad=" + kad_nids.contains( nid ));
+     		System.out.println( ni );
      	}
     }
 }

@@ -27,12 +27,33 @@ class KBTrimmer implements KBucketTrimmer<NID> {
         if (kbucket.getLastChanged() > now - MIN_BUCKET_AGE)
             return false;
         Set<NID> entries = kbucket.getEntries();
+        NID oldest_fail  = null;
         for (NID nid : entries) {
             if (nid.getLastKnown() < now - MAX_NODE_AGE) {
                 if (kbucket.remove(nid))
                     return true;
             }
+            if ( nid.getFailCount() > 0 ){
+            	if ( oldest_fail == null ){
+            		oldest_fail = nid;
+            	}else if ( nid.getFirstFailed() < oldest_fail.getFirstFailed()){
+            		oldest_fail = nid;
+            	}
+            }
         }
-        return entries.size() < _max;
+        
+        if ( entries.size() < _max ){
+        	
+        	return( true );
+        }
+        
+        if ( oldest_fail != null ){
+        	
+        	System.out.println( "KADTrim: discarding failed node: " + oldest_fail );
+        	
+        	return(  kbucket.remove(oldest_fail));
+        }
+        
+        return( false );
     }
 }
