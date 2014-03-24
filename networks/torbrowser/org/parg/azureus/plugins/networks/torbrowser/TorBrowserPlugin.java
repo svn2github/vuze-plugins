@@ -501,7 +501,7 @@ TorBrowserPlugin
 				copyProfile( from_file, to_file );
 				
 			}else{
-				
+				/*
 				if ( to_file.exists()){
 					
 					if ( !to_file.delete()){
@@ -509,10 +509,17 @@ TorBrowserPlugin
 						throw( new Exception( "Failed to delete file: " + to_file ));
 					}
 				}
+				*/
 				
-				if ( !FileUtil.copyFile( from_file, to_file )){
+				// logic changed 3.5.3 to only preserve files that don't exist in the new profile as we need
+				// to update extensions etc
+				
+				if ( !to_file.exists()){
 					
-					throw( new Exception( "Failed to copy file: " + from_file + " -> " + to_file ));
+					if ( !FileUtil.copyFile( from_file, to_file )){
+						
+						throw( new Exception( "Failed to copy file: " + from_file + " -> " + to_file ));
+					}
 				}
 			}
 		}
@@ -574,7 +581,8 @@ TorBrowserPlugin
 		user_pref.put("browser.startup.homepage", HOME_PAGE );
 		user_pref.put("network.proxy.no_proxies_on", "127.0.0.1");
 		user_pref.put("network.proxy.socks_port", socks_port );
-		
+		user_pref.put("extensions.torbutton.updateNeeded", false );	// we handle this
+
 		Set<String>	user_pref_opt = new HashSet<String>();
 		
 		user_pref_opt.add( "browser.startup.homepage" );
