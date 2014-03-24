@@ -1764,11 +1764,15 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             super(SimpleTimer2.getInstance(), 15*1000 );
         }
 
-        public void timeReached() {
-            if (!_isRunning){
+        public void 
+        timeReached() 
+        {
+            if ( !_isRunning ){
             	
                 return;
             }
+            
+            int	live_node_count = 0;           
             
             try{
             	System.out.println( "Refreshing" );
@@ -1781,21 +1785,38 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             	}
             	
             	boolean 	all_failing 	= true;
-            	NodeInfo	fn_target 		= null;
             	
             	List<NodeInfo> all_nodes = new ArrayList<NodeInfo>(_knownNodes.valuesInKAD());
             	
+            	int	all_nodes_count = all_nodes.size();
+            	
+               	List<NodeInfo>	live_nodes 		= new ArrayList<NodeInfo>( all_nodes_count );
+               	List<NodeInfo>	unknown_nodes 	= new ArrayList<NodeInfo>( all_nodes_count );
+            	
             	for ( NodeInfo node: all_nodes ){
             		
-            		if ( node.getNID().getFailCount() == 0 ){
+            		NID nid = node.getNID();
+            		
+            		if ( nid.getFailCount() == 0 ){
             			
             			all_failing = false;
+            			
+            			if ( nid.getLastAlive() > 0 ){
+            				
+            				live_nodes.add( node );
+            				
+            			}else{
+            				
+            				unknown_nodes.add( node );
+            			}
             		}
             	}
             	
+            	live_node_count = live_nodes.size();
+            	
             	long now =_context.clock().now();
             	
-            	if ( all_nodes.size() < 20 || all_failing ){
+            	if ( all_nodes_count < 20 || all_failing ){
             		
             			// not enough nodes, see if we can grab some more from most recently heard from node
             			// track to ensure we don't keep hitting the same most recent one...
@@ -1806,50 +1827,77 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             				( next_bootstrap == 0 || ( now > next_bootstrap ))){
             			
             			System.out.println( "Bootstrapping..." );
-            			            			
-            			int delay = 2*60*1000;
-            			
-            			for (int i=0;i<consec_bootstraps;i++){
+            			       
+            			if ( lookupDest( bootstrap_node )){
+
+	            			int delay = 2*60*1000;
+	            			
+	            			for (int i=0;i<consec_bootstraps;i++){
+	            				
+	            				delay *= 2;
+	            				
+	            				if ( delay > 60*60*1000 ){
+	            				
+	            					break;
+	            				}
+	            			}
+	            			
+	            			next_bootstrap = now + delay;
+	            			
+	            			consec_bootstraps++;
+	
+	             			
+	            			ReplyWaiter waiter = sendFindNode( bootstrap_node, new NID( RandomUtils.nextSecureHash()));
+	
+							if ( waiter != null){
+							
+	    						synchronized( waiter ){
+	    							
+	    							try{
+	    								waiter.wait(60*1000);
+	    								
+	    							}catch (InterruptedException ie) {}
+	    						}	
+	    						
+	    						if ( waiter.getReplyCode() == REPLY_NODES ){
+	    							
+	    							System.out.println( "Bootstrap worked" );
+	    							
+	    						}else{
+	    							
+	    							System.out.println( "Bootstrap failed" );
+	    						}
+							}
+            			}else{
             				
-            				delay *= 2;
-            				
-            				if ( delay > 60*60*1000 ){
-            				
-            					break;
-            				}
+            				System.out.println( "Bootstrap not resolved" );
             			}
-            			
-            			next_bootstrap = now + delay;
-            			
-            			consec_bootstraps++;
-
-            			ReplyWaiter waiter = sendFindNode( bootstrap_node, new NID( RandomUtils.nextSecureHash()));
-
-						if ( waiter != null){
-						
-    						synchronized( waiter ){
-    							
-    							try{
-    								waiter.wait(60*1000);
-    								
-    							}catch (InterruptedException ie) {}
-    						}	
-    						
-    						if ( waiter.getReplyCode() == REPLY_NODES ){
-    							
-    							System.out.println( "Bootstrap worked" );
-    							
-    						}else{
-    							
-    							System.out.println( "Bootstrap failed" );
-    						}
-						}
             		}else{
-            		
-            			consec_bootstraps = 0;
+            			
+            				// try and grab some more nodes from existing non-dead ones
+            			            			
+            			List<NodeInfo> nodes_to_use = live_node_count>0?live_nodes:unknown_nodes;
+            			
+            			if ( nodes_to_use.size() > 0 ){
+            				
+            				NodeInfo node = nodes_to_use.get( RandomUtils.nextInt( nodes_to_use.size()));
+            				
+                			ReplyWaiter waiter = sendFindNode( node, new NID( RandomUtils.nextSecureHash()));
+
+    						if ( waiter != null){
+    						
+        						synchronized( waiter ){
+        							
+        							try{
+        								waiter.wait(60*1000);
+        								
+        							}catch (InterruptedException ie) {}
+        						}
+    						}
+            			}
             		}
-            		
             	}else{
+            		
             		consec_bootstraps = 0;
             		
 	            	Collections.shuffle( all_nodes );
@@ -1910,37 +1958,78 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
 	            	
 	            	int	done = 0;
 	            	
+	            	boolean	try_fn = live_node_count < 5;
+	            	
 	            	for ( NodeInfo ni: all_nodes ){
 	            	
-	            		if ( done > 10 ){
+	            		if ( done > (live_node_count>10?5:10 )){
 	            			
 	            			break;
 	            		}
 	            		
 	            		done++;
-	            			            		
-	            		ReplyWaiter waiter = sendPing( ni );
-	            		
-	            		if ( waiter != null ){
+	            			 
+	            		if ( try_fn ){
 	            			
-		            		synchronized( waiter ){
-								try{
-									waiter.wait(30*1000);
-									
-									int replyType = waiter.getReplyCode();
-									
-									System.out.println( "Ping of " + ni + " -> " + ( replyType == REPLY_PONG ));
-		    						
-								}catch( InterruptedException ie ){
-								
-									
+	            			try_fn = false;
+	            			
+	               			ReplyWaiter waiter = sendFindNode( ni, new NID( RandomUtils.nextSecureHash()));
+
+    						if ( waiter != null){
+    						
+        						synchronized( waiter ){
+        							
+        							try{
+        								waiter.wait(60*1000);
+        								
+        							}catch (InterruptedException ie ){
+        							}
+        						}
+    						}
+	            		}else{
+	            			
+		            		ReplyWaiter waiter = sendPing( ni );
+		            		
+		            		if ( waiter != null ){
+		            			
+			            		synchronized( waiter ){
+									try{
+										waiter.wait(30*1000);
+										
+										int replyType = waiter.getReplyCode();
+										
+										System.out.println( "Ping of " + ni + " -> " + ( replyType == REPLY_PONG ));
+			    						
+									}catch( InterruptedException ie ){	
+									}
 								}
-							}
+		            		}
+	            		}
+	            	}
+	            	
+	            	if ( done < all_nodes_count ){
+	            		
+	            		int	bad_sent = 0;
+	            		
+	            		for ( int i=all_nodes_count-1;i>=done&&bad_sent<2;i--){
+	            			
+	            			ReplyWaiter waiter = sendPing( all_nodes.get( i ));
+		            		
+		            		if ( waiter != null ){
+		            			
+			            		synchronized( waiter ){
+									try{
+										waiter.wait(30*1000);
+										
+									}catch( InterruptedException ie ){									
+									}
+			            		}
+		            		}
 	            		}
 	            	}
             	}
             }finally{
-            	schedule( 15*1000 );
+            	schedule( live_node_count>10?60*1000:15*1000 );
             }
         }
     }
