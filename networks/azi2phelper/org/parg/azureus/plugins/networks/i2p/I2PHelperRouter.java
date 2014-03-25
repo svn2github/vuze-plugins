@@ -156,7 +156,9 @@ I2PHelperRouter
 	
 	protected void
 	initialise(
-		File		config_dir )
+		File		config_dir,
+		int			i2p_internal__port,
+		int			i2p_external_port )
 	
 		throws Exception
 	{	
@@ -165,7 +167,6 @@ I2PHelperRouter
 			File dest_key_file 	= new File( config_dir,  "dest_key.dat" );
 	
 			String 	i2p_host 	= "127.0.0.1";
-			int		i2p_port	= 17654;
 
 			if ( !config_dir.isDirectory()){
 				
@@ -189,18 +190,14 @@ I2PHelperRouter
 			
 				// router config
 			
-			router_props.put( "i2cp.port", i2p_port );
+			router_props.put( "i2cp.port", i2p_internal__port );
 			router_props.put( "i2np.upnp.enable", false );
 			router_props.put( "i2p.streaming.answerPings", true );		// testing
 			
-				// TODO: manage the external port + upnp where required
 				// Note that TCP defaults to the same as UDP port
-			
-			if ( is_bootstrap_node ){
-			
-				router_props.put( "i2np.udp.port", 19817 );
-				router_props.put( "i2np.udp.internalPort", 19817 );
-			}
+						
+			router_props.put( "i2np.udp.port", i2p_external_port );
+			router_props.put( "i2np.udp.internalPort", i2p_external_port );
 	
 				// router bandwidth
 				// TODO: review!
@@ -254,7 +251,7 @@ I2PHelperRouter
 			while( true ){
 				
 				try{
-					Socket s = new Socket( i2p_host, 17654 );
+					Socket s = new Socket( i2p_host, i2p_internal__port );
 				
 					s.close();
 				
@@ -332,14 +329,14 @@ I2PHelperRouter
             
 			if ( !dest_key_file.exists() ){
                
-            	manager = I2PSocketManagerFactory.createManager( i2p_host, i2p_port, opts );
+            	manager = I2PSocketManagerFactory.createManager( i2p_host, i2p_internal__port, opts );
             	
             }else{
             	
         		InputStream is = new FileInputStream( dest_key_file );
         	
         		try{
-        			manager = I2PSocketManagerFactory.createManager( is, i2p_host, i2p_port, opts );
+        			manager = I2PSocketManagerFactory.createManager( is, i2p_host, i2p_internal__port, opts );
         	
         		}finally{
         		
@@ -372,7 +369,9 @@ I2PHelperRouter
 
 			String dht_port_str = dht_props.getProperty( "port" );
 			String dht_NID_str 	= dht_props.getProperty( "nid" );
-						
+				
+			DHTNodes.setBootstrap( is_bootstrap_node ); 
+			
 			if ( dht_port_str != null && dht_NID_str != null ){
 				
 				int	dht_port = Integer.parseInt( dht_port_str );

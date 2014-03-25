@@ -27,15 +27,40 @@ import java.io.File;
 
 
 
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.net.InetSocketAddress;
+import java.nio.channels.ServerSocketChannel;
+
 import net.i2p.data.Base64;
 import net.i2p.data.Destination;
 
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.FileUtil;
+import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.plugins.PluginAdapter;
+import org.gudy.azureus2.plugins.PluginConfig;
+import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.UnloadablePlugin;
+import org.gudy.azureus2.plugins.logging.LoggerChannel;
+import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
+import org.gudy.azureus2.plugins.ui.UIManager;
+import org.gudy.azureus2.plugins.ui.config.ActionParameter;
+import org.gudy.azureus2.plugins.ui.config.BooleanParameter;
+import org.gudy.azureus2.plugins.ui.config.InfoParameter;
+import org.gudy.azureus2.plugins.ui.config.IntParameter;
+import org.gudy.azureus2.plugins.ui.config.Parameter;
+import org.gudy.azureus2.plugins.ui.config.ParameterListener;
+import org.gudy.azureus2.plugins.ui.config.StringParameter;
+import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
+import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
+import org.gudy.azureus2.plugins.utils.LocaleUtilities;
+
+import com.aelitis.azureus.plugins.upnp.UPnPMapping;
+import com.aelitis.azureus.plugins.upnp.UPnPPlugin;
 
 
 public class 
@@ -51,65 +76,256 @@ I2PHelperPlugin
        DHT/KRPC: Added constructor/accessor to support persistent NID
 	*/
 	
-	private PluginInterface		plugin_interface;
+	private PluginInterface			plugin_interface;
+	private PluginConfig			plugin_config;
+	private LoggerChannel 			log;
+	private BasicPluginConfigModel 	config_model;
+	private BasicPluginViewModel	view_model;
+
+	private boolean					plugin_enabled;
 	
-	private I2PHelperRouter		router;
+	private I2PHelperRouter			router;
+
+	private File			lock_file;
+	private InputStream		lock_stream;
 	
 	private boolean	unloaded;
 	
 	public void
 	initialize(
 		PluginInterface		pi )
+		
+		throws PluginException
 	{
 		try{
 			plugin_interface	= pi;
 			
 			setUnloadable( true );
 			
-			plugin_interface.addListener(
-				new PluginAdapter()
-				{
-					public void
-					initializationComplete()
+			final File plugin_dir = pi.getPluginconfig().getPluginUserFile( "tmp.tmp" ).getParentFile();
+
+			lock_file = new File( plugin_dir, ".azlock" );
+			
+			lock_file.delete();
+			
+			if ( lock_file.createNewFile()){
+
+				lock_stream = new FileInputStream( lock_file );
+				
+			}else{
+				
+				throw( new PluginException( "Another instance of Vuze is running, can't initialize plugin" ));
+			}
+			
+			final LocaleUtilities loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
+			
+			log	= plugin_interface.getLogger().getTimeStampedChannel( "I2PHelper");
+			
+			final UIManager	ui_manager = plugin_interface.getUIManager();
+
+			view_model = ui_manager.createBasicPluginViewModel( loc_utils.getLocalisedMessageText( "azi2phelper.name" ));
+
+			view_model.getActivity().setVisible( false );
+			view_model.getProgress().setVisible( false );
+			
+			log.addListener(
+					new LoggerChannelListener()
 					{
-						
-					}
-					
-					public void
-					closedownInitiated()
-					{
-						if ( router != null ){
-							
-							router.destroy();
+						public void
+						messageLogged(
+							int		type,
+							String	content )
+						{
+							view_model.getLogArea().appendText( content + "\n" );
 						}
+						
+						public void
+						messageLogged(
+							String		str,
+							Throwable	error )
+						{
+							view_model.getLogArea().appendText( str + "\n" );
+							view_model.getLogArea().appendText( error.toString() + "\n" );
+						}
+					});
+					
+			plugin_config = plugin_interface.getPluginconfig();
+						
+			config_model = ui_manager.createBasicPluginConfigModel( "plugins", "azi2phelper.name" );
+
+			view_model.setConfigSectionID( "azi2phelper.name" );
+
+			config_model.addLabelParameter2( "azi2phelper.info1" );
+			config_model.addLabelParameter2( "azi2phelper.info2" );
+			
+			final BooleanParameter enable_param = config_model.addBooleanParameter2( "enable", "azi2phelper.enable", true );
+
+			final IntParameter internal_port = config_model.addIntParameter2( "azi2phelper.internal.port", "azi2phelper.internal.port", 0 );
+			final IntParameter external_port = config_model.addIntParameter2( "azi2phelper.external.port", "azi2phelper.external.port", 0 );
+						
+			int	int_port = internal_port.getValue();
+			
+			boolean port_changed = false;
+			
+			if ( int_port == 0 ){
+				
+				int_port = plugin_config.getPluginIntParameter( "azi2phelper.internal.port.auto", 0 );
+				
+				if ( int_port == 0 || !testPort( int_port )){
+					
+					int_port = allocatePort( 17654, 0 );
+					
+					plugin_config.setPluginParameter( "azi2phelper.internal.port.auto", int_port );
+					
+					port_changed = true;
+				}
+			}else{
+				if  ( !testPort( int_port )){
+					
+					log.log( "Testing of explicitly configured internal port " + int_port + " failed - this isn't good" );
+				}
+			}
+			
+			int	ext_port = external_port.getValue();
+			
+			if ( ext_port == 0 ){
+				
+				ext_port = plugin_config.getPluginIntParameter( "azi2phelper.external.port.auto", 0 );
+				
+				if ( ext_port == 0 || !testPort( ext_port )){
+					
+					ext_port = allocatePort( 23154, int_port );
+					
+					plugin_config.setPluginParameter( "azi2phelper.external.port.auto", ext_port );
+					
+					port_changed = true;
+				}
+			}else{
+				
+				if  ( !testPort( ext_port )){
+					
+					log.log( "Testing of explicitly configured external port " + ext_port + " failed - this isn't good" );
+				}
+			}
+
+			final InfoParameter info_param = config_model.addInfoParameter2( "azi2phelper.port.info", int_port + "/" + ext_port );
+
+			final BooleanParameter use_upnp = config_model.addBooleanParameter2( "azi2phelper.upnp.enable", "azi2phelper.upnp.enable", true );
+
+			
+			final StringParameter 	command_text_param = config_model.addStringParameter2( "azi2phelper.cmd.text", "azi2phelper.cmd.text", "" );
+			final ActionParameter	command_exec_param = config_model.addActionParameter2( "azi2phelper.cmd.act1", "azi2phelper.cmd.act2" );
+			
+			command_exec_param.addListener(
+				new ParameterListener() 
+				{
+					public void 
+					parameterChanged(
+						Parameter param) 
+					{
+						String cmd = command_text_param.getValue();
+						
+						System.out.println( "exec " + cmd );
 					}
 				});
-				
-			new AEThread2("derp")
-			{
-				public void
-				run()
-				{
-					router = new I2PHelperRouter( false );
-					
-					try{
-						router.initialise( new File( "C:\\test\\i2phelper" ));
-						
-						while( true ){
-							
-							router.logInfo();
-							
-							Thread.sleep(1000);
-						}
-					}catch( Throwable e ){
-						
-						e.printStackTrace();
-						
-						router = null;
-					}
-				}
-			}.start();
 			
+			if ( port_changed ){
+				
+				plugin_config.save();
+			}
+			
+			final int f_int_port = int_port;
+			final int f_ext_port = ext_port;
+			
+			log.log( "Internal port=" + int_port +", external=" + ext_port );
+						
+			ParameterListener enabler_listener =
+					new ParameterListener()
+					{
+						public void 
+						parameterChanged(
+							Parameter param )
+						{
+							plugin_enabled 		= enable_param.getValue();
+
+							internal_port.setEnabled( plugin_enabled );
+							external_port.setEnabled( plugin_enabled );
+							info_param.setEnabled( plugin_enabled );
+							use_upnp.setEnabled( plugin_enabled );
+							command_text_param.setEnabled( plugin_enabled );
+							command_exec_param.setEnabled( plugin_enabled );
+						}
+					};
+			
+			enable_param.addListener( enabler_listener );
+			
+			enabler_listener.parameterChanged( null );
+					
+			if ( plugin_enabled ){
+				
+				plugin_interface.addListener(
+					new PluginAdapter()
+					{
+						public void
+						initializationComplete()
+						{
+							if ( use_upnp.getValue()){
+								
+								PluginInterface pi_upnp = plugin_interface.getPluginManager().getPluginInterfaceByClass( UPnPPlugin.class );
+								
+								if ( pi_upnp == null ){
+									
+									log.log( "No UPnP plugin available, not attempting port mapping");
+									
+								}else{
+									
+									for ( int i=0;i<2;i++){
+										UPnPMapping	mapping = 
+											((UPnPPlugin)pi_upnp.getPlugin()).addMapping( 
+												plugin_interface.getPluginName(), 
+												i==0, 
+												f_ext_port, 
+												true );
+									}
+								}
+							}else{
+									
+								log.log( "UPnP disabled for the plugin, not attempting port mapping");
+							}
+						}
+						
+						public void
+						closedownInitiated()
+						{
+							unload();
+						}
+					});
+					
+				new AEThread2("I2P: RouterInit")
+				{
+					public void
+					run()
+					{
+						router = new I2PHelperRouter( false );
+						
+						try{
+							router.initialise( plugin_dir, f_int_port, f_ext_port );
+							
+							while( true ){
+								
+								router.logInfo();
+								
+								Thread.sleep(30*1000);
+							}
+						}catch( Throwable e ){
+							
+							e.printStackTrace();
+							
+							router = null;
+						}
+					}
+				}.start();
+			}
 		}catch( Throwable e ){
 			
 			synchronized( this ){
@@ -118,6 +334,11 @@ I2PHelperPlugin
 			}
 			
 			Debug.out( e );
+			
+			if ( e instanceof PluginException ){
+				
+				throw((PluginException)e);
+			}
 		}
 	}
 	
@@ -144,11 +365,102 @@ I2PHelperPlugin
 		if ( router != null ){
 			
 			router.destroy();
+			
+			router = null;
+		}
+		
+		if ( lock_stream != null ){
+			
+			try{
+				lock_stream.close();
+				
+			}catch( Throwable e ){
+			}
+			
+			lock_stream = null;
+		}
+		
+		if ( lock_file != null ){
+			
+			lock_file.delete();
+			
+			lock_file = null;
 		}
 	}
 	
 
+	private boolean
+	testPort(
+		int		port )
+	{
+		ServerSocketChannel ssc = null;
+
+		try{	
+			ssc = ServerSocketChannel.open();
+			
+			ssc.socket().bind( new InetSocketAddress( "127.0.0.1", port ));
+			
+			return( true );
+			
+		}catch( Throwable e ){
+			
+		}finally{
+			
+			if ( ssc != null ){
+				
+				try{
+					ssc.close();
+					
+				}catch( Throwable e ){
+					
+				}
+			}
+		}
+		
+		return( false );
+	}
 	
+	private int
+	allocatePort(
+		int				def,
+		int				exclude_port )
+	{
+		for ( int i=0;i<32;i++){
+			
+			int port = 20000 + RandomUtils.nextInt( 20000 );
+			
+			if ( port == exclude_port ){
+				
+				continue;
+			}
+			
+			ServerSocketChannel ssc = null;
+
+			try{	
+				ssc = ServerSocketChannel.open();
+				
+				ssc.socket().bind( new InetSocketAddress( "127.0.0.1", port ));
+				
+				return( port );
+				
+			}catch( Throwable e ){
+				
+			}finally{
+				
+				if ( ssc != null ){
+					
+					try{
+						ssc.close();
+						
+					}catch( Throwable e ){
+						
+					}
+				}
+			}
+		}
+		
+		return( def );
+	}
 	
 	public static void
 	main(
@@ -183,7 +495,9 @@ I2PHelperPlugin
 		try{
 			I2PHelperRouter router = new I2PHelperRouter( bootstrap );
 			
-			router.initialise( config_dir );
+				// 19817 must be used for bootstrap node
+			
+			router.initialise( config_dir, 17654, bootstrap?19817:23014 );
 			
 			I2PHelperTracker tracker = new I2PHelperTracker( router.getDHT());
 			

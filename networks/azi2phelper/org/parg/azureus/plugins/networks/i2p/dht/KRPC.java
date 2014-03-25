@@ -1830,14 +1830,16 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             			       
             			if ( lookupDest( bootstrap_node )){
 
-	            			int delay = 2*60*1000;
+	            			int delay = 1*60*1000;
 	            			
 	            			for (int i=0;i<consec_bootstraps;i++){
 	            				
 	            				delay *= 2;
 	            				
-	            				if ( delay > 60*60*1000 ){
+	            				if ( delay > 10*60*1000 ){
 	            				
+	            					delay = 10*60*1000;
+	            					
 	            					break;
 	            				}
 	            			}
@@ -2029,7 +2031,17 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
 	            	}
             	}
             }finally{
-            	schedule( live_node_count>10?60*1000:15*1000 );
+            	
+            	if ( bootstrap_node == null ){
+            		
+            			// we're bootstrap node, keep things fresh
+            		
+            		schedule(10*1000 );
+            		
+            	}else{
+            	
+            		schedule( live_node_count>10?60*1000:15*1000 );
+            	}
             }
         }
     }

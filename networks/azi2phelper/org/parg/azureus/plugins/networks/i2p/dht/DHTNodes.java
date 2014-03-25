@@ -26,7 +26,7 @@ import net.i2p.util.SimpleTimer2;
  * @since 0.9.2
  * @author zzz
  */
-class DHTNodes {
+public class DHTNodes {
 
     private final I2PAppContext _context;
     private long _expireTime;
@@ -44,9 +44,23 @@ class DHTNodes {
     private static final int MAX_PEERS = 799;
     /** Buckets older than this are refreshed - BEP 5 says 15 minutes */
     private static final long MAX_BUCKET_AGE = 15*60*1000;
-    private static final int KAD_K = 8;
-    private static final int KAD_B = 1;
+    private static final int NORMAL_KAD_K = 8;
+    private static final int NORMAL_KAD_B = 1;
 
+    private static final int BS_KAD_K = 16;
+    private static final int BS_KAD_B = 1;
+    
+    private static int KAD_K = NORMAL_KAD_K;
+    private static int KAD_B = NORMAL_KAD_B;
+    
+    public static void
+    setBootstrap(
+    	boolean		is_boot )
+    {
+       KAD_K = is_boot?BS_KAD_K:NORMAL_KAD_K;
+       KAD_B = is_boot?BS_KAD_B:NORMAL_KAD_B;
+    }
+    
     public DHTNodes(I2PAppContext ctx, NID me) {
         _context = ctx;
         _expireTime = MAX_EXPIRE_TIME;
