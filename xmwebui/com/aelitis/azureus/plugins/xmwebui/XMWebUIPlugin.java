@@ -5196,6 +5196,8 @@ XMWebUIPlugin
 		
 		int[] file_indexes = getFileIndexes(args, download_id);
 		
+		String baseURL = MapUtils.getMapString(args, "base-url", null);
+		
 		if (file_indexes == null || file_indexes.length == 0) {
 			for (int i = 0; i < files.length; i++) {
 				DiskManagerFileInfo file = files[i];
@@ -5204,7 +5206,7 @@ XMWebUIPlugin
   			
 				map.put("index", i);
 
-  			torrentGet_files(map, file_fields, host, download, file);
+  			torrentGet_files(map, file_fields, host, baseURL, download, file);
   			if (file_fields != null && file_fields.size() == 0) {
   				torrentGet_fileStats(map, file_fields, file);
   			}
@@ -5223,7 +5225,7 @@ XMWebUIPlugin
 				map.put("index", file_index);
 				DiskManagerFileInfo fileInfo = files[file_index];
 				torrentGet_fileStats(map, file_fields, fileInfo);
-				torrentGet_files(map, file_fields, host, download, fileInfo);
+				torrentGet_files(map, file_fields, host, baseURL, download, fileInfo);
 
   			hashAndAdd(map, file_list, listHCs, i);
 			}
@@ -5233,7 +5235,7 @@ XMWebUIPlugin
 	}
 
 	private void torrentGet_files(Map obj, List<String> sortedFields,
-			String host, Download download, DiskManagerFileInfo file) {
+			String host, String baseURL, Download download, DiskManagerFileInfo file) {
 		boolean all = sortedFields == null || sortedFields.size() == 0;
 
 		if (all
@@ -5270,7 +5272,11 @@ XMWebUIPlugin
 					|| Collections.binarySearch(sortedFields, FIELD_FILES_CONTENT_URL) >= 0) {
 				URL f_stream_url = PlayUtils.getMediaServerContentURL(file);
 				if (f_stream_url != null) {
-					obj.put(FIELD_FILES_CONTENT_URL, adjustURL(host, f_stream_url));
+					String s = adjustURL(host, f_stream_url);
+					if (baseURL != null && s.startsWith(baseURL)) {
+						s = s.substring(baseURL.length(), s.length());
+					}
+					obj.put(FIELD_FILES_CONTENT_URL, s);
 				}
 			}
 
