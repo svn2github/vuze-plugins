@@ -3,10 +3,10 @@ package org.parg.azureus.plugins.networks.i2p.dht;
  *  From zzzot, relicensed to GPLv2
  */
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
+
+import java.util.*;
+
+import org.parg.azureus.plugins.networks.i2p.I2pHelperLogger;
 
 import net.i2p.I2PAppContext;
 import net.i2p.data.DataHelper;
@@ -183,5 +183,17 @@ class DHTTracker {
             _torrentCount = torrentCount;
             schedule(tooMany ? CLEAN_TIME / 3 : CLEAN_TIME);
         }
+    }
+    
+    public void
+    print(
+    	I2pHelperLogger logger )
+    {
+    	logger.log( "Torrents: " + _torrents.size());
+    	
+    	for ( Map.Entry<InfoHash,Peers> entry: _torrents.entrySet()){
+    		
+    		logger.log( "    " + entry.getKey() + " -> " + entry.getValue().size());
+    	}
     }
 }

@@ -31,7 +31,10 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.nio.channels.ServerSocketChannel;
+import java.text.SimpleDateFormat;
+import java.util.Locale;
 
+import net.i2p.data.Base32;
 import net.i2p.data.Base64;
 import net.i2p.data.Destination;
 
@@ -58,6 +61,7 @@ import org.gudy.azureus2.plugins.ui.config.StringParameter;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
+import org.parg.azureus.plugins.networks.i2p.dht.DHT;
 
 import com.aelitis.azureus.plugins.upnp.UPnPMapping;
 import com.aelitis.azureus.plugins.upnp.UPnPPlugin;
@@ -65,10 +69,15 @@ import com.aelitis.azureus.plugins.upnp.UPnPPlugin;
 
 public class 
 I2PHelperPlugin 
-	implements UnloadablePlugin
+	implements UnloadablePlugin, I2pHelperLogger
 {	
 	/*
-	 * Router: commented out System.setProperties in static initialiser
+	 * Router: commented out System.setProperties for timezone, http agent etc in static initialiser
+	 * RoutingKeyGenerator: Fixed up SimpleDateFormat
+	 *    	private final static SimpleDateFormat _fmt = new SimpleDateFormat(FORMAT, Locale.UK);
+    		static{
+    			_fmt.setCalendar( _cal );	 // PARG
+    		}
 	 * KRPC: Added code to persist DHT periodically in Cleaner
 	 *  	System.out.println( "Persisting DHT" );
             boolean saveAll = _context.clock().now() - _started < 20*60*1000;
@@ -85,7 +94,8 @@ I2PHelperPlugin
 	private boolean					plugin_enabled;
 	
 	private I2PHelperRouter			router;
-
+	private I2PHelperTracker		tracker;
+	
 	private File			lock_file;
 	private InputStream		lock_stream;
 	
@@ -182,7 +192,7 @@ I2PHelperPlugin
 			}else{
 				if  ( !testPort( int_port )){
 					
-					log.log( "Testing of explicitly configured internal port " + int_port + " failed - this isn't good" );
+					log( "Testing of explicitly configured internal port " + int_port + " failed - this isn't good" );
 				}
 			}
 			
@@ -204,7 +214,7 @@ I2PHelperPlugin
 				
 				if  ( !testPort( ext_port )){
 					
-					log.log( "Testing of explicitly configured external port " + ext_port + " failed - this isn't good" );
+					log( "Testing of explicitly configured external port " + ext_port + " failed - this isn't good" );
 				}
 			}
 
@@ -212,6 +222,11 @@ I2PHelperPlugin
 
 			final BooleanParameter use_upnp = config_model.addBooleanParameter2( "azi2phelper.upnp.enable", "azi2phelper.upnp.enable", true );
 
+			final BooleanParameter ext_i2p_param 		= config_model.addBooleanParameter2( "azi2phelper.use.ext", "azi2phelper.use.ext", false );
+			
+			final IntParameter ext_i2p_port_param 		= config_model.addIntParameter2( "azi2phelper.use.ext.port", "azi2phelper.use.ext.port", 7654 ); 
+
+			
 			
 			final StringParameter 	command_text_param = config_model.addStringParameter2( "azi2phelper.cmd.text", "azi2phelper.cmd.text", "" );
 			final ActionParameter	command_exec_param = config_model.addActionParameter2( "azi2phelper.cmd.act1", "azi2phelper.cmd.act2" );
@@ -221,11 +236,107 @@ I2PHelperPlugin
 				{
 					public void 
 					parameterChanged(
-						Parameter param) 
+						Parameter param ) 
 					{
-						String cmd = command_text_param.getValue();
-						
-						System.out.println( "exec " + cmd );
+						new AEThread2( "cmdrunner" )
+						{
+							public void
+							run()
+							{
+								try{
+									command_exec_param.setEnabled( false );
+									
+									String cmd_str = command_text_param.getValue().trim();
+									
+									String[] bits = cmd_str.split( " " );
+			
+									if ( bits.length == 0 ){
+										
+										log( "No command" );
+										
+									}else if ( router == null ){
+										
+										log( "Router is not initialised" );
+										
+									}else{
+									
+										DHT dht = router.getDHT();
+										
+										if ( dht == null ){
+											
+											log( "DHT is not initialised" );
+											
+										}else{
+											
+											String cmd = bits[0].toLowerCase();
+											
+											if ( cmd.equals( "print" )){
+											
+												dht.print( I2PHelperPlugin.this );
+											
+											}else if ( cmd.equals( "lookup" )){
+												
+												if ( bits.length != 2 ){
+													
+													throw( new Exception( "usage: lookup <hash>"));
+												}
+												
+												byte[] hash = decodeHash( bits[1] );
+
+												Destination dest = router.lookupDestination( hash );
+												
+												if ( dest == null ){
+													
+													log( "lookup failed" );;
+													
+												}else{
+												
+													log( "lookup -> " + dest.toBase64());
+												}		
+											}else if ( cmd.equals( "announce" )){
+												
+												if ( bits.length != 2 ){
+													
+													throw( new Exception( "usage: announce <base16_infohash>"));
+												}
+												
+												byte[] hash = decodeHash( bits[1] );
+											
+												tracker.announce( hash );
+												
+											}else if ( cmd.equals( "ping" )){
+												
+												if ( bits.length != 3 ){
+												
+													throw( new Exception( "usage: ping <base64_dest> <dht_port>"));
+												}
+												
+												String dest_64 = bits[1];
+												
+												int		port 	= Integer.parseInt( bits[2] );
+												
+												Destination dest = new Destination();
+												
+												dest.fromBase64( dest_64 );
+												
+												dht.ping( dest, port );
+												
+											}else{
+										
+												log( "Usage: print" );
+											}
+										}
+									}
+								}catch( Throwable e){
+									
+									log( "Command failed: " + Debug.getNestedExceptionMessage( e ));
+									
+								}finally{
+									
+									command_exec_param.setEnabled( true );
+								}
+							}
+						}.start();
 					}
 				});
 			
@@ -237,7 +348,7 @@ I2PHelperPlugin
 			final int f_int_port = int_port;
 			final int f_ext_port = ext_port;
 			
-			log.log( "Internal port=" + int_port +", external=" + ext_port );
+			log( "Internal port=" + int_port +", external=" + ext_port );
 						
 			ParameterListener enabler_listener =
 					new ParameterListener()
@@ -246,18 +357,24 @@ I2PHelperPlugin
 						parameterChanged(
 							Parameter param )
 						{
-							plugin_enabled 		= enable_param.getValue();
+							plugin_enabled 			= enable_param.getValue();
 
-							internal_port.setEnabled( plugin_enabled );
-							external_port.setEnabled( plugin_enabled );
-							info_param.setEnabled( plugin_enabled );
-							use_upnp.setEnabled( plugin_enabled );
+							boolean use_ext_i2p  	= ext_i2p_param.getValue();
+							
+							internal_port.setEnabled( plugin_enabled && !use_ext_i2p );
+							external_port.setEnabled( plugin_enabled && !use_ext_i2p);
+							info_param.setEnabled( plugin_enabled  && !use_ext_i2p);
+							use_upnp.setEnabled( plugin_enabled  && !use_ext_i2p );
+							
+							ext_i2p_port_param.setEnabled( plugin_enabled && use_ext_i2p );
+							
 							command_text_param.setEnabled( plugin_enabled );
 							command_exec_param.setEnabled( plugin_enabled );
 						}
 					};
 			
 			enable_param.addListener( enabler_listener );
+			ext_i2p_param.addListener( enabler_listener );
 			
 			enabler_listener.parameterChanged( null );
 					
@@ -275,7 +392,7 @@ I2PHelperPlugin
 								
 								if ( pi_upnp == null ){
 									
-									log.log( "No UPnP plugin available, not attempting port mapping");
+									log( "No UPnP plugin available, not attempting port mapping");
 									
 								}else{
 									
@@ -290,7 +407,7 @@ I2PHelperPlugin
 								}
 							}else{
 									
-								log.log( "UPnP disabled for the plugin, not attempting port mapping");
+								log( "UPnP disabled for the plugin, not attempting port mapping");
 							}
 						}
 						
@@ -309,13 +426,22 @@ I2PHelperPlugin
 						router = new I2PHelperRouter( false );
 						
 						try{
-							router.initialise( plugin_dir, f_int_port, f_ext_port );
+							if ( ext_i2p_param.getValue()){
+								
+								router.initialise( plugin_dir, ext_i2p_port_param.getValue());
+										
+							}else{
+							
+								router.initialise( plugin_dir, f_int_port, f_ext_port );
+							}
+							
+							tracker = new I2PHelperTracker( router.getDHT());
 							
 							while( true ){
 								
-								router.logInfo();
+								router.logInfo( I2PHelperPlugin.this  );
 								
-								Thread.sleep(30*1000);
+								Thread.sleep(60*1000);
 							}
 						}catch( Throwable e ){
 							
@@ -340,6 +466,50 @@ I2PHelperPlugin
 				throw((PluginException)e);
 			}
 		}
+	}
+	
+	public void
+	log(
+		String	str )
+	{
+		if ( log != null ){
+			
+			log.log( str );
+			
+		}else{
+			
+			System.out.println( str );
+		}
+	}
+	
+	private byte[]
+	decodeHash(
+		String	hash_str )
+	{		
+		byte[] hash;
+		
+		int	pos = hash_str.indexOf( ".b32" );
+		
+		if ( pos != -1 ){
+			
+			hash = Base32.decode( hash_str.substring(0,pos));
+			
+		}else{
+			
+			if ( hash_str.length() == 40 ){
+				
+				hash = ByteFormatter.decodeString( hash_str );
+				
+			}else if ( hash_str.length() == 32 ){
+				
+				hash = Base32.decode( hash_str );
+			}else{
+				
+				hash =  Base64.decode( hash_str );
+			}
+		}
+		
+		return( hash );
 	}
 	
 	private void
@@ -492,13 +662,26 @@ I2PHelperPlugin
 			System.out.println( "Boostrap Node" );
 		}
 		
+		I2pHelperLogger logger = 
+			new I2pHelperLogger() 
+			{
+				public void 
+				log(
+					String str ) 
+				{
+					System.out.println( str );
+				}
+			};
+			
 		try{
 			I2PHelperRouter router = new I2PHelperRouter( bootstrap );
 			
 				// 19817 must be used for bootstrap node
 			
 			router.initialise( config_dir, 17654, bootstrap?19817:23014 );
-			
+			//router.initialise( config_dir, 29903 ); // 7654 );
+			//router.initialise( config_dir, 7654 );
+
 			I2PHelperTracker tracker = new I2PHelperTracker( router.getDHT());
 			
 			I2PHelperConsole console = new I2PHelperConsole();
@@ -559,11 +742,11 @@ I2PHelperPlugin
 						
 					}else if ( cmd.equals( "print" )){
 						
-						router.getDHT().print();
+						router.getDHT().print( logger );
 						
 					}else{
 						
-						router.logInfo();
+						router.logInfo( logger );
 					}
 				}catch( Throwable e ){
 					

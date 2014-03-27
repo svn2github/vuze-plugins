@@ -6,6 +6,8 @@ package org.parg.azureus.plugins.networks.i2p.dht;
 
 import java.util.Collection;
 
+import org.parg.azureus.plugins.networks.i2p.I2pHelperLogger;
+
 import net.i2p.data.Destination;
 import net.i2p.data.Hash;
 import net.i2p.util.Log;
@@ -37,7 +39,7 @@ public interface DHT {
     crawl();
     
     public void
-    print();
+    print( I2pHelperLogger logger );
     
     public void
     setBootstrapNode( NodeInfo ni );

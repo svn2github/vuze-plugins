@@ -51,6 +51,7 @@ import org.klomp.snark.bencode.BDecoder;
 import org.klomp.snark.bencode.BEncoder;
 import org.klomp.snark.bencode.BEValue;
 import org.klomp.snark.bencode.InvalidBEncodingException;
+import org.parg.azureus.plugins.networks.i2p.I2pHelperLogger;
 
 
 /**
@@ -999,7 +1000,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             // use a short timeout for now
             Destination dest = _session.lookupDest(nInfo.getHash(), DEST_LOOKUP_TIMEOUT);
             if (dest != null) {
-            	System.out.println( "Destination lookup OK for " + nInfo.getNID());
+            	System.out.println( "Destination lookup OK for " + nInfo );
                 nInfo.setDestination(dest);
                 if (_log.shouldLog(Log.INFO))
                     _log.info("lookup success for " + nInfo);
@@ -1012,7 +1013,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
         if (_log.shouldLog(Log.INFO))
             _log.info("lookup fail for " + nInfo);
         
-        System.out.println( "Destination lookup FAIL for " + nInfo.getNID());
+        System.out.println( "Destination lookup FAIL for " + nInfo );
         return false;
     }
 
@@ -1830,6 +1831,11 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             			       
             			if ( lookupDest( bootstrap_node )){
 
+            				if ( !_isRunning ){
+            					
+            					return;
+            				}
+            				
 	            			int delay = 1*60*1000;
 	            			
 	            			for (int i=0;i<consec_bootstraps;i++){
@@ -1847,7 +1853,6 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
 	            			next_bootstrap = now + delay;
 	            			
 	            			consec_bootstraps++;
-	
 	             			
 	            			ReplyWaiter waiter = sendFindNode( bootstrap_node, new NID( RandomUtils.nextSecureHash()));
 	
@@ -1881,6 +1886,11 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             			List<NodeInfo> nodes_to_use = live_node_count>0?live_nodes:unknown_nodes;
             			
             			if ( nodes_to_use.size() > 0 ){
+            				
+            				if ( !_isRunning ){
+            					
+            					return;
+            				}
             				
             				NodeInfo node = nodes_to_use.get( RandomUtils.nextInt( nodes_to_use.size()));
             				
@@ -1964,6 +1974,11 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
 	            	
 	            	for ( NodeInfo ni: all_nodes ){
 	            	
+        				if ( !_isRunning ){
+        					
+        					return;
+        				}
+        				
 	            		if ( done > (live_node_count>10?5:10 )){
 	            			
 	            			break;
@@ -2015,6 +2030,11 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
 	            		
 	            		for ( int i=all_nodes_count-1;i>=done&&bad_sent<2;i--){
 	            			
+            				if ( !_isRunning ){
+            					
+            					return;
+            				}
+            				
 	            			ReplyWaiter waiter = sendPing( all_nodes.get( i ));
 		            		
 		            		if ( waiter != null ){
@@ -2032,16 +2052,19 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             	}
             }finally{
             	
-            	if ( bootstrap_node == null ){
-            		
-            			// we're bootstrap node, keep things fresh
-            		
-            		schedule(10*1000 );
-            		
-            	}else{
-            	
-            		schedule( live_node_count>10?60*1000:15*1000 );
-            	}
+				if ( _isRunning ){
+					
+	            	if ( bootstrap_node == null ){
+	            		
+	            			// we're bootstrap node, keep things fresh
+	            		
+	            		schedule(10*1000 );
+	            		
+	            	}else{
+	            	
+	            		schedule( live_node_count>10?60*1000:15*1000 );
+	            	}
+				}
             }
         }
     }
@@ -2132,13 +2155,16 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
     }
     
     public void
-    print()
+    print(
+    	I2pHelperLogger	logger )
     {
     	List<NodeInfo> known_nodes = new LinkedList<NodeInfo>(_knownNodes.valuesInKAD());
     	
        	Set<NID> kad_nids = _knownNodes.kadValues();
 
-    	System.out.println( "Printing " + known_nodes.size() + " nodes, nids=" + kad_nids.size());
+       	_tracker.print( logger );
+       	
+       	logger.log( "Nodes: " + known_nodes.size() + ", NIDs=" + kad_nids.size());
     	
     	int	alive 	= 0;
     	int dead1	= 0;
@@ -2150,7 +2176,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
      		
      		NID nid = ni.getNID();
      		
-     		System.out.println( ni );
+     		logger.log( ni.toString() );
      		
      		int fails = nid.getFailCount();
      		
@@ -2178,6 +2204,6 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
      		}
      	}
      	
-     	System.out.println( "Alive=" + alive + ", dead1=" + dead1 + ", dead2=" + dead2 + ", unknown=" + unknown + ", no-dest=" + no_dest );
+     	logger.log( "Alive=" + alive + ", dead1=" + dead1 + ", dead2=" + dead2 + ", unknown=" + unknown + ", no-dest=" + no_dest );
     }
 }

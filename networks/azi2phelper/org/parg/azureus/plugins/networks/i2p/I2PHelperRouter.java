@@ -57,6 +57,8 @@ import org.parg.azureus.plugins.networks.i2p.dht.*;
 public class 
 I2PHelperRouter 
 {
+	private static final String 	i2p_host 	= "127.0.0.1";
+
 	private boolean		is_bootstrap_node;
 	
 	private Router 		router;
@@ -154,34 +156,38 @@ I2PHelperRouter
 		}
 	}
 	
+	private void
+	init(
+		File		config_dir )
+		
+		throws Exception
+	{
+		if ( !config_dir.isDirectory()){
+			
+			config_dir.mkdirs();
+			
+			if ( !config_dir.isDirectory()){
+				
+				throw( new Exception( "Failed to create config dir '" + config_dir +"'" ));
+			}
+		}
+				
+			// setting this prevents stdout/stderr from being hijacked
+		
+		System.setProperty( "wrapper.version", "dummy" );	
+	}
+	
 	protected void
 	initialise(
 		File		config_dir,
-		int			i2p_internal__port,
+		int			i2p_internal_port,
 		int			i2p_external_port )
 	
 		throws Exception
 	{	
 		try{
-			File dht_config 	= new File( config_dir,  "dht.config" );
-			File dest_key_file 	= new File( config_dir,  "dest_key.dat" );
-	
-			String 	i2p_host 	= "127.0.0.1";
-
-			if ( !config_dir.isDirectory()){
-				
-				config_dir.mkdirs();
-				
-				if ( !config_dir.isDirectory()){
-					
-					throw( new Exception( "Failed to create config dir '" + config_dir +"'" ));
-				}
-			}
-					
-				// setting this prevents stdout/stderr from being hijacked
+			init( config_dir );
 			
-			System.setProperty( "wrapper.version", "dummy" );
-						
 			new File( config_dir, "router.ping" ).delete();
 			
 			File router_config = new File( config_dir, "router.config" );
@@ -190,7 +196,7 @@ I2PHelperRouter
 			
 				// router config
 			
-			router_props.put( "i2cp.port", i2p_internal__port );
+			router_props.put( "i2cp.port", i2p_internal_port );
 			router_props.put( "i2np.upnp.enable", false );
 			router_props.put( "i2p.streaming.answerPings", true );		// testing
 			
@@ -251,7 +257,7 @@ I2PHelperRouter
 			while( true ){
 				
 				try{
-					Socket s = new Socket( i2p_host, i2p_internal__port );
+					Socket s = new Socket( i2p_host, i2p_internal_port );
 				
 					s.close();
 				
@@ -270,144 +276,12 @@ I2PHelperRouter
 			
 			System.out.println( "Router startup complete" );
 			
-			I2PAppContext ctx = I2PAppContext.getGlobalContext();
-
-			ctx.logManager().setDefaultLimit( "WARN" );
-			
-			I2PSocketManager manager;
-			
-            Properties opts = new Properties();        
+            Properties opts = new Properties();
+            
             opts.putAll( router_ctx.getProperties());
-                        
-            // outbound speed limit
-            // "i2cp.outboundBytesPerSecond"
-            // tell router -> 
-            //Properties newProps = new Properties();
-            //newProps.putAll(_opts);
-            // sess.updateOptions(newProps);
             
+            initialiseDHT( config_dir, i2p_host, i2p_internal_port, opts );
             
-            // Dont do this for now, it is set in I2PSocketEepGet for announces,
-            // we don't need fast handshake for peer connections.
-            //if (opts.getProperty("i2p.streaming.connectDelay") == null)
-            //    opts.setProperty("i2p.streaming.connectDelay", "500");
-            if (opts.getProperty(I2PSocketOptions.PROP_CONNECT_TIMEOUT) == null)
-                opts.setProperty(I2PSocketOptions.PROP_CONNECT_TIMEOUT, "75000");
-            if (opts.getProperty("i2p.streaming.inactivityTimeout") == null)
-                opts.setProperty("i2p.streaming.inactivityTimeout", "240000");
-            if (opts.getProperty("i2p.streaming.inactivityAction") == null)
-                opts.setProperty("i2p.streaming.inactivityAction", "1"); // 1 == disconnect, 2 == ping
-            if (opts.getProperty("i2p.streaming.initialWindowSize") == null)
-                opts.setProperty("i2p.streaming.initialWindowSize", "1");
-            if (opts.getProperty("i2p.streaming.slowStartGrowthRateFactor") == null)
-                opts.setProperty("i2p.streaming.slowStartGrowthRateFactor", "1");
-            //if (opts.getProperty("i2p.streaming.writeTimeout") == null)
-            //    opts.setProperty("i2p.streaming.writeTimeout", "90000");
-            //if (opts.getProperty("i2p.streaming.readTimeout") == null)
-            //    opts.setProperty("i2p.streaming.readTimeout", "120000");
-            //if (opts.getProperty("i2p.streaming.maxConnsPerMinute") == null)
-            //    opts.setProperty("i2p.streaming.maxConnsPerMinute", "2");
-            //if (opts.getProperty("i2p.streaming.maxTotalConnsPerMinute") == null)
-            //    opts.setProperty("i2p.streaming.maxTotalConnsPerMinute", "8");
-            //if (opts.getProperty("i2p.streaming.maxConnsPerHour") == null)
-            //    opts.setProperty("i2p.streaming.maxConnsPerHour", "20");
-            if (opts.getProperty("i2p.streaming.enforceProtocol") == null)
-                opts.setProperty("i2p.streaming.enforceProtocol", "true");
-            //if (opts.getProperty("i2p.streaming.disableRejectLogging") == null)
-            //    opts.setProperty("i2p.streaming.disableRejectLogging", "true");
-            if (opts.getProperty("i2p.streaming.answerPings") == null)
-                opts.setProperty("i2p.streaming.answerPings", "false");
-            
-            opts.setProperty( "i2p.streaming.disableRejectLogging", "false");
-            opts.setProperty( "i2cp.dontPublishLeaseSet", "false" );
-            opts.setProperty( "inbound.length", "2" );
-            opts.setProperty( "inbound.lengthVariance", "0" );
-            opts.setProperty( "outbound.length", "2" ); 
-            opts.setProperty( "outbound.lengthVariance", "0" ); 
-            opts.setProperty( "inbound.quantity", "16" ); 
-            opts.setProperty( "outbound.quantity", "64" );
-            
-			if ( !dest_key_file.exists() ){
-               
-            	manager = I2PSocketManagerFactory.createManager( i2p_host, i2p_internal__port, opts );
-            	
-            }else{
-            	
-        		InputStream is = new FileInputStream( dest_key_file );
-        	
-        		try{
-        			manager = I2PSocketManagerFactory.createManager( is, i2p_host, i2p_internal__port, opts );
-        	
-        		}finally{
-        		
-        			is.close();
-        		}
-            }
-			
-			System.out.println( "Waiting for socket manager startup" );
-			
-			while( true ){
-				
-				session = manager.getSession();
-				
-				if ( session != null ){
-					
-					break;
-				}
-				
-				Thread.sleep(250);
-			}
-			
-			System.out.println( "Socket manager startup complete" );
-			
-			if ( !dest_key_file.exists()){
-				
-				new PrivateKeyFile( dest_key_file , session ).write();
-			}
-			
-			Properties dht_props = readProperties( dht_config );
-
-			String dht_port_str = dht_props.getProperty( "port" );
-			String dht_NID_str 	= dht_props.getProperty( "nid" );
-				
-			DHTNodes.setBootstrap( is_bootstrap_node ); 
-			
-			if ( dht_port_str != null && dht_NID_str != null ){
-				
-				int	dht_port = Integer.parseInt( dht_port_str );
-				NID	dht_nid	= new NID( Base32.decode( dht_NID_str ));
-		
-				dht = new KRPC( ctx, "i2pvuze", session, dht_port, dht_nid );
-				
-			}else{	
-				
-        		dht = new KRPC( ctx, "i2pvuze", session );
-        	}
-						
-			if ( dht_props.isEmpty()){
-				
-				dht_props.setProperty( "dest", session.getMyDestination().toBase64());
-				dht_props.setProperty( "port", String.valueOf( dht.getPort()));
-				dht_props.setProperty( "nid", Base32.encode( dht.getNID().getData()));
-				
-				writeProperties( dht_config, dht_props );
-			}
-			
-			if ( !is_bootstrap_node ){
-				
-				String 	boot_dest 	= "N0e4jfsxy~NYzyr-0bY1nwpnhTza8fn1wWr6IHHOmaIEnbEvgltJvyJn8LWvwlu589mUPhQXQb9BtMrkEan8RZSL4Vo2iFgMCxjTOnfA2dW1~JpL0ddGM28OQITya-1YDgNZFmyX0Me-~RjJjTg31YNozDoosIQ-Uvz2s5aUrzI0gt0r3M4PFUThb0eefd51Yb-eEQMpBb-Hd~EU07yw46ljy2uP4tiEPlWt0l0YR8nbeH0Eg6i3fCoSVgWpSeRjJ9vJeHvwGymO2rPHCSCPgIVwwyqNYpgkqGWnn9Qg97Wc-zrTBiRJp0Dn4lcYvkbbeBrblZDOy6PnPFp33-WZ7lcaVeR6uNGqphQxCYv8pbti5Q9QYcc6IzYpvzsgDCbIVhuzQ9Px2-l6qVg6S-i-cYwQfxBYnVSyVmryuGSkIha2AezYJk2~0k7-byeJ0q57Re~aZy6boIDa2qtaOyi-RDbCWAoIIfOycwkAvqf5nG8KOVwGzvFEjYuExyP3f9ZlAAAA";
-				int		boot_port 	= 52896;
-				String	boot_nid	= "6d3dh2bwrafjdx4ba46zb6jvbnnt2g3r";
-					
-				NodeInfo ninf = new NodeInfo( new NID( Base32.decode( boot_nid )), new Destination( boot_dest ), boot_port );
-					
-				dht.setBootstrapNode( ninf );
-			}
-			
-			System.out.println( "MyDest: " + session.getMyDestination().toBase64());
-			System.out.println( "MyDest: " + Base32.encode( session.getMyDestination().calculateHash().getData()).toUpperCase() + ".b32.i2p" );
-			System.out.println( "MyNID:  " + Base32.encode( dht.getNID().getData()));
-						
 		}catch( Throwable e ){
 			
 			destroy();
@@ -424,6 +298,217 @@ I2PHelperRouter
 				}
 			}
 		}
+	}
+	
+	protected void
+	initialise(
+		File		config_dir,
+		int			i2p_separate_port )
+	
+		throws Exception
+	{	
+		try{
+			init( config_dir );
+		
+			System.out.println( "Waiting for router startup" );;
+						
+			while( true ){
+				
+				try{
+					Socket s = new Socket( i2p_host, i2p_separate_port );
+				
+					s.close();
+				
+					break;
+					
+				}catch( Throwable e ){
+					
+					try{
+						Thread.sleep(250);
+						
+					}catch( Throwable f ){
+						
+					}
+				}
+			}
+			
+			System.out.println( "Router startup complete" );
+			
+            Properties opts = new Properties();
+                        
+            initialiseDHT( config_dir, i2p_host, i2p_separate_port, opts );
+            
+		}catch( Throwable e ){
+			
+			destroy();
+			
+			throw( new Exception( "Initialisation failed", e ));
+			
+		}finally{
+			
+			synchronized( this ){
+				
+				if ( destroyed ){
+					
+					destroy();
+				}
+			}
+		}
+	}
+	
+	private void 
+	initialiseDHT(
+		File			config_dir,
+		String			i2p_host,
+		int				i2p_internal_port,
+		Properties		opts )
+		
+		throws Exception
+	{
+		File dht_config 	= new File( config_dir,  "dht.config" );
+		File dest_key_file 	= new File( config_dir,  "dest_key.dat" );
+
+
+		I2PAppContext ctx = I2PAppContext.getGlobalContext();
+
+		ctx.logManager().setDefaultLimit( "WARN" );
+		
+		I2PSocketManager manager;
+		
+		
+        // outbound speed limit
+        // "i2cp.outboundBytesPerSecond"
+        // tell router -> 
+        //Properties newProps = new Properties();
+        //newProps.putAll(_opts);
+        // sess.updateOptions(newProps);
+        
+        
+        // Dont do this for now, it is set in I2PSocketEepGet for announces,
+        // we don't need fast handshake for peer connections.
+        //if (opts.getProperty("i2p.streaming.connectDelay") == null)
+        //    opts.setProperty("i2p.streaming.connectDelay", "500");
+        if (opts.getProperty(I2PSocketOptions.PROP_CONNECT_TIMEOUT) == null)
+            opts.setProperty(I2PSocketOptions.PROP_CONNECT_TIMEOUT, "75000");
+        if (opts.getProperty("i2p.streaming.inactivityTimeout") == null)
+            opts.setProperty("i2p.streaming.inactivityTimeout", "240000");
+        if (opts.getProperty("i2p.streaming.inactivityAction") == null)
+            opts.setProperty("i2p.streaming.inactivityAction", "1"); // 1 == disconnect, 2 == ping
+        if (opts.getProperty("i2p.streaming.initialWindowSize") == null)
+            opts.setProperty("i2p.streaming.initialWindowSize", "1");
+        if (opts.getProperty("i2p.streaming.slowStartGrowthRateFactor") == null)
+            opts.setProperty("i2p.streaming.slowStartGrowthRateFactor", "1");
+        //if (opts.getProperty("i2p.streaming.writeTimeout") == null)
+        //    opts.setProperty("i2p.streaming.writeTimeout", "90000");
+        //if (opts.getProperty("i2p.streaming.readTimeout") == null)
+        //    opts.setProperty("i2p.streaming.readTimeout", "120000");
+        //if (opts.getProperty("i2p.streaming.maxConnsPerMinute") == null)
+        //    opts.setProperty("i2p.streaming.maxConnsPerMinute", "2");
+        //if (opts.getProperty("i2p.streaming.maxTotalConnsPerMinute") == null)
+        //    opts.setProperty("i2p.streaming.maxTotalConnsPerMinute", "8");
+        //if (opts.getProperty("i2p.streaming.maxConnsPerHour") == null)
+        //    opts.setProperty("i2p.streaming.maxConnsPerHour", "20");
+        if (opts.getProperty("i2p.streaming.enforceProtocol") == null)
+            opts.setProperty("i2p.streaming.enforceProtocol", "true");
+        //if (opts.getProperty("i2p.streaming.disableRejectLogging") == null)
+        //    opts.setProperty("i2p.streaming.disableRejectLogging", "true");
+        if (opts.getProperty("i2p.streaming.answerPings") == null)
+            opts.setProperty("i2p.streaming.answerPings", "false");
+        
+        opts.setProperty( "i2p.streaming.disableRejectLogging", "false");
+        opts.setProperty( "i2cp.dontPublishLeaseSet", "false" );
+        opts.setProperty( "inbound.length", "2" );
+        opts.setProperty( "inbound.lengthVariance", "0" );
+        opts.setProperty( "outbound.length", "2" ); 
+        opts.setProperty( "outbound.lengthVariance", "0" ); 
+        opts.setProperty( "inbound.quantity", "4" ); 
+        opts.setProperty( "outbound.quantity", "4" );
+        
+		if ( !dest_key_file.exists() ){
+           
+        	manager = I2PSocketManagerFactory.createManager( i2p_host, i2p_internal_port, opts );
+        	
+        }else{
+        	
+    		InputStream is = new FileInputStream( dest_key_file );
+    	
+    		try{
+    			manager = I2PSocketManagerFactory.createManager( is, i2p_host, i2p_internal_port, opts );
+    	
+    		}finally{
+    		
+    			is.close();
+    		}
+        }
+		
+		if ( manager == null ){
+			
+			throw( new Exception ( "Failed to create socket manager" ));
+		}
+		
+		System.out.println( "Waiting for socket manager startup" );
+		
+		while( true ){
+			
+			session = manager.getSession();
+			
+			if ( session != null ){
+				
+				break;
+			}
+			
+			Thread.sleep(250);
+		}
+		
+		System.out.println( "Socket manager startup complete" );
+		
+		if ( !dest_key_file.exists()){
+			
+			new PrivateKeyFile( dest_key_file , session ).write();
+		}
+		
+		Properties dht_props = readProperties( dht_config );
+
+		String dht_port_str = dht_props.getProperty( "port" );
+		String dht_NID_str 	= dht_props.getProperty( "nid" );
+			
+		DHTNodes.setBootstrap( is_bootstrap_node ); 
+		
+		if ( dht_port_str != null && dht_NID_str != null ){
+			
+			int	dht_port = Integer.parseInt( dht_port_str );
+			NID	dht_nid	= new NID( Base32.decode( dht_NID_str ));
+	
+			dht = new KRPC( ctx, "i2pvuze", session, dht_port, dht_nid );
+			
+		}else{	
+			
+    		dht = new KRPC( ctx, "i2pvuze", session );
+    	}
+					
+		if ( dht_props.isEmpty()){
+			
+			dht_props.setProperty( "dest", session.getMyDestination().toBase64());
+			dht_props.setProperty( "port", String.valueOf( dht.getPort()));
+			dht_props.setProperty( "nid", Base32.encode( dht.getNID().getData()));
+			
+			writeProperties( dht_config, dht_props );
+		}
+		
+		if ( !is_bootstrap_node ){
+			
+			String 	boot_dest 	= "N0e4jfsxy~NYzyr-0bY1nwpnhTza8fn1wWr6IHHOmaIEnbEvgltJvyJn8LWvwlu589mUPhQXQb9BtMrkEan8RZSL4Vo2iFgMCxjTOnfA2dW1~JpL0ddGM28OQITya-1YDgNZFmyX0Me-~RjJjTg31YNozDoosIQ-Uvz2s5aUrzI0gt0r3M4PFUThb0eefd51Yb-eEQMpBb-Hd~EU07yw46ljy2uP4tiEPlWt0l0YR8nbeH0Eg6i3fCoSVgWpSeRjJ9vJeHvwGymO2rPHCSCPgIVwwyqNYpgkqGWnn9Qg97Wc-zrTBiRJp0Dn4lcYvkbbeBrblZDOy6PnPFp33-WZ7lcaVeR6uNGqphQxCYv8pbti5Q9QYcc6IzYpvzsgDCbIVhuzQ9Px2-l6qVg6S-i-cYwQfxBYnVSyVmryuGSkIha2AezYJk2~0k7-byeJ0q57Re~aZy6boIDa2qtaOyi-RDbCWAoIIfOycwkAvqf5nG8KOVwGzvFEjYuExyP3f9ZlAAAA";
+			int		boot_port 	= 52896;
+			String	boot_nid	= "6d3dh2bwrafjdx4ba46zb6jvbnnt2g3r";
+				
+			NodeInfo ninf = new NodeInfo( new NID( Base32.decode( boot_nid )), new Destination( boot_dest ), boot_port );
+				
+			dht.setBootstrapNode( ninf );
+		}
+		
+		System.out.println( "MyDest: " + session.getMyDestination().toBase64());
+		System.out.println( "MyDest: " + Base32.encode( session.getMyDestination().calculateHash().getData()).toUpperCase() + ".b32.i2p" );
+		System.out.println( "MyNID:  " + Base32.encode( dht.getNID().getData()));
 	}
 	
 	public Destination
@@ -475,29 +560,30 @@ I2PHelperRouter
 	}
 	
 	protected void
-	logInfo()
+	logInfo(
+		I2pHelperLogger	logger )
 	{
 		DHT		dht		= this.dht;
 		Router router 	= this.router;
 		
 		if ( dht == null ){
 			
-			System.out.println( "DHT is inactive" );
+			logger.log( "DHT is inactive" );
 			
 		}else{
 			
-			System.out.println( dht.renderStatusHTML());
+			logger.log( dht.renderStatusHTML());
 		}
 		
 		if ( router == null ){
 			
-			System.out.println( "Router is inactive" );
+			logger.log( "Router is inactive" );
 			
 		}else{
 			
 			RouterContext router_ctx = router.getContext();
 			
-			System.out.println( "Known routers=" + router_ctx.netDb().getKnownRouters() + ", lease-sets=" + router_ctx.netDb().getKnownLeaseSets());
+			logger.log( "Known routers=" + router_ctx.netDb().getKnownRouters() + ", lease-sets=" + router_ctx.netDb().getKnownLeaseSets());
 			
 			TunnelManagerFacade tunnel_manager = router_ctx.tunnelManager();
 			
@@ -505,9 +591,9 @@ I2PHelperRouter
 			int	client_tunnels			= tunnel_manager.getInboundClientTunnelCount()  + tunnel_manager.getOutboundClientTunnelCount();
 			int participating_tunnels	= tunnel_manager.getParticipatingCount();
 			
-			System.out.println( "Tunnels: exploratory=" + exploratory_tunnels + ", client=" + client_tunnels + ", participating=" + participating_tunnels ); 
+			logger.log( "Tunnels: exploratory=" + exploratory_tunnels + ", client=" + client_tunnels + ", participating=" + participating_tunnels ); 
 	
-			System.out.println( "Throttle: msg_delay=" + router_ctx.throttle().getMessageDelay() + ", tunnel_lag=" + router_ctx.throttle().getTunnelLag() + ", tunnel_stat=" +  router_ctx.throttle().getTunnelStatus());
+			logger.log( "Throttle: msg_delay=" + router_ctx.throttle().getMessageDelay() + ", tunnel_lag=" + router_ctx.throttle().getTunnelLag() + ", tunnel_stat=" +  router_ctx.throttle().getTunnelStatus());
 			
 			FIFOBandwidthLimiter bwl = router_ctx.bandwidthLimiter();
 			
@@ -518,7 +604,7 @@ I2PHelperRouter
 		    //RateStat recvRate = router_ctx.statManager().getRate("bw.recvRate"); 
 			//System.out.println( "Rates: send=" + sendRate.getRate(60*1000).getAverageValue() + ", recv=" + recvRate.getRate(60*1000).getAverageValue());
 		    
-			System.out.println( 
+			logger.log( 
 				"Rates: send=" + DisplayFormatters.formatByteCountToKiBEtcPerSec(send_rate) +
 				", recv=" + DisplayFormatters.formatByteCountToKiBEtcPerSec(recv_rate) +
 				"; Limits: send=" + DisplayFormatters.formatByteCountToKiBEtcPerSec(bwl.getOutboundKBytesPerSecond()*1024) + 
