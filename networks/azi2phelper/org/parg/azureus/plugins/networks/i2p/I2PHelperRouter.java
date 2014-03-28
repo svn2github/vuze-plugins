@@ -432,7 +432,9 @@ I2PHelperRouter
         opts.setProperty( "inbound.quantity", "4" ); 
         opts.setProperty( "outbound.quantity", "4" );
         
-		if ( !dest_key_file.exists() ){
+        boolean	use_existing_key = dest_key_file.exists();
+        		
+		if ( use_existing_key ){
            
         	manager = I2PSocketManagerFactory.createManager( i2p_host, i2p_internal_port, opts );
         	
@@ -468,21 +470,29 @@ I2PHelperRouter
 			Thread.sleep(250);
 		}
 		
+		DHTNodes.setBootstrap( is_bootstrap_node ); 
+
 		System.out.println( "Socket manager startup complete" );
 		
-		if ( !dest_key_file.exists()){
+		Properties dht_props;
+		
+		if ( !use_existing_key ){
 			
 			new PrivateKeyFile( dest_key_file , session ).write();
+			
+			dht_props = new Properties();
+			
+		}else{
+		
+			dht_props = readProperties( dht_config );
 		}
 		
-		Properties dht_props = readProperties( dht_config );
-
 		String dht_port_str = dht_props.getProperty( "port" );
 		String dht_NID_str 	= dht_props.getProperty( "nid" );
 			
-		DHTNodes.setBootstrap( is_bootstrap_node ); 
-		
-		if ( dht_port_str != null && dht_NID_str != null ){
+		boolean	use_existing_nid = dht_port_str != null && dht_NID_str != null;
+				
+		if ( use_existing_nid ){
 			
 			int	dht_port = Integer.parseInt( dht_port_str );
 			NID	dht_nid	= new NID( Base32.decode( dht_NID_str ));
@@ -494,7 +504,7 @@ I2PHelperRouter
     		dht = new KRPC( ctx, "i2pvuze", session, logger );
     	}
 					
-		if ( dht_props.isEmpty()){
+		if ( !use_existing_nid){
 			
 			dht_props.setProperty( "dest", session.getMyDestination().toBase64());
 			dht_props.setProperty( "port", String.valueOf( dht.getPort()));

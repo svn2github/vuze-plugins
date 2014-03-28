@@ -31,8 +31,8 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.nio.channels.ServerSocketChannel;
-import java.text.SimpleDateFormat;
-import java.util.Locale;
+
+
 
 import net.i2p.data.Base32;
 import net.i2p.data.Base64;
@@ -41,7 +41,6 @@ import net.i2p.data.Destination;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
-import org.gudy.azureus2.core3.util.FileUtil;
 import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.plugins.PluginAdapter;
 import org.gudy.azureus2.plugins.PluginConfig;
@@ -74,16 +73,18 @@ I2PHelperPlugin
 {	
 	/*
 	 * Router: commented out System.setProperties for timezone, http agent etc in static initialiser
-	 * RoutingKeyGenerator: Fixed up SimpleDateFormat
+	 * RoutingKeyGenerator: Fixed up SimpleDateFormat as it assumes GMT (TimeZone default used within SimpleDateFormat)
 	 *    	private final static SimpleDateFormat _fmt = new SimpleDateFormat(FORMAT, Locale.UK);
     		static{
     			_fmt.setCalendar( _cal );	 // PARG
     		}
-	 * KRPC: Added code to persist DHT periodically in Cleaner
-	 *  	System.out.println( "Persisting DHT" );
-            boolean saveAll = _context.clock().now() - _started < 20*60*1000;
-            PersistDHT.saveDHT(_knownNodes, saveAll, _dhtFile);
-       DHT/KRPC: Added constructor/accessor to support persistent NID
+    		
+    		
+    	NativeBigInteger: Added load attempt from classes's loader (i.e. plugin class loader)
+    	    if (resource == null) {
+        		// PARG added search via plugin class loader as well
+        		resource = NativeBigInteger.class.getClassLoader().getResource(resourceName);
+        	}
 	*/
 	
 	private PluginInterface			plugin_interface;

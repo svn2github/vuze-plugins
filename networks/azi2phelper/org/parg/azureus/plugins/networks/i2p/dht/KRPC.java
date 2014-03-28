@@ -1857,7 +1857,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             	
             	long now =_context.clock().now();
             	
-            	if ( all_nodes_count < 20 || all_failing ){
+            	if ( all_nodes_count < 20 || all_failing || force_bootstrap ){
             		
             			// not enough nodes, see if we can grab some more from most recently heard from node
             			// track to ensure we don't keep hitting the same most recent one...
