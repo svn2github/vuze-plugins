@@ -50,6 +50,7 @@ import net.i2p.router.RouterContext;
 import net.i2p.router.TunnelManagerFacade;
 import net.i2p.router.transport.FIFOBandwidthLimiter;
 
+import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.DisplayFormatters;
 import org.parg.azureus.plugins.networks.i2p.dht.*;
 
@@ -59,7 +60,8 @@ I2PHelperRouter
 {
 	private static final String 	i2p_host 	= "127.0.0.1";
 
-	private boolean		is_bootstrap_node;
+	private boolean				is_bootstrap_node;
+	private I2pHelperLogger		logger;
 	
 	private Router 		router;
 	private I2PSession 	session;
@@ -69,9 +71,11 @@ I2PHelperRouter
 	
 	protected
 	I2PHelperRouter(
-		boolean	bootstrap_node )
+		boolean				bootstrap_node,
+		I2pHelperLogger		_logger )
 	{
 		is_bootstrap_node	= bootstrap_node;
+		logger				= _logger;
 	}
 	
 	private Properties
@@ -242,6 +246,10 @@ I2PHelperRouter
 			router_props.setProperty( "i2p.dir.base" , config_dir.getAbsolutePath());
 			router_props.setProperty( "i2p.dir.config" , config_dir.getAbsolutePath());
 
+			Debug.out( "Turn off stats sometime!!!!" );
+		
+			router_props.put( "stat.full", "true" );
+			
 			router = new Router( router_props );
 				
 			router.setKillVMOnEnd( false );
@@ -479,11 +487,11 @@ I2PHelperRouter
 			int	dht_port = Integer.parseInt( dht_port_str );
 			NID	dht_nid	= new NID( Base32.decode( dht_NID_str ));
 	
-			dht = new KRPC( ctx, "i2pvuze", session, dht_port, dht_nid );
+			dht = new KRPC( ctx, "i2pvuze", session, dht_port, dht_nid, logger );
 			
 		}else{	
 			
-    		dht = new KRPC( ctx, "i2pvuze", session );
+    		dht = new KRPC( ctx, "i2pvuze", session, logger );
     	}
 					
 		if ( dht_props.isEmpty()){
@@ -560,8 +568,7 @@ I2PHelperRouter
 	}
 	
 	protected void
-	logInfo(
-		I2pHelperLogger	logger )
+	logInfo()
 	{
 		DHT		dht		= this.dht;
 		Router router 	= this.router;
@@ -604,6 +611,8 @@ I2PHelperRouter
 		    //RateStat recvRate = router_ctx.statManager().getRate("bw.recvRate"); 
 			//System.out.println( "Rates: send=" + sendRate.getRate(60*1000).getAverageValue() + ", recv=" + recvRate.getRate(60*1000).getAverageValue());
 		    
+			logger.log( "lease repubs=" + router_ctx.statManager().getRate("netDb.republishLeaseSetCount" ).getLifetimeEventCount());
+			
 			logger.log( 
 				"Rates: send=" + DisplayFormatters.formatByteCountToKiBEtcPerSec(send_rate) +
 				", recv=" + DisplayFormatters.formatByteCountToKiBEtcPerSec(recv_rate) +

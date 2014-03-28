@@ -78,9 +78,7 @@ abstract class PersistDHT {
             return;
         Log log = I2PAppContext.getGlobalContext().logManager().getLog(PersistDHT.class);
         int count = 0;
-        
-        System.out.println( "Saving DHT" );
-        
+               
         long maxAge = 0; // saveAll ? 0 : I2PAppContext.getGlobalContext().clock().now() - MAX_AGE;
         PrintWriter out = null;
         try {

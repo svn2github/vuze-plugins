@@ -62,6 +62,7 @@ import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.parg.azureus.plugins.networks.i2p.dht.DHT;
+import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 
 import com.aelitis.azureus.plugins.upnp.UPnPMapping;
 import com.aelitis.azureus.plugins.upnp.UPnPPlugin;
@@ -245,88 +246,13 @@ I2PHelperPlugin
 							{
 								try{
 									command_exec_param.setEnabled( false );
-									
-									String cmd_str = command_text_param.getValue().trim();
-									
-									String[] bits = cmd_str.split( " " );
-			
-									if ( bits.length == 0 ){
-										
-										log( "No command" );
-										
-									}else if ( router == null ){
-										
-										log( "Router is not initialised" );
-										
-									}else{
-									
-										DHT dht = router.getDHT();
-										
-										if ( dht == null ){
-											
-											log( "DHT is not initialised" );
-											
-										}else{
-											
-											String cmd = bits[0].toLowerCase();
-											
-											if ( cmd.equals( "print" )){
-											
-												dht.print( I2PHelperPlugin.this );
-											
-											}else if ( cmd.equals( "lookup" )){
-												
-												if ( bits.length != 2 ){
-													
-													throw( new Exception( "usage: lookup <hash>"));
-												}
-												
-												byte[] hash = decodeHash( bits[1] );
 
-												Destination dest = router.lookupDestination( hash );
-												
-												if ( dest == null ){
-													
-													log( "lookup failed" );;
-													
-												}else{
-												
-													log( "lookup -> " + dest.toBase64());
-												}		
-											}else if ( cmd.equals( "announce" )){
-												
-												if ( bits.length != 2 ){
-													
-													throw( new Exception( "usage: announce <base16_infohash>"));
-												}
-												
-												byte[] hash = decodeHash( bits[1] );
-											
-												tracker.announce( hash );
-												
-											}else if ( cmd.equals( "ping" )){
-												
-												if ( bits.length != 3 ){
-												
-													throw( new Exception( "usage: ping <base64_dest> <dht_port>"));
-												}
-												
-												String dest_64 = bits[1];
-												
-												int		port 	= Integer.parseInt( bits[2] );
-												
-												Destination dest = new Destination();
-												
-												dest.fromBase64( dest_64 );
-												
-												dht.ping( dest, port );
-												
-											}else{
-										
-												log( "Usage: print" );
-											}
-										}
-									}
+									executeCommand( 
+										command_text_param.getValue(),
+										router,
+										tracker,
+										I2PHelperPlugin.this );
+									
 								}catch( Throwable e){
 									
 									log( "Command failed: " + Debug.getNestedExceptionMessage( e ));
@@ -423,7 +349,7 @@ I2PHelperPlugin
 					public void
 					run()
 					{
-						router = new I2PHelperRouter( false );
+						router = new I2PHelperRouter( false, I2PHelperPlugin.this );
 						
 						try{
 							if ( ext_i2p_param.getValue()){
@@ -439,7 +365,7 @@ I2PHelperPlugin
 							
 							while( true ){
 								
-								router.logInfo( I2PHelperPlugin.this  );
+								router.logInfo();
 								
 								Thread.sleep(60*1000);
 							}
@@ -468,6 +394,126 @@ I2PHelperPlugin
 		}
 	}
 	
+	private static void
+	executeCommand(
+		String				cmd_str,
+		I2PHelperRouter		router,
+		I2PHelperTracker	tracker,
+		I2pHelperLogger		log )
+		
+		throws Exception
+	{
+		cmd_str = cmd_str.trim();
+		
+		String[] bits = cmd_str.split( " " );
+
+		if ( bits.length == 0 ){
+			
+			log.log( "No command" );
+			
+		}else if ( router == null ){
+			
+			log.log( "Router is not initialised" );
+			
+		}else{
+		
+			DHT dht = router.getDHT();
+			
+			if ( dht == null ){
+				
+				log.log( "DHT is not initialised" );
+				
+			}else{
+				
+				String cmd = bits[0].toLowerCase();
+				
+				if ( cmd.equals( "print" )){
+				
+					dht.print();
+				
+				}else if ( cmd.equals( "info" )){
+						
+					router.logInfo();
+					
+				}else if ( cmd.equals( "lookup" )){
+					
+					if ( bits.length != 2 ){
+						
+						throw( new Exception( "usage: lookup <hash>"));
+					}
+					
+					byte[] hash = decodeHash( bits[1] );
+
+					Destination dest = router.lookupDestination( hash );
+					
+					if ( dest == null ){
+						
+						log.log( "lookup failed" );
+						
+					}else{
+					
+						log.log( "lookup -> " + dest.toBase64());
+					}		
+				}else if ( cmd.equals( "announce" )){
+					
+					if ( bits.length != 2 ){
+						
+						throw( new Exception( "usage: announce <base16_infohash>"));
+					}
+					
+					byte[] hash = decodeHash( bits[1] );
+				
+					tracker.announce( hash );
+					
+				}else if ( cmd.equals( "ping_dest" )){
+					
+					if ( bits.length != 3 ){
+					
+						throw( new Exception( "usage: ping_dest <base64_dest> <dht_port>"));
+					}
+					
+					String dest_64 = bits[1];
+					
+					int		port 	= Integer.parseInt( bits[2] );
+					
+					Destination dest = new Destination();
+					
+					dest.fromBase64( dest_64 );
+					
+					dht.ping( dest, port );
+					
+				}else if ( cmd.equals( "ping_node" )){
+
+					if ( bits.length != 2 ){
+						
+						throw( new Exception( "usage: ping_node <nid_hash>"));
+					}
+					
+					byte[] hash = decodeHash( bits[1] );
+					
+					NodeInfo ni = dht.getNodeInfo( hash );
+					
+					if ( ni == null ){
+						
+						log.log( "Node not found in routing table" );
+						
+					}else{
+						
+						dht.ping( ni );
+					}
+					
+				}else if ( cmd.equals( "bootstrap" )){
+					
+					dht.requestBootstrap();
+					
+				}else{
+			
+					log.log( "Usage: print|info..." );
+				}
+			}
+		}	
+	}
+	
 	public void
 	log(
 		String	str )
@@ -482,7 +528,7 @@ I2PHelperPlugin
 		}
 	}
 	
-	private byte[]
+	private static byte[]
 	decodeHash(
 		String	hash_str )
 	{		
@@ -674,7 +720,7 @@ I2PHelperPlugin
 			};
 			
 		try{
-			I2PHelperRouter router = new I2PHelperRouter( bootstrap );
+			I2PHelperRouter router = new I2PHelperRouter( bootstrap, logger );
 			
 				// 19817 must be used for bootstrap node
 			
@@ -698,55 +744,13 @@ I2PHelperPlugin
 				try{
 					line = line.trim();
 					
-					String[]	bits = line.split(" ");
-					
-					String cmd = bits[0].toLowerCase();
-					
-					if ( cmd.equals( "quit" )){
+					if ( line.equals( "quit" )){
 						
 						break;
 						
-					}else if ( cmd.equals( "lookup" )){
-						
-						Destination dest = router.lookupDestination( Base64.decode( bits[1] ));
-						
-						if ( dest == null ){
-							
-							System.out.println( "lookup failed" );;
-							
-						}else{
-						
-							System.out.println( dest.toBase64());
-						}
-					}else if ( cmd.equals( "announce" )){
-						
-						byte[] hash = bits.length==1?new byte[20]: ByteFormatter.decodeString( bits[1] );
-					
-						tracker.announce( hash );
-						
-					}else if ( cmd.equals( "ping" )){
-						
-						String dest_64 = bits[1];
-						
-						int		port 	= Integer.parseInt( bits[2] );
-						
-						Destination dest = new Destination();
-						
-						dest.fromBase64( dest_64 );
-						
-						router.getDHT().ping( dest, port );
-						
-					}else if ( cmd.equals( "crawl" )){
-						
-						router.getDHT().crawl();
-						
-					}else if ( cmd.equals( "print" )){
-						
-						router.getDHT().print( logger );
-						
 					}else{
 						
-						router.logInfo( logger );
+						executeCommand(line, router, tracker, logger);
 					}
 				}catch( Throwable e ){
 					

@@ -92,7 +92,9 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
 
     private final I2PAppContext _context;
     private final Log _log;
-
+    private final I2pHelperLogger	_logger;
+    private boolean force_bootstrap;
+    
     /** our tracker */
     private final DHTTracker _tracker;
     /** who we know */
@@ -171,19 +173,19 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
      */
     	// PARG - added constructor to allow using fixed NID
     
-    public KRPC(I2PAppContext ctx, String baseName, I2PSession session) {
+    public KRPC(I2PAppContext ctx, String baseName, I2PSession session, I2pHelperLogger logger) {
     	
     	 this( 		ctx, baseName, session,
     			 	TrackerClient.PORT + 10 + ctx.random().nextInt(65535 - 20 - TrackerClient.PORT ),
-    			 	null );
+    			 	null, logger );
     }
     
-    public KRPC(I2PAppContext ctx, String baseName, I2PSession session, int qport, NID nid ) {
+    public KRPC(I2PAppContext ctx, String baseName, I2PSession session, int qport, NID nid, I2pHelperLogger logger ) {
         _context = ctx;
         _session = session;
         _log = ctx.logManager().getLog(KRPC.class);
         _tracker = new DHTTracker(ctx);
-
+        _logger = logger;
         _sentQueries = new ConcurrentHashMap<MsgID, ReplyWaiter>();
         _outgoingTokens = new ConcurrentHashMap<Token, NodeInfo>();
         _incomingTokens = new ConcurrentHashMap<NID, Token>();
@@ -241,12 +243,50 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
     
     	// PARG
     
+    public void
+    requestBootstrap()
+    {
+    	force_bootstrap = true;
+    }
+    
     public NID
     getNID()
     {
     	return( _myNID );
     }
 
+    public NodeInfo
+    getNodeInfo(
+    	byte[]		nid_hash )
+    {
+    	return( _knownNodes.get( new NID( nid_hash )));
+    }
+    
+    public void
+    ping(
+    	NodeInfo		ni )
+   	{
+		ReplyWaiter waiter = sendPing( ni );
+		
+		if ( waiter != null ){
+			
+    		synchronized( waiter ){
+				try{
+					waiter.wait(30*1000);
+					
+					int replyType = waiter.getReplyCode();
+					
+					_logger.log( "Ping of " + ni + " -> " + ( replyType == REPLY_PONG ));
+					
+				}catch( InterruptedException ie ){	
+				}
+			}
+		}else{
+			
+			_logger.log( "Failed to send ping" );
+		}
+   	}
+    
     public Log
     getLog()
     {
@@ -1698,6 +1738,8 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             
             if ( now - last_save >= 5*60*1000 ){
             
+            	last_save = now;
+            	
             	PersistDHT.saveDHT(_knownNodes, _dhtFile);
             }
             
@@ -1775,9 +1817,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             
             int	live_node_count = 0;           
             
-            try{
-            	System.out.println( "Refreshing" );
-            	
+            try{            	
             	if ( bootstrap_node != null ){
             		
             			// in case it has found its way into the DHT
@@ -1823,9 +1863,17 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             			// track to ensure we don't keep hitting the same most recent one...
             			// boostrap if screwed
             		
-            		if ( 	( all_failing || all_nodes.size() < 5 ) && 
-            				bootstrap_node != null &&
-            				( next_bootstrap == 0 || ( now > next_bootstrap ))){
+            		if ( 	force_bootstrap || 
+            					(( all_failing || all_nodes.size() < 5 ) && 
+            					bootstrap_node != null &&
+            					( next_bootstrap == 0 || ( now > next_bootstrap )))){
+            			
+            			if ( force_bootstrap ){
+            				
+            				force_bootstrap = false;
+            				
+            				consec_bootstraps = 0;
+            			}
             			
             			System.out.println( "Bootstrapping..." );
             			       
@@ -1979,6 +2027,11 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
         					return;
         				}
         				
+        				if ( force_bootstrap ){
+        					
+        					break;
+        				}
+        				
 	            		if ( done > (live_node_count>10?5:10 )){
 	            			
 	            			break;
@@ -2035,6 +2088,11 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             					return;
             				}
             				
+              				if ( force_bootstrap ){
+            					
+            					break;
+            				}
+              				
 	            			ReplyWaiter waiter = sendPing( all_nodes.get( i ));
 		            		
 		            		if ( waiter != null ){
@@ -2062,7 +2120,14 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
 	            		
 	            	}else{
 	            	
-	            		schedule( live_node_count>10?60*1000:15*1000 );
+	            		if ( force_bootstrap ){
+	            			
+	            			schedule( 100 );
+	            			
+	            		}else{
+	            			
+	            			schedule( live_node_count>10?60*1000:15*1000 );
+	            		}
 	            	}
 				}
             }
@@ -2155,16 +2220,15 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
     }
     
     public void
-    print(
-    	I2pHelperLogger	logger )
+    print()
     {
     	List<NodeInfo> known_nodes = new LinkedList<NodeInfo>(_knownNodes.valuesInKAD());
     	
        	Set<NID> kad_nids = _knownNodes.kadValues();
 
-       	_tracker.print( logger );
+       	_tracker.print( _logger );
        	
-       	logger.log( "Nodes: " + known_nodes.size() + ", NIDs=" + kad_nids.size());
+       	_logger.log( "Nodes: " + known_nodes.size() + ", NIDs=" + kad_nids.size());
     	
     	int	alive 	= 0;
     	int dead1	= 0;
@@ -2176,7 +2240,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
      		
      		NID nid = ni.getNID();
      		
-     		logger.log( ni.toString() );
+     		_logger.log( ni.toString() );
      		
      		int fails = nid.getFailCount();
      		
@@ -2204,6 +2268,6 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
      		}
      	}
      	
-     	logger.log( "Alive=" + alive + ", dead1=" + dead1 + ", dead2=" + dead2 + ", unknown=" + unknown + ", no-dest=" + no_dest );
+     	_logger.log( "Alive=" + alive + ", dead1=" + dead1 + ", dead2=" + dead2 + ", unknown=" + unknown + ", no-dest=" + no_dest );
     }
 }
