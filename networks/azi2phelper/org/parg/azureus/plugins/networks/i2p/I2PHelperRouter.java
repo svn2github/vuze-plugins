@@ -260,7 +260,7 @@ I2PHelperRouter
 
 			RouterContext router_ctx = router.getContext();
 			
-			System.out.println( "Waiting for router startup" );;
+			logger.log( "Waiting for router startup" );;
 						
 			while( true ){
 				
@@ -282,7 +282,7 @@ I2PHelperRouter
 				}
 			}
 			
-			System.out.println( "Router startup complete" );
+			logger.log( "Router startup complete" );
 			
             Properties opts = new Properties();
             
@@ -318,7 +318,7 @@ I2PHelperRouter
 		try{
 			init( config_dir );
 		
-			System.out.println( "Waiting for router startup" );;
+			logger.log( "Waiting for router startup" );;
 						
 			while( true ){
 				
@@ -340,7 +340,7 @@ I2PHelperRouter
 				}
 			}
 			
-			System.out.println( "Router startup complete" );
+			logger.log( "Router startup complete" );
 			
             Properties opts = new Properties();
                         
@@ -435,11 +435,7 @@ I2PHelperRouter
         boolean	use_existing_key = dest_key_file.exists();
         		
 		if ( use_existing_key ){
-           
-        	manager = I2PSocketManagerFactory.createManager( i2p_host, i2p_internal_port, opts );
-        	
-        }else{
-        	
+         	
     		InputStream is = new FileInputStream( dest_key_file );
     	
     		try{
@@ -449,6 +445,9 @@ I2PHelperRouter
     		
     			is.close();
     		}
+        }else{
+        	
+        	manager = I2PSocketManagerFactory.createManager( i2p_host, i2p_internal_port, opts );
         }
 		
 		if ( manager == null ){
@@ -456,7 +455,7 @@ I2PHelperRouter
 			throw( new Exception ( "Failed to create socket manager" ));
 		}
 		
-		System.out.println( "Waiting for socket manager startup" );
+		logger.log( "Waiting for socket manager startup" );
 		
 		while( true ){
 			
@@ -472,7 +471,7 @@ I2PHelperRouter
 		
 		DHTNodes.setBootstrap( is_bootstrap_node ); 
 
-		System.out.println( "Socket manager startup complete" );
+		logger.log( "Socket manager startup complete" );
 		
 		Properties dht_props;
 		
@@ -524,9 +523,9 @@ I2PHelperRouter
 			dht.setBootstrapNode( ninf );
 		}
 		
-		System.out.println( "MyDest: " + session.getMyDestination().toBase64());
-		System.out.println( "MyDest: " + Base32.encode( session.getMyDestination().calculateHash().getData()).toUpperCase() + ".b32.i2p" );
-		System.out.println( "MyNID:  " + Base32.encode( dht.getNID().getData()));
+		logger.log( "MyDest: " + session.getMyDestination().toBase64());
+		logger.log( "        " + Base32.encode( session.getMyDestination().calculateHash().getData()).toUpperCase() + ".b32.i2p"  + ", existing=" + use_existing_key );
+		logger.log( "MyNID:  " + Base32.encode( dht.getNID().getData()) + ", existing=" + use_existing_nid );
 	}
 	
 	public Destination
@@ -590,6 +589,7 @@ I2PHelperRouter
 		}else{
 			
 			logger.log( dht.renderStatusHTML());
+			logger.log( dht.getStats());
 		}
 		
 		if ( router == null ){

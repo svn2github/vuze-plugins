@@ -168,6 +168,17 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
 
     private NodeInfo	bootstrap_node;
     
+    private int			dest_lookup_fail;
+    private int			dest_lookup_ok;
+    private int			refresh_find_node_ok;
+    private int			refresh_find_node_fail;
+    private int			refresh_ping_ok;
+    private int			refresh_ping_fail;
+    private int			announce_peer_in;
+    private int			find_node_in;
+    private int			get_peers_in;
+    private int			ping_in;
+    
     /**
      *  @param baseName generally "i2psnark"
      */
@@ -1040,7 +1051,8 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             // use a short timeout for now
             Destination dest = _session.lookupDest(nInfo.getHash(), DEST_LOOKUP_TIMEOUT);
             if (dest != null) {
-            	System.out.println( "Destination lookup OK for " + nInfo );
+            	//System.out.println( "Destination lookup OK for " + nInfo );
+            	dest_lookup_ok++;
                 nInfo.setDestination(dest);
                 if (_log.shouldLog(Log.INFO))
                     _log.info("lookup success for " + nInfo);
@@ -1053,7 +1065,8 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
         if (_log.shouldLog(Log.INFO))
             _log.info("lookup fail for " + nInfo);
         
-        System.out.println( "Destination lookup FAIL for " + nInfo );
+        //System.out.println( "Destination lookup FAIL for " + nInfo );
+        dest_lookup_fail++;
         return false;
     }
 
@@ -1200,20 +1213,22 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
         } else {
             nInfo = null;
         }
-
-        System.out.println( "Received inbound '" + method + "' from " + (nInfo==null?"<unknown>":nInfo));
-        
+       
         if (method.equals("ping")) {
+        	ping_in++;
             receivePing(msgID, nInfo);
         } else if (method.equals("find_node")) {
+        	find_node_in++;
             byte[] tid = args.get("target").getBytes();
             NID tID = new NID(tid);
             receiveFindNode(msgID, nInfo, tID);
         } else if (method.equals("get_peers")) {
+        	get_peers_in++;
             byte[] hash = args.get("info_hash").getBytes();
             InfoHash ih = new InfoHash(hash);
             receiveGetPeers(msgID, nInfo, ih);
         } else if (method.equals("announce_peer")) {
+        	announce_peer_in++;
             byte[] hash = args.get("info_hash").getBytes();
             InfoHash ih = new InfoHash(hash);
             // this is the "TCP" port, we don't care
@@ -1875,7 +1890,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             				consec_bootstraps = 0;
             			}
             			
-            			System.out.println( "Bootstrapping..." );
+            			_logger.log( "Bootstrapping..." );
             			       
             			if ( lookupDest( bootstrap_node )){
 
@@ -1916,16 +1931,16 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
 	    						
 	    						if ( waiter.getReplyCode() == REPLY_NODES ){
 	    							
-	    							System.out.println( "Bootstrap worked" );
+	    							_logger.log( "Bootstrap worked" );
 	    							
 	    						}else{
 	    							
-	    							System.out.println( "Bootstrap failed" );
+	    							_logger.log( "Bootstrap failed" );
 	    						}
 							}
             			}else{
             				
-            				System.out.println( "Bootstrap not resolved" );
+            				_logger.log( "Bootstrap not resolved" );
             			}
             		}else{
             			
@@ -1951,6 +1966,16 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
         							try{
         								waiter.wait(60*1000);
         								
+        								int replyType = waiter.getReplyCode();
+										
+										if ( replyType == REPLY_NODES ){
+											
+											refresh_find_node_ok++;
+											
+										}else{
+											
+											refresh_find_node_fail++;
+										}
         							}catch (InterruptedException ie) {}
         						}
     						}
@@ -2052,6 +2077,16 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
         							try{
         								waiter.wait(60*1000);
         								
+        								int replyType = waiter.getReplyCode();
+										
+										if ( replyType == REPLY_NODES ){
+											
+											refresh_find_node_ok++;
+											
+										}else{
+											
+											refresh_find_node_fail++;
+										}
         							}catch (InterruptedException ie ){
         							}
         						}
@@ -2068,7 +2103,15 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
 										
 										int replyType = waiter.getReplyCode();
 										
-										System.out.println( "Ping of " + ni + " -> " + ( replyType == REPLY_PONG ));
+										if ( replyType == REPLY_PONG ){
+											
+											refresh_ping_ok++;
+											
+										}else{
+											
+											refresh_ping_fail++;
+										}
+										//System.out.println( "Ping of " + ni + " -> " + ( replyType == REPLY_PONG ));
 			    						
 									}catch( InterruptedException ie ){	
 									}
@@ -2080,6 +2123,8 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
 	            	if ( done < all_nodes_count ){
 	            		
 	            		int	bad_sent = 0;
+	            		
+	            			// ping a couple of the failing ones to precipitate their demise if possible
 	            		
 	            		for ( int i=all_nodes_count-1;i>=done&&bad_sent<2;i--){
 	            			
@@ -2139,7 +2184,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
     {
     	List<NodeInfo> all_nodes = new LinkedList<NodeInfo>(_knownNodes.valuesInKAD());
     	
-    	System.out.println( "Crawling " + all_nodes.size() + " nodes" );
+    	_logger.log( "Crawling " + all_nodes.size() + " nodes" );
     	
     	Iterator<NodeInfo>	it = all_nodes.iterator();
     	
@@ -2162,7 +2207,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
     			
     			if ( _blacklist.contains( nid )){
     				
-    				System.out.println( "Blacklisted" );
+    				_logger.log( "Blacklisted" );
     				
     				continue;
     			}
@@ -2175,7 +2220,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
     				run()
     				{
     					try{
-    						System.out.println( "Searching " + nid.toString());
+    						_logger.log( "Searching " + nid.toString());
 
     						long start = SystemTime.getMonotonousTime();
     						
@@ -2183,7 +2228,8 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
 
     						if ( waiter == null){
     							
-    							System.out.println( "No dest" );
+    							_logger.log( "No dest" );
+    							
     						}else{
     						
 	    						synchronized(waiter) {
@@ -2194,14 +2240,14 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
 	
 	    						int replyType = waiter.getReplyCode();
 	    						if (replyType == REPLY_NONE) {
-	    							System.out.println("Got no reply");
+	    							_logger.log("Got no reply");
 	    						} else if (replyType == REPLY_NODES) {
 	    							List<NodeInfo> reply = (List<NodeInfo>) waiter.getReplyObject();
 
-	    							System.out.println( "Got " + reply.size() + " nodes from " + nid.toString() + " in " + (SystemTime.getMonotonousTime() - start ));
+	    							_logger.log( "Got " + reply.size() + " nodes from " + nid.toString() + " in " + (SystemTime.getMonotonousTime() - start ));
 	
 	    						}else{
-	    							System.out.println( "Got derp" );
+	    							_logger.log( "Got derp" );
 	    						}
     						}
     					}finally{
@@ -2269,5 +2315,13 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
      	}
      	
      	_logger.log( "Alive=" + alive + ", dead1=" + dead1 + ", dead2=" + dead2 + ", unknown=" + unknown + ", no-dest=" + no_dest );
+    }
+    
+    public String
+    getStats()
+    {
+        return( "in: pi=" + ping_in + ",an=" + announce_peer_in + ",fn=" + find_node_in +",gp=" + get_peers_in + "\r\n" +
+        		"dest: ok=" + dest_lookup_ok + ",fail=" + dest_lookup_fail + "; ref_pi: ok=" + refresh_ping_ok + ",fail=" + refresh_ping_fail + "; ref_fn: ok=" + refresh_find_node_ok + ",fail=" + refresh_find_node_fail );
+    	
     }
 }

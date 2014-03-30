@@ -49,6 +49,9 @@ public interface DHT {
     public void
     print();
     
+    public String
+    getStats();
+    
     public void
     setBootstrapNode( NodeInfo ni );
     
