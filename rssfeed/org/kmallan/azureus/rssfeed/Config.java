@@ -24,6 +24,9 @@ import java.io.*;
 import java.util.*;
 import java.net.*;
 
+import com.cedarsoftware.util.io.JsonReader;
+import com.cedarsoftware.util.io.JsonWriter;
+
 public class Config implements Serializable {
 
   private List urlBeans, filterBeans, histBeans;
@@ -102,6 +105,86 @@ public class Config implements Serializable {
     oos.close();
   }
 
+  protected static class
+  JSONWrapper
+  {
+	  private List		urlBeans;
+	  private List		filterBeans;
+	  private List		historyBeans;
+  }
+  
+  protected File 
+  exportToJSON()
+  
+  	throws Exception
+  {
+	  	File file = new File(getPath() + "rssfeed.options.json");
+	  	
+		FileOutputStream fos = new FileOutputStream( file  );
+		
+		try{
+			Map<String,Object> args = new HashMap<String, Object>();
+			
+			args.put( JsonWriter.PRETTY_PRINT, true );
+			
+			JsonWriter writer = new JsonWriter( fos, args  );
+			
+			JSONWrapper wrapper = new JSONWrapper();
+			
+			wrapper.urlBeans 		= validateBeans(urlBeans);
+			wrapper.filterBeans 	= validateBeans(filterBeans);
+			wrapper.historyBeans 	= validateBeans(histBeans);
+			
+			writer.write( wrapper );
+			writer.close();
+			
+			return( file );
+			
+		}finally{
+			
+			fos.close();
+		}
+  }
+  
+  protected void 
+  importFromJSON()
+		
+  	throws Exception
+  {
+	  	File file_backup = new File(getPath() + "rssfeed.options.bak");
+
+	    if (!file_backup.exists()){
+	    	
+	    	file_backup.createNewFile();
+	    }
+	      
+	    storeObjectFile(file_backup);
+	    
+	  	File file = new File(getPath() + "rssfeed.options.json");
+
+		FileInputStream fis = new FileInputStream( file  );
+		
+		try{						
+			JsonReader reader = new JsonReader( fis );
+			
+			JSONWrapper wrapper = (JSONWrapper)reader.readObject();
+			
+			urlBeans 		= validateBeans(wrapper.urlBeans);
+			filterBeans 	= validateBeans(wrapper.filterBeans);
+			histBeans 	= validateBeans(wrapper.historyBeans);
+		
+			Collections.sort(histBeans);
+			
+			reader.close();
+			
+			storeOptions();
+			
+		}finally{
+			
+			fis.close();
+		}
+  }
+  
   private void loadObjectFile(File file) throws IOException, ClassNotFoundException {
     ObjectInputStream ois = null;
     try {

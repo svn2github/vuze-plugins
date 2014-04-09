@@ -19,17 +19,29 @@
 
 package org.kmallan.azureus.rssfeed;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
+import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.ui.UIInstance;
+import org.gudy.azureus2.plugins.ui.UIManager;
+import org.gudy.azureus2.plugins.ui.UIManagerEvent;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
 import org.gudy.azureus2.plugins.ui.config.*;
+import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
+import org.gudy.azureus2.plugins.utils.LocaleUtilities;
+import org.gudy.azureus2.ui.swt.Utils;
 import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 import org.gudy.azureus2.ui.swt.plugins.UISWTViewEvent;
 import org.gudy.azureus2.ui.swt.plugins.UISWTViewEventListener;
 import org.eclipse.swt.program.Program;
 import org.eclipse.swt.widgets.Composite;
+
+import com.cedarsoftware.util.io.JsonWriter;
 
 public class Plugin implements org.gudy.azureus2.plugins.Plugin {
 
@@ -48,7 +60,123 @@ public class Plugin implements org.gudy.azureus2.plugins.Plugin {
     pluginInterface = pluginIf;
     rssfeedConfig = new Config();
     
-			pluginInterface.addConfigUIParameters(getParameters(), "RSSFeed.Config");
+    	final UIManager ui_manager = pluginInterface.getUIManager();
+    	
+		final LocaleUtilities loc_utils = pluginInterface.getUtilities().getLocaleUtilities();
+
+		BasicPluginConfigModel config = ui_manager.createBasicPluginConfigModel( "RSSFeed.Config" );
+		
+		BooleanParameter 	auto_reload 		= config.addBooleanParameter2("Enabled", "RSSFeed.Config.Enable", true);
+		IntParameter		auto_reload_delay 	= config.addIntParameter2("Delay", "RSSFeed.Config.Delay", 900);
+		config.addBooleanParameter2("AutoLoad", "RSSFeed.Config.AutoLoad", false);
+		config.addBooleanParameter2("AutoStartManual", "RSSFeed.Config.AutoStartManual", true);
+		config.addIntParameter2("KeepOld", "RSSFeed.Config.KeepOld", 2);
+		config.addIntParameter2("KeepMax", "RSSFeed.Config.KeepMax", 1000);
+		config.addBooleanParameter2("ForceNoProxy", "RSSFeed.Config.ForceNoProxy", false);
+				
+		ActionParameter export_param = config.addActionParameter2(  "RSSFeed.Config.export.info", "RSSFeed.Config.export.label" );
+		
+		export_param.addListener(
+			new ParameterListener(){
+				
+				public void 
+				parameterChanged(
+					Parameter param) 
+				{
+					try{
+						File result = rssfeedConfig.exportToJSON();
+						
+						String msg = loc_utils.getLocalisedMessageText( "RSSFeed.Config.export.ok.msg", new String[]{ result.getAbsolutePath() });
+						
+						ui_manager.showMessageBox(
+								"RSSFeed.Config.export.ok.title",
+								"!" + msg + "!",
+								UIManagerEvent.MT_OK );
+						
+					}catch( Throwable e ){
+						
+						String msg = loc_utils.getLocalisedMessageText( "RSSFeed.Config.export.fail.msg", new String[]{ Debug.getNestedExceptionMessage(e )});
+						
+						ui_manager.showMessageBox(
+								"RSSFeed.Config.export.fail.title",
+								"!" + msg + "!",
+								UIManagerEvent.MT_OK );	
+					}
+				}
+			});
+		
+		ActionParameter import_param = config.addActionParameter2( "RSSFeed.Config.import.info", "RSSFeed.Config.import.label" );
+		
+		import_param.addListener(
+			new ParameterListener(){
+				
+				public void 
+				parameterChanged(
+					Parameter param) 
+				{
+					try{
+						rssfeedConfig.importFromJSON();
+						
+						String msg = loc_utils.getLocalisedMessageText( "RSSFeed.Config.import.ok.msg" );
+						
+						ui_manager.showMessageBox(
+								"RSSFeed.Config.import.ok.title",
+								"!" + msg + "!",
+								UIManagerEvent.MT_OK );
+						
+					}catch( Throwable e ){
+						
+						String msg = loc_utils.getLocalisedMessageText( "RSSFeed.Config.import.fail.msg", new String[]{ Debug.getNestedExceptionMessage(e )});
+						
+						ui_manager.showMessageBox(
+								"RSSFeed.Config.import.fail.title",
+								"!" + msg + "!",
+								UIManagerEvent.MT_OK );		
+					}
+				}
+			});
+		
+		ActionParameter browse_param = config.addActionParameter2( "RSSFeed.Config.browse.info", "RSSFeed.Config.browse.label" );
+		
+		browse_param.addListener(
+			new ParameterListener(){
+				
+				public void 
+				parameterChanged(
+					Parameter param) 
+				{
+					Utils.launch( rssfeedConfig.getPath());
+				}
+			});
+
+		config.createGroup(
+			 "RSSFeed.Config.impexp",
+			 new Parameter[]{
+					 export_param, import_param, browse_param,
+			 });
+		
+		auto_reload.addEnabledOnSelection( auto_reload_delay );
+		
+		/*
+		pluginInterface.addConfigUIParameters(getParameters(), );
+		
+		  private Parameter[] getParameters() {
+			    PluginConfigUIFactory configUIFactory = pluginInterface.getPluginConfigUIFactory();
+			    Parameter[] para = new Parameter[7];
+			    para[0] = configUIFactory.createBooleanParameter("Enabled", "RSSFeed.Config.Enable", true);
+			    para[1] = configUIFactory.createIntParameter("Delay", "RSSFeed.Config.Delay", 900);
+			    para[2] = configUIFactory.createBooleanParameter("AutoLoad", "RSSFeed.Config.AutoLoad", false);
+			    para[3] = configUIFactory.createBooleanParameter("AutoStartManual", "RSSFeed.Config.AutoStartManual", true);
+			    para[4] = configUIFactory.createIntParameter("KeepOld", "RSSFeed.Config.KeepOld", 2);
+			    para[5] = configUIFactory.createIntParameter("KeepMax", "RSSFeed.Config.KeepMax", 1000);
+			    para[6] = configUIFactory.createBooleanParameter("ForceNoProxy", "RSSFeed.Config.ForceNoProxy", false);
+			    
+			    ((EnablerParameter) para[0]).addEnabledOnSelection(para[1]);
+
+			    return para;
+			  }
+		*/
+		
 		PLUGIN_VERSION = pluginInterface.getPluginVersion();
 
 		pluginInterface.getUIManager().addUIListener(
@@ -138,22 +266,6 @@ public class Plugin implements org.gudy.azureus2.plugins.Plugin {
 			return true;
 		}
 	}
-
-  private Parameter[] getParameters() {
-    PluginConfigUIFactory configUIFactory = pluginInterface.getPluginConfigUIFactory();
-    Parameter[] para = new Parameter[7];
-    para[0] = configUIFactory.createBooleanParameter("Enabled", "RSSFeed.Config.Enable", true);
-    para[1] = configUIFactory.createIntParameter("Delay", "RSSFeed.Config.Delay", 900);
-    para[2] = configUIFactory.createBooleanParameter("AutoLoad", "RSSFeed.Config.AutoLoad", false);
-    para[3] = configUIFactory.createBooleanParameter("AutoStartManual", "RSSFeed.Config.AutoStartManual", true);
-    para[4] = configUIFactory.createIntParameter("KeepOld", "RSSFeed.Config.KeepOld", 2);
-    para[5] = configUIFactory.createIntParameter("KeepMax", "RSSFeed.Config.KeepMax", 1000);
-    para[6] = configUIFactory.createBooleanParameter("ForceNoProxy", "RSSFeed.Config.ForceNoProxy", false);
-    
-    ((EnablerParameter) para[0]).addEnabledOnSelection(para[1]);
-
-    return para;
-  }
 
   public static String getPluginDirectoryName() {
     return pluginInterface.getPluginDirectoryName();
