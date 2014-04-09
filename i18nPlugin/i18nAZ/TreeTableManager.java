@@ -651,7 +651,8 @@ class TreeTableManager
         }
     }  
     static void dispose()
-    {
+    {        
+        TreeTableManager.areaComposite = null;        
         if (TreeTableManager.treeTable != null)
         {
             ToolTipText.unconfig(TreeTableManager.treeTable);
@@ -695,15 +696,6 @@ class TreeTableManager
             }
             TreeTableManager.ExtraImage = null;
         }
-        if (TreeTableManager.areaComposite != null)
-        {
-            if (!TreeTableManager.areaComposite.isDisposed())
-            {
-                TreeTableManager.areaComposite.dispose();
-            }
-            TreeTableManager.areaComposite = null;
-        }
-        
     }
     static Rectangle getBounds(Item item, int column)
     {

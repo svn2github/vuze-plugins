@@ -62,11 +62,7 @@ public class ToolTipText
             }
 
             public void handleItemEvent(Item item, int columnIndex, Event event, int eventType)
-            {                
-                if(item.isDisposed() == true)
-                {
-                    //return;
-                }
+            {
                 Event e = this.cloneEvent(event);
                 e.widget = item;
                 e.data = columnIndex;
@@ -141,7 +137,7 @@ public class ToolTipText
                         handleItemEvent((Item)this.hottedItems.get(i)[0], (int)this.hottedItems.get(i)[1], e, SWT.MouseExit);
                         this.hottedItems.remove(i);
                     }                    
-                    if(hotted == false && item != null && columnIndex > -1)
+                    if(hotted == false && item != null && item.isDisposed() == false && columnIndex > -1)
                     {
                         handleItemEvent(item, columnIndex, e, SWT.MouseEnter);
                         this.hottedItems.add(new Object[]{item, columnIndex});

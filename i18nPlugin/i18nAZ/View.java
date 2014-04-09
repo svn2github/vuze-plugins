@@ -91,7 +91,6 @@ import org.gudy.azureus2.ui.swt.pluginsimpl.UISWTViewImpl;
 import com.aelitis.azureus.ui.mdi.MdiEntry;
 import com.aelitis.azureus.ui.skin.SkinPropertiesImpl;
 import com.aelitis.azureus.ui.swt.imageloader.ImageLoader;
-import com.aelitis.azureus.ui.swt.skin.SWTSkin;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinButtonUtility;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinFactory;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinObject;
@@ -100,6 +99,7 @@ import com.aelitis.azureus.ui.swt.skin.SWTSkinButtonUtility.ButtonListenerAdapte
 import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectText2;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectTextbox;
 import com.aelitis.azureus.ui.swt.views.skin.sidebar.SideBar;
+
 /**
  * View.java
  * 
@@ -122,15 +122,12 @@ class View implements UISWTViewCoreEventListener
 
     private boolean isCreated = false;
 
+    private ImageLoader imageLoader = SWTSkinFactory.getInstance().getImageLoader(SWTSkinFactory.getInstance().getSkinProperties());
+
     private Display display = null;
 
     private PluginInterface pluginInterface = null;
     private PluginInterface[] pluginInterfaces = null;
-
-    private UISWTViewImpl uiView = null;
-    private SWTSkinObjectContainer skinObjectContainer = null;
-    private SWTSkin skin = SWTSkinFactory.getInstance();
-    private ImageLoader imageLoader = this.skin.getImageLoader(this.skin.getSkinProperties());
 
     private LoggerChannel loggerChannel = null;
 
@@ -147,10 +144,10 @@ class View implements UISWTViewCoreEventListener
     private SWTSkinButtonUtility redirectKeysFilterButton = null;
     private SWTSkinButtonUtility helpButton = null;
 
-    private SWTSkinObjectText2 infoText;
+    private SWTSkinObjectText2 infoText = null;
     private SWTSkinObjectTextbox searchTextbox = null;
 
-    private Combo pluginsCombo;
+    private Combo pluginsCombo = null;
 
     private ToolItem undoToolItem = null;
     private ToolItem redoToolItem = null;
@@ -169,9 +166,9 @@ class View implements UISWTViewCoreEventListener
 
     private StyledText infoStyledText = null;
     private StyledText editorStyledText = null;
-    
+
     private Label statusLabel = null;
-    
+
     private BundleObject currentBundleObject;
     private String defaultPath;
 
@@ -184,7 +181,7 @@ class View implements UISWTViewCoreEventListener
 
     private boolean multilineEditor = false;
 
-    private ArrayList<String> keys;
+    private ArrayList<String> keys = new ArrayList<String>();
 
     Map<Locale, CommentedProperties> localesProperties;
 
@@ -192,12 +189,12 @@ class View implements UISWTViewCoreEventListener
     private HashSet<String> searchPrefixes = null;
     private boolean regexSearch = false;
 
-    Map<String, Item> deletableRows;
+    Map<String, Item> deletableRows = new HashMap<String, Item>();
 
     private PluginInterface selectedPluginInterface = null;
 
     private Clipboard clipboard = null;
-    
+
     private List<int[]> infoParams = null;
     private List<Object[]> infoReferences = null;
     private List<int[]> editorParams = null;
@@ -211,15 +208,14 @@ class View implements UISWTViewCoreEventListener
     HashSet<String> urlsFilterExcludedKey = new HashSet<String>();
 
     private Thread saveThread = null;
-    
+
     private List<SaveObject> saveObjects = new ArrayList<SaveObject>();
 
     private MenuItem editMenu = null;
-    private Menu dropDownMenu = null;  
-    
+    private Menu dropDownMenu = null;
 
-    UndoRedo undoRedo = null;  
-    
+    UndoRedo undoRedo = null;
+
     class State
     {
         static final int NONE = 0;
@@ -229,16 +225,18 @@ class View implements UISWTViewCoreEventListener
         static final int URL = 8;
         static final int REDIRECT_KEY = 16;
     }
+
     class MenuOptions
     {
         static final int NONE = 0;
         static final int ROW_COPY = 1;
-         static final int REMOVE_COLUMN = 2;
+        static final int REMOVE_COLUMN = 2;
         static final int EDITOR = 4;
         static final int FILTERS = 8;
         static final int TOPFILTERS = 16;
         static final int SEARCH = 32;
     }
+
     class SaveObject
     {
         private CommentedProperties commentedProperties = null;
@@ -249,7 +247,7 @@ class View implements UISWTViewCoreEventListener
         {
             this.commentedProperties = (CommentedProperties) commentedProperties.clone();
             this.file = new File(file.getAbsolutePath());
-            this.currentKey = currentKey;            
+            this.currentKey = currentKey;
         }
 
         public CommentedProperties getCommentedProperties()
@@ -261,10 +259,12 @@ class View implements UISWTViewCoreEventListener
         {
             return this.file;
         }
+
         public String getCurrentKey()
         {
             return this.currentKey;
         }
+
         public void dispose()
         {
             this.commentedProperties.clear();
@@ -311,272 +311,112 @@ class View implements UISWTViewCoreEventListener
         }
 
         // HEADER
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.attach.bottom", "");
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.attach.template", "template.fill");
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.color", "{color.library.header}");
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.height", "26");
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.propogate", "1");
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.type", "container");
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.widgets", "mdientry.toolbar.full");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.attach.bottom", "");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.attach.template", "template.fill");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.color", "{color.library.header}");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.height", "26");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.propogate", "1");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.type", "container");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.widgets", "mdientry.toolbar.full");
 
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.info.align", "left");
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.info.attach.bottom", "100,0");
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.info.attach.left", "5,0");
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.info.attach.right", "i18nAZ.main.header.search,-5,0");
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.info.attach.template", "template.fill");
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.info.text.shadow", "#FFFFFF80");
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.info.text.style", "bold,shadow");
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.info.type", "text");
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.info.view", "i18nAZ-info");
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.info.v-align", "center");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.info.align", "left");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.info.attach.bottom", "100,0");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.info.attach.left", "5,0");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.info.attach.right", "i18nAZ.main.header.search,-5,0");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.info.attach.template", "template.fill");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.info.text.shadow", "#FFFFFF80");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.info.text.style", "bold,shadow");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.info.type", "text");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.info.view", "i18nAZ-info");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.info.v-align", "center");
 
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.search.attach.left", "");
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.search.attach.right", "100,-10");
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.search.attach.top", "0,center");
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.search.message", "{i18nAZ.Labels.Filter}");
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.search.style", "search");
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.search.type", "textbox");
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.search.view", "i18nAZ-search");
-        this.skin.getSkinProperties().addProperty("i18nAZ.main.header.search.width", "150");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.search.attach.left", "");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.search.attach.right", "100,-10");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.search.attach.top", "0,center");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.search.message", "{i18nAZ.Labels.Filter}");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.search.style", "search");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.search.type", "textbox");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.search.view", "i18nAZ-search");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.search.width", "150");
 
         // TOOLBAR
-        this.skin.getSkinProperties().addProperty("toolbar.area.sitem.all.attach.top", "0,0");
-        this.skin.getSkinProperties().addProperty("toolbar.area.sitem.all.cursor", "hand");
-        this.skin.getSkinProperties().addProperty("toolbar.area.sitem.all.propogate", "1");
-        this.skin.getSkinProperties().addProperty("toolbar.area.sitem.all.type", "container");
-        this.skin.getSkinProperties().addProperty("toolbar.area.sitem.all.widgets", "toolbar.area.sitem.a.imagearea");
-        this.skin.getSkinProperties().addProperty("toolbar.area.sitem.a.imagearea.attach.bottom", "100,0");
-        this.skin.getSkinProperties().addProperty("toolbar.area.sitem.a.imagearea.attach.left", "0,0");
-        this.skin.getSkinProperties().addProperty("toolbar.area.sitem.a.imagearea.attach.right", "100,0");
-        this.skin.getSkinProperties().addProperty("toolbar.area.sitem.a.imagearea.background", "{image.toolbar.2nd.lr-bg}");
-        this.skin.getSkinProperties().addProperty("toolbar.area.sitem.a.imagearea.background.drawmode", "tile-x");
-        this.skin.getSkinProperties().addProperty("toolbar.area.sitem.a.imagearea.background-down", "{image.toolbar.2nd.lr-bg-down}");
-        this.skin.getSkinProperties().addProperty("toolbar.area.sitem.a.imagearea.background-over", "{image.toolbar.2nd.lr-bg}");
-        this.skin.getSkinProperties().addProperty("toolbar.area.sitem.a.imagearea.height", "{button.height}");
-        this.skin.getSkinProperties().addProperty("toolbar.area.sitem.a.imagearea.minwidth", "{button.width}");
-        this.skin.getSkinProperties().addProperty("toolbar.area.sitem.a.imagearea.type", "container");
-        this.skin.getSkinProperties().addProperty("toolbar.area.sitem.a.imagearea.widgets", "toolbar.area.sitem.image");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.sitem.all.attach.top", "0,0");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.sitem.all.cursor", "hand");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.sitem.all.propogate", "1");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.sitem.all.type", "container");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.sitem.all.widgets", "toolbar.area.sitem.a.imagearea");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.sitem.a.imagearea.attach.bottom", "100,0");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.sitem.a.imagearea.attach.left", "0,0");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.sitem.a.imagearea.attach.right", "100,0");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.sitem.a.imagearea.background", "{image.toolbar.2nd.lr-bg}");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.sitem.a.imagearea.background.drawmode", "tile-x");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.sitem.a.imagearea.background-down", "{image.toolbar.2nd.lr-bg-down}");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.sitem.a.imagearea.background-over", "{image.toolbar.2nd.lr-bg}");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.sitem.a.imagearea.height", "{button.height}");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.sitem.a.imagearea.minwidth", "{button.width}");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.sitem.a.imagearea.type", "container");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.sitem.a.imagearea.widgets", "toolbar.area.sitem.image");
 
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.attach.top", "0,0");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.cursor", "hand");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.propogate", "1");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.type", "container");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.widgets", "toolbar.area.vitem.imagearea");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.attach.top", "0,0");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.cursor", "hand");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.propogate", "1");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.type", "container");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.widgets", "toolbar.area.vitem.imagearea");
 
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.imagearea.attach.bottom", "100,0");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.imagearea.attach.left", "0,0");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.imagearea.attach.right", "100,0");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.imagearea.background", "{i18nAZ.image.toolbar.2nd-view.m-bg}");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.imagearea.background.drawmode", "tile-x");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.imagearea.background-over", "{i18nAZ.image.toolbar.2nd-view.m-bg}");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.imagearea.background-over-selected", "{i18nAZ.image.toolbar.2nd-view.m-bg-down}");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.imagearea.background-selected", "{i18nAZ.image.toolbar.2nd-view.m-bg-down}");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.imagearea.height", "{button.height}");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.imagearea.minwidth", "32");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.imagearea.type", "container");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.imagearea.widgets", "toolbar.area.sitem.image");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.imagearea.attach.bottom", "100,0");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.imagearea.attach.left", "0,0");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.imagearea.attach.right", "100,0");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.imagearea.background", "{i18nAZ.image.toolbar.2nd-view.m-bg}");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.imagearea.background.drawmode", "tile-x");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.imagearea.background-over", "{i18nAZ.image.toolbar.2nd-view.m-bg}");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.imagearea.background-over-selected", "{i18nAZ.image.toolbar.2nd-view.m-bg-down}");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.imagearea.background-selected", "{i18nAZ.image.toolbar.2nd-view.m-bg-down}");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.imagearea.height", "{button.height}");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.imagearea.minwidth", "32");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.imagearea.type", "container");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.imagearea.widgets", "toolbar.area.sitem.image");
 
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.all.attach.top", "0,0");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.all.cursor", "hand");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.all.propogate", "1");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.all.type", "container");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.all.widgets", "toolbar.area.vitem.a.imagearea");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.all.attach.top", "0,0");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.all.cursor", "hand");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.all.propogate", "1");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.all.type", "container");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.all.widgets", "toolbar.area.vitem.a.imagearea");
 
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.attach.bottom", "100,0");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.attach.left", "0,0");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.attach.right", "100,0");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.background", "{i18nAZ.image.toolbar.2nd-view.lr-bg}");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.background.drawmode", "tile-x");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.background-over", "{i18nAZ.image.toolbar.2nd-view.lr-bg}");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.background-over-selected", "{i18nAZ.image.toolbar.2nd-view.lr-bg-down}");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.background-selected", "{i18nAZ.image.toolbar.2nd-view.lr-bg-down}");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.height", "{button.height}");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.minwidth", "32");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.type", "container");
-        this.skin.getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.widgets", "toolbar.area.sitem.image");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.attach.bottom", "100,0");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.attach.left", "0,0");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.attach.right", "100,0");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.background", "{i18nAZ.image.toolbar.2nd-view.lr-bg}");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.background.drawmode", "tile-x");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.background-over", "{i18nAZ.image.toolbar.2nd-view.lr-bg}");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.background-over-selected", "{i18nAZ.image.toolbar.2nd-view.lr-bg-down}");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.background-selected", "{i18nAZ.image.toolbar.2nd-view.lr-bg-down}");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.height", "{button.height}");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.minwidth", "32");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.type", "container");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("toolbar.area.vitem.a.imagearea.widgets", "toolbar.area.sitem.image");
 
-        this.skin.getSkinProperties().addProperty("i18nAZ.image.toolbar.2nd-view.m-bg", "{template.imagedir}/tb/view_r_l.png,{template.imagedir}/tb/view_r_m.png,{template.imagedir}/tb/view_l_r.png");
-        this.skin.getSkinProperties().addProperty("i18nAZ.image.toolbar.2nd-view.m-bg-down", "{template.imagedir}/tb/view_r_l_down.png,{template.imagedir}/tb/view_r_m_down.png,{template.imagedir}/tb/view_l_r_down.png");
-        this.skin.getSkinProperties().addProperty("i18nAZ.image.toolbar.2nd-view.lr-bg", "{template.imagedir}/tb/view_l_l.png,{template.imagedir}/tb/view_r_m.png,{template.imagedir}/tb/view_r_r.png");
-        this.skin.getSkinProperties().addProperty("i18nAZ.image.toolbar.2nd-view.lr-bg-down", "{template.imagedir}/tb/view_l_l_down.png,{template.imagedir}/tb/view_r_m_down.png,{template.imagedir}/tb/view_r_r_down.png");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.image.toolbar.2nd-view.m-bg", "{template.imagedir}/tb/view_r_l.png,{template.imagedir}/tb/view_r_m.png,{template.imagedir}/tb/view_l_r.png");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.image.toolbar.2nd-view.m-bg-down", "{template.imagedir}/tb/view_r_l_down.png,{template.imagedir}/tb/view_r_m_down.png,{template.imagedir}/tb/view_l_r_down.png");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.image.toolbar.2nd-view.lr-bg", "{template.imagedir}/tb/view_l_l.png,{template.imagedir}/tb/view_r_m.png,{template.imagedir}/tb/view_r_r.png");
+        SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.image.toolbar.2nd-view.lr-bg-down", "{template.imagedir}/tb/view_l_l_down.png,{template.imagedir}/tb/view_r_m_down.png,{template.imagedir}/tb/view_r_r_down.png");
 
         this.imageLoader.addSkinProperties(new SkinPropertiesImpl(pluginInterface.getPluginClassLoader(), "images", "images.properties"));
 
-        this.saveThread = new Thread(new Runnable()
-        {
-            public void setInfo( final String info)
-            {
-                View.this.display.syncExec(new Runnable()
-                {
-    
-                    @Override
-                    public void run()
-                    {
-                        View.this.statusLabel.setText(info);   
-                        View.this.statusLabel.getParent().layout();                             
-                    }                            
-                });
-            }
-            
-            @Override
-            public void run()
-            {
-                try
-                {
-                    while (View.this.isCreated == true)
-                    {
-                        this.setInfo(View.this.getLocalisedMessageText("i18nAZ.Messages.Status.Ready"));
-                          
-                        Thread.sleep(1000);
-
-                        SaveObject saveObject = null;
-                        synchronized (View.this.saveObjects)
-                        {
-                            if (View.this.saveObjects.size() == 0)
-                            {
-                                continue;
-                            }
-                            saveObject = View.this.saveObjects.get(0);
-                            View.this.saveObjects.remove(0);
-                        }
-                        
-                        String currentSaveName = saveObject.getFile().getParentFile().getName() + File.pathSeparator + saveObject.getFile().getName();
-                        this.setInfo(View.this.getLocalisedMessageText("i18nAZ.Messages.Status.Saving"));
-                        Thread.sleep(1000);
-                        
-                        // clean empty reference
-                        while (true)
-                        {
-                            boolean loop = false;
-                            for (Iterator<String> iterator = saveObject.getCommentedProperties().stringPropertyNames().iterator(); iterator.hasNext();)
-                            {
-                                String key = iterator.next();
-                                if (saveObject.getCommentedProperties().getProperty(key).equals("") == true)
-                                {
-                                    saveObject.getCommentedProperties().remove(key);
-                                    loop = true;
-                                    break;
-                                }
-
-                            }
-                            if (loop == false)
-                            {
-                                break;
-                            }
-                        }
-
-                        String result = Util.saveLocaleProperties(saveObject.getCommentedProperties(), saveObject.getFile());
-                        
-                        // dispose
-                        saveObject.dispose();
-                        saveObject = null;
-
-                        if(result != null)
-                        {
-                            this.setInfo(View.this.getLocalisedMessageText("i18nAZ.Messages.Status.ErrorSave", new String[]{currentSaveName, result}));
-                            Thread.sleep(10000);
-                            continue;
-                        }
-                        
-                        
-                        // merge and store all bundle files for viewing in Vuze
-                        synchronized (View.this.saveObjects)
-                        {
-                            if (View.this.saveObjects.size() > 0)
-                            {
-                                continue;
-                            }
-                        }
-                        
-                        // get Buze directory
-                        File vuzeDirectory = new File(i18nAZ.viewInstance.getPluginInterface().getUtilities().getAzureusProgramDir());
-
-                        // collect all locales
-                        final List<Locale> locales = new ArrayList<Locale>();
-                        i18nAZ.viewInstance.display.syncExec(new Runnable()
-                        {
-                            @Override
-                            public void run()
-                            {
-                                for (int i = 1; i < TreeTableManager.getColumnCount(); i++)
-                                {
-                                    locales.add((Locale) TreeTableManager.getColumn(i).getData(View.DATAKEY_LOCALE));
-                                }
-                            }
-
-                        });        
-                        
-                        for (int i = 0; i < locales.size(); i++)
-                        {
-                            // merge plugins properties
-                            CommentedProperties mergedlocaleProperties = new CommentedProperties();
-                            for (int j = 0; j < i18nAZ.viewInstance.pluginInterfaces.length; j++)
-                            {
-                                BundleObject bundleObject = new BundleObject(i18nAZ.viewInstance.pluginInterfaces[j]);
-                                if (bundleObject.isValid() == true)
-                                {
-                                    String localizedBundleName = bundleObject.getName();
-                                    if (i > 0)
-                                    {
-                                        localizedBundleName = localizedBundleName + "_" + locales.get(i).toLanguageTag().replace('-', '_');
-                                    }
-                                    File localfile = new File(i18nAZ.viewInstance.getPluginInterface().getPluginDirectoryName().toString() + "\\internat\\" + bundleObject.getPluginName() + "\\" + localizedBundleName + BundleObject.EXTENSION);
-                                    if ((localfile.isFile()) && (localfile.exists()))
-                                    {
-                                        CommentedProperties localeProperties = Util.getLocaleProperties(localfile);                        
-                                        if (localeProperties != null && localeProperties.IsLoaded() == true)
-                                        {
-                                            for (Iterator<String> iterator = localeProperties.stringPropertyNames().iterator(); iterator.hasNext();)
-                                            {
-                                                String key = iterator.next();
-                                                mergedlocaleProperties.put(key, localeProperties.getProperty(key));
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            // set merge file            
-                            String fileName = BundleObject.DEFAULT_NAME;
-                            if (i > 0)
-                            {
-                                fileName = fileName + "_" + locales.get(i).toLanguageTag().replace('-', '_');                                
-                            }
-
-                            File localFile = new File(vuzeDirectory + File.separator + fileName + BundleObject.EXTENSION);
-
-                            // save 
-                            result = Util.saveLocaleProperties(mergedlocaleProperties, localFile);  
-                            if(result != null)
-                            {
-                                this.setInfo(View.this.getLocalisedMessageText("i18nAZ.Messages.Status.ErrorGlobalSave", new String[]{fileName, result}));
-                                Thread.sleep(10000);
-                                break;
-                            }
-                        }
-                        Thread.sleep(5000);
-                    }
-                }
-                catch (InterruptedException e)
-                {
-                    Thread.currentThread().interrupt();
-                }
-                
-            }
-        }, "i18nAZ.saveThread");
     }
 
     private SWTSkinButtonUtility addButton(SWTSkinObjectContainer ToolBarContainer, String Id, boolean checked, String Align, String ImageId, final String TextID, int Offset, Control LastControl)
     {
         return this.addButton(ToolBarContainer, Id, checked == true ? 1 : 0, Align, ImageId, TextID, Offset, LastControl);
     }
+
     private SWTSkinButtonUtility addButton(SWTSkinObjectContainer ToolBarContainer, String Id, String Align, String ImageId, final String TextID, int Offset, Control LastControl)
     {
         return this.addButton(ToolBarContainer, Id, -1, Align, ImageId, TextID, Offset, LastControl);
-    }   
+    }
+
     private SWTSkinButtonUtility addButton(SWTSkinObjectContainer toolBarContainer, String id, int checked, String align, String imageId, final String textID, int offset, Control lastControl)
     {
-        final SWTSkinButtonUtility button = new SWTSkinButtonUtility(this.skin.createSkinObject("toolbar:" + id, "toolbar.area." + ((checked != -1) ? "vitem" : "sitem") + ((align.equals("") == true) ? "" : "." + align), toolBarContainer), "toolbar-item-image");
+        final SWTSkinButtonUtility button = new SWTSkinButtonUtility(SWTSkinFactory.getInstance().createSkinObject("toolbar:" + id, "toolbar.area." + ((checked != -1) ? "vitem" : "sitem") + ((align.equals("") == true) ? "" : "." + align), toolBarContainer), "toolbar-item-image");
         button.setImage(imageId);
         button.setTextID(textID);
         button.getSkinObject().getControl().setData(View.DATAKEY_TEXT_ID, textID);
@@ -592,7 +432,7 @@ class View implements UISWTViewCoreEventListener
                 @Override
                 public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
                 {
-                    View.this.checkButton(button);                    
+                    View.this.checkButton(button);
                 }
             });
         }
@@ -608,11 +448,12 @@ class View implements UISWTViewCoreEventListener
         lastControl = button.getSkinObject().getControl();
         return button;
     }
+
     private void addLanguage()
     {
         TreeTableManager.getCurrent().setFocus();
-        
-        AddLanguageDialog addLanguageDialog = new AddLanguageDialog(this.skin.getShell().getShell());
+
+        AddLanguageDialog addLanguageDialog = new AddLanguageDialog(SWTSkinFactory.getInstance().getShell().getShell());
         if (addLanguageDialog.localesSelected != null)
         {
             for (int i = 0; i < addLanguageDialog.localesSelected.length; i++)
@@ -642,7 +483,8 @@ class View implements UISWTViewCoreEventListener
 
             TreeTableManager.getCurrent().setFocus();
         }
-    }    
+    }
+
     private void addLocaleColumn(Locale locale, BundleObject bundleObject)
     {
         String localizedBundleName = this.currentBundleObject.getName();
@@ -674,7 +516,7 @@ class View implements UISWTViewCoreEventListener
             }
             if (OriginalBundleURL != null && Util.jarEntryExists(OriginalBundleURL))
             {
-                localeProperties = Util.getLocaleProperties(OriginalBundleURL);                
+                localeProperties = Util.getLocaleProperties(OriginalBundleURL);
                 if (localeProperties != null && localeProperties.IsLoaded() == true)
                 {
                     Util.saveLocaleProperties(localeProperties, localFile);
@@ -682,23 +524,23 @@ class View implements UISWTViewCoreEventListener
             }
         }
         if (localeProperties == null && tempProperties != null)
-        {            
-            if(Util.saveLocaleProperties(tempProperties, localFile) == null)
+        {
+            if (Util.saveLocaleProperties(tempProperties, localFile) == null)
             {
-                localeProperties = tempProperties;                
+                localeProperties = tempProperties;
             }
             else
             {
-                tempProperties.clear();  
-                tempProperties = null;   
+                tempProperties.clear();
+                tempProperties = null;
             }
         }
         if (localeProperties != null && tempProperties != null)
-        {            
+        {
             tempFile.delete();
             tempProperties = null;
         }
-        
+
         if (localeProperties != null && localeProperties.IsLoaded() == true)
         {
             for (Iterator<String> iterator = localeProperties.stringPropertyNames().iterator(); iterator.hasNext();)
@@ -717,7 +559,7 @@ class View implements UISWTViewCoreEventListener
         this.localesProperties.put(locale, localeProperties);
         String headerText = "";
         String headerLanguageTag = "";
-        int width =  COConfigurationManager.getIntParameter("i18nAZ.columnWidth." + TreeTableManager.getColumnCount() , 200);
+        int width = COConfigurationManager.getIntParameter("i18nAZ.columnWidth." + TreeTableManager.getColumnCount(), 200);
         if (TreeTableManager.getColumnCount() == 1)
         {
             headerText = this.getLocalisedMessageText("i18nAZ.Columns.Reference");
@@ -726,92 +568,96 @@ class View implements UISWTViewCoreEventListener
         {
             headerText = Util.getLocaleDisplay(locale, false);
             headerLanguageTag = locale.toLanguageTag().replace("-", "");
-        }        
+        }
         Item column = TreeTableManager.addColumn(headerText, width);
         column.setData(View.DATAKEY_LOCALE, locale);
         column.setData(View.DATAKEY_FILE, localFile);
         column.setData(View.DATAKEY_LANGUAGE_TAG, headerLanguageTag);
     }
-    
 
     private SWTSkinObject addSeparator(SWTSkinObjectContainer ToolBarContainer, Control LastControl)
     {
-        SWTSkinObject so = this.skin.createSkinObject("toolbar_sep" + Math.random(), "toolbar.area.sitem.sep", ToolBarContainer);
+        SWTSkinObject so = SWTSkinFactory.getInstance().createSkinObject("toolbar_sep" + Math.random(), "toolbar.area.sitem.sep", ToolBarContainer);
         FormData formData = (FormData) so.getControl().getLayoutData();
         formData.left = new FormAttachment(LastControl);
         return so;
     }
+
     private void cancel()
     {
         View.this.updateStyledTexts();
         TreeTableManager.Cursor.cancelfocusedRow();
         this.selectEditor();
     }
+
     private void checkButton(SWTSkinButtonUtility button)
     {
         boolean checked = (boolean) button.getSkinObject().getData("checked") == false;
-        View.this.checkButton(button, checked); 
+        View.this.checkButton(button, checked);
     }
+
     private void checkButton(SWTSkinButtonUtility button, boolean checked)
     {
         String textID = (String) button.getSkinObject().getControl().getData(View.DATAKEY_TEXT_ID);
         button.getSkinObject().switchSuffix(checked ? "-selected" : "", 4, false);
         button.getSkinObject().setData("checked", checked);
-        ToolTipText.set(button.getSkinObject().getControl(), textID + ((checked) ? ".Pressed" : ""));        
+        ToolTipText.set(button.getSkinObject().getControl(), textID + ((checked) ? ".Pressed" : ""));
     }
+
     private void createTopLevelMenuitem()
     {
-        if (MenuFactory.findMenuItem(View.this.skin.getShell().getShell().getMenuBar(), "i18nAZ.Menus.Edit") == null)
+        if (MenuFactory.findMenuItem(SWTSkinFactory.getInstance().getShell().getShell().getMenuBar(), "i18nAZ.Menus.Edit") == null)
         {
-            this.dropDownMenu = new Menu(View.this.skin.getShell().getShell(), SWT.DROP_DOWN);
+            this.dropDownMenu = new Menu(SWTSkinFactory.getInstance().getShell().getShell(), SWT.DROP_DOWN);
             this.dropDownMenu.setData(IMenuConstants.KEY_MENU_ID, "i18nAZ.Menus.Edit");
-           
-            this.editMenu = new MenuItem(View.this.skin.getShell().getShell().getMenuBar(), SWT.CASCADE, 1);
+
+            this.editMenu = new MenuItem(SWTSkinFactory.getInstance().getShell().getShell().getMenuBar(), SWT.CASCADE, 1);
             this.editMenu.setData(IMenuConstants.KEY_MENU_ID, this.dropDownMenu.getData(IMenuConstants.KEY_MENU_ID));
-            Messages.setLanguageText(this.editMenu, (String) this.dropDownMenu.getData(IMenuConstants.KEY_MENU_ID)); 
-            this.editMenu.setMenu(dropDownMenu);
-            
+            Messages.setLanguageText(this.editMenu, (String) this.dropDownMenu.getData(IMenuConstants.KEY_MENU_ID));
+            this.editMenu.setMenu(this.dropDownMenu);
+
             this.dropDownMenu.addMenuListener(new MenuListener()
             {
 
                 @Override
                 public void menuHidden(MenuEvent e)
-                {                                     
+                {
                 }
 
                 @Override
                 public void menuShown(MenuEvent e)
                 {
-                   if(e.widget != null && e.widget.equals(View.this.dropDownMenu) == true)
-                   {                       
-                       
-                       int visible = MenuOptions.SEARCH | MenuOptions.TOPFILTERS | MenuOptions.EDITOR | MenuOptions.ROW_COPY;
-                       int enabled = MenuOptions.SEARCH | MenuOptions.TOPFILTERS;
-                                   
-                       if( TreeTableManager.Cursor.isFocusControl() == true && (boolean) TreeTableManager.Cursor.getRow().getData(TreeTableManager.DATAKEY_EXIST) == true)
-                       {
-                           enabled |= MenuOptions.ROW_COPY;                
-                       }
-                       
-                       if(View.this.editorStyledText.isFocusControl() == true)
-                       {                           
-                           enabled |= MenuOptions.EDITOR;                 
-                       }                      
-                       
-                       View.this.populateMenu(View.this.dropDownMenu, visible, enabled);
-                       
-                       View.this.dropDownMenu.getItems()[16].getMenu().getItems()[0].setSelection((boolean) View.this.emptyFilterButton.getSkinObject().getData("checked"));
-                       View.this.dropDownMenu.getItems()[16].getMenu().getItems()[1].setSelection((boolean) View.this.unchangedFilterButton.getSkinObject().getData("checked"));
-                       View.this.dropDownMenu.getItems()[16].getMenu().getItems()[2].setSelection((boolean) View.this.extraFilterButton.getSkinObject().getData("checked"));
-                       View.this.dropDownMenu.getItems()[16].getMenu().getItems()[4].setSelection((boolean) View.this.redirectKeysFilterButton.getSkinObject().getData("checked"));
-                       View.this.dropDownMenu.getItems()[16].getMenu().getItems()[5].setSelection((boolean) View.this.urlsFilterButton.getSkinObject().getData("checked"));
-                      
-                   }
-                }                
+                    if (e.widget != null && e.widget.equals(View.this.dropDownMenu) == true)
+                    {
+
+                        int visible = MenuOptions.SEARCH | MenuOptions.TOPFILTERS | MenuOptions.EDITOR | MenuOptions.ROW_COPY;
+                        int enabled = MenuOptions.SEARCH | MenuOptions.TOPFILTERS;
+
+                        if (TreeTableManager.Cursor.isFocusControl() == true && (boolean) TreeTableManager.Cursor.getRow().getData(TreeTableManager.DATAKEY_EXIST) == true)
+                        {
+                            enabled |= MenuOptions.ROW_COPY;
+                        }
+
+                        if (View.this.editorStyledText.isFocusControl() == true)
+                        {
+                            enabled |= MenuOptions.EDITOR;
+                        }
+
+                        View.this.populateMenu(View.this.dropDownMenu, visible, enabled);
+
+                        View.this.dropDownMenu.getItems()[16].getMenu().getItems()[0].setSelection((boolean) View.this.emptyFilterButton.getSkinObject().getData("checked"));
+                        View.this.dropDownMenu.getItems()[16].getMenu().getItems()[1].setSelection((boolean) View.this.unchangedFilterButton.getSkinObject().getData("checked"));
+                        View.this.dropDownMenu.getItems()[16].getMenu().getItems()[2].setSelection((boolean) View.this.extraFilterButton.getSkinObject().getData("checked"));
+                        View.this.dropDownMenu.getItems()[16].getMenu().getItems()[4].setSelection((boolean) View.this.redirectKeysFilterButton.getSkinObject().getData("checked"));
+                        View.this.dropDownMenu.getItems()[16].getMenu().getItems()[5].setSelection((boolean) View.this.urlsFilterButton.getSkinObject().getData("checked"));
+
+                    }
+                }
             });
-            
+
         }
     }
+
     @Override
     public boolean eventOccurred(UISWTViewEvent e)
     {
@@ -822,38 +668,43 @@ class View implements UISWTViewCoreEventListener
                 {
                     return false;
                 }
-                this.uiView = (UISWTViewImpl) e.getView();
-                this.uiView.setTitle(this.getLocalisedMessageText("i18nAZ.SideBar.Title"));
-
-                if ( SideBar.instance != null ){
-                	MdiEntry mdiEntry = SideBar.instance.getEntry(VIEWID);
-                	mdiEntry.setImageLeftID("i18nAZ.image.sidebar");
+                ((UISWTViewImpl) e.getView()).setTitle(this.getLocalisedMessageText("i18nAZ.SideBar.Title"));
+                if (SideBar.instance != null)
+                {
+                    MdiEntry mdiEntry = SideBar.instance.getEntry(VIEWID);
+                    mdiEntry.setImageLeftID("i18nAZ.image.sidebar");
                 }
-
                 this.isCreated = true;
 
                 break;
 
             case UISWTViewEvent.TYPE_INITIALIZE:
-                this.skinObjectContainer = (SWTSkinObjectContainer) this.uiView.getSkinObject();
-                this.initialize((Composite) e.getData());
-                
-                this.saveThread.start();
-                
+                this.emptyFilterExcludedKey.clear();
+                this.unchangedFilterExcludedKey.clear();
+                this.extraFilterExcludedKey.clear();
+                this.redirectKeysFilterExcludedKey.clear();
+                this.urlsFilterExcludedKey.clear();
+                this.saveObjects.clear();
+                this.keys.clear();
+
+                this.initialize((Composite) e.getData(), (SWTSkinObjectContainer) ((UISWTViewImpl) e.getView()).getSkinObject());
+
+                this.startSaveThread();
+
                 break;
             case UISWTViewEvent.TYPE_FOCUSGAINED:
                 this.createTopLevelMenuitem();
                 break;
-                
-            case UISWTViewEvent.TYPE_FOCUSLOST:                
-                if(this.editMenu != null)
+
+            case UISWTViewEvent.TYPE_FOCUSLOST:
+                if (this.editMenu != null)
                 {
                     this.editMenu.dispose();
                     this.editMenu = null;
                     this.dropDownMenu = null;
-                }            
+                }
                 break;
-                
+
             case UISWTViewEvent.TYPE_REFRESH:
                 break;
 
@@ -861,16 +712,79 @@ class View implements UISWTViewCoreEventListener
                 break;
 
             case UISWTViewEvent.TYPE_DESTROY:
-                this.isCreated = false;
-                TreeTableManager.dispose();
-                try
+                if (this.isCreated == true)
                 {
-                    this.saveThread.join();             
+                    this.isCreated = false;
+
+                    this.pluginInterfaces = null;
+
+                    this.display = null;
+
+                    this.addLanguageButton = null;
+                    this.exportLanguageButton = null;
+                    this.removeLanguageButton = null;
+
+                    this.emptyFilterButton = null;
+                    this.unchangedFilterButton = null;
+                    this.extraFilterButton = null;
+                    this.multilineEditorButton = null;
+                    this.treeModeButton = null;
+                    this.urlsFilterButton = null;
+                    this.redirectKeysFilterButton = null;
+                    this.helpButton = null;
+                    this.infoText = null;
+                    this.searchTextbox = null;
+                    this.pluginsCombo = null;
+                    this.undoToolItem = null;
+                    this.redoToolItem = null;
+                    this.cutToolItem = null;
+                    this.copyToolItem = null;
+                    this.pasteToolItem = null;
+                    this.selectAllToolItem = null;
+                    this.upperCaseToolItem = null;
+                    this.lowerCaseToolItem = null;
+                    this.firstCaseToolItem = null;
+                    this.trademarkToolItem = null;
+                    this.validateToolItem = null;
+                    this.cancelToolItem = null;
+                    this.toolBar = null;
+                    this.infoStyledText = null;
+                    this.editorStyledText = null;
+                    this.statusLabel = null;
+
+                    if (this.undoRedo != null)
+                    {
+                        this.undoRedo.dispose();
+                        this.undoRedo = null;
+                    }
+                    if (this.clipboard != null)
+                    {
+                        this.clipboard.dispose();
+                        this.clipboard = null;
+                    }
+
+                    if (this.editMenu != null)
+                    {
+                        this.editMenu.dispose();
+                        this.editMenu = null;
+                        this.dropDownMenu = null;
+                    }
+
+                    TreeTableManager.dispose();
+                    if (this.saveThread != null && this.saveThread.isAlive())
+                    {
+                        try
+                        {
+                            this.saveThread.join();
+                        }
+                        catch (InterruptedException ie)
+                        {
+                            ie.printStackTrace();
+                        }
+                        this.saveThread = null;
+                    }
                 }
-                catch (InterruptedException ie)
-                {
-                    ie.printStackTrace();
-                }
+
                 break;
         }
         return true;
@@ -879,8 +793,8 @@ class View implements UISWTViewCoreEventListener
     private void exportLanguage()
     {
         TreeTableManager.getCurrent().setFocus();
-        
-        DirectoryDialog directoryDialog = new DirectoryDialog(this.skin.getShell().getShell(), SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL);
+
+        DirectoryDialog directoryDialog = new DirectoryDialog(SWTSkinFactory.getInstance().getShell().getShell(), SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL);
         directoryDialog.setFilterPath(this.defaultPath);
         directoryDialog.setText(this.getLocalisedMessageText("i18nAZ.Titles.Export") + this.currentBundleObject.getName() + "_*");
         directoryDialog.setMessage(this.getLocalisedMessageText("i18nAZ.Labels.Export"));
@@ -893,7 +807,7 @@ class View implements UISWTViewCoreEventListener
             {
                 Locale locale = (Locale) TreeTableManager.getColumn(i).getData(View.DATAKEY_LOCALE);
                 String sFileName = this.currentBundleObject.getName() + "_" + locale.toLanguageTag().replace('-', '_') + BundleObject.EXTENSION;
-                Util.saveLocaleProperties(this.localesProperties.get(locale), new File(pathFile + File.separator + sFileName));                
+                Util.saveLocaleProperties(this.localesProperties.get(locale), new File(pathFile + File.separator + sFileName));
             }
         }
     }
@@ -1452,12 +1366,7 @@ class View implements UISWTViewCoreEventListener
         return prebuildItems;
     }
 
-    private SWTSkin getSkin()
-    {
-        return this.skin;
-    }
-
-    private void initialize(Composite composite)
+    private void initialize(Composite composite, SWTSkinObjectContainer skinObjectContainer)
     {
         this.loggerChannel.log(1, "Initialize");
 
@@ -1465,14 +1374,14 @@ class View implements UISWTViewCoreEventListener
 
         this.display = composite.getDisplay();
 
-        SWTSkinObjectContainer MainChildContainer = new SWTSkinObjectContainer(this.skin, this.skin.getSkinProperties(), "i18nAZ.main", "i18nAZ.main", this.skinObjectContainer);
+        SWTSkinObjectContainer MainChildContainer = new SWTSkinObjectContainer(SWTSkinFactory.getInstance(), SWTSkinFactory.getInstance().getSkinProperties(), "i18nAZ.main", "i18nAZ.main", skinObjectContainer);
         MainChildContainer.setControl(composite);
         MainChildContainer.getComposite().setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
-        SWTSkinObjectContainer HeaderContainer = new SWTSkinObjectContainer(this.skin, this.skin.getSkinProperties(), "i18nAZ.main.header", "i18nAZ.main.header", MainChildContainer);
+        SWTSkinObjectContainer HeaderContainer = new SWTSkinObjectContainer(SWTSkinFactory.getInstance(), SWTSkinFactory.getInstance().getSkinProperties(), "i18nAZ.main.header", "i18nAZ.main.header", MainChildContainer);
         HeaderContainer.getComposite().setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
 
-        SWTSkinObjectContainer ToolBarContainer = (SWTSkinObjectContainer) this.skin.createSkinObject("mdientry.toolbar.full", "mdientry.toolbar.full", HeaderContainer);
+        SWTSkinObjectContainer ToolBarContainer = (SWTSkinObjectContainer) SWTSkinFactory.getInstance().createSkinObject("mdientry.toolbar.full", "mdientry.toolbar.full", HeaderContainer);
 
         Control lastControl = null;
 
@@ -1486,7 +1395,7 @@ class View implements UISWTViewCoreEventListener
                 View.this.addLanguage();
             }
         });
-        
+
         lastControl = this.addLanguageButton.getSkinObject().getControl();
         lastControl = this.addSeparator(ToolBarContainer, lastControl).getControl();
 
@@ -1525,7 +1434,7 @@ class View implements UISWTViewCoreEventListener
             public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
             {
                 TreeTableManager.getCurrent().setFocus();
-                
+
                 TreeTableManager.setMode((boolean) buttonUtility.getSkinObject().getData("checked"));
                 View.this.updateTreeTable(false);
                 COConfigurationManager.setParameter("i18nAZ.treeMode", TreeTableManager.isTreeMode());
@@ -1544,7 +1453,7 @@ class View implements UISWTViewCoreEventListener
             public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
             {
                 TreeTableManager.getCurrent().setFocus();
-                
+
                 View.this.redirectKeysFilter = (boolean) buttonUtility.getSkinObject().getData("checked");
                 View.this.updateTreeTable();
                 COConfigurationManager.setParameter("i18nAZ.redirectKeysFilter", View.this.redirectKeysFilter);
@@ -1563,7 +1472,7 @@ class View implements UISWTViewCoreEventListener
             public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
             {
                 TreeTableManager.getCurrent().setFocus();
-                
+
                 View.this.urlsFilter = (boolean) buttonUtility.getSkinObject().getData("checked");
                 View.this.updateTreeTable();
                 COConfigurationManager.setParameter("i18nAZ.urlsFilter", View.this.urlsFilter);
@@ -1581,7 +1490,7 @@ class View implements UISWTViewCoreEventListener
             public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
             {
                 TreeTableManager.getCurrent().setFocus();
-                
+
                 View.this.setEmptyFilter((boolean) buttonUtility.getSkinObject().getData("checked"));
                 View.this.updateTreeTable();
             }
@@ -1598,7 +1507,7 @@ class View implements UISWTViewCoreEventListener
             public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
             {
                 TreeTableManager.getCurrent().setFocus();
-                
+
                 View.this.setUnchangedFilter((boolean) buttonUtility.getSkinObject().getData("checked"));
                 View.this.updateTreeTable();
             }
@@ -1615,7 +1524,7 @@ class View implements UISWTViewCoreEventListener
             public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
             {
                 TreeTableManager.getCurrent().setFocus();
-                
+
                 View.this.setExtraFilter((boolean) buttonUtility.getSkinObject().getData("checked"));
                 View.this.updateTreeTable();
             }
@@ -1657,7 +1566,7 @@ class View implements UISWTViewCoreEventListener
             }
         });
         lastControl = this.multilineEditorButton.getSkinObject().getControl();
-        
+
         // HELP BUTTON
         this.helpButton = this.addButton(ToolBarContainer, "help", "all", "i18nAZ.image.toolbar.help", "i18nAZ.ToolTips.Help", 10, lastControl);
         this.helpButton.addSelectionListener(new ButtonListenerAdapter()
@@ -1691,8 +1600,8 @@ class View implements UISWTViewCoreEventListener
                 }
 
                 // create shell
-                Shell shell = new Shell(View.this.skin.getShell().getShell(), SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL);
-                shell.setImages(View.this.skin.getShell().getShell().getImages());
+                Shell shell = new Shell(SWTSkinFactory.getInstance().getShell().getShell(), SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL);
+                shell.setImages(SWTSkinFactory.getInstance().getShell().getShell().getImages());
                 shell.setLayout(new FillLayout());
                 shell.setText(View.this.getLocalisedMessageText("i18nAZ.Titles.Help"));
 
@@ -1709,14 +1618,14 @@ class View implements UISWTViewCoreEventListener
                 shell.setSize(640, 480);
 
                 // open shell and center it to parent
-                Util.openShell(View.this.skin.getShell().getShell(), shell);
+                Util.openShell(SWTSkinFactory.getInstance().getShell().getShell(), shell);
             }
         });
         lastControl = this.helpButton.getSkinObject().getControl();
 
         // SEARCH TEXTBOX
         this.regexSearch = COConfigurationManager.getBooleanParameter("i18nAZ.RegexSearch");
-        this.searchTextbox = (SWTSkinObjectTextbox) this.skin.createSkinObject("i18nAZ.main.header.search", "i18nAZ.main.header.search", ToolBarContainer);
+        this.searchTextbox = (SWTSkinObjectTextbox) SWTSkinFactory.getInstance().createSkinObject("i18nAZ.main.header.search", "i18nAZ.main.header.search", ToolBarContainer);
         ToolTipText.set(this.searchTextbox.getTextControl(), "i18nAZ.ToolTips.Search");
         this.searchTextbox.getTextControl().setBackground(Display.getCurrent().getSystemColor(this.regexSearch == true ? SWT.COLOR_INFO_BACKGROUND : SWT.COLOR_WIDGET_BACKGROUND));
         this.searchTextbox.getTextControl().addModifyListener(new ModifyListener()
@@ -1772,11 +1681,11 @@ class View implements UISWTViewCoreEventListener
         });
 
         // INFO TEXT
-        this.infoText = (SWTSkinObjectText2) this.skin.createSkinObject("i18nAZ.main.header.info", "i18nAZ.main.header.info", ToolBarContainer);
+        this.infoText = (SWTSkinObjectText2) SWTSkinFactory.getInstance().createSkinObject("i18nAZ.main.header.info", "i18nAZ.main.header.info", ToolBarContainer);
         FormData formData = (FormData) this.infoText.getControl().getLayoutData();
         formData.left = new FormAttachment(lastControl, 10);
 
-        SWTSkinObjectContainer AreaContainer = new SWTSkinObjectContainer(this.skin, this.skin.getSkinProperties(), "i18nAZ.main.area", "i18nAZ.main.area", MainChildContainer);
+        SWTSkinObjectContainer AreaContainer = new SWTSkinObjectContainer(SWTSkinFactory.getInstance(), SWTSkinFactory.getInstance().getSkinProperties(), "i18nAZ.main.area", "i18nAZ.main.area", MainChildContainer);
         AreaContainer.getComposite().setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
         GridLayout gridLayout = null;
@@ -1901,7 +1810,7 @@ class View implements UISWTViewCoreEventListener
         this.toolBar = new ToolBar(toolBarComposite, SWT.FLAT);
         this.toolBar.setFont(new Font(null, "Times New Roman", 11, SWT.NORMAL));
         ToolTipText.config(this.toolBar);
-        
+
         this.undoToolItem = new ToolItem(this.toolBar, SWT.PUSH);
         this.undoToolItem.setImage(this.imageLoader.getImage("i18nAZ.image.toolbar.undo"));
         ToolTipText.set(this.undoToolItem, "i18nAZ.ToolTips.Undo");
@@ -1910,11 +1819,11 @@ class View implements UISWTViewCoreEventListener
             @Override
             public void widgetSelected(SelectionEvent e)
             {
-                undoRedo.undo();
+                View.this.undoRedo.undo();
                 View.this.editorStyledText.setFocus();
             }
-        });        
-        
+        });
+
         this.redoToolItem = new ToolItem(this.toolBar, SWT.PUSH);
         this.redoToolItem.setImage(this.imageLoader.getImage("i18nAZ.image.toolbar.redo"));
         ToolTipText.set(this.redoToolItem, "i18nAZ.ToolTips.Redo");
@@ -1923,11 +1832,11 @@ class View implements UISWTViewCoreEventListener
             @Override
             public void widgetSelected(SelectionEvent e)
             {
-                undoRedo.redo();
+                View.this.undoRedo.redo();
                 View.this.editorStyledText.setFocus();
             }
         });
-        
+
         new ToolItem(this.toolBar, SWT.SEPARATOR);
 
         this.cutToolItem = new ToolItem(this.toolBar, SWT.PUSH);
@@ -2159,13 +2068,13 @@ class View implements UISWTViewCoreEventListener
         this.undoRedo = new UndoRedo(this.editorStyledText);
         this.undoRedo.addListener(SWT.CHANGED, new Listener()
         {
-            
+
             @Override
             public void handleEvent(Event e)
             {
                 View.this.undoToolItem.setEnabled(View.this.undoRedo.canUndo());
-                View.this.redoToolItem.setEnabled(View.this.undoRedo.canRedo());                
-            }            
+                View.this.redoToolItem.setEnabled(View.this.undoRedo.canRedo());
+            }
         });
         gridData = new GridData(SWT.FILL, SWT.FILL, true, true);
         this.editorStyledText.setVisible(false);
@@ -2189,7 +2098,7 @@ class View implements UISWTViewCoreEventListener
             {
             }
         });
-        
+
         final Menu menu = new Menu(this.editorStyledText);
         this.editorStyledText.setMenu(menu);
         this.editorStyledText.addMenuDetectListener(new MenuDetectListener()
@@ -2197,12 +2106,12 @@ class View implements UISWTViewCoreEventListener
             @Override
             public void menuDetected(MenuDetectEvent e)
             {
-                View.this.populateMenu(menu, MenuOptions.EDITOR);                
-            }                
+                View.this.populateMenu(menu, MenuOptions.EDITOR);
+            }
         });
-        
+
         this.createTopLevelMenuitem();
-        
+
         this.editorStyledText.addExtendedModifyListener(new ExtendedModifyListener()
         {
             @Override
@@ -2433,44 +2342,45 @@ class View implements UISWTViewCoreEventListener
                 }
             }
         });
-        
-        this.updateTreeTable(true, true);        
-        
+
+        this.updateTreeTable(true, true);
+
         this.statusLabel = new Label(AreaContainer.getComposite(), SWT.NULL);
     }
-    
+
     void itemEnterEventOccurred(Item item, int columnIndex)
     {
         String key = (String) item.getData(TreeTableManager.DATAKEY_KEY);
         String message = "";
-        if(columnIndex == 0)
-        {                      
+        if (columnIndex == 0)
+        {
             if (TreeTableManager.Cursor.getColumn() < 2 || TreeTableManager.getChildItemCount(item) == 0)
             {
                 return;
-            }     
-            int[] counts = this.getCounts(key, null, TreeTableManager.Cursor.getColumn());                  
-            message += this.getLocalisedMessageText("i18nAZ.ToolTips.Items.ExpandMessage", new String[] { String.valueOf(counts[0]), String.valueOf(counts[1]), String.valueOf(counts[2]), String.valueOf(counts[3])});
+            }
+            int[] counts = this.getCounts(key, null, TreeTableManager.Cursor.getColumn());
+            message += this.getLocalisedMessageText("i18nAZ.ToolTips.Items.ExpandMessage", new String[] { String.valueOf(counts[0]), String.valueOf(counts[1]), String.valueOf(counts[2]), String.valueOf(counts[3]) });
         }
         else
         {
-            if((Boolean) item.getData(TreeTableManager.DATAKEY_EXIST) == false)
+            if ((Boolean) item.getData(TreeTableManager.DATAKEY_EXIST) == false)
             {
                 return;
             }
             message = TreeTableManager.getText(item, columnIndex);
-            if(this.multilineEditor == false)
+            if (this.multilineEditor == false)
             {
                 message = Util.unescape(message);
             }
         }
-        ToolTipText.set(item, columnIndex, null, new String[]{key}, new String[]{message});
-    }        
+        ToolTipText.set(item, columnIndex, null, new String[] { key }, new String[] { message });
+    }
 
     void populateMenu(final Menu menu, final int visible)
     {
-        this.populateMenu(menu, visible, visible);      
+        this.populateMenu(menu, visible, visible);
     }
+
     void populateMenu(final Menu menu, final int visible, int enabled)
     {
         while (menu.getItemCount() > 0)
@@ -2480,7 +2390,7 @@ class View implements UISWTViewCoreEventListener
         MenuItem menuItem = null;
 
         if ((visible & MenuOptions.REMOVE_COLUMN) != 0)
-        {                
+        {
             menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.RemoveLanguage", new Listener()
             {
                 @Override
@@ -2490,8 +2400,8 @@ class View implements UISWTViewCoreEventListener
                 }
             }, SWT.PUSH);
             menuItem.setEnabled(View.this.removeLanguageButton.isDisabled() == false && ((enabled & MenuOptions.REMOVE_COLUMN) != 0));
-        }       
-        
+        }
+
         // EDITOR
         if ((visible & MenuOptions.EDITOR) != 0)
         {
@@ -2504,7 +2414,7 @@ class View implements UISWTViewCoreEventListener
                 }
             }, SWT.PUSH);
             menuItem.setEnabled(View.this.undoToolItem.getEnabled() && ((enabled & MenuOptions.EDITOR) != 0));
-            
+
             menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.Redo", new Listener()
             {
                 @Override
@@ -2514,9 +2424,9 @@ class View implements UISWTViewCoreEventListener
                 }
             }, SWT.PUSH);
             menuItem.setEnabled(View.this.redoToolItem.getEnabled() && ((enabled & MenuOptions.EDITOR) != 0));
-            
+
             new MenuItem(menu, SWT.SEPARATOR);
-    
+
             menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.Cut", new Listener()
             {
                 @Override
@@ -2526,7 +2436,7 @@ class View implements UISWTViewCoreEventListener
                 }
             }, SWT.PUSH);
             menuItem.setEnabled(View.this.cutToolItem.getEnabled() && ((enabled & MenuOptions.EDITOR) != 0));
-         
+
             menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.Copy", new Listener()
             {
                 @Override
@@ -2536,11 +2446,11 @@ class View implements UISWTViewCoreEventListener
                 }
             }, SWT.PUSH);
             menuItem.setEnabled(View.this.copyToolItem.getEnabled() && ((enabled & MenuOptions.EDITOR) != 0));
-        }        
-        
+        }
+
         // ROW_COPY
         if ((visible & MenuOptions.ROW_COPY) != 0)
-        {         
+        {
             menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.CopyKey", new Listener()
             {
                 @Override
@@ -2551,7 +2461,7 @@ class View implements UISWTViewCoreEventListener
                 }
             }, SWT.PUSH);
             menuItem.setEnabled(true && ((enabled & MenuOptions.ROW_COPY) != 0));
-            
+
             menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.CopyReference", new Listener()
             {
                 @Override
@@ -2561,9 +2471,9 @@ class View implements UISWTViewCoreEventListener
                     View.this.clipboard.setContents(new Object[] { textData }, new Transfer[] { TextTransfer.getInstance() });
                 }
             }, SWT.PUSH);
-            menuItem.setEnabled(true && ((enabled & MenuOptions.ROW_COPY) != 0));           
+            menuItem.setEnabled(true && ((enabled & MenuOptions.ROW_COPY) != 0));
         }
-        
+
         // EDITOR
         if ((visible & MenuOptions.EDITOR) != 0)
         {
@@ -2576,9 +2486,9 @@ class View implements UISWTViewCoreEventListener
                 }
             }, SWT.PUSH);
             menuItem.setEnabled(View.this.pasteToolItem.getEnabled() && ((enabled & MenuOptions.EDITOR) != 0));
-    
+
             new MenuItem(menu, SWT.SEPARATOR);
-    
+
             menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.SelectAll", new Listener()
             {
                 @Override
@@ -2588,9 +2498,9 @@ class View implements UISWTViewCoreEventListener
                 }
             }, SWT.PUSH);
             menuItem.setEnabled(View.this.selectAllToolItem.getEnabled() && ((enabled & MenuOptions.EDITOR) != 0));
-    
+
             new MenuItem(menu, SWT.SEPARATOR);
-            
+
             menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.Uppercase", new Listener()
             {
                 @Override
@@ -2600,7 +2510,7 @@ class View implements UISWTViewCoreEventListener
                 }
             }, SWT.PUSH);
             menuItem.setEnabled(View.this.upperCaseToolItem.getEnabled() && ((enabled & MenuOptions.EDITOR) != 0));
-    
+
             menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.Lowercase", new Listener()
             {
                 @Override
@@ -2610,7 +2520,7 @@ class View implements UISWTViewCoreEventListener
                 }
             }, SWT.PUSH);
             menuItem.setEnabled(View.this.lowerCaseToolItem.getEnabled() && ((enabled & MenuOptions.EDITOR) != 0));
-    
+
             menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.Firstcase", new Listener()
             {
                 @Override
@@ -2621,14 +2531,14 @@ class View implements UISWTViewCoreEventListener
             }, SWT.PUSH);
             menuItem.setEnabled(View.this.firstCaseToolItem.getEnabled() && ((enabled & MenuOptions.EDITOR) != 0));
         }
-        
+
         // SEARCH
         if ((visible & MenuOptions.SEARCH) != 0)
         {
             if (menu.getItemCount() > 0)
-            {               
-                new MenuItem(menu, SWT.SEPARATOR);            
-            } 
+            {
+                new MenuItem(menu, SWT.SEPARATOR);
+            }
             menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.Find", new Listener()
             {
                 @Override
@@ -2638,18 +2548,18 @@ class View implements UISWTViewCoreEventListener
                     View.this.searchTextbox.getTextControl().setFocus();
                 }
             }, SWT.PUSH);
-            menuItem.setEnabled(true && ((enabled & MenuOptions.SEARCH) != 0));            
-        }     
-        
+            menuItem.setEnabled(true && ((enabled & MenuOptions.SEARCH) != 0));
+        }
+
         // FILTERS & TOPFILTERS
         if ((visible & MenuOptions.FILTERS) != 0 || (visible & MenuOptions.TOPFILTERS) != 0)
-        {      
-            
+        {
+
             if ((visible & MenuOptions.ROW_COPY) != 0 && (visible & MenuOptions.SEARCH) == 0)
-            {               
-                new MenuItem(menu, SWT.SEPARATOR);            
-            } 
-            
+            {
+                new MenuItem(menu, SWT.SEPARATOR);
+            }
+
             Menu topMenu = menu;
             if ((visible & MenuOptions.TOPFILTERS) != 0)
             {
@@ -2658,14 +2568,14 @@ class View implements UISWTViewCoreEventListener
                     @Override
                     public void handleEvent(Event e)
                     {
-                       
+
                     }
                 }, SWT.CASCADE);
-                menuItem.setEnabled(((enabled & MenuOptions.TOPFILTERS) != 0));   
-                
+                menuItem.setEnabled(((enabled & MenuOptions.TOPFILTERS) != 0));
+
                 topMenu = new Menu(menu);
                 menuItem.setMenu(topMenu);
-                
+
             }
 
             menuItem = MenuFactory.addMenuItem(topMenu, "i18nAZ.Menus.EmptyFilter", new Listener()
@@ -2678,9 +2588,9 @@ class View implements UISWTViewCoreEventListener
                         View.this.emptyFilterButton.getSkinObject().getControl().notifyListeners(SWT.MouseDown, null);
                         View.this.emptyFilterButton.getSkinObject().getControl().notifyListeners(SWT.MouseUp, null);
                         return;
-                    }     
+                    }
                     Item item = (Item) menu.getData(TreeTableManager.DATAKEY_ITEM);
-    
+
                     if (((MenuItem) e.widget).getSelection() == View.this.emptyFilter)
                     {
                         View.this.emptyFilterExcludedKey.remove(item.getData(TreeTableManager.DATAKEY_KEY));
@@ -2693,7 +2603,7 @@ class View implements UISWTViewCoreEventListener
                 }
             }, SWT.CHECK);
             menuItem.setEnabled((enabled & MenuOptions.FILTERS) != 0 || ((enabled & MenuOptions.TOPFILTERS) != 0 && this.emptyFilterButton.isDisabled() == false));
-            
+
             menuItem = MenuFactory.addMenuItem(topMenu, "i18nAZ.Menus.UnchangedFilter", new Listener()
             {
                 @Override
@@ -2704,9 +2614,9 @@ class View implements UISWTViewCoreEventListener
                         View.this.unchangedFilterButton.getSkinObject().getControl().notifyListeners(SWT.MouseDown, null);
                         View.this.unchangedFilterButton.getSkinObject().getControl().notifyListeners(SWT.MouseUp, null);
                         return;
-                    }  
+                    }
                     Item item = (Item) menu.getData(TreeTableManager.DATAKEY_ITEM);
-    
+
                     if (((MenuItem) e.widget).getSelection() == View.this.unchangedFilter)
                     {
                         View.this.unchangedFilterExcludedKey.remove(item.getData(TreeTableManager.DATAKEY_KEY));
@@ -2715,11 +2625,11 @@ class View implements UISWTViewCoreEventListener
                     {
                         View.this.unchangedFilterExcludedKey.add((String) item.getData(TreeTableManager.DATAKEY_KEY));
                     }
-                    View.this.updateTreeTable();                    
+                    View.this.updateTreeTable();
                 }
             }, SWT.CHECK);
             menuItem.setEnabled((enabled & MenuOptions.FILTERS) != 0 || ((enabled & MenuOptions.TOPFILTERS) != 0 && this.unchangedFilterButton.isDisabled() == false));
-            
+
             menuItem = MenuFactory.addMenuItem(topMenu, "i18nAZ.Menus.ExtraFilter", new Listener()
             {
                 @Override
@@ -2730,9 +2640,9 @@ class View implements UISWTViewCoreEventListener
                         View.this.extraFilterButton.getSkinObject().getControl().notifyListeners(SWT.MouseDown, null);
                         View.this.extraFilterButton.getSkinObject().getControl().notifyListeners(SWT.MouseUp, null);
                         return;
-                    }  
+                    }
                     Item item = (Item) menu.getData(TreeTableManager.DATAKEY_ITEM);
-    
+
                     if (((MenuItem) e.widget).getSelection() == View.this.extraFilter)
                     {
                         View.this.extraFilterExcludedKey.remove(item.getData(TreeTableManager.DATAKEY_KEY));
@@ -2741,13 +2651,13 @@ class View implements UISWTViewCoreEventListener
                     {
                         View.this.extraFilterExcludedKey.add((String) item.getData(TreeTableManager.DATAKEY_KEY));
                     }
-                    View.this.updateTreeTable();                    
+                    View.this.updateTreeTable();
                 }
             }, SWT.CHECK);
             menuItem.setEnabled((enabled & MenuOptions.FILTERS) != 0 || ((enabled & MenuOptions.TOPFILTERS) != 0 && this.extraFilterButton.isDisabled() == false));
-            
+
             new MenuItem(topMenu, SWT.SEPARATOR);
-            
+
             menuItem = MenuFactory.addMenuItem(topMenu, "i18nAZ.Menus.RedirectKeysFilter", new Listener()
             {
                 @Override
@@ -2758,9 +2668,9 @@ class View implements UISWTViewCoreEventListener
                         View.this.redirectKeysFilterButton.getSkinObject().getControl().notifyListeners(SWT.MouseDown, null);
                         View.this.redirectKeysFilterButton.getSkinObject().getControl().notifyListeners(SWT.MouseUp, null);
                         return;
-                    }  
+                    }
                     Item item = (Item) menu.getData(TreeTableManager.DATAKEY_ITEM);
-                    
+
                     if (((MenuItem) e.widget).getSelection() == View.this.redirectKeysFilter)
                     {
                         View.this.redirectKeysFilterExcludedKey.remove(item.getData(TreeTableManager.DATAKEY_KEY));
@@ -2773,7 +2683,7 @@ class View implements UISWTViewCoreEventListener
                 }
             }, SWT.CHECK);
             menuItem.setEnabled((enabled & MenuOptions.FILTERS) != 0 || ((enabled & MenuOptions.TOPFILTERS) != 0 && this.redirectKeysFilterButton.isDisabled() == false));
-            
+
             menuItem = MenuFactory.addMenuItem(topMenu, "i18nAZ.Menus.UrlsFilter", new Listener()
             {
                 @Override
@@ -2784,9 +2694,9 @@ class View implements UISWTViewCoreEventListener
                         View.this.urlsFilterButton.getSkinObject().getControl().notifyListeners(SWT.MouseDown, null);
                         View.this.urlsFilterButton.getSkinObject().getControl().notifyListeners(SWT.MouseUp, null);
                         return;
-                    }  
+                    }
                     Item item = (Item) menu.getData(TreeTableManager.DATAKEY_ITEM);
-    
+
                     if (((MenuItem) e.widget).getSelection() == View.this.urlsFilter)
                     {
                         View.this.urlsFilterExcludedKey.remove(item.getData(TreeTableManager.DATAKEY_KEY));
@@ -2800,18 +2710,19 @@ class View implements UISWTViewCoreEventListener
             }, SWT.CHECK);
             menuItem.setEnabled((enabled & MenuOptions.FILTERS) != 0 || ((enabled & MenuOptions.TOPFILTERS) != 0 && this.urlsFilterButton.isDisabled() == false));
         }
-    }   
+    }
+
     void removeLanguage()
     {
         TreeTableManager.getCurrent().setFocus();
-        
+
         final int columnIndex = TreeTableManager.Cursor.getColumn();
         if (columnIndex != -1)
         {
             // Item column = TreeTableManager.getColumn(columnIndex);
             final Locale selectedLocale = (Locale) TreeTableManager.getColumn(columnIndex).getData(View.DATAKEY_LOCALE);
 
-            MessageBox messageBox = new MessageBox(View.this.skin.getShell().getShell(), SWT.ICON_WARNING | SWT.YES | SWT.NO);
+            MessageBox messageBox = new MessageBox(SWTSkinFactory.getInstance().getShell().getShell(), SWT.ICON_WARNING | SWT.YES | SWT.NO);
             messageBox.setMessage(View.this.getLocalisedMessageText("i18nAZ.Messages.Remove"));
 
             int result = messageBox.open();
@@ -2857,7 +2768,8 @@ class View implements UISWTViewCoreEventListener
             View.this.updateTreeTable(false, false);
 
         }
-    }    
+    }
+
     void selectEditor()
     {
         this.editorStyledText.selectAll();
@@ -2977,6 +2889,172 @@ class View implements UISWTViewCoreEventListener
         View.this.unchangedFilterButton.getSkinObject().switchSuffix(checked ? "-selected" : "", 4, true);
     }
 
+    void startSaveThread()
+    {
+        this.saveThread = new Thread(new Runnable()
+        {
+            public void setInfo(final String info)
+            {
+                View.this.display.syncExec(new Runnable()
+                {
+
+                    @Override
+                    public void run()
+                    {
+                        View.this.statusLabel.setText(info);
+                        View.this.statusLabel.getParent().layout();
+                    }
+                });
+            }
+
+            @Override
+            public void run()
+            {
+                try
+                {
+                    while (View.this.isCreated == true)
+                    {
+                        this.setInfo(View.this.getLocalisedMessageText("i18nAZ.Messages.Status.Ready"));
+
+                        Thread.sleep(1000);
+
+                        SaveObject saveObject = null;
+                        synchronized (View.this.saveObjects)
+                        {
+                            if (View.this.saveObjects.size() == 0)
+                            {
+                                continue;
+                            }
+                            saveObject = View.this.saveObjects.get(0);
+                            View.this.saveObjects.remove(0);
+                        }
+
+                        String currentSaveName = saveObject.getFile().getParentFile().getName() + File.pathSeparator + saveObject.getFile().getName();
+                        this.setInfo(View.this.getLocalisedMessageText("i18nAZ.Messages.Status.Saving"));
+
+                        // clean empty reference
+                        while (true)
+                        {
+                            boolean loop = false;
+                            for (Iterator<String> iterator = saveObject.getCommentedProperties().stringPropertyNames().iterator(); iterator.hasNext();)
+                            {
+                                String key = iterator.next();
+                                if (saveObject.getCommentedProperties().getProperty(key).equals("") == true)
+                                {
+                                    saveObject.getCommentedProperties().remove(key);
+                                    loop = true;
+                                    break;
+                                }
+
+                            }
+                            if (loop == false)
+                            {
+                                break;
+                            }
+                        }
+
+                        String result = Util.saveLocaleProperties(saveObject.getCommentedProperties(), saveObject.getFile());
+
+                        // dispose
+                        saveObject.dispose();
+                        saveObject = null;
+
+                        if (result != null)
+                        {
+                            this.setInfo(View.this.getLocalisedMessageText("i18nAZ.Messages.Status.ErrorSave", new String[] { currentSaveName, result }));
+                            Thread.sleep(10000);
+                            continue;
+                        }
+
+                        // merge and store all bundle files for viewing in Vuze
+                        synchronized (View.this.saveObjects)
+                        {
+                            if (View.this.saveObjects.size() > 0)
+                            {
+                                continue;
+                            }
+                        }
+
+                        // get Buze directory
+                        File vuzeDirectory = new File(i18nAZ.viewInstance.getPluginInterface().getUtilities().getAzureusProgramDir());
+
+                        // collect all locales
+                        final List<Locale> locales = new ArrayList<Locale>();
+                        i18nAZ.viewInstance.display.syncExec(new Runnable()
+                        {
+                            @Override
+                            public void run()
+                            {
+                                for (int i = 1; i < TreeTableManager.getColumnCount(); i++)
+                                {
+                                    locales.add((Locale) TreeTableManager.getColumn(i).getData(View.DATAKEY_LOCALE));
+                                }
+                            }
+
+                        });
+
+                        for (int i = 0; i < locales.size(); i++)
+                        {
+                            // merge plugins properties
+                            CommentedProperties mergedlocaleProperties = new CommentedProperties();
+                            for (int j = 0; j < i18nAZ.viewInstance.pluginInterfaces.length; j++)
+                            {
+                                BundleObject bundleObject = new BundleObject(i18nAZ.viewInstance.pluginInterfaces[j]);
+                                if (bundleObject.isValid() == true)
+                                {
+                                    String localizedBundleName = bundleObject.getName();
+                                    if (i > 0)
+                                    {
+                                        localizedBundleName = localizedBundleName + "_" + locales.get(i).toLanguageTag().replace('-', '_');
+                                    }
+                                    File localfile = new File(i18nAZ.viewInstance.getPluginInterface().getPluginDirectoryName().toString() + "\\internat\\" + bundleObject.getPluginName() + "\\" + localizedBundleName + BundleObject.EXTENSION);
+                                    if ((localfile.isFile()) && (localfile.exists()))
+                                    {
+                                        CommentedProperties localeProperties = Util.getLocaleProperties(localfile);
+                                        if (localeProperties != null && localeProperties.IsLoaded() == true)
+                                        {
+                                            for (Iterator<String> iterator = localeProperties.stringPropertyNames().iterator(); iterator.hasNext();)
+                                            {
+                                                String key = iterator.next();
+                                                mergedlocaleProperties.put(key, localeProperties.getProperty(key));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // set merge file
+                            String fileName = BundleObject.DEFAULT_NAME;
+                            if (i > 0)
+                            {
+                                fileName = fileName + "_" + locales.get(i).toLanguageTag().replace('-', '_');
+                            }
+
+                            File localFile = new File(vuzeDirectory + File.separator + fileName + BundleObject.EXTENSION);
+
+                            // save
+                            result = Util.saveLocaleProperties(mergedlocaleProperties, localFile);
+                            if (result != null)
+                            {
+                                this.setInfo(View.this.getLocalisedMessageText("i18nAZ.Messages.Status.ErrorGlobalSave", new String[] { fileName, result }));
+                                Thread.sleep(10000);
+                                break;
+                            }
+                        }
+                        //Thread.sleep(2000);
+                    }
+                }
+                catch (InterruptedException e)
+                {
+                    Thread.currentThread().interrupt();
+                }
+
+            }
+        }, "i18nAZ.saveThread");
+        this.saveThread .setDaemon(true);
+        this.saveThread.start();
+    }
+
     private void updateInfoText()
     {
         Thread infoThread = new Thread(new Runnable()
@@ -3036,6 +3114,7 @@ class View implements UISWTViewCoreEventListener
                 });
             }
         }, "i18nAZ.infoText");
+        infoThread .setDaemon(true);
         infoThread.start();
     }
 
@@ -3278,14 +3357,14 @@ class View implements UISWTViewCoreEventListener
             toolBargridData.heightHint = SWT.DEFAULT;
             valuegridData.heightHint = SWT.DEFAULT;
             valuegridData.minimumHeight = 100;
-            
+
             // set undo redo
             this.undoRedo.setKey(key);
 
             // set visibles
             this.toolBar.getParent().setVisible(true);
             this.editorStyledText.setVisible(true);
-            
+
         }
         else
         {
@@ -3407,7 +3486,7 @@ class View implements UISWTViewCoreEventListener
         this.redirectKeysFilterButton.setDisabled(true);
         this.urlsFilterButton.setDisabled(true);
 
-        this.deletableRows = new HashMap<String, Item>();
+        this.deletableRows.clear();
         TreeTableManager.removeAll(savePosition);
 
         if (refreshColumn == true)
@@ -3415,7 +3494,7 @@ class View implements UISWTViewCoreEventListener
             TreeTableManager.removeAllColumns();
             if ((this.currentBundleObject == null || this.currentBundleObject.getPluginInterface() != this.selectedPluginInterface))
             {
-                this.keys = new ArrayList<String>();
+                this.keys.clear();
                 this.currentBundleObject = new BundleObject(this.selectedPluginInterface);
             }
 
@@ -3465,7 +3544,7 @@ class View implements UISWTViewCoreEventListener
     }
 
     private void valid(boolean force)
-    { 
+    {
         // show/hide value editor
         if (this.editorStyledText.getVisible() == false)
         {
@@ -3481,7 +3560,7 @@ class View implements UISWTViewCoreEventListener
         {
             return;
         }
-        
+
         // get selected column
         int selectedColumn = (int) this.editorStyledText.getData(View.DATAKEY_SELECTED_COLUMN);
 
@@ -3643,7 +3722,7 @@ class View implements UISWTViewCoreEventListener
             TreeTableManager.Cursor.setfocusedRow(selectedRow, selectedColumn);
             if (errorMessage.equals("") == false)
             {
-                MessageBox messageBox = new MessageBox((Shell) this.getSkin().getShell(), SWT.ICON_ERROR);
+                MessageBox messageBox = new MessageBox((Shell) SWTSkinFactory.getInstance().getShell(), SWT.ICON_ERROR);
                 messageBox.setMessage(errorMessage);
                 messageBox.open();
             }

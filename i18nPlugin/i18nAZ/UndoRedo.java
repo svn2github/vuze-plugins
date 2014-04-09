@@ -7,6 +7,7 @@
 package i18nAZ;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -15,10 +16,12 @@ import java.util.Map;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.ExtendedModifyEvent;
 import org.eclipse.swt.custom.ExtendedModifyListener;
+import org.eclipse.swt.custom.ST;
 import org.eclipse.swt.custom.StyledText;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Listener;
+import org.eclipse.swt.widgets.TypedListener;
 
 /**
  * UndoRedo.java
@@ -153,6 +156,24 @@ public class UndoRedo
         undoStack.add(0, undoRedoObject);
         
         this.notifyListeners(SWT.CHANGED, null);
+    }
+    synchronized public void dispose()
+    {
+        List<Listener> listeners = new  ArrayList<Listener>();
+        listeners.addAll(Arrays.asList(this.styledText.getListeners(ST.ExtendedModify)));
+        
+        for (int i = 0; i < listeners.size(); i++)
+        {
+            if (!(listeners.get(i) instanceof TypedListener))
+            {
+                continue;
+            }
+            TypedListener typedListener = (TypedListener) listeners.get(i);
+            if (typedListener.getEventListener() instanceof ExtendedModifyListener)
+            {
+                this.styledText.removeListener(ST.ExtendedModify, typedListener);               
+            }
+        }
     }
     synchronized public void notifyListeners(int eventType, Event event) 
     {       
