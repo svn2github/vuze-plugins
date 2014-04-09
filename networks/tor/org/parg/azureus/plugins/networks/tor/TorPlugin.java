@@ -1133,7 +1133,7 @@ TorPlugin
 								
 								ProxyMapEntry entry = it.next();
 								
-								if ( now - entry.getCreateTime() > 3*60*1000 ){
+								if ( now - entry.getCreateTime() > 10*60*1000 ){
 									
 									it.remove();
 									
@@ -2067,7 +2067,7 @@ TorPlugin
 							return( null );
 						}
 						
-						socks_proxy = new SOCKSProxy();
+						socks_proxy = new SOCKSProxy( reason );
 					
 					}catch( Throwable e ){
 					
@@ -2176,6 +2176,11 @@ TorPlugin
 	public boolean
 	requestActivation()
 	{
+		if ( external_tor ){
+			
+			return( true );
+		}
+		
 		ControlConnection con = getConnection( 5*1000, true );
 		
 		boolean active = con != null && con.isConnected();
@@ -2563,6 +2568,8 @@ TorPlugin
 			try{
 				socket = new Socket( Proxy.NO_PROXY );
 
+				socket.bind( new InetSocketAddress( "127.0.0.1", 0 ));
+				
 				socket.connect( new InetSocketAddress( "127.0.0.1", control_port ), 30*1000 );
 
 				did_connect = true;
@@ -2998,13 +3005,14 @@ TorPlugin
 		private AESocksProxy proxy;
 		
 		private
-		SOCKSProxy()
+		SOCKSProxy(
+			String reason )
 		
 			throws AEProxyException
 		{
 			proxy = AESocksProxyFactory.create( 0, 120*1000, 120*1000, this );
 			
-			log( "Intermediate SOCKS proxy started on port " + proxy.getPort());
+			log( "Intermediate SOCKS proxy started on port " + proxy.getPort() + " for " + reason );
 		}
 		
 		private int
