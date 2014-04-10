@@ -52,8 +52,10 @@ import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.events.VerifyEvent;
 import org.eclipse.swt.graphics.Color;
+import org.eclipse.swt.graphics.Cursor;
 import org.eclipse.swt.graphics.Font;
 import org.eclipse.swt.graphics.Point;
+import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.layout.FormAttachment;
 import org.eclipse.swt.layout.FormData;
@@ -76,12 +78,14 @@ import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.swt.widgets.ToolBar;
 import org.eclipse.swt.widgets.ToolItem;
+import org.eclipse.swt.widgets.ToolTip;
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.BEncoder;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.ui.swt.Messages;
+import org.gudy.azureus2.ui.swt.Utils;
 import org.gudy.azureus2.ui.swt.mainwindow.IMenuConstants;
 import org.gudy.azureus2.ui.swt.mainwindow.MenuFactory;
 import org.gudy.azureus2.ui.swt.plugins.UISWTViewEvent;
@@ -116,8 +120,11 @@ class View implements UISWTViewCoreEventListener
     static final String DATAKEY_SELECTED_COLUMN = "selectedColumn";
     static final String DATAKEY_DEFAULT_STYLES = "styles";
     static final String DATAKEY_TEXT_ID = "textId";
+    static final String DATAKEY_TOOLTIP = "toolTip";
+    static final String DATAKEY_TOOLTIP_HAND = "toolTipHand";
 
     static final String AZUREUS_LANG_FILE = "org.gudy.azureus2.internat.MessagesBundle";
+
     static String AZUREUS_PLUGIN_NAME = "(core)";
 
     private boolean isCreated = false;
@@ -177,15 +184,15 @@ class View implements UISWTViewCoreEventListener
     boolean extraFilter = false;
 
     boolean redirectKeysFilter = false;
-    boolean urlsFilter = false;
+    int urlsFilter = 0;
 
     private boolean multilineEditor = false;
 
     private ArrayList<String> keys = new ArrayList<String>();
 
-    Map<Locale, CommentedProperties> localesProperties;
+    List<LocalesProperties> localesProperties = null;
 
-    Map<Pattern, Object> searchPatterns;
+    Map<Pattern, Object> searchPatterns = null;
     private HashSet<String> searchPrefixes = null;
     private boolean regexSearch = false;
 
@@ -197,15 +204,18 @@ class View implements UISWTViewCoreEventListener
 
     private List<int[]> infoParams = null;
     private List<Object[]> infoReferences = null;
+    private List<Object[]> infoUrls = null;
+
     private List<int[]> editorParams = null;
     private List<Object[]> editorReferences = null;
+    private List<Object[]> editorUrls = null;
 
     HashSet<String> emptyFilterExcludedKey = new HashSet<String>();
     HashSet<String> unchangedFilterExcludedKey = new HashSet<String>();
     HashSet<String> extraFilterExcludedKey = new HashSet<String>();
 
-    HashSet<String> redirectKeysFilterExcludedKey = new HashSet<String>();
-    HashSet<String> urlsFilterExcludedKey = new HashSet<String>();
+    HashSet<String> hideRedirectKeysFilterExcludedKey = new HashSet<String>();
+    Map<String, Integer> urlsFilterOverriddenStates = new HashMap<String, Integer>();
 
     private Thread saveThread = null;
 
@@ -215,6 +225,18 @@ class View implements UISWTViewCoreEventListener
     private Menu dropDownMenu = null;
 
     UndoRedo undoRedo = null;
+
+    class LocalesProperties
+    {
+        Locale locale = null;
+        CommentedProperties commentedProperties = null;
+
+        LocalesProperties(Locale locale)
+        {
+            this.locale = locale;
+            this.commentedProperties = null;
+        }
+    }
 
     class State
     {
@@ -235,6 +257,7 @@ class View implements UISWTViewCoreEventListener
         static final int FILTERS = 8;
         static final int TOPFILTERS = 16;
         static final int SEARCH = 32;
+        static final int OPEN_URL = 64;
     }
 
     class SaveObject
@@ -291,8 +314,8 @@ class View implements UISWTViewCoreEventListener
             this.defaultPath = "";
         }
 
-        this.localesProperties = new HashMap<Locale, CommentedProperties>();
-        this.localesProperties.put(new Locale("", ""), null);
+        this.localesProperties = new ArrayList<LocalesProperties>();
+        this.localesProperties.add(new LocalesProperties(new Locale("", "")));
 
         List<?> original_list = COConfigurationManager.getListParameter("i18nAZ.LocalesSelected", new ArrayList<String>());
         List<?> list = BDecoder.decodeStrings(BEncoder.cloneList(original_list));
@@ -304,7 +327,7 @@ class View implements UISWTViewCoreEventListener
             {
                 if (list.get(i).equals(AvailableLocales[j].toLanguageTag()))
                 {
-                    this.localesProperties.put(AvailableLocales[j], null);
+                    this.localesProperties.add(new LocalesProperties(AvailableLocales[j]));
                     break;
                 }
             }
@@ -422,7 +445,7 @@ class View implements UISWTViewCoreEventListener
         button.getSkinObject().getControl().setData(View.DATAKEY_TEXT_ID, textID);
         if (checked == -1)
         {
-            ToolTipText.set(button.getSkinObject().getControl(), textID + ((checked == 1) ? ".Pressed" : ""));
+            ToolTipText.set(button.getSkinObject().getControl(), textID);
         }
         else
         {
@@ -457,7 +480,8 @@ class View implements UISWTViewCoreEventListener
         if (addLanguageDialog.localesSelected != null)
         {
             for (int i = 0; i < addLanguageDialog.localesSelected.length; i++)
-            {
+            {                
+                this.localesProperties.add(new LocalesProperties(addLanguageDialog.localesSelected[i]));
                 try
                 {
                     this.addLocaleColumn(addLanguageDialog.localesSelected[i], addLanguageDialog.getLocalBundleObject());
@@ -468,9 +492,9 @@ class View implements UISWTViewCoreEventListener
                 }
             }
             List<String> Locales = new ArrayList<String>();
-            for (Iterator<Locale> iterator = this.localesProperties.keySet().iterator(); iterator.hasNext();)
+            for (int i = 0; i < this.localesProperties.size(); i++)
             {
-                Locale locale = iterator.next();
+                Locale locale = this.localesProperties.get(i).locale;
                 if ((locale.toLanguageTag() != null) && (!locale.toLanguageTag().equals("")) && (!locale.toLanguageTag().equals("und")))
                 {
                     Locales.add(locale.toLanguageTag());
@@ -483,6 +507,103 @@ class View implements UISWTViewCoreEventListener
 
             TreeTableManager.getCurrent().setFocus();
         }
+    }
+
+    private void addLinkManager(final StyledText styledText, boolean hand)
+    {
+        styledText.setData(View.DATAKEY_TOOLTIP_HAND, hand);
+        if (styledText.getData(View.DATAKEY_TOOLTIP) == null)
+        {
+            styledText.setData(View.DATAKEY_TOOLTIP, new ToolTip(SWTSkinFactory.getInstance().getShell().getShell(), SWT.NULL));
+            ((ToolTip) styledText.getData(View.DATAKEY_TOOLTIP)).addListener(SWT.MouseExit, new Listener()
+            {
+                @Override
+                public void handleEvent(Event event)
+                {
+                    ((ToolTip) styledText.getData(View.DATAKEY_TOOLTIP)).setVisible(false);
+                }
+
+            });
+        }
+
+        Listener mouselistener = new Listener()
+        {
+            @Override
+            public void handleEvent(Event e)
+            {
+
+                boolean hand = (boolean) styledText.getData(View.DATAKEY_TOOLTIP_HAND);
+                ToolTip toolTip = (ToolTip) styledText.getData(View.DATAKEY_TOOLTIP);
+                StyleRange styleRange = null;
+                int offset = -1;
+                if (e.type != SWT.KeyUp && e.type != SWT.KeyDown)
+                {
+                    try
+                    {
+                        offset = styledText.getOffsetAtLocation(new Point(e.x, e.y));
+                        styleRange = styledText.getStyleRangeAtOffset(offset);
+                    }
+                    catch (IllegalArgumentException ie)
+                    {
+                    }
+                }
+                if (hand == false)
+                {
+                    styledText.setCursor(new Cursor(View.this.display, SWT.CURSOR_IBEAM));
+                }
+                if (styleRange != null && styleRange.data != null)
+                {
+                    if (hand == false)
+                    {
+                        if (styledText.isFocusControl() == false)
+                        {
+                            styledText.setFocus();
+                            styledText.setSelection(offset);
+                        }
+                    }
+                    if ((e.stateMask & SWT.MOD1) != 0 || e.keyCode == SWT.MOD1)
+                    {
+                        if (e.type == SWT.MouseUp)
+                        {
+                            Utils.launch((String) ((Object[]) styleRange.data)[2]);
+                            e.doit = false;
+                        }
+                        else
+                        {
+                            if (e.type == SWT.MouseDown)
+                            {
+                                e.doit = false;
+                            }
+                            if (hand == false)
+                            {
+                                styledText.setCursor(new Cursor(View.this.display, SWT.CURSOR_HAND));
+                            }
+                        }
+                    }
+                    else
+                    {
+
+                        Rectangle bounds = (Rectangle) Util.invoke(styledText, "getBoundsAtOffset", new Object[] { (int) ((Object[]) styleRange.data)[0] });
+                        Point point = styledText.toDisplay(bounds.x, bounds.y + bounds.height);
+                        toolTip.setText(View.this.getLocalisedMessageText("i18nAZ.ToolTips.FollowLink"));
+                        toolTip.setMessage((String) ((Object[]) styleRange.data)[2]);
+                        toolTip.setLocation(point);
+                        toolTip.setVisible(true);
+                        return;
+                    }
+                }
+
+                toolTip.setVisible(false);
+            }
+        };
+        styledText.addListener(SWT.MouseExit, mouselistener);
+        styledText.addListener(SWT.MouseEnter, mouselistener);
+        styledText.addListener(SWT.MouseMove, mouselistener);
+        styledText.addListener(SWT.MouseUp, mouselistener);
+        styledText.addListener(SWT.MouseDown, mouselistener);
+        styledText.addListener(SWT.KeyUp, mouselistener);
+        styledText.addListener(SWT.KeyDown, mouselistener);
+
     }
 
     private void addLocaleColumn(Locale locale, BundleObject bundleObject)
@@ -556,7 +677,7 @@ class View implements UISWTViewCoreEventListener
         {
             localeProperties = new CommentedProperties();
         }
-        this.localesProperties.put(locale, localeProperties);
+        this.getLocalesProperties(locale).commentedProperties = localeProperties;
         String headerText = "";
         String headerLanguageTag = "";
         int width = COConfigurationManager.getIntParameter("i18nAZ.columnWidth." + TreeTableManager.getColumnCount(), 200);
@@ -630,7 +751,7 @@ class View implements UISWTViewCoreEventListener
                     if (e.widget != null && e.widget.equals(View.this.dropDownMenu) == true)
                     {
 
-                        int visible = MenuOptions.SEARCH | MenuOptions.TOPFILTERS | MenuOptions.EDITOR | MenuOptions.ROW_COPY;
+                        int visible = MenuOptions.SEARCH | MenuOptions.TOPFILTERS | MenuOptions.EDITOR | MenuOptions.ROW_COPY | MenuOptions.OPEN_URL;
                         int enabled = MenuOptions.SEARCH | MenuOptions.TOPFILTERS;
 
                         if (TreeTableManager.Cursor.isFocusControl() == true && (boolean) TreeTableManager.Cursor.getRow().getData(TreeTableManager.DATAKEY_EXIST) == true)
@@ -641,16 +762,28 @@ class View implements UISWTViewCoreEventListener
                         if (View.this.editorStyledText.isFocusControl() == true)
                         {
                             enabled |= MenuOptions.EDITOR;
+                            int[] states = (int[]) TreeTableManager.Cursor.getRow().getData(TreeTableManager.DATAKEY_STATES);
+                            if ((states[1] & State.URL) != 0)
+                            {
+                                try
+                                {
+                                    new URL(TreeTableManager.getText(TreeTableManager.Cursor.getRow(), TreeTableManager.Cursor.getColumn()));
+                                    enabled |= MenuOptions.OPEN_URL;
+                                }
+                                catch (MalformedURLException me)
+                                {
+                                }
+                            }
                         }
 
                         View.this.populateMenu(View.this.dropDownMenu, visible, enabled);
 
-                        View.this.dropDownMenu.getItems()[16].getMenu().getItems()[0].setSelection((boolean) View.this.emptyFilterButton.getSkinObject().getData("checked"));
-                        View.this.dropDownMenu.getItems()[16].getMenu().getItems()[1].setSelection((boolean) View.this.unchangedFilterButton.getSkinObject().getData("checked"));
-                        View.this.dropDownMenu.getItems()[16].getMenu().getItems()[2].setSelection((boolean) View.this.extraFilterButton.getSkinObject().getData("checked"));
-                        View.this.dropDownMenu.getItems()[16].getMenu().getItems()[4].setSelection((boolean) View.this.redirectKeysFilterButton.getSkinObject().getData("checked"));
-                        View.this.dropDownMenu.getItems()[16].getMenu().getItems()[5].setSelection((boolean) View.this.urlsFilterButton.getSkinObject().getData("checked"));
-
+                        View.this.dropDownMenu.getItems()[18].getMenu().getItems()[0].setSelection((boolean) View.this.emptyFilterButton.getSkinObject().getData("checked"));
+                        View.this.dropDownMenu.getItems()[18].getMenu().getItems()[1].setSelection((boolean) View.this.unchangedFilterButton.getSkinObject().getData("checked"));
+                        View.this.dropDownMenu.getItems()[18].getMenu().getItems()[2].setSelection((boolean) View.this.extraFilterButton.getSkinObject().getData("checked"));
+                        View.this.dropDownMenu.getItems()[18].getMenu().getItems()[4].setSelection((boolean) View.this.redirectKeysFilterButton.getSkinObject().getData("checked"));
+                        View.this.dropDownMenu.getItems()[18].getMenu().getItems()[6].setSelection(View.this.urlsFilter == 1);
+                        View.this.dropDownMenu.getItems()[18].getMenu().getItems()[7].setSelection(View.this.urlsFilter == 2);
                     }
                 }
             });
@@ -679,11 +812,6 @@ class View implements UISWTViewCoreEventListener
                 break;
 
             case UISWTViewEvent.TYPE_INITIALIZE:
-                this.emptyFilterExcludedKey.clear();
-                this.unchangedFilterExcludedKey.clear();
-                this.extraFilterExcludedKey.clear();
-                this.redirectKeysFilterExcludedKey.clear();
-                this.urlsFilterExcludedKey.clear();
                 this.saveObjects.clear();
                 this.keys.clear();
 
@@ -719,6 +847,17 @@ class View implements UISWTViewCoreEventListener
                     this.pluginInterfaces = null;
 
                     this.display = null;
+
+                    if (this.infoStyledText.getData(View.DATAKEY_TOOLTIP) != null)
+                    {
+                        ((ToolTip) this.infoStyledText.getData(View.DATAKEY_TOOLTIP)).dispose();
+                        this.infoStyledText.setData(View.DATAKEY_TOOLTIP, null);
+                    }
+                    if (this.editorStyledText.getData(View.DATAKEY_TOOLTIP) != null)
+                    {
+                        ((ToolTip) this.editorStyledText.getData(View.DATAKEY_TOOLTIP)).dispose();
+                        this.editorStyledText.setData(View.DATAKEY_TOOLTIP, null);
+                    }
 
                     this.addLanguageButton = null;
                     this.exportLanguageButton = null;
@@ -803,16 +942,16 @@ class View implements UISWTViewCoreEventListener
         {
             this.defaultPath = path;
             File pathFile = new File(path);
-            for (int i = 2; i < TreeTableManager.getColumnCount(); i++)
+            for (int i = 1; i < this.localesProperties.size(); i++)
             {
-                Locale locale = (Locale) TreeTableManager.getColumn(i).getData(View.DATAKEY_LOCALE);
+                Locale locale = this.localesProperties.get(i).locale;
                 String sFileName = this.currentBundleObject.getName() + "_" + locale.toLanguageTag().replace('-', '_') + BundleObject.EXTENSION;
-                Util.saveLocaleProperties(this.localesProperties.get(locale), new File(pathFile + File.separator + sFileName));
+                Util.saveLocaleProperties(this.localesProperties.get(i).commentedProperties, new File(pathFile + File.separator + sFileName));
             }
         }
     }
 
-    private void formatStyledText(StyledText styledText, List<int[]> params, List<Object[]> references)
+    private void formatStyledText(StyledText styledText, List<int[]> params, List<Object[]> references, List<Object[]> urls, boolean hand)
     {
         // found default styles
         StyleRange styleRange = null;
@@ -870,6 +1009,20 @@ class View implements UISWTViewCoreEventListener
 
             styleRange = new StyleRange((int) references.get(i)[0] + (int) references.get(i)[1] - 1, 1, Display.getCurrent().getSystemColor(SWT.COLOR_DARK_RED), null);
             styleRange.font = new Font(null, styledText.getFont().getFontData()[0].getName(), 9, SWT.NORMAL);
+            styledText.setStyleRange(styleRange);
+        }
+
+        // set styles urls
+        for (int i = 0; i < urls.size(); i++)
+        {
+            styleRange = new StyleRange((int) urls.get(i)[0], (int) urls.get(i)[1], new Color(Display.getCurrent(), 0, 0, 0), null);
+            styleRange.font = new Font(null, styledText.getFont().getFontData()[0].getName(), 9, SWT.NORMAL);
+            styleRange.underline = true;
+            if (hand == true)
+            {
+                styleRange.underlineStyle = SWT.UNDERLINE_LINK;
+            }
+            styleRange.data = urls.get(i);
             styledText.setStyleRange(styleRange);
         }
     }
@@ -974,7 +1127,7 @@ class View implements UISWTViewCoreEventListener
             boolean rowContainUnchanged = false;
             boolean rowContainExtra = false;
 
-            for (int j = 2; j < TreeTableManager.getColumnCount(); j++)
+            for (int j = 2; j < this.localesProperties.size() + 1; j++)
             {
                 if (columnIndex == -1 || columnIndex == j)
                 {
@@ -1036,6 +1189,18 @@ class View implements UISWTViewCoreEventListener
         return this.imageLoader;
     }
 
+    LocalesProperties getLocalesProperties(Locale locale)
+    {
+        for (int i = 0; i < this.localesProperties.size(); i++)
+        {
+            if (this.localesProperties.get(i).locale == locale)
+            {
+                return this.localesProperties.get(i);
+            }
+        }
+        return null;
+    }
+
     String getLocalisedMessageText(String key)
     {
         return this.getPluginInterface().getUtilities().getLocaleUtilities().getLocalisedMessageText(key);
@@ -1060,8 +1225,7 @@ class View implements UISWTViewCoreEventListener
     private List<Map<String, Object>> getPrebuildItems(String topKey, boolean sort)
     {
         List<Map<String, Object>> prebuildItems = new ArrayList<Map<String, Object>>();
-        int columnCount = TreeTableManager.getColumnCount();
-        if (columnCount > 0)
+        if (this.localesProperties.size() > 0)
         {
             if (sort == true)
             {
@@ -1119,8 +1283,8 @@ class View implements UISWTViewCoreEventListener
                     continue;
                 }
 
-                String[] values = new String[columnCount];
-                int[] states = new int[columnCount];
+                String[] values = new String[this.localesProperties.size() + 1];
+                int[] states = new int[this.localesProperties.size() + 1];
                 values[0] = (TreeTableManager.isTreeMode() ? key.substring(key.lastIndexOf('.') + 1) : key);
                 if (matchesSearch == false && key != null)
                 {
@@ -1132,7 +1296,7 @@ class View implements UISWTViewCoreEventListener
                 boolean showRowUnchanged = this.unchangedFilter;
                 boolean showRowExtra = this.extraFilter;
                 boolean hideRedirectKeysFilter = this.redirectKeysFilter;
-                boolean hideUrlsFilter = this.urlsFilter;
+                int urlsFilterState = this.urlsFilter;
 
                 for (Iterator<String> iterator = this.emptyFilterExcludedKey.iterator(); iterator.hasNext();)
                 {
@@ -1158,7 +1322,7 @@ class View implements UISWTViewCoreEventListener
                         break;
                     }
                 }
-                for (Iterator<String> iterator = this.redirectKeysFilterExcludedKey.iterator(); iterator.hasNext();)
+                for (Iterator<String> iterator = this.hideRedirectKeysFilterExcludedKey.iterator(); iterator.hasNext();)
                 {
                     if (key.startsWith(iterator.next() + "."))
                     {
@@ -1166,16 +1330,18 @@ class View implements UISWTViewCoreEventListener
                         break;
                     }
                 }
-                for (Iterator<String> iterator = this.urlsFilterExcludedKey.iterator(); iterator.hasNext();)
+                for (Iterator<Entry<String, Integer>> iterator = this.urlsFilterOverriddenStates.entrySet().iterator(); iterator.hasNext();)
                 {
-                    if (key.startsWith(iterator.next() + "."))
+                    Entry<String, Integer> entry = iterator.next();
+                    if (key.startsWith(entry.getKey() + "."))
                     {
-                        hideUrlsFilter = !hideUrlsFilter;
+                        urlsFilterState = entry.getValue();
                         break;
                     }
                 }
+
                 // reference
-                CommentedProperties localeProperties = this.localesProperties.get(TreeTableManager.getDataColumn(1, View.DATAKEY_LOCALE));
+                CommentedProperties localeProperties = this.localesProperties.get(0).commentedProperties;
                 values[1] = Util.escape(localeProperties.getProperty(key), false);
                 states[1] = Util.getStateOfReference(values[1]);
                 if (matchesSearch == false && values[1] != null)
@@ -1203,10 +1369,22 @@ class View implements UISWTViewCoreEventListener
                     show = false;
                 }
 
-                // show not url
-                if (hideUrlsFilter == true && (states[1] & State.URL) != 0)
+                // show/hide url
+                switch (urlsFilterState)
                 {
-                    show = false;
+                    case 1:
+                        if ((states[1] & State.URL) != 0)
+                        {
+                            show = false;
+                        }
+                        break;
+
+                    case 2:
+                        if ((states[1] & State.URL) == 0)
+                        {
+                            show = false;
+                        }
+                        break;
                 }
 
                 // values
@@ -1215,16 +1393,16 @@ class View implements UISWTViewCoreEventListener
                 boolean rowContainUnchanged = false;
                 boolean rowContainExtra = false;
 
-                for (int j = 2; j < columnCount; j++)
+                for (int j = 1; j < this.localesProperties.size(); j++)
                 {
-                    localeProperties = this.localesProperties.get(TreeTableManager.getDataColumn(j, View.DATAKEY_LOCALE));
-                    values[j] = Util.escape(localeProperties.getProperty(key), false);
-                    states[j] = Util.getStateOfValue(values[1], values[j]);
+                    localeProperties = this.localesProperties.get(j).commentedProperties;
+                    values[j + 1] = Util.escape(localeProperties.getProperty(key), false);
+                    states[j + 1] = Util.getStateOfValue(values[1], values[j + 1]);
                     if (matchesSearch == false)
                     {
-                        matchesSearch = this.find(j, values[j]);
+                        matchesSearch = this.find(j + 1, values[j + 1]);
                     }
-                    switch (states[j])
+                    switch (states[j + 1])
                     {
                         case State.EMPTY:
                             rowContainEmpty = true;
@@ -1238,7 +1416,7 @@ class View implements UISWTViewCoreEventListener
                             rowContainExtra = true;
                             break;
                     }
-                    rowText += values[j];
+                    rowText += values[j + 1];
                 }
                 if (matchesSearch == false)
                 {
@@ -1289,13 +1467,13 @@ class View implements UISWTViewCoreEventListener
                             item = new HashMap<String, Object>();
                             int parentLastDotIndex = currentKey.lastIndexOf('.');
 
-                            String[] values = new String[columnCount];
+                            String[] values = new String[this.localesProperties.size() + 1];
                             values[0] = currentKey.substring(parentLastDotIndex + 1);
 
                             item.put(TreeTableManager.DATAKEY_KEY, currentKey);
                             item.put(TreeTableManager.DATAKEY_COMMENTS, new String[] {});
                             item.put(TreeTableManager.DATAKEY_VALUES, values);
-                            item.put(TreeTableManager.DATAKEY_STATES, new int[columnCount]);
+                            item.put(TreeTableManager.DATAKEY_STATES, new int[this.localesProperties.size() + 1]);
                             item.put(TreeTableManager.DATAKEY_EXIST, false);
                         }
 
@@ -1453,7 +1631,7 @@ class View implements UISWTViewCoreEventListener
             public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
             {
                 TreeTableManager.getCurrent().setFocus();
-
+                View.this.extraFilterExcludedKey.clear();
                 View.this.redirectKeysFilter = (boolean) buttonUtility.getSkinObject().getData("checked");
                 View.this.updateTreeTable();
                 COConfigurationManager.setParameter("i18nAZ.redirectKeysFilter", View.this.redirectKeysFilter);
@@ -1464,19 +1642,15 @@ class View implements UISWTViewCoreEventListener
         lastControl = this.addSeparator(ToolBarContainer, lastControl).getControl();
 
         // SHOW URL BUTTON
-        this.urlsFilter = COConfigurationManager.getBooleanParameter("i18nAZ.urlsFilter");
-        this.urlsFilterButton = this.addButton(ToolBarContainer, "urlsFilter", this.urlsFilter, "right", "i18nAZ.image.toolbar.urlsFilter", "i18nAZ.ToolTips.UrlsFilter", 0, lastControl);
+        this.urlsFilter = COConfigurationManager.getIntParameter("i18nAZ.urlsFilter", 0);
+        this.urlsFilterButton = this.addButton(ToolBarContainer, "urlsFilter", this.urlsFilter != 0, "right", "i18nAZ.image.toolbar.urlsFilter" + (this.urlsFilter == 2 ? "On" : (this.urlsFilter == 1 ? "Off" : "")), "i18nAZ.ToolTips.UrlsFilter", 0, lastControl);
+        View.this.setUrlsFilterState(this.urlsFilter);
         this.urlsFilterButton.addSelectionListener(new ButtonListenerAdapter()
         {
             @Override
             public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
             {
-                TreeTableManager.getCurrent().setFocus();
-
-                View.this.urlsFilter = (boolean) buttonUtility.getSkinObject().getData("checked");
-                View.this.updateTreeTable();
-                COConfigurationManager.setParameter("i18nAZ.urlsFilter", View.this.urlsFilter);
-                COConfigurationManager.save();
+                View.this.setUrlsFilterState();
             }
         });
         lastControl = this.urlsFilterButton.getSkinObject().getControl();
@@ -1575,11 +1749,11 @@ class View implements UISWTViewCoreEventListener
             public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
             {
                 String helpText = "";
-                String helpFullPath = "readme\\readme_" + View.this.getPluginInterface().getUtilities().getLocaleUtilities().getCurrentLocale().toLanguageTag().replace('-', '_') + ".txt";
+                String helpFullPath = "readme/readme_" + View.this.getPluginInterface().getUtilities().getLocaleUtilities().getCurrentLocale().toLanguageTag().replace('-', '_') + ".txt";
                 InputStream stream = View.this.getPluginInterface().getPluginClassLoader().getResourceAsStream(helpFullPath);
                 if (stream == null)
                 {
-                    helpFullPath = "readme\\readme.txt";
+                    helpFullPath = "readme/readme.txt";
                     stream = View.this.getPluginInterface().getPluginClassLoader().getResourceAsStream(helpFullPath);
                 }
                 if (stream == null)
@@ -1692,20 +1866,20 @@ class View implements UISWTViewCoreEventListener
 
         AreaContainer.getComposite().setLayout(new GridLayout(1, false));
 
-        Composite PluginComposite = new Composite(AreaContainer.getComposite(), SWT.NULL);
+        Composite pluginComposite = new Composite(AreaContainer.getComposite(), SWT.NULL);
         gridLayout = new GridLayout(2, false);
         gridLayout.verticalSpacing = 0;
         gridLayout.horizontalSpacing = 0;
         gridLayout.marginHeight = 0;
         gridLayout.marginWidth = 0;
-        PluginComposite.setLayout(gridLayout);
-        PluginComposite.setLayoutData(new GridData(SWT.FILL, SWT.NULL, true, false));
+        pluginComposite.setLayout(gridLayout);
+        pluginComposite.setLayoutData(new GridData(SWT.FILL, SWT.NULL, true, false));
 
-        Label PluginsLabel = new Label(PluginComposite, SWT.NULL);
-        PluginsLabel.setLayoutData(new GridData(SWT.RIGHT, SWT.CENTER, true, false));
-        PluginsLabel.setText(this.getLocalisedMessageText("i18nAZ.Labels.Plugins"));
+        Label pluginsLabel = new Label(pluginComposite, SWT.NULL);
+        pluginsLabel.setLayoutData(new GridData(SWT.RIGHT, SWT.CENTER, true, false));
+        pluginsLabel.setText(this.getLocalisedMessageText("i18nAZ.Labels.Plugins"));
 
-        this.pluginsCombo = new Combo(PluginComposite, SWT.READ_ONLY);
+        this.pluginsCombo = new Combo(pluginComposite, SWT.READ_ONLY);
         GridData gridData = new GridData(SWT.FILL, SWT.NULL, false, false);
         gridData.widthHint = 200;
         this.pluginsCombo.setLayoutData(gridData);
@@ -1751,13 +1925,13 @@ class View implements UISWTViewCoreEventListener
             public void widgetSelected(SelectionEvent e)
             {
                 PluginInterface pluginInterface = View.this.pluginInterfaces[View.this.pluginsCombo.getSelectionIndex()];
-                String PluginKey = "";
+                String pluginKey = "";
                 if (pluginInterface != null)
                 {
-                    Properties PluginProperties = pluginInterface.getPluginProperties();
-                    PluginKey = PluginProperties.getProperty("plugin.id") + "_" + PluginProperties.getProperty("plugin.version");
+                    Properties pluginProperties = pluginInterface.getPluginProperties();
+                    pluginKey = pluginProperties.getProperty("plugin.id") + "_" + pluginProperties.getProperty("plugin.version");
                 }
-                COConfigurationManager.setParameter("i18nAZ.PluginSelected", PluginKey);
+                COConfigurationManager.setParameter("i18nAZ.PluginSelected", pluginKey);
                 COConfigurationManager.save();
                 View.this.selectedPluginInterface = pluginInterface;
                 View.this.updateTreeTable(true, true);
@@ -1798,6 +1972,7 @@ class View implements UISWTViewCoreEventListener
         this.infoStyledText.setFont(new Font(null, this.infoStyledText.getFont().getFontData()[0].getName(), 8, SWT.NORMAL));
         this.infoStyledText.setEditable(false);
         this.infoStyledText.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+        this.addLinkManager(this.infoStyledText, true);
 
         Composite toolBarComposite = new Composite(infoComposite, SWT.NULL);
         RowLayout rowLayout = new RowLayout(SWT.NULL);
@@ -2064,11 +2239,11 @@ class View implements UISWTViewCoreEventListener
         this.editorStyledText.setKeyBinding(SWT.MOD1 | 'X', ST.VerifyKey);
         this.editorStyledText.setKeyBinding(SWT.MOD1 | 'C', ST.VerifyKey);
         this.editorStyledText.setKeyBinding(SWT.MOD1 | 'V', ST.VerifyKey);
+        this.addLinkManager(this.editorStyledText, false);
 
         this.undoRedo = new UndoRedo(this.editorStyledText);
         this.undoRedo.addListener(SWT.CHANGED, new Listener()
         {
-
             @Override
             public void handleEvent(Event e)
             {
@@ -2148,9 +2323,10 @@ class View implements UISWTViewCoreEventListener
                 // found params & references for editor
                 View.this.editorParams = Util.getParams(0, View.this.editorStyledText.getText());
                 View.this.editorReferences = Util.getReferences(0, View.this.editorStyledText.getText());
+                View.this.editorUrls = Util.getUrls(0, View.this.editorStyledText.getText());
 
                 // apply styles for editorStyledText
-                View.this.formatStyledText(View.this.editorStyledText, View.this.editorParams, View.this.editorReferences);
+                View.this.formatStyledText(View.this.editorStyledText, View.this.editorParams, View.this.editorReferences, View.this.editorUrls, false);
 
                 // search unknown params
                 for (int i = 0; i < View.this.editorParams.size(); i++)
@@ -2456,7 +2632,8 @@ class View implements UISWTViewCoreEventListener
                 @Override
                 public void handleEvent(Event e)
                 {
-                    String textData = (String) TreeTableManager.getSelection()[0].getData(TreeTableManager.DATAKEY_KEY);
+                    Item item = (Item) menu.getData(TreeTableManager.DATAKEY_ITEM);
+                    String textData = (String) item.getData(TreeTableManager.DATAKEY_KEY);
                     View.this.clipboard.setContents(new Object[] { textData }, new Transfer[] { TextTransfer.getInstance() });
                 }
             }, SWT.PUSH);
@@ -2467,7 +2644,8 @@ class View implements UISWTViewCoreEventListener
                 @Override
                 public void handleEvent(Event e)
                 {
-                    String textData = TreeTableManager.getText(TreeTableManager.getSelection()[0], 1);
+                    Item item = (Item) menu.getData(TreeTableManager.DATAKEY_ITEM);
+                    String textData = TreeTableManager.getText(item, 1);
                     View.this.clipboard.setContents(new Object[] { textData }, new Transfer[] { TextTransfer.getInstance() });
                 }
             }, SWT.PUSH);
@@ -2532,6 +2710,26 @@ class View implements UISWTViewCoreEventListener
             menuItem.setEnabled(View.this.firstCaseToolItem.getEnabled() && ((enabled & MenuOptions.EDITOR) != 0));
         }
 
+        // OPEN URL
+        if ((visible & MenuOptions.OPEN_URL) != 0)
+        {
+            if (menu.getItemCount() > 0)
+            {
+                new MenuItem(menu, SWT.SEPARATOR);
+            }
+            menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.OpenUrl", new Listener()
+            {
+                @Override
+                public void handleEvent(Event e)
+                {
+                    Item item = (Item) menu.getData(TreeTableManager.DATAKEY_ITEM);
+                    int columnIndex = (int) menu.getData(TreeTableManager.DATAKEY_COLUMN_INDEX);
+                    Utils.launch(TreeTableManager.getText(item, columnIndex));
+                }
+            }, SWT.PUSH);
+            menuItem.setEnabled(true && ((enabled & MenuOptions.OPEN_URL) != 0));
+        }
+
         // SEARCH
         if ((visible & MenuOptions.SEARCH) != 0)
         {
@@ -2545,7 +2743,7 @@ class View implements UISWTViewCoreEventListener
                 public void handleEvent(Event e)
                 {
                     View.this.searchTextbox.getTextControl().setFocus();
-                    View.this.searchTextbox.getTextControl().setFocus();
+                    View.this.searchTextbox.getTextControl().selectAll();
                 }
             }, SWT.PUSH);
             menuItem.setEnabled(true && ((enabled & MenuOptions.SEARCH) != 0));
@@ -2673,42 +2871,112 @@ class View implements UISWTViewCoreEventListener
 
                     if (((MenuItem) e.widget).getSelection() == View.this.redirectKeysFilter)
                     {
-                        View.this.redirectKeysFilterExcludedKey.remove(item.getData(TreeTableManager.DATAKEY_KEY));
+                        View.this.hideRedirectKeysFilterExcludedKey.remove(item.getData(TreeTableManager.DATAKEY_KEY));
                     }
                     else
                     {
-                        View.this.redirectKeysFilterExcludedKey.add((String) item.getData(TreeTableManager.DATAKEY_KEY));
+                        View.this.hideRedirectKeysFilterExcludedKey.add((String) item.getData(TreeTableManager.DATAKEY_KEY));
                     }
                     View.this.updateTreeTable();
                 }
             }, SWT.CHECK);
             menuItem.setEnabled((enabled & MenuOptions.FILTERS) != 0 || ((enabled & MenuOptions.TOPFILTERS) != 0 && this.redirectKeysFilterButton.isDisabled() == false));
 
-            menuItem = MenuFactory.addMenuItem(topMenu, "i18nAZ.Menus.UrlsFilter", new Listener()
+            new MenuItem(topMenu, SWT.SEPARATOR);
+
+            menuItem = MenuFactory.addMenuItem(topMenu, "i18nAZ.Menus.HideUrlsFilter", new Listener()
             {
                 @Override
                 public void handleEvent(Event e)
                 {
                     if ((visible & MenuOptions.TOPFILTERS) != 0)
                     {
-                        View.this.urlsFilterButton.getSkinObject().getControl().notifyListeners(SWT.MouseDown, null);
-                        View.this.urlsFilterButton.getSkinObject().getControl().notifyListeners(SWT.MouseUp, null);
+                        if (View.this.urlsFilter != 1)
+                        {
+                            View.this.setUrlsFilterState(1);
+                        }
+                        else
+                        {
+                            View.this.setUrlsFilterState(0);
+                        }
                         return;
                     }
                     Item item = (Item) menu.getData(TreeTableManager.DATAKEY_ITEM);
-
-                    if (((MenuItem) e.widget).getSelection() == View.this.urlsFilter)
+                    if (View.this.urlsFilter == 1)
                     {
-                        View.this.urlsFilterExcludedKey.remove(item.getData(TreeTableManager.DATAKEY_KEY));
+                        if (((MenuItem) e.widget).getSelection() == true)
+                        {
+                            View.this.urlsFilterOverriddenStates.remove(item.getData(TreeTableManager.DATAKEY_KEY));
+                        }
+                        else
+                        {
+                            View.this.urlsFilterOverriddenStates.put((String) item.getData(TreeTableManager.DATAKEY_KEY), 0);
+                            TreeTableManager.setExpanded(item, true);
+                        }
                     }
                     else
                     {
-                        View.this.urlsFilterExcludedKey.add((String) item.getData(TreeTableManager.DATAKEY_KEY));
+                        if (((MenuItem) e.widget).getSelection() == true)
+                        {
+                            View.this.urlsFilterOverriddenStates.put((String) item.getData(TreeTableManager.DATAKEY_KEY), 1);
+                        }
+                        else
+                        {
+                            View.this.urlsFilterOverriddenStates.remove(item.getData(TreeTableManager.DATAKEY_KEY));
+                            TreeTableManager.setExpanded(item, true);
+                        }
                     }
                     View.this.updateTreeTable();
                 }
             }, SWT.CHECK);
             menuItem.setEnabled((enabled & MenuOptions.FILTERS) != 0 || ((enabled & MenuOptions.TOPFILTERS) != 0 && this.urlsFilterButton.isDisabled() == false));
+
+            menuItem = MenuFactory.addMenuItem(topMenu, "i18nAZ.Menus.ShowUrlsFilter", new Listener()
+            {
+                @Override
+                public void handleEvent(Event e)
+                {
+                    if ((visible & MenuOptions.TOPFILTERS) != 0)
+                    {
+                        if (View.this.urlsFilter != 2)
+                        {
+                            View.this.setUrlsFilterState(2);
+                        }
+                        else
+                        {
+                            View.this.setUrlsFilterState(0);
+                        }
+                        return;
+                    }
+                    Item item = (Item) menu.getData(TreeTableManager.DATAKEY_ITEM);
+                    if (View.this.urlsFilter == 2)
+                    {
+                        if (((MenuItem) e.widget).getSelection() == true)
+                        {
+                            View.this.urlsFilterOverriddenStates.remove(item.getData(TreeTableManager.DATAKEY_KEY));
+                        }
+                        else
+                        {
+                            View.this.urlsFilterOverriddenStates.put((String) item.getData(TreeTableManager.DATAKEY_KEY), 0);
+                        }
+                    }
+                    else
+                    {
+                        if (((MenuItem) e.widget).getSelection() == true)
+                        {
+                            View.this.urlsFilterOverriddenStates.put((String) item.getData(TreeTableManager.DATAKEY_KEY), 2);
+                        }
+                        else
+                        {
+                            View.this.urlsFilterOverriddenStates.remove(item.getData(TreeTableManager.DATAKEY_KEY));
+                        }
+                    }
+                    TreeTableManager.setExpanded(item, true);
+                    View.this.updateTreeTable();
+                }
+            }, SWT.CHECK);
+            menuItem.setEnabled((enabled & MenuOptions.FILTERS) != 0 || ((enabled & MenuOptions.TOPFILTERS) != 0 && this.urlsFilterButton.isDisabled() == false));
+
         }
     }
 
@@ -2752,12 +3020,18 @@ class View implements UISWTViewCoreEventListener
             }
             // remove column
             TreeTableManager.removeColumns(columnIndex);
-
-            View.this.localesProperties.remove(selectedLocale);
-            List<String> locales = new ArrayList<String>();
-            for (Iterator<Locale> iterator = View.this.localesProperties.keySet().iterator(); iterator.hasNext();)
+            for (int i = 0; i < this.localesProperties.size(); i++)
             {
-                Locale locale = iterator.next();
+                if (this.localesProperties.get(i).locale == selectedLocale)
+                {
+                    this.localesProperties.remove(i);
+                    break;
+                }
+            }
+            List<String> locales = new ArrayList<String>();
+            for (int i = 0; i < this.localesProperties.size(); i++)
+            {
+                Locale locale = this.localesProperties.get(i).locale;
                 if ((locale.toLanguageTag() != null) && (!locale.toLanguageTag().equals("")) && (!locale.toLanguageTag().equals("und")))
                 {
                     locales.add(locale.toLanguageTag());
@@ -2782,20 +3056,72 @@ class View implements UISWTViewCoreEventListener
         this.selectAllToolItem.setEnabled(false);
     }
 
-    void setEmptyFilter(boolean checked)
+    private void setEmptyFilter(boolean checked)
     {
+        this.emptyFilterExcludedKey.clear();
         View.this.emptyFilter = checked;
         COConfigurationManager.setParameter("i18nAZ.emptyFilter", View.this.emptyFilter);
         COConfigurationManager.save();
         View.this.emptyFilterButton.getSkinObject().switchSuffix(checked ? "-selected" : "", 4, true);
     }
 
-    void setExtraFilter(boolean checked)
+    private void setExtraFilter(boolean checked)
     {
+        this.extraFilterExcludedKey.clear();
         View.this.extraFilter = checked;
         COConfigurationManager.setParameter("i18nAZ.extraFilter", View.this.extraFilter);
         COConfigurationManager.save();
         View.this.extraFilterButton.getSkinObject().switchSuffix(checked ? "-selected" : "", 4, true);
+    }
+
+    private void setUrlsFilterState()
+    {
+        this.urlsFilterOverriddenStates.clear();
+        switch (View.this.urlsFilter)
+        {
+            case 0:
+                View.this.setUrlsFilterState(1);
+                break;
+            case 1:
+                View.this.setUrlsFilterState(2);
+                break;
+            case 2:
+                View.this.setUrlsFilterState(0);
+                break;
+        }
+    }
+
+    private void setUrlsFilterState(int state)
+    {
+        if (TreeTableManager.getCurrent() != null)
+        {
+            TreeTableManager.getCurrent().setFocus();
+        }
+        View.this.urlsFilter = state;
+        switch (state)
+        {
+            case 0:
+                View.this.urlsFilterButton.setImage("i18nAZ.image.toolbar.urlsFilter");
+                View.this.checkButton(View.this.urlsFilterButton, false);
+                ToolTipText.set(View.this.urlsFilterButton.getSkinObject().getControl(), "i18nAZ.ToolTips.UrlsFilter.State1");
+                break;
+            case 1:
+                View.this.urlsFilterButton.setImage("i18nAZ.image.toolbar.urlsFilterOff");
+                View.this.checkButton(View.this.urlsFilterButton, true);
+                ToolTipText.set(View.this.urlsFilterButton.getSkinObject().getControl(), "i18nAZ.ToolTips.UrlsFilter.State2");
+                break;
+            case 2:
+                View.this.urlsFilterButton.setImage("i18nAZ.image.toolbar.urlsFilterOn");
+                View.this.checkButton(View.this.urlsFilterButton, true);
+                ToolTipText.set(View.this.urlsFilterButton.getSkinObject().getControl(), "i18nAZ.ToolTips.UrlsFilter.State3");
+                break;
+        }
+        if (TreeTableManager.getCurrent() != null)
+        {
+            View.this.updateTreeTable();
+        }
+        COConfigurationManager.setParameter("i18nAZ.urlsFilter", View.this.urlsFilter);
+        COConfigurationManager.save();
     }
 
     private void setSearch(String text)
@@ -2883,6 +3209,7 @@ class View implements UISWTViewCoreEventListener
 
     void setUnchangedFilter(boolean checked)
     {
+        this.unchangedFilterExcludedKey.clear();
         View.this.unchangedFilter = checked;
         COConfigurationManager.setParameter("i18nAZ.unchangedFilter", View.this.unchangedFilter);
         COConfigurationManager.save();
@@ -2895,7 +3222,7 @@ class View implements UISWTViewCoreEventListener
         {
             public void setInfo(final String info)
             {
-                View.this.display.syncExec(new Runnable()
+                View.this.display.asyncExec(new Runnable()
                 {
 
                     @Override
@@ -2977,23 +3304,7 @@ class View implements UISWTViewCoreEventListener
 
                         // get Buze directory
                         File vuzeDirectory = new File(i18nAZ.viewInstance.getPluginInterface().getUtilities().getAzureusProgramDir());
-
-                        // collect all locales
-                        final List<Locale> locales = new ArrayList<Locale>();
-                        i18nAZ.viewInstance.display.syncExec(new Runnable()
-                        {
-                            @Override
-                            public void run()
-                            {
-                                for (int i = 1; i < TreeTableManager.getColumnCount(); i++)
-                                {
-                                    locales.add((Locale) TreeTableManager.getColumn(i).getData(View.DATAKEY_LOCALE));
-                                }
-                            }
-
-                        });
-
-                        for (int i = 0; i < locales.size(); i++)
+                        for (int i = 0; i < View.this.localesProperties.size(); i++)
                         {
                             // merge plugins properties
                             CommentedProperties mergedlocaleProperties = new CommentedProperties();
@@ -3005,7 +3316,7 @@ class View implements UISWTViewCoreEventListener
                                     String localizedBundleName = bundleObject.getName();
                                     if (i > 0)
                                     {
-                                        localizedBundleName = localizedBundleName + "_" + locales.get(i).toLanguageTag().replace('-', '_');
+                                        localizedBundleName = localizedBundleName + "_" + View.this.localesProperties.get(i).locale.toLanguageTag().replace('-', '_');
                                     }
                                     File localfile = new File(i18nAZ.viewInstance.getPluginInterface().getPluginDirectoryName().toString() + "\\internat\\" + bundleObject.getPluginName() + "\\" + localizedBundleName + BundleObject.EXTENSION);
                                     if ((localfile.isFile()) && (localfile.exists()))
@@ -3027,7 +3338,7 @@ class View implements UISWTViewCoreEventListener
                             String fileName = BundleObject.DEFAULT_NAME;
                             if (i > 0)
                             {
-                                fileName = fileName + "_" + locales.get(i).toLanguageTag().replace('-', '_');
+                                fileName = fileName + "_" + View.this.localesProperties.get(i).locale.toLanguageTag().replace('-', '_');
                             }
 
                             File localFile = new File(vuzeDirectory + File.separator + fileName + BundleObject.EXTENSION);
@@ -3041,7 +3352,6 @@ class View implements UISWTViewCoreEventListener
                                 break;
                             }
                         }
-                        //Thread.sleep(2000);
                     }
                 }
                 catch (InterruptedException e)
@@ -3051,34 +3361,38 @@ class View implements UISWTViewCoreEventListener
 
             }
         }, "i18nAZ.saveThread");
-        this.saveThread .setDaemon(true);
+        this.saveThread.setDaemon(true);
         this.saveThread.start();
     }
 
     private void updateInfoText()
     {
-        Thread infoThread = new Thread(new Runnable()
+
+        String localisedMessageText = "";
+        if (TreeTableManager.getItemCount() == 0)
         {
-            @Override
-            synchronized public void run()
+            if (View.this.searchPatterns == null)
             {
-                String localisedMessageText = "";
-                if (TreeTableManager.getItemCount() == 0)
+                localisedMessageText = View.this.getLocalisedMessageText("i18nAZ.Labels.Noentry");
+            }
+            else
+            {
+                localisedMessageText = View.this.getLocalisedMessageText("i18nAZ.Labels.UnsuccessfulSearch");
+            }
+        }
+        else
+        {            
+            final int columnIndex = TreeTableManager.Cursor.getColumn();
+            if (columnIndex >= 2)
+            {
+                
+                Thread infoThread = new Thread(new Runnable()
                 {
-                    if (View.this.searchPatterns == null)
+                    @Override
+                    synchronized public void run()
                     {
-                        localisedMessageText = View.this.getLocalisedMessageText("i18nAZ.Labels.Noentry");
-                    }
-                    else
-                    {
-                        localisedMessageText = View.this.getLocalisedMessageText("i18nAZ.Labels.UnsuccessfulSearch");
-                    }
-                }
-                else
-                {
-                    if (TreeTableManager.Cursor.getColumn() >= 2)
-                    {
-                        int[] counts = View.this.getCounts("", null, TreeTableManager.Cursor.getColumn());
+                        String localisedMessageText = "";
+                        int[] counts = View.this.getCounts("", null, columnIndex);
                         if (View.this.searchPatterns == null)
                         {
                             localisedMessageText = View.this.getLocalisedMessageText("i18nAZ.Labels.Informations.Prefix");
@@ -3089,33 +3403,30 @@ class View implements UISWTViewCoreEventListener
                         }
                         localisedMessageText += View.this.getLocalisedMessageText("i18nAZ.Labels.Informations", new String[] { String.valueOf(counts[0]), String.valueOf(counts[1]), String.valueOf(counts[2]), String.valueOf(counts[3]) });
 
+                        
+                        final String finalLocalisedMessageText = localisedMessageText;
                         View.this.display.asyncExec(new Runnable()
                         {
                             @Override
                             public void run()
                             {
-                                View.this.updateToolTipColumnHeader(TreeTableManager.getColumn(TreeTableManager.Cursor.getColumn()));
+                                View.this.updateToolTipColumnHeader(TreeTableManager.getColumn(columnIndex));
+                                View.this.infoText.setText(finalLocalisedMessageText);
                             }
                         });
+                        
                     }
-                    else
-                    {
-                        localisedMessageText = View.this.getLocalisedMessageText("i18nAZ.Labels.Nolanguage");
-                    }
-                }
-                final String finalLocalisedMessageText = localisedMessageText;
-                View.this.display.asyncExec(new Runnable()
-                {
-                    @Override
-                    public void run()
-                    {
-                        View.this.infoText.setText(finalLocalisedMessageText);
-                    }
-                });
+                }, "i18nAZ.infoText");
+                infoThread.setDaemon(true);
+                infoThread.start();
+                return;
             }
-        }, "i18nAZ.infoText");
-        infoThread .setDaemon(true);
-        infoThread.start();
+            else
+            {
+                localisedMessageText = View.this.getLocalisedMessageText("i18nAZ.Labels.Nolanguage");
+            }
+        }
+        View.this.infoText.setText(localisedMessageText);      
     }
 
     void updateStyledTexts()
@@ -3225,7 +3536,7 @@ class View implements UISWTViewCoreEventListener
         String referencesInfo = "";
         if (selectedColumn >= 2)
         {
-            String[] refs = Util.getReferences((String) this.localesProperties.get(DefaultLocale).get(key));
+            String[] refs = Util.getReferences((String) this.getLocalesProperties(DefaultLocale).commentedProperties.get(key));
             while (true)
             {
                 if (refs.length > 0)
@@ -3236,13 +3547,13 @@ class View implements UISWTViewCoreEventListener
                         referencesInfo += refs[i] + " => ";
                         String ref = refs[i].substring(1, refs[i].length() - 1);;
                         String value = "";
-                        if (this.localesProperties.get(selectedLocale).containsKey(ref))
+                        if (this.getLocalesProperties(selectedLocale).commentedProperties.containsKey(ref))
                         {
-                            value = (String) this.localesProperties.get(selectedLocale).get(ref);
+                            value = (String) this.getLocalesProperties(selectedLocale).commentedProperties.get(ref);
                         }
-                        else if (this.localesProperties.get(DefaultLocale).containsKey(ref))
+                        else if (this.getLocalesProperties(DefaultLocale).commentedProperties.containsKey(ref))
                         {
-                            value = (String) this.localesProperties.get(DefaultLocale).get(ref);
+                            value = (String) this.getLocalesProperties(DefaultLocale).commentedProperties.get(ref);
                         }
                         else if (this.getPluginInterface().getUtilities().getLocaleUtilities().hasLocalisedMessageText(ref))
                         {
@@ -3339,9 +3650,10 @@ class View implements UISWTViewCoreEventListener
         // found params & references for info
         this.infoParams = Util.getParams(keyInfo.length(), currentReferenceInfo);
         this.infoReferences = Util.getReferences(keyInfo.length(), currentReferenceInfo);
+        this.infoUrls = Util.getUrls(keyInfo.length(), currentReferenceInfo);
 
         // apply styles for infoStyledText
-        this.formatStyledText(this.infoStyledText, this.infoParams, this.infoReferences);
+        this.formatStyledText(this.infoStyledText, this.infoParams, this.infoReferences, this.infoUrls, true);
 
         // set data for editor
         this.editorStyledText.setData(View.DATAKEY_SELECTED_ROW, selectedRow);
@@ -3359,7 +3671,14 @@ class View implements UISWTViewCoreEventListener
             valuegridData.minimumHeight = 100;
 
             // set undo redo
-            this.undoRedo.setKey(key);
+            PluginInterface pluginInterface = View.this.pluginInterfaces[View.this.pluginsCombo.getSelectionIndex()];
+            String pluginKey = "(core)";
+            if (pluginInterface != null)
+            {
+                Properties pluginProperties = pluginInterface.getPluginProperties();
+                pluginKey = pluginProperties.getProperty("plugin.id") + "_" + pluginProperties.getProperty("plugin.version");
+            }
+            this.undoRedo.set(pluginKey, key);
 
             // set visibles
             this.toolBar.getParent().setVisible(true);
@@ -3393,7 +3712,7 @@ class View implements UISWTViewCoreEventListener
             int state = State.NONE;
             String key = this.keys.get(i);
 
-            localeProperties = this.localesProperties.get(TreeTableManager.getColumn(1).getData(View.DATAKEY_LOCALE));
+            localeProperties = this.getLocalesProperties((Locale) TreeTableManager.getColumn(1).getData(View.DATAKEY_LOCALE)).commentedProperties;
             String reference = localeProperties.getProperty(key);
 
             state = Util.getStateOfReference(reference);
@@ -3403,7 +3722,7 @@ class View implements UISWTViewCoreEventListener
             }
             entryCount++;
 
-            localeProperties = this.localesProperties.get(column.getData(View.DATAKEY_LOCALE));
+            localeProperties = this.getLocalesProperties((Locale) column.getData(View.DATAKEY_LOCALE)).commentedProperties;
             String value = localeProperties.getProperty(key);
 
             state = Util.getStateOfValue(reference, value);
@@ -3491,6 +3810,11 @@ class View implements UISWTViewCoreEventListener
 
         if (refreshColumn == true)
         {
+            this.emptyFilterExcludedKey.clear();
+            this.unchangedFilterExcludedKey.clear();
+            this.extraFilterExcludedKey.clear();
+            this.hideRedirectKeysFilterExcludedKey.clear();
+            this.urlsFilterOverriddenStates.clear();
             TreeTableManager.removeAllColumns();
             if ((this.currentBundleObject == null || this.currentBundleObject.getPluginInterface() != this.selectedPluginInterface))
             {
@@ -3502,11 +3826,11 @@ class View implements UISWTViewCoreEventListener
             {
                 int width = COConfigurationManager.getIntParameter("i18nAZ.columnWidth.0", 200);
                 TreeTableManager.addColumn(this.getLocalisedMessageText("i18nAZ.Columns.Key"), width);
-                for (Iterator<Locale> iterator = this.localesProperties.keySet().iterator(); iterator.hasNext();)
+                for (int i = 0; i < this.localesProperties.size(); i++)
                 {
                     try
                     {
-                        this.addLocaleColumn(iterator.next(), this.currentBundleObject);
+                        this.addLocaleColumn(this.localesProperties.get(i).locale, this.currentBundleObject);
                     }
                     catch (Exception e)
                     {
@@ -3558,6 +3882,7 @@ class View implements UISWTViewCoreEventListener
         Item selectedRow = (Item) this.editorStyledText.getData(View.DATAKEY_SELECTED_ROW);
         if (selectedRow == null || selectedRow.isDisposed() == true)
         {
+            updateStyledTexts();
             return;
         }
 
@@ -3578,7 +3903,7 @@ class View implements UISWTViewCoreEventListener
         }
 
         // restaure styles for infoStyledText
-        this.formatStyledText(this.infoStyledText, this.infoParams, this.infoReferences);
+        this.formatStyledText(this.infoStyledText, this.infoParams, this.infoReferences, this.infoUrls, true);
 
         // search missing params
         if (errorMessage == null)
@@ -3717,6 +4042,30 @@ class View implements UISWTViewCoreEventListener
                 }
             }
         }
+
+        // search url error
+        if (errorMessage == null)
+        {
+            int referenceState = ((int[]) selectedRow.getData(TreeTableManager.DATAKEY_STATES))[1];
+            if ((referenceState & State.URL) != 0)
+            {
+                try
+                {
+                    new URL(newValue);
+                }
+                catch (MalformedURLException e)
+                {
+                    // show error message box
+                    errorMessage = "";
+                    if (TreeTableManager.Cursor.isSetFocusedRow() == false || force == true)
+                    {
+                        errorMessage = this.getLocalisedMessageText("i18nAZ.Messages.MalformedURL", new String[] { newValue });
+                    }
+                }
+
+            }
+        }
+
         if (errorMessage != null)
         {
             TreeTableManager.Cursor.setfocusedRow(selectedRow, selectedColumn);
@@ -3751,7 +4100,7 @@ class View implements UISWTViewCoreEventListener
             TreeTableManager.setRedraw(true);
 
             // get locale properties for save
-            CommentedProperties localeProperties = this.localesProperties.get(TreeTableManager.getColumn(selectedColumn).getData(View.DATAKEY_LOCALE));
+            CommentedProperties localeProperties = this.getLocalesProperties((Locale) TreeTableManager.getColumn(selectedColumn).getData(View.DATAKEY_LOCALE)).commentedProperties;
 
             // update resource bundle
             localeProperties.put(currentKey, Util.unescape(newValue));
@@ -3834,7 +4183,7 @@ class View implements UISWTViewCoreEventListener
 
             for (int j = 2; j < TreeTableManager.getColumnCount(); j++)
             {
-                localeProperties = this.localesProperties.get(TreeTableManager.getColumn(j).getData(View.DATAKEY_LOCALE));
+                localeProperties = this.getLocalesProperties((Locale) TreeTableManager.getColumn(j).getData(View.DATAKEY_LOCALE)).commentedProperties;
                 if (localeProperties == null)
                 {
                     continue;
@@ -3929,6 +4278,13 @@ class View implements UISWTViewCoreEventListener
         }
 
         // set focus
-        TreeTableManager.Cursor.setFocus();
+        if(TreeTableManager.getItemCount() > 0)
+        {
+            TreeTableManager.Cursor.setFocus();
+        }
+        else
+        {
+            updateStyledTexts();
+        }
     }
 }

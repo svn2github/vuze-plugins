@@ -9,7 +9,8 @@ package i18nAZ;
 import i18nAZ.View.MenuOptions;
 import i18nAZ.View.State;
 
-import java.util.ArrayList;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -146,20 +147,7 @@ class TreeTableManager
         }
 
         static int getColumn()
-        {
-            if(i18nAZ.viewInstance.getDisplay().getThread().equals(Thread.currentThread()) == false)            
-            {
-                final List<Integer> value = new ArrayList<Integer>();
-                i18nAZ.viewInstance.getDisplay().syncExec(new Runnable()
-                {
-                    @Override
-                    public void run()
-                    {
-                        value.add(TreeTableManager.Cursor.getColumn());           
-                   }                
-                });
-                return value.get(0);
-            }
+        {        
             switch (TreeTableManager.CurrentMode)
             {
                 case TreeTableManager.MODE_TABLE:
@@ -192,9 +180,11 @@ class TreeTableManager
 
         private static void onSelect()
         {
-
             // set undo redo
-            i18nAZ.viewInstance.undoRedo.unsetKey();
+            if(i18nAZ.viewInstance.undoRedo != null)
+            {
+                i18nAZ.viewInstance.undoRedo.unset();
+            }
             
             if (TreeTableManager.focusedRow != null)
             {
@@ -671,31 +661,10 @@ class TreeTableManager
                 TreeTableManager.cursor.dispose();
             }
             TreeTableManager.cursor = null;
-        }
-        if (TreeTableManager.EmptyImage != null)
-        {
-            if (!TreeTableManager.EmptyImage.isDisposed())
-            {
-                TreeTableManager.EmptyImage.dispose();
-            }
-            TreeTableManager.EmptyImage = null;
-        }
-        if (TreeTableManager.UnchangedImage != null)
-        {
-            if (!TreeTableManager.UnchangedImage.isDisposed())
-            {
-                TreeTableManager.UnchangedImage.dispose();
-            }
-            TreeTableManager.UnchangedImage = null;
-        }
-        if (TreeTableManager.ExtraImage != null)
-        {
-            if (!TreeTableManager.ExtraImage.isDisposed())
-            {
-                TreeTableManager.ExtraImage.dispose();
-            }
-            TreeTableManager.ExtraImage = null;
-        }
+        }        
+        TreeTableManager.EmptyImage = null;  
+        TreeTableManager.UnchangedImage = null;
+        TreeTableManager.ExtraImage = null;
     }
     static Rectangle getBounds(Item item, int column)
     {
@@ -747,19 +716,6 @@ class TreeTableManager
 
     static int getColumnCount()
     { 
-        if(i18nAZ.viewInstance.getDisplay().getThread().equals(Thread.currentThread()) == false)            
-        {
-            final List<Integer> value = new ArrayList<Integer>();
-            i18nAZ.viewInstance.getDisplay().syncExec(new Runnable()
-            {
-                @Override
-                public void run()
-                {
-                    value.add(TreeTableManager.getColumnCount());           
-               }                
-            });
-            return value.get(0);
-        }
         switch (TreeTableManager.CurrentMode)
         {
             case TreeTableManager.MODE_TABLE:
@@ -773,23 +729,6 @@ class TreeTableManager
     static Composite getCurrent()
     {
         return TreeTableManager.treeTable;
-    }
-    static Object getDataColumn(final int columnIndex, final String key)
-    {
-        if(i18nAZ.viewInstance.getDisplay().getThread().equals(Thread.currentThread()) == false)            
-        {
-            final List<Object> value = new ArrayList<Object>();
-            i18nAZ.viewInstance.getDisplay().syncExec(new Runnable()
-            {
-                @Override
-                public void run()
-                {
-                    value.add(TreeTableManager.getColumn(columnIndex).getData(key));           
-               }                
-            });
-            return value.get(0);
-        }
-        return TreeTableManager.getColumn(columnIndex).getData(key);
     }
     private static Item getItem(int index)
     {
@@ -805,19 +744,6 @@ class TreeTableManager
 
     static int getItemCount()
     {
-        if(i18nAZ.viewInstance.getDisplay().getThread().equals(Thread.currentThread()) == false)            
-        {
-            final List<Integer> value = new ArrayList<Integer>();
-            i18nAZ.viewInstance.getDisplay().syncExec(new Runnable()
-            {
-                @Override
-                public void run()
-                {
-                    value.add(TreeTableManager.getItemCount());           
-               }                
-            });
-            return value.get(0);
-        }
         switch (TreeTableManager.CurrentMode)
         {
             case TreeTableManager.MODE_TABLE:
@@ -1223,18 +1149,33 @@ class TreeTableManager
                         return;
                     }
                     Item item = TreeTableManager.getSelection()[0];
+                    int columnIndex = -1;
+                    for(int i = 0; i < TreeTableManager.getColumnCount(); i++)
+                    {
+                        if(TreeTableManager.getBounds(item, i).contains(TreeTableManager.getCurrent().toControl(e.x, e.y)) == true)
+                        {
+                            columnIndex = i;
+                            break;                            
+                        }
+                    }
+                    if(columnIndex == -1)
+                    {
+                        e.doit = false;
+                        return;
+                    }
                     Menu menu = ((Composite) e.widget).getMenu();
-                    
+                    menu.setData(TreeTableManager.DATAKEY_ITEM, item);
+                    menu.setData(TreeTableManager.DATAKEY_COLUMN_INDEX, columnIndex);
+               
                     int visible = MenuOptions.NONE;
                     int enabled = MenuOptions.NONE;
                     
-                    if (TreeTableManager.Cursor.getColumn() >= 2 && TreeTableManager.getBounds(item, TreeTableManager.Cursor.getColumn()).contains(TreeTableManager.getCurrent().toControl(e.x, e.y)) == true)
+                    if (columnIndex >= 2 && TreeTableManager.getBounds(item, TreeTableManager.Cursor.getColumn()).contains(TreeTableManager.getCurrent().toControl(e.x, e.y)) == true)
                     {
                         visible |= MenuOptions.REMOVE_COLUMN;
                         enabled |= MenuOptions.REMOVE_COLUMN;
                     }
-                    if ((TreeTableManager.getBounds(item, 0).contains(TreeTableManager.getCurrent().toControl(e.x, e.y)) == true ||
-                            TreeTableManager.getBounds(item, 1).contains(TreeTableManager.getCurrent().toControl(e.x, e.y)) == true))
+                    if (columnIndex == 0 || columnIndex == 1)
                     {
                         visible |= MenuOptions.ROW_COPY;
                         if (((boolean) item.getData(TreeTableManager.DATAKEY_EXIST)) == true)
@@ -1242,11 +1183,29 @@ class TreeTableManager
                             enabled |= MenuOptions.ROW_COPY;
                         }
                     }                     
-                    if (TreeTableManager.getChildItemCount(item) > 0 && TreeTableManager.getBounds(item, 0).contains(TreeTableManager.getCurrent().toControl(e.x, e.y)) == true)
+                    if (columnIndex == 0  && TreeTableManager.getChildItemCount(item) > 0)
                     {
                         visible |= MenuOptions.FILTERS;
                         enabled |= MenuOptions.FILTERS;
                     }
+                    
+                    if (columnIndex > 0)
+                    {
+                        int[] states = (int[]) item.getData(TreeTableManager.DATAKEY_STATES);
+                        if ((states[1] & State.URL) != 0)
+                        {
+                            visible |= MenuOptions.OPEN_URL;
+                            try
+                            {
+                                new URL(TreeTableManager.getText(item, columnIndex));
+                                enabled |= MenuOptions.OPEN_URL;
+                            }
+                            catch (MalformedURLException me)
+                            {
+                            }
+                        }                        
+                    }                    
+                    
                     i18nAZ.viewInstance.populateMenu(menu, visible, enabled);
                     
                     if((visible & MenuOptions.FILTERS) != 0)
@@ -1265,14 +1224,19 @@ class TreeTableManager
                         menu.getItems()[5].setText(i18nAZ.viewInstance.getLocalisedMessageText("i18nAZ.Menus.ExtraFilter") + (counts[3] == 0 ? "" : " (" + counts[3] + ")"));
                         menu.getItems()[7].setText(i18nAZ.viewInstance.getLocalisedMessageText("i18nAZ.Menus.RedirectKeysFilter") + (counts[4] == 0 ? "" : " (" + counts[4] + ")"));
                         menu.getItems()[8].setText(i18nAZ.viewInstance.getLocalisedMessageText("i18nAZ.Menus.UrlsFilter") + (counts[5] == 0 ? "" : " (" + counts[5] + ")"));
-
-                        menu.setData(TreeTableManager.DATAKEY_ITEM, item);
-                        menu.getItems()[3].setSelection(i18nAZ.viewInstance.emptyFilter == i18nAZ.viewInstance.emptyFilterExcludedKey.contains(key) == false);
-                        menu.getItems()[4].setSelection(i18nAZ.viewInstance.unchangedFilter == i18nAZ.viewInstance.unchangedFilterExcludedKey.contains(key) == false);
-                        menu.getItems()[5].setSelection(i18nAZ.viewInstance.extraFilter == i18nAZ.viewInstance.extraFilterExcludedKey.contains(key) == false);
-                        menu.getItems()[7].setSelection(i18nAZ.viewInstance.redirectKeysFilter == i18nAZ.viewInstance.redirectKeysFilterExcludedKey.contains(key) == false);
-                        menu.getItems()[8].setSelection(i18nAZ.viewInstance.urlsFilter == i18nAZ.viewInstance.urlsFilterExcludedKey.contains(key) == false);
-                    }
+                         
+                        menu.getItems()[3].setSelection(i18nAZ.viewInstance.emptyFilter && i18nAZ.viewInstance.emptyFilterExcludedKey.contains(key) == false);
+                        menu.getItems()[4].setSelection(i18nAZ.viewInstance.unchangedFilter && i18nAZ.viewInstance.unchangedFilterExcludedKey.contains(key) == false);
+                        menu.getItems()[5].setSelection(i18nAZ.viewInstance.extraFilter && i18nAZ.viewInstance.extraFilterExcludedKey.contains(key) == false);
+                        menu.getItems()[7].setSelection(i18nAZ.viewInstance.redirectKeysFilter && i18nAZ.viewInstance.hideRedirectKeysFilterExcludedKey.contains(key) == false);
+                       int overriddenState = i18nAZ.viewInstance.urlsFilter;
+                       if(i18nAZ.viewInstance.urlsFilterOverriddenStates.containsKey(key))
+                       {
+                           overriddenState = i18nAZ.viewInstance.urlsFilterOverriddenStates.get(key);
+                       }                               
+                        menu.getItems()[9].setSelection(overriddenState == 1);
+                        menu.getItems()[10].setSelection(overriddenState == 2);
+                     }
                     
                     e.doit = visible != MenuOptions.NONE;                    
                 }
@@ -1412,14 +1376,18 @@ class TreeTableManager
 
     }
 
-    private static void setExpanded(TreeItem item, boolean expanded)
-    {
+    static void setExpanded(Item item, boolean expanded)
+    {        
         if (item.isDisposed() == true || TreeTableManager.treeTable.isDisposed() == true)
         {
             return;
         }
-        TreeItem[] items = item.getItems();
-        item.setExpanded(expanded);
+        if( item instanceof TreeItem)
+        {
+            return;
+        }
+        TreeItem[] items = ((TreeItem)item).getItems();
+        ((TreeItem)item).setExpanded(expanded);
         for (int i = 0; i < items.length; i++)
         {
             TreeTableManager.setExpanded(items[i], expanded);

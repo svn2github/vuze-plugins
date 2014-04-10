@@ -11,8 +11,10 @@
         </sealing>
     </manifest>
     <selectedElements exportClassFiles="true" exportJavaFiles="true" exportOutputFolder="false">
+        <file path="/azi18n/plugin.properties"/>
         <javaElement handleIdentifier="=azi18n/&lt;images"/>
         <javaElement handleIdentifier="=azi18n/&lt;i18nAZ.internat"/>
+        <javaElement handleIdentifier="=azi18n/&lt;readme"/>
         <javaElement handleIdentifier="=azi18n/&lt;i18nAZ"/>
     </selectedElements>
 </jardesc>

@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 import java.util.jar.JarEntry;
@@ -50,7 +51,12 @@ class AddLanguageDialog
 
     AddLanguageDialog(Shell owner)
     {
-        this.localeAlsoSelected = i18nAZ.viewInstance.localesProperties.keySet();
+        this.localeAlsoSelected = new HashSet<Locale>();        
+        for (int i = 0; i < i18nAZ.viewInstance.localesProperties.size(); i++)                
+        {
+            this.localeAlsoSelected.add(i18nAZ.viewInstance.localesProperties.get(i).locale);
+        }
+        
         this.localBundleObject = i18nAZ.viewInstance.getCurrentBundleObject();
         this.defaultPath = i18nAZ.viewInstance.getDefaultPath();
 

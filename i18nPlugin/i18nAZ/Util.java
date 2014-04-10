@@ -401,21 +401,21 @@ class Util
     {
         value = (value == null) ? "" : value;
         List<Object[]> references = new ArrayList<Object[]>();
-        int indexOfPercent = -1;
+        int indexOfCurlyBracket  = -1;
         while (true)
         {
-            indexOfPercent = value.indexOf('{', indexOfPercent + 1);
-            if (indexOfPercent == -1 || indexOfPercent == value.length() - 1)
+            indexOfCurlyBracket = value.indexOf('{', indexOfCurlyBracket + 1);
+            if (indexOfCurlyBracket == -1 || indexOfCurlyBracket == value.length() - 1)
             {
                 break;
             }
             String reference = null;
-            for (int i = indexOfPercent + 1; i < value.length(); i++)
+            for (int i = indexOfCurlyBracket + 1; i < value.length(); i++)
             {
                 if (value.charAt(i) == '}')
                 {
                     boolean IsNotRef = false;
-                    for (int j = indexOfPercent + 1; j < i; j++)
+                    for (int j = indexOfCurlyBracket + 1; j < i; j++)
                     {
                         char c = value.charAt(j);
                         if (c == '#' || c == '.' || c == '_' || c == '%' || c == '-' || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || (c >= 48 && c <= 57))
@@ -427,19 +427,67 @@ class Util
                     }
                     if (IsNotRef == false)
                     {
-                        reference = value.substring(indexOfPercent, i + 1);
+                        reference = value.substring(indexOfCurlyBracket, i + 1);
                     }
                     break;
                 }
             }
             if (reference != null)
             {
-                references.add(new Object[] { offset + indexOfPercent, reference.length(), reference });
+                references.add(new Object[] { offset + indexOfCurlyBracket, reference.length(), reference });
             }
         }
         return references;
     }
-
+    static List<Object[]> getUrls(int offset, String value)
+    {
+        value = (value == null) ? "" : value;
+        List<Object[]> urls = new ArrayList<Object[]>();
+        int indexOfScheme = -1;
+        while (true)
+        {
+            indexOfScheme = value.indexOf("http://", indexOfScheme + 1);
+            if (indexOfScheme == -1 || indexOfScheme == value.length() - 1)
+            {
+                break;
+            }
+            char finalChar = ' ';
+            if (indexOfScheme - 1 > -1)
+            {                
+                if (value.charAt(indexOfScheme - 1) == '\'' || value.charAt(indexOfScheme - 1) == '"' )
+                {    
+                    finalChar = value.charAt(indexOfScheme - 1);  
+                }
+            }
+            String url = null;
+            for (int i = indexOfScheme + 6; i < value.length(); i++)
+            {              
+                try
+                {
+                    new URL(value.substring(indexOfScheme, i));
+                }
+                catch (MalformedURLException e)
+                {
+                    break;
+                }
+                if (value.charAt(i) == finalChar)
+                {    
+                    url = value.substring(indexOfScheme, i);                    
+                    break;
+                }
+                if (i == value.length() - 1 && finalChar == ' ')
+                {
+                    url = value.substring(indexOfScheme, i + 1);
+                    break;
+                }
+            }
+            if (url != null)
+            {
+                urls.add(new Object[] { offset + indexOfScheme, url.length(), url});
+            }
+        }
+        return urls;
+    }
     static String[] getReferences(String value)
     {
         List<Object[]> references = getReferences(0, value);
@@ -521,11 +569,16 @@ class Util
         Method method = null;
         try
         {
-            method = object.getClass().getMethod(methodName, paramTypes);
+            method = object.getClass().getDeclaredMethod(methodName, paramTypes);
         }
         catch (NoSuchMethodException | SecurityException e1)
         {
         }
+        if(method.isAccessible() == false)
+        {
+            method.setAccessible(true);
+        }        
+        
         Object result = null;
         try
         {

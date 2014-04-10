@@ -134,7 +134,10 @@ public class ToolTipText
                             hotted = true;
                             continue;
                         }
-                        handleItemEvent((Item)this.hottedItems.get(i)[0], (int)this.hottedItems.get(i)[1], e, SWT.MouseExit);
+                        if(((Item)this.hottedItems.get(i)[0]).isDisposed() == false) 
+                        {
+                            handleItemEvent((Item)this.hottedItems.get(i)[0], (int)this.hottedItems.get(i)[1], e, SWT.MouseExit);
+                        }
                         this.hottedItems.remove(i);
                     }                    
                     if(hotted == false && item != null && item.isDisposed() == false && columnIndex > -1)
@@ -144,7 +147,7 @@ public class ToolTipText
                         return;
                     }
                 }
-                if(item != null && columnIndex > -1)
+                if(item != null && item.isDisposed() == false && columnIndex > -1)
                 {                 
                     handleItemEvent(item, columnIndex, e, e.type);                    
                 }                    

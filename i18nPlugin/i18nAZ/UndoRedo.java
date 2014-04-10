@@ -53,7 +53,7 @@ public class UndoRedo
     private Map<String, List<UndoRedoObject>> undoStacks = new HashMap<String, List<UndoRedoObject>>();
     private Map<String, List<UndoRedoObject>> redoStacks = new HashMap<String, List<UndoRedoObject>>();
 
-    private String curentKey = null;
+    private String curentPairPluginKey = null;
     private StyledText styledText;
        
     private List<EventListener> eventListeners = null;
@@ -75,12 +75,12 @@ public class UndoRedo
                 undoRedoObject.selection = UndoRedo.this.styledText.getSelection();
                 synchronized(UndoRedo.this.undoStacks)
                 {
-                    if(UndoRedo.this.curentKey == null || UndoRedo.this.undoStacks.containsKey(UndoRedo.this.curentKey) == false)
+                    if(UndoRedo.this.curentPairPluginKey == null || UndoRedo.this.undoStacks.containsKey(UndoRedo.this.curentPairPluginKey) == false)
                     {
                         return;
                     }
 
-                    List<UndoRedoObject> undoStack = UndoRedo.this.undoStacks.get(UndoRedo.this.curentKey);                   
+                    List<UndoRedoObject> undoStack = UndoRedo.this.undoStacks.get(UndoRedo.this.curentPairPluginKey);                   
                     
                     if (undoStack.size() > 0)
                     {
@@ -115,35 +115,35 @@ public class UndoRedo
     }
     synchronized public boolean canRedo()
     {
-        if(this.curentKey == null || this.undoStacks.containsKey(this.curentKey) == false)
+        if(this.curentPairPluginKey == null || this.undoStacks.containsKey(this.curentPairPluginKey) == false)
         {
             return false;
         }
 
-        List<UndoRedoObject> redoStack = this.redoStacks.get(this.curentKey);
+        List<UndoRedoObject> redoStack = this.redoStacks.get(this.curentPairPluginKey);
         
         return redoStack.size() > 0;
     }
     synchronized public boolean canUndo()
     {
-        if(this.curentKey == null || this.undoStacks.containsKey(this.curentKey) == false)
+        if(this.curentPairPluginKey == null || this.undoStacks.containsKey(this.curentPairPluginKey) == false)
         {
             return false;
         }
 
-        List<UndoRedoObject> undoStack = this.undoStacks.get(this.curentKey);        
+        List<UndoRedoObject> undoStack = this.undoStacks.get(this.curentPairPluginKey);        
         
         return undoStack.size() > 1;
     }
     synchronized private void clear()
     {
-        if(this.curentKey == null || this.undoStacks.containsKey(this.curentKey) == false)
+        if(this.curentPairPluginKey == null || this.undoStacks.containsKey(this.curentPairPluginKey) == false)
         {
             return;
         }
 
-        List<UndoRedoObject> undoStack = this.undoStacks.get(this.curentKey);
-        List<UndoRedoObject> redoStack = this.redoStacks.get(this.curentKey);
+        List<UndoRedoObject> undoStack = this.undoStacks.get(this.curentPairPluginKey);
+        List<UndoRedoObject> redoStack = this.redoStacks.get(this.curentPairPluginKey);
         
         undoStack.clear();
         redoStack.clear();
@@ -196,13 +196,13 @@ public class UndoRedo
     }
     synchronized public void redo()
     {
-        if(this.curentKey == null || this.undoStacks.containsKey(this.curentKey) == false)
+        if(this.curentPairPluginKey == null || this.undoStacks.containsKey(this.curentPairPluginKey) == false)
         {
             return;
         }
 
-        List<UndoRedoObject> undoStack = this.undoStacks.get(this.curentKey);
-        List<UndoRedoObject> redoStack = this.redoStacks.get(this.curentKey);
+        List<UndoRedoObject> undoStack = this.undoStacks.get(this.curentPairPluginKey);
+        List<UndoRedoObject> redoStack = this.redoStacks.get(this.curentPairPluginKey);
         
         if (redoStack.size() > 0)
         {
@@ -233,27 +233,34 @@ public class UndoRedo
             }         
         }
     }
-    synchronized public void setKey(String key)
+    synchronized public void set(String pluginName, String key)
     {
-        this.curentKey = key;
-        if( this.curentKey == null || this.undoStacks.containsKey(this.curentKey) == true)
+        if(pluginName == null)
+        {
+            this.curentPairPluginKey = null;
+        }
+        else
+        {
+            this.curentPairPluginKey = pluginName + "_" + key;            
+        }
+             if( this.curentPairPluginKey == null || this.undoStacks.containsKey(this.curentPairPluginKey) == true)
         {
             this.notifyListeners(SWT.CHANGED, null);
             return;
         }
-        this.undoStacks.put(this.curentKey, new LinkedList<UndoRedoObject>());
-        this.redoStacks.put(this.curentKey, new LinkedList<UndoRedoObject>());
+        this.undoStacks.put(this.curentPairPluginKey, new LinkedList<UndoRedoObject>());
+        this.redoStacks.put(this.curentPairPluginKey, new LinkedList<UndoRedoObject>());
         this.clear();
     }
     synchronized public void undo()
     {
-        if(this.curentKey == null || this.undoStacks.containsKey(this.curentKey) == false)
+        if(this.curentPairPluginKey == null || this.undoStacks.containsKey(this.curentPairPluginKey) == false)
         {
             return;
         }
 
-        List<UndoRedoObject> undoStack = this.undoStacks.get(this.curentKey);
-        List<UndoRedoObject> redoStack = this.redoStacks.get(this.curentKey);
+        List<UndoRedoObject> undoStack = this.undoStacks.get(this.curentPairPluginKey);
+        List<UndoRedoObject> redoStack = this.redoStacks.get(this.curentPairPluginKey);
         
         if (undoStack.size() > 1)
         {
@@ -267,9 +274,9 @@ public class UndoRedo
             this.onDo = false;
         }
     }
-    synchronized public void unsetKey()
+    synchronized public void unset()
     {
-        this.setKey(null);
+        this.set(null, null);
     }
 }
 
