@@ -71,6 +71,12 @@ public class NID extends SHA1Hash {
     	fails = 0;
     }
     
+    public boolean 
+    isAlive()
+    {
+    	return( fails == 0 && lastAlive > 0 );
+    }
+    
     public void
     resetCreated()
     {

@@ -5,6 +5,8 @@ package org.parg.azureus.plugins.networks.i2p.dht;
  */
 
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 
 import net.i2p.data.Destination;
 import net.i2p.data.Hash;
@@ -55,7 +57,12 @@ public interface DHT {
     public void
     setBootstrapNode( NodeInfo ni );
     
+    public List<NodeInfo>
+    getNodesForBootstrap( 
+    	int	num );
+    
     public NodeInfo heardAbout(NodeInfo nInfo);
+    public NodeInfo heardAbout(Map map);
     
     public Collection<Hash> getPeersAndNoAnnounce(byte[] ih, int max, long maxWait, int annMax, long annMaxWait);
 

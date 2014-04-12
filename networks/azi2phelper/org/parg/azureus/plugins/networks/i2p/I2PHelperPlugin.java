@@ -21,6 +21,7 @@
 
 package org.parg.azureus.plugins.networks.i2p;
 
+import java.io.BufferedInputStream;
 import java.io.File;
 
 
@@ -30,15 +31,21 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.net.URL;
+import java.net.URLConnection;
 import java.nio.channels.ServerSocketChannel;
 
 
+
+import java.util.List;
+import java.util.Map;
 
 import net.i2p.data.Base32;
 import net.i2p.data.Base64;
 import net.i2p.data.Destination;
 
 import org.gudy.azureus2.core3.util.AEThread2;
+import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.RandomUtils;
@@ -69,11 +76,11 @@ import com.aelitis.azureus.plugins.upnp.UPnPPlugin;
 
 public class 
 I2PHelperPlugin 
-	implements UnloadablePlugin, I2pHelperLogger
+	implements UnloadablePlugin, I2pHelperAdapter
 {	
 	/*
-	 * Router: commented out System.setProperties for timezone, http agent etc in static initialiser
-	 * RoutingKeyGenerator: Fixed up SimpleDateFormat as it assumes GMT (TimeZone default used within SimpleDateFormat)
+	 *	Router: commented out System.setProperties for timezone, http agent etc in static initialiser
+	 *	RoutingKeyGenerator: Fixed up SimpleDateFormat as it assumes GMT (TimeZone default used within SimpleDateFormat)
 	 *    	private final static SimpleDateFormat _fmt = new SimpleDateFormat(FORMAT, Locale.UK);
     		static{
     			_fmt.setCalendar( _cal );	 // PARG
@@ -86,6 +93,8 @@ I2PHelperPlugin
         		resource = NativeBigInteger.class.getClassLoader().getResource(resourceName);
         	}
 	*/
+	
+	private static final String	BOOTSTRAP_SERVER = "http://i2pboot.vuze.com:60000/?getNodes=true";
 	
 	private PluginInterface			plugin_interface;
 	private PluginConfig			plugin_config;
@@ -400,7 +409,7 @@ I2PHelperPlugin
 		String				cmd_str,
 		I2PHelperRouter		router,
 		I2PHelperTracker	tracker,
-		I2pHelperLogger		log )
+		I2pHelperAdapter		log )
 		
 		throws Exception
 	{
@@ -513,6 +522,12 @@ I2PHelperPlugin
 				}
 			}
 		}	
+	}
+	
+	public void
+	tryExternalBootstrap()
+	{
+		log.log( "External bootstrap requested" );
 	}
 	
 	public void
@@ -706,11 +721,13 @@ I2PHelperPlugin
 		
 		if ( bootstrap ){
 			
-			System.out.println( "Boostrap Node" );
+			System.out.println( "Bootstrap Node" );
 		}
 		
-		I2pHelperLogger logger = 
-			new I2pHelperLogger() 
+		final I2PHelperRouter[] f_router = { null };
+		
+		I2pHelperAdapter adapter = 
+			new I2pHelperAdapter() 
 			{
 				public void 
 				log(
@@ -718,10 +735,46 @@ I2PHelperPlugin
 				{
 					System.out.println( str );
 				}
+				
+				public void
+				tryExternalBootstrap()
+				{
+					log( "External bootstrap test" );
+					
+					try{
+						URL url = new URL( "http://i2pboot.vuze.com:60000/" );
+						
+						URLConnection connection = url.openConnection();
+						
+						connection.connect();
+						
+						InputStream is = connection.getInputStream();
+						
+						Map map = BDecoder.decode( new BufferedInputStream( is ));
+									
+						List<Map> nodes = (List<Map>)map.get( "nodes" );
+						
+						log( "I2P Bootstrap server returned " + nodes.size() + " nodes" );
+						
+						for ( Map m: nodes ){
+							
+							NodeInfo ni = f_router[0].getDHT().heardAbout( m );
+							
+							if ( ni != null ){
+								
+								log( "    imported " + ni );
+							}
+						}
+				
+					}catch( Throwable e ){
+						
+						log( "External bootstrap failed: " + Debug.getNestedExceptionMessage(e));
+					}
+				}
 			};
 			
 		try{
-			I2PHelperRouter router = new I2PHelperRouter( bootstrap, logger );
+			I2PHelperRouter router = f_router[0] = new I2PHelperRouter( bootstrap, adapter );
 			
 				// 19817 must be used for bootstrap node
 			
@@ -732,6 +785,15 @@ I2PHelperPlugin
 			I2PHelperTracker tracker = new I2PHelperTracker( router.getDHT());
 			
 			I2PHelperConsole console = new I2PHelperConsole();
+			
+			I2PHelperBootstrapServer bootstrap_server = null;
+			
+			if ( bootstrap ){
+				
+				bootstrap_server = new I2PHelperBootstrapServer( 60000, router );
+			}
+			
+			System.out.println( "Accepting commands" );
 			
 			while( true ){
 				
@@ -749,9 +811,18 @@ I2PHelperPlugin
 						
 						break;
 						
+					}else if ( line.equals( "extboot" )){
+						
+						adapter.tryExternalBootstrap();
+						
 					}else{
 						
-						executeCommand(line, router, tracker, logger);
+						executeCommand(line, router, tracker, adapter);
+					}
+					
+					if ( bootstrap_server != null ){
+						
+						System.out.println( "Bootstrap http: " + bootstrap_server.getString());
 					}
 				}catch( Throwable e ){
 					

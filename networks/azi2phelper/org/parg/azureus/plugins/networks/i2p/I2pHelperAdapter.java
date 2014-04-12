@@ -22,9 +22,12 @@
 package org.parg.azureus.plugins.networks.i2p;
 
 public interface 
-I2pHelperLogger 
+I2pHelperAdapter 
 {
 	public void
 	log(
 		String	str );
+	
+	public void
+	tryExternalBootstrap();
 }

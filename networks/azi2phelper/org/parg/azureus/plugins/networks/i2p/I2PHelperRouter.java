@@ -36,6 +36,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.Vector;
 
+import net.i2p.CoreVersion;
 import net.i2p.I2PAppContext;
 import net.i2p.client.I2PSession;
 import net.i2p.client.streaming.I2PSocketManager;
@@ -61,7 +62,7 @@ I2PHelperRouter
 	private static final String 	i2p_host 	= "127.0.0.1";
 
 	private boolean				is_bootstrap_node;
-	private I2pHelperLogger		logger;
+	private I2pHelperAdapter		logger;
 	
 	private Router 		router;
 	private I2PSession 	session;
@@ -72,7 +73,7 @@ I2PHelperRouter
 	protected
 	I2PHelperRouter(
 		boolean				bootstrap_node,
-		I2pHelperLogger		_logger )
+		I2pHelperAdapter		_logger )
 	{
 		is_bootstrap_node	= bootstrap_node;
 		logger				= _logger;
@@ -282,7 +283,7 @@ I2PHelperRouter
 				}
 			}
 			
-			logger.log( "Router startup complete" );
+			logger.log( "Router startup complete: version=" + CoreVersion.VERSION );
 			
             Properties opts = new Properties();
             
@@ -373,6 +374,8 @@ I2PHelperRouter
 		
 		throws Exception
 	{
+		logger.log( "Initializing DHT..." );
+		
 		File dht_config 	= new File( config_dir,  "dht.config" );
 		File dest_key_file 	= new File( config_dir,  "dest_key.dat" );
 

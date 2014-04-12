@@ -5,6 +5,7 @@ package org.parg.azureus.plugins.networks.i2p.dht;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -97,6 +98,55 @@ public class DHTNodes {
     public NodeInfo get(NID nid) {
         return _nodeMap.get(nid);
     }
+    
+    public List<NodeInfo>
+    getNodesForBootstrap( 
+    	int	num )
+   	{
+    		// obviously this isn't efficient
+    	
+    	List<NID> nids = new ArrayList<NID>( _kad.getAll());
+    	
+    	Collections.shuffle( nids );
+    	
+       	List<NodeInfo> result = new ArrayList<NodeInfo>();
+       	List<NodeInfo> backup = new ArrayList<NodeInfo>();
+    	
+    	for ( int i=0;i<nids.size() && result.size() < num; i++ ){
+    		
+    		NID nid = nids.get(i);
+    		
+    		if ( nid.getFailCount() == 0 ){
+    			
+    			NodeInfo ni = _nodeMap.get( nids.get(i));
+    		
+    			if ( ni != null && ni.getDestination() != null ){
+    			
+    				if ( nid.getLastAlive() > 0 ){
+    					
+    					result.add( ni );
+    					
+    				}else{
+    					
+    					if ( backup.size() < num ){
+    						
+    						backup.add( ni );
+    					}
+    				}
+    			}
+    		}
+    	}
+    	
+    	if ( result.size() < num ){
+    	
+    		for ( int i=0;i<backup.size()&&result.size()<num;i++){
+    			
+    			result.add( backup.get(i));
+    		}
+    	}
+    	
+    	return( result );
+   	}
 
     /**
      *  @return the old value if present, else null

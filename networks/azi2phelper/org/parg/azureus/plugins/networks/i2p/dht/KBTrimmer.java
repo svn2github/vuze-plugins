@@ -49,7 +49,7 @@ class KBTrimmer implements KBucketTrimmer<NID> {
         
         if ( oldest_fail != null ){
         	
-        	System.out.println( "KADTrim: discarding failed node: " + oldest_fail );
+        	//System.out.println( "KADTrim: discarding failed node: " + oldest_fail );
         	
         	return(  kbucket.remove(oldest_fail));
         }
