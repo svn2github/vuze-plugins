@@ -232,7 +232,12 @@ RCMPlugin
 							result.put( "isAllSources", isAllSources());
 							
 						} else if ( method.equals( "rcm-get-list" )){
-							rpcGetList(result, args);
+
+							if (isRCMEnabled() && hasFTUXBeenShown()) {
+								rpcGetList(result, args);
+							} else {
+								throw( new PluginException( "RCM not enabled" ));
+							}
 
 						} else if ( method.equals( "rcm-set-enabled" )) {
 
