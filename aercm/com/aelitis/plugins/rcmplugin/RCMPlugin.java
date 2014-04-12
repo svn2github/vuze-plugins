@@ -196,6 +196,7 @@ RCMPlugin
 					{
 						methods.add( "rcm-is-enabled" );
 						methods.add( "rcm-get-list" );
+						methods.add( "rcm-set-enabled" );
 					}
 					
 					public String 
@@ -226,11 +227,35 @@ RCMPlugin
 						
 						if ( method.equals( "rcm-is-enabled" )){
 							
-							result.put( "enabled", isRCMEnabled());
+							result.put( "enabled", isRCMEnabled() && hasFTUXBeenShown());
+							result.put( "sources", getSourcesList());
+							result.put( "isAllSources", isAllSources());
 							
 						} else if ( method.equals( "rcm-get-list" )){
 							rpcGetList(result, args);
 
+						} else if ( method.equals( "rcm-set-enabled" )) {
+
+							boolean enable = MapUtils.getMapBoolean(args, "enable", false);
+							boolean all = MapUtils.getMapBoolean(args, "all-sources", false);
+							if (enable) {
+								setRCMEnabled(enable);
+							}
+
+							RelatedContentUI ui = RelatedContentUI.getSingleton();
+							if (ui != null) {
+								ui.setSearchEnabled(enable);
+								ui.setUIEnabled(enable);
+							}
+
+							setFTUXBeenShown(true);
+							
+							if (all) {
+								setToAllSources();
+							} else {
+								setToDefaultSourcesList();
+							}
+							
 						}else{
 							
 							throw( new PluginException( "Unsupported method" ));
@@ -255,6 +280,9 @@ RCMPlugin
 			RelatedContent[] relatedContent = manager.getRelatedContent();
 			
 			for (RelatedContent item : relatedContent) {
+				if (!isVisible(item)) {
+					continue;
+				}
 				HashMap<String, Object> map = new HashMap<String, Object>();
 				
 				long changedLocallyOn = item.getChangedLocallyOn();
