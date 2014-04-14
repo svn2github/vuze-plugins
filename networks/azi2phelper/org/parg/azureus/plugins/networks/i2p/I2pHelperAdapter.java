@@ -28,6 +28,6 @@ I2pHelperAdapter
 	log(
 		String	str );
 	
-	public void
+	public boolean
 	tryExternalBootstrap();
 }

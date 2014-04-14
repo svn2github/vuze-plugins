@@ -30,6 +30,7 @@ import java.io.File;
 
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.net.URLConnection;
@@ -70,6 +71,9 @@ import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.parg.azureus.plugins.networks.i2p.dht.DHT;
 import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 
+import com.aelitis.azureus.core.proxy.AEProxyFactory;
+import com.aelitis.azureus.core.proxy.AEProxyFactory.PluginProxy;
+import com.aelitis.azureus.core.proxy.impl.AEPluginProxyHandler;
 import com.aelitis.azureus.plugins.upnp.UPnPMapping;
 import com.aelitis.azureus.plugins.upnp.UPnPPlugin;
 
@@ -524,10 +528,67 @@ I2PHelperPlugin
 		}	
 	}
 	
-	public void
+	public boolean
 	tryExternalBootstrap()
 	{
 		log.log( "External bootstrap requested" );
+		
+		try{
+			PluginProxy proxy = AEProxyFactory.getPluginProxy( "I2P bootstrap", new URL( BOOTSTRAP_SERVER ));
+		
+			if ( proxy != null ){
+				
+				boolean	worked = false;
+				
+				try{
+					HttpURLConnection url_connection = (HttpURLConnection)proxy.getURL().openConnection( proxy.getProxy());
+					
+					url_connection.setConnectTimeout( 3*60*1000 );
+					url_connection.setReadTimeout( 30*1000 );
+			
+					url_connection.connect();
+			
+					try{
+						InputStream	is = url_connection.getInputStream();
+			
+						Map map = BDecoder.decode( new BufferedInputStream( is ));
+						
+						List<Map> nodes = (List<Map>)map.get( "nodes" );
+						
+						log( "I2P Bootstrap server returned " + nodes.size() + " nodes" );
+						
+						for ( Map m: nodes ){
+							
+							NodeInfo ni = router.getDHT().heardAbout( m );
+							
+							if ( ni != null ){
+								
+								log( "    imported " + ni );
+							}
+						}
+			
+					}finally{
+			
+						url_connection.disconnect();
+					}
+				}finally{
+					
+					proxy.setOK( worked );
+				}	
+			}else{
+				
+				throw( new Exception( "No plugin proxy available" ));
+			}
+		}catch( Throwable e ){
+		
+			log( "External bootstrap failed: " + Debug.getNestedExceptionMessage(e));
+			
+				// retry if we got a timeout
+			
+			return( Debug.getNestedExceptionMessage(e).toLowerCase().contains( "timeout" ));
+		}
+		
+		return( false );
 	}
 	
 	public void
@@ -736,13 +797,13 @@ I2PHelperPlugin
 					System.out.println( str );
 				}
 				
-				public void
+				public boolean
 				tryExternalBootstrap()
 				{
 					log( "External bootstrap test" );
 					
 					try{
-						URL url = new URL( "http://i2pboot.vuze.com:60000/" );
+						URL url = new URL( BOOTSTRAP_SERVER );
 						
 						URLConnection connection = url.openConnection();
 						
@@ -770,6 +831,8 @@ I2PHelperPlugin
 						
 						log( "External bootstrap failed: " + Debug.getNestedExceptionMessage(e));
 					}
+					
+					return( false );
 				}
 			};
 			

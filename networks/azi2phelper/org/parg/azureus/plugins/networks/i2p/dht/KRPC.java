@@ -1985,7 +1985,12 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             					
             					last_external_bootstrap = now;
             					
-            					_adapter.tryExternalBootstrap();
+            					if ( _adapter.tryExternalBootstrap()){
+            						
+            							// reschedule with a 2 min delay
+            						
+            						last_external_bootstrap = now - 28*60*1000;
+            					}
             				}
             			}
             		}else{
