@@ -223,17 +223,18 @@ RCMPlugin
 							throw( new PluginException( "Plugin unloaded" ));
 						}
 						
-						Map result = new HashMap();
+						Map<String, Object> result = new HashMap<String, Object>();
 						
 						if ( method.equals( "rcm-is-enabled" )){
 							
-							result.put( "enabled", isRCMEnabled() && hasFTUXBeenShown());
+							result.put( "enabled", isRCMEnabled());
 							result.put( "sources", getSourcesList());
-							result.put( "isAllSources", isAllSources());
+							result.put( "is-all-sources", isAllSources());
+							result.put( "ui-enabled", isUIEnabled());
 							
 						} else if ( method.equals( "rcm-get-list" )){
 
-							if (isRCMEnabled() && hasFTUXBeenShown()) {
+							if (isRCMEnabled() && isUIEnabled()) {
 								rpcGetList(result, args);
 							} else {
 								throw( new PluginException( "RCM not enabled" ));
@@ -247,11 +248,8 @@ RCMPlugin
 								setRCMEnabled(enable);
 							}
 
-							RelatedContentUI ui = RelatedContentUI.getSingleton();
-							if (ui != null) {
-								ui.setSearchEnabled(enable);
-								ui.setUIEnabled(enable);
-							}
+							setSearchEnabled(enable);
+							setUIEnabled(enable);
 
 							setFTUXBeenShown(true);
 							
@@ -392,11 +390,31 @@ RCMPlugin
 	}
 	
 	protected boolean
+	isUIEnabled() {
+		return( plugin_interface.getPluginconfig().getPluginBooleanParameter( "rcm.ui.enable", false ));
+	}
+
+	protected void
+	setUIEnabled(
+		boolean b )
+	{
+		plugin_interface.getPluginconfig().setPluginParameter( "rcm.ui.enable", b );
+	}
+
+	protected boolean
 	isSearchEnabled()
 	{
 		return( plugin_interface.getPluginconfig().getPluginBooleanParameter( "rcm.search.enable", false ));
 	}
-	
+
+
+	protected void
+	setSearchEnabled(
+		boolean b )
+	{
+		plugin_interface.getPluginconfig().setPluginParameter( "rcm.search.enable", b );
+	}
+
 	protected int
 	getMinuumSearchRank()
 	{
