@@ -73,7 +73,6 @@ import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 
 import com.aelitis.azureus.core.proxy.AEProxyFactory;
 import com.aelitis.azureus.core.proxy.AEProxyFactory.PluginProxy;
-import com.aelitis.azureus.core.proxy.impl.AEPluginProxyHandler;
 import com.aelitis.azureus.plugins.upnp.UPnPMapping;
 import com.aelitis.azureus.plugins.upnp.UPnPPlugin;
 
@@ -114,7 +113,7 @@ I2PHelperPlugin
 	private File			lock_file;
 	private InputStream		lock_stream;
 	
-	private boolean	unloaded;
+	private volatile boolean	unloaded;
 	
 	public void
 	initialize(
@@ -363,30 +362,43 @@ I2PHelperPlugin
 					public void
 					run()
 					{
-						router = new I2PHelperRouter( false, I2PHelperPlugin.this );
+						I2PHelperRouter my_router = router = new I2PHelperRouter( false, I2PHelperPlugin.this );
 						
 						try{
 							if ( ext_i2p_param.getValue()){
 								
-								router.initialise( plugin_dir, ext_i2p_port_param.getValue());
+								my_router.initialise( plugin_dir, ext_i2p_port_param.getValue());
 										
 							}else{
 							
-								router.initialise( plugin_dir, f_int_port, f_ext_port );
+								my_router.initialise( plugin_dir, f_int_port, f_ext_port );
 							}
 							
-							tracker = new I2PHelperTracker( router.getDHT());
-							
-							while( true ){
+							if ( !unloaded ){
 								
-								router.logInfo();
+								tracker = new I2PHelperTracker( my_router.getDHT());
 								
-								Thread.sleep(60*1000);
+								while( !unloaded ){
+									
+									try{
+										my_router.logInfo();
+									
+									}catch( Throwable e ){
+										
+									}
+									
+									Thread.sleep(60*1000);
+								}
 							}
 						}catch( Throwable e ){
 							
 							e.printStackTrace();
-							
+						}
+						
+						my_router.destroy();
+
+						if ( router == my_router ){
+															
 							router = null;
 						}
 					}
@@ -678,6 +690,20 @@ I2PHelperPlugin
 			lock_file.delete();
 			
 			lock_file = null;
+		}
+		
+		if ( config_model != null ){
+			
+			config_model.destroy();
+			
+			config_model = null;
+		}
+		
+		if ( view_model != null ){
+			
+			view_model.destroy();
+			
+			view_model = null;
 		}
 	}
 	

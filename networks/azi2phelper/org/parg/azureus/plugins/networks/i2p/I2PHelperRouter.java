@@ -61,8 +61,10 @@ I2PHelperRouter
 {
 	private static final String 	i2p_host 	= "127.0.0.1";
 
-	private boolean				is_bootstrap_node;
+	private boolean					is_bootstrap_node;
 	private I2pHelperAdapter		logger;
+	
+	private static final boolean	FULL_STATS = false;
 	
 	private Router 		router;
 	private I2PSession 	session;
@@ -247,9 +249,12 @@ I2PHelperRouter
 			router_props.setProperty( "i2p.dir.base" , config_dir.getAbsolutePath());
 			router_props.setProperty( "i2p.dir.config" , config_dir.getAbsolutePath());
 
-			Debug.out( "Turn off stats sometime!!!!" );
-		
-			router_props.put( "stat.full", "true" );
+			if ( FULL_STATS ){
+				
+				Debug.out( "Turn off stats sometime!!!!" );
+				
+				router_props.put( "stat.full", "true" );
+			}
 			
 			router = new Router( router_props );
 				
@@ -382,7 +387,7 @@ I2PHelperRouter
 
 		I2PAppContext ctx = I2PAppContext.getGlobalContext();
 
-		ctx.logManager().setDefaultLimit( "WARN" );
+		ctx.logManager().setDefaultLimit( "ERROR" ); // "WARN" );
 		
 		I2PSocketManager manager;
 		
@@ -624,7 +629,10 @@ I2PHelperRouter
 		    //RateStat recvRate = router_ctx.statManager().getRate("bw.recvRate"); 
 			//System.out.println( "Rates: send=" + sendRate.getRate(60*1000).getAverageValue() + ", recv=" + recvRate.getRate(60*1000).getAverageValue());
 		    
-			logger.log( "lease repubs=" + router_ctx.statManager().getRate("netDb.republishLeaseSetCount" ).getLifetimeEventCount());
+			if ( FULL_STATS ){
+			
+				logger.log( "Lease repubs=" + router_ctx.statManager().getRate("netDb.republishLeaseSetCount" ).getLifetimeEventCount());
+			}
 			
 			logger.log( 
 				"Rates: send=" + DisplayFormatters.formatByteCountToKiBEtcPerSec(send_rate) +

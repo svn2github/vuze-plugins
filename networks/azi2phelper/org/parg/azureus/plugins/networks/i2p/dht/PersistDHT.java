@@ -98,6 +98,10 @@ abstract class PersistDHT {
             		out.println(ni.toPersistentString());
             		count++;
             		
+            		if ( count > 40 ){
+            			
+            			break;
+            		}
             	}else{
             		
             		if ( nid.getFailCount() == 0 ){
@@ -111,11 +115,11 @@ abstract class PersistDHT {
             	}
             }
             
-            if ( count < 50 ){
+            if ( count < 40 ){
                 for (NodeInfo ni : notFailed ) {
                 	out.println(ni.toPersistentString());
             		count++;
-            		if ( count > 50 ){
+            		if ( count > 40 ){
             			break;
             		}
                 }
