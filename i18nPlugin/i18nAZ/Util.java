@@ -374,7 +374,7 @@ class Util
                     }
                     else
                     {
-                        s1 = PluginProperties.getProperty("plugin.name");
+                        s1 = pluginInterface1.getPluginName();
                     }
                 }
                 if (pluginInterface2 != null)
@@ -387,7 +387,7 @@ class Util
                     }
                     else
                     {
-                        s2 = PluginProperties.getProperty("plugin.name");
+                        s2 = pluginInterface2.getPluginName();
                     }
                 }
                 return s1.toString().compareToIgnoreCase(s2);

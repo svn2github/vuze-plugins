@@ -1908,7 +1908,7 @@ class View implements UISWTViewCoreEventListener
                 }
                 else
                 {
-                    PluginName = PluginProperties.getProperty("plugin.name");
+                    PluginName = pluginInterface.getPluginName();
                 }
             }
             this.pluginsCombo.add(PluginName);
