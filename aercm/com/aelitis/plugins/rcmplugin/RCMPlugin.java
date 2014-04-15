@@ -34,15 +34,12 @@ import org.gudy.azureus2.plugins.ui.UIManagerListener;
 import org.gudy.azureus2.plugins.utils.Utilities;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.gudy.azureus2.plugins.utils.search.SearchProvider;
-import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 
 import com.aelitis.azureus.core.cnetwork.ContentNetwork;
 import com.aelitis.azureus.core.content.ContentException;
 import com.aelitis.azureus.core.content.RelatedContent;
 import com.aelitis.azureus.core.content.RelatedContentManager;
 import com.aelitis.azureus.ui.UserPrompterResultListener;
-import com.aelitis.azureus.ui.swt.skin.SWTSkinFactory;
-import com.aelitis.azureus.ui.swt.skin.SWTSkinProperties;
 import com.aelitis.azureus.util.MapUtils;
 
 
@@ -148,24 +145,8 @@ RCMPlugin
 				UIAttached(
 					UIInstance instance) 
 				{
-					if ( instance instanceof UISWTInstance ){
+					if ( instance.getUIType() ==  UIInstance.UIT_SWT ){
 						
-						String path = "com/aelitis/plugins/rcmplugin/skins/";
-
-						String sFile = path + "skin3_rcm";
-
-						ClassLoader loader = RCMPlugin.class.getClassLoader();
-
-						SWTSkinProperties skinProperties = SWTSkinFactory.getInstance().getSkinProperties();
-
-						try {
-							ResourceBundle subBundle = ResourceBundle.getBundle(sFile,
-									Locale.getDefault(), loader);
-							skinProperties.addResourceBundle(subBundle, path, loader);
-						} catch (MissingResourceException mre) {
-							Debug.out(mre);
-						}	
-
 						synchronized( RCMPlugin.this ){
 
 							if ( destroyed ){
@@ -173,7 +154,16 @@ RCMPlugin
 								return;
 							}
 
-							ui = RelatedContentUI.getSingleton( plugin_interface, (UISWTInstance)instance, RCMPlugin.this );
+							try{
+								Class cla = RCMPlugin.class.forName( "com.aelitis.plugins.rcmplugin.RelatedContentUISWT" );
+							
+								ui = (RelatedContentUI)cla.getMethod( "getSingleton", PluginInterface.class, UIInstance.class, RCMPlugin.class ).invoke(
+										null, plugin_interface, instance, RCMPlugin.this );
+								
+							}catch( Throwable e ){
+								
+								Debug.out( e );
+							}
 						}
 					}
 				}
@@ -626,8 +616,7 @@ RCMPlugin
 		
 		if ( !hasFTUXBeenShown() || !isRCMEnabled()){
 			
-			RelatedContentUI.showFTUX( 
-				null,
+			current_ui.showFTUX( 
 				new UserPrompterResultListener()
 				{
 					public void 
@@ -670,8 +659,7 @@ RCMPlugin
 		
 		if ( !hasFTUXBeenShown() || !isRCMEnabled()){
 			
-			RelatedContentUI.showFTUX( 
-				null,
+			current_ui.showFTUX(
 				new UserPrompterResultListener()
 				{
 					public void 
@@ -715,8 +703,7 @@ RCMPlugin
 		
 		if ( !hasFTUXBeenShown() || !isRCMEnabled()){
 			
-			RelatedContentUI.showFTUX( 
-				null,
+			current_ui.showFTUX( 
 				new UserPrompterResultListener()
 				{
 					public void 

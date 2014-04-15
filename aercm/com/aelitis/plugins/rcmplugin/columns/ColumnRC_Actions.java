@@ -42,7 +42,7 @@ import com.aelitis.azureus.ui.UIFunctionsManager;
 import com.aelitis.azureus.ui.common.table.TableColumnCore;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinFactory;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinProperties;
-import com.aelitis.plugins.rcmplugin.RelatedContentUI;
+import com.aelitis.plugins.rcmplugin.RelatedContentUISWT;
 
 /**
  * @author TuxPaper
@@ -144,9 +144,9 @@ public class ColumnRC_Actions
 
 		String s;
 		
-		if ( rc instanceof RelatedContentUI.SubsRelatedContent ){
+		if ( rc instanceof RelatedContentUISWT.SubsRelatedContent ){
 			
-			Subscription subs = ((RelatedContentUI.SubsRelatedContent)rc).getSubscription();
+			Subscription subs = ((RelatedContentUISWT.SubsRelatedContent)rc).getSubscription();
 			
 			if ( subs.isSearchTemplate()){
 				
@@ -224,7 +224,7 @@ public class ColumnRC_Actions
 					} else if (hitUrl.url.equals("subscribe")) {
 						rc.setUnread( false );
 					} else if (hitUrl.url.equals("install")) {
-						Subscription subs = ((RelatedContentUI.SubsRelatedContent)rc).getSubscription();
+						Subscription subs = ((RelatedContentUISWT.SubsRelatedContent)rc).getSubscription();
 						
 						try{
 							VuzeFile vf = subs.getSearchTemplateVuzeFile();

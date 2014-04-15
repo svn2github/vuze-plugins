@@ -65,9 +65,9 @@ import com.aelitis.azureus.ui.swt.mdi.MultipleDocumentInterfaceSWT;
 import com.aelitis.azureus.ui.swt.skin.*;
 import com.aelitis.azureus.ui.swt.views.skin.InfoBarUtil;
 import com.aelitis.azureus.ui.swt.views.skin.SkinView;
-import com.aelitis.plugins.rcmplugin.RelatedContentUI.RCMItemContent;
-import com.aelitis.plugins.rcmplugin.RelatedContentUI.RCMItemSubView;
-import com.aelitis.plugins.rcmplugin.RelatedContentUI.RCMItemSubscriptions;
+import com.aelitis.plugins.rcmplugin.RelatedContentUISWT.RCMItemContent;
+import com.aelitis.plugins.rcmplugin.RelatedContentUISWT.RCMItemSubView;
+import com.aelitis.plugins.rcmplugin.RelatedContentUISWT.RCMItemSubscriptions;
 import com.aelitis.plugins.rcmplugin.columns.*;
 
 
@@ -170,7 +170,7 @@ SBC_RCMView
 				
 			}else{
 				
-				mdi_entry = mdi.getEntry( RelatedContentUI.SIDEBAR_SECTION_RELATED_CONTENT );
+				mdi_entry = mdi.getEntry( RelatedContentUISWT.SIDEBAR_SECTION_RELATED_CONTENT );
 			}
 			
 			if ( mdi_entry != null ){
@@ -329,7 +329,7 @@ SBC_RCMView
 		
 		if ( show ){
 			
-			show = RelatedContentUI.getSingleton().getPlugin().isVisible( c );
+			show = RelatedContentUISWT.getSingleton().getPlugin().isVisible( c );
 		}
 		
 		return( show );
@@ -515,11 +515,12 @@ SBC_RCMView
 	private void
 	showView()
 	{
-		RelatedContentUI ui = RelatedContentUI.getSingleton();
+		RelatedContentUISWT ui = RelatedContentUISWT.getSingleton();
 		
 		if ( ui != null && !ui.getPlugin().hasFTUXBeenShown()){
 			
-			 RelatedContentUI.showFTUX(getSkinObject("rcm-list"));
+			ui.showFTUX(getSkinObject("rcm-list"));
+			
 		}else{
 			
 			SWTSkinObject so_list = getSkinObject("rcm-list");
@@ -1008,7 +1009,7 @@ SBC_RCMView
 				}
 			});
 
-		RelatedContentUI ui = RelatedContentUI.getSingleton();
+		RelatedContentUISWT ui = RelatedContentUISWT.getSingleton();
 		
 		final Image	swarm_image = ui==null?null:ui.getSwarmImage();
 		
@@ -1048,7 +1049,7 @@ SBC_RCMView
 							
 							int	 i = 0;
 							
-							RelatedContentUI ui = RelatedContentUI.getSingleton();
+							RelatedContentUISWT ui = RelatedContentUISWT.getSingleton();
 							
 							if ( ui != null ){
 								
