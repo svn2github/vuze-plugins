@@ -8,6 +8,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
+import org.parg.azureus.plugins.networks.i2p.I2PHelperDHT;
+
 import net.i2p.data.Destination;
 import net.i2p.data.Hash;
 
@@ -16,7 +18,7 @@ import net.i2p.data.Hash;
  * Stub for KRPC
  * @since 0.8.4
  */
-public interface DHT {
+public interface DHT extends I2PHelperDHT{
 
 
     /**

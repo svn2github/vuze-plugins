@@ -362,7 +362,7 @@ I2PHelperPlugin
 					public void
 					run()
 					{
-						I2PHelperRouter my_router = router = new I2PHelperRouter( false, I2PHelperPlugin.this );
+						I2PHelperRouter my_router = router = new I2PHelperRouter( false, false, I2PHelperPlugin.this );
 						
 						try{
 							if ( ext_i2p_param.getValue()){
@@ -443,7 +443,7 @@ I2PHelperPlugin
 			
 		}else{
 		
-			DHT dht = router.getDHT();
+			I2PHelperDHT dht = router.getDHT();
 			
 			if ( dht == null ){
 				
@@ -804,11 +804,18 @@ I2PHelperPlugin
 			}
 		}
 		
-		boolean bootstrap = args.length > 1 && args[1].equals( "true" );
-		
+		boolean bootstrap 	= args.length > 1 && args[1].equals( "true" );
+				
 		if ( bootstrap ){
 			
 			System.out.println( "Bootstrap Node" );
+		}
+		
+		boolean vuze_dht 	= args.length > 2 && args[2].equals( "true" );
+		
+		if ( vuze_dht ){
+			
+			System.out.println( "Vuze DHT" );
 		}
 		
 		final I2PHelperRouter[] f_router = { null };
@@ -863,7 +870,7 @@ I2PHelperPlugin
 			};
 			
 		try{
-			I2PHelperRouter router = f_router[0] = new I2PHelperRouter( bootstrap, adapter );
+			I2PHelperRouter router = f_router[0] = new I2PHelperRouter( bootstrap, vuze_dht, adapter );
 			
 				// 19817 must be used for bootstrap node
 			

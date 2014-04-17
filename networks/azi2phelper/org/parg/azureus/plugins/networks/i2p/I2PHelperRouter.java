@@ -53,7 +53,9 @@ import net.i2p.router.transport.FIFOBandwidthLimiter;
 
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.DisplayFormatters;
+import org.gudy.azureus2.core3.util.RandomUtils;
 import org.parg.azureus.plugins.networks.i2p.dht.*;
+import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTI2P;
 
 
 public class 
@@ -62,22 +64,25 @@ I2PHelperRouter
 	private static final String 	i2p_host 	= "127.0.0.1";
 
 	private boolean					is_bootstrap_node;
+	private boolean					is_vuze_dht;
 	private I2pHelperAdapter		logger;
 	
 	private static final boolean	FULL_STATS = false;
 	
-	private Router 		router;
-	private I2PSession 	session;
-	private DHT			dht;
+	private Router 			router;
+	private I2PSession 		session;
+	private I2PHelperDHT	dht;
 	
 	private boolean		destroyed;
 	
 	protected
 	I2PHelperRouter(
-		boolean				bootstrap_node,
+		boolean					bootstrap_node,
+		boolean					use_vuze_dht,
 		I2pHelperAdapter		_logger )
 	{
 		is_bootstrap_node	= bootstrap_node;
+		is_vuze_dht			= use_vuze_dht;
 		logger				= _logger;
 	}
 	
@@ -498,42 +503,90 @@ I2PHelperRouter
 		String dht_NID_str 	= dht_props.getProperty( "nid" );
 			
 		boolean	use_existing_nid = dht_port_str != null && dht_NID_str != null;
+			
+		if ( !is_vuze_dht ){
+			
+			KRPC	snark_dht;
+			
+			if ( use_existing_nid ){
 				
-		if ( use_existing_nid ){
+				int	dht_port = Integer.parseInt( dht_port_str );
+				NID	dht_nid	= new NID( Base32.decode( dht_NID_str ));
+		
+				dht = snark_dht = new KRPC( ctx, "i2pvuze", session, dht_port, dht_nid, logger );
+				
+			}else{	
+				
+	    		dht = snark_dht = new KRPC( ctx, "i2pvuze", session, logger );
+	    	}
+						
+			if ( !use_existing_nid ){
+				
+				dht_props.setProperty( "dest", session.getMyDestination().toBase64());
+				dht_props.setProperty( "port", String.valueOf( snark_dht.getPort()));
+				dht_props.setProperty( "nid", Base32.encode( snark_dht.getNID().getData()));
+				
+				writeProperties( dht_config, dht_props );
+			}
 			
-			int	dht_port = Integer.parseInt( dht_port_str );
-			NID	dht_nid	= new NID( Base32.decode( dht_NID_str ));
-	
-			dht = new KRPC( ctx, "i2pvuze", session, dht_port, dht_nid, logger );
-			
-		}else{	
-			
-    		dht = new KRPC( ctx, "i2pvuze", session, logger );
-    	}
+			if ( !is_bootstrap_node ){
+				
+				String 	boot_dest 	= "N0e4jfsxy~NYzyr-0bY1nwpnhTza8fn1wWr6IHHOmaIEnbEvgltJvyJn8LWvwlu589mUPhQXQb9BtMrkEan8RZSL4Vo2iFgMCxjTOnfA2dW1~JpL0ddGM28OQITya-1YDgNZFmyX0Me-~RjJjTg31YNozDoosIQ-Uvz2s5aUrzI0gt0r3M4PFUThb0eefd51Yb-eEQMpBb-Hd~EU07yw46ljy2uP4tiEPlWt0l0YR8nbeH0Eg6i3fCoSVgWpSeRjJ9vJeHvwGymO2rPHCSCPgIVwwyqNYpgkqGWnn9Qg97Wc-zrTBiRJp0Dn4lcYvkbbeBrblZDOy6PnPFp33-WZ7lcaVeR6uNGqphQxCYv8pbti5Q9QYcc6IzYpvzsgDCbIVhuzQ9Px2-l6qVg6S-i-cYwQfxBYnVSyVmryuGSkIha2AezYJk2~0k7-byeJ0q57Re~aZy6boIDa2qtaOyi-RDbCWAoIIfOycwkAvqf5nG8KOVwGzvFEjYuExyP3f9ZlAAAA";
+				int		boot_port 	= 52896;
+				String	boot_nid	= "6d3dh2bwrafjdx4ba46zb6jvbnnt2g3r";
 					
-		if ( !use_existing_nid){
+				NodeInfo ninf = new NodeInfo( new NID( Base32.decode( boot_nid )), new Destination( boot_dest ), boot_port );
+					
+				snark_dht.setBootstrapNode( ninf );
+			}
 			
-			dht_props.setProperty( "dest", session.getMyDestination().toBase64());
-			dht_props.setProperty( "port", String.valueOf( dht.getPort()));
-			dht_props.setProperty( "nid", Base32.encode( dht.getNID().getData()));
+			logger.log( "MyDest: " + session.getMyDestination().toBase64());
+			logger.log( "        " + Base32.encode( session.getMyDestination().calculateHash().getData()).toUpperCase() + ".b32.i2p"  + ", existing=" + use_existing_key );
+			logger.log( "MyNID:  " + Base32.encode( snark_dht.getNID().getData()) + ", existing=" + use_existing_nid );
 			
-			writeProperties( dht_config, dht_props );
-		}
-		
-		if ( !is_bootstrap_node ){
+		}else{
 			
-			String 	boot_dest 	= "N0e4jfsxy~NYzyr-0bY1nwpnhTza8fn1wWr6IHHOmaIEnbEvgltJvyJn8LWvwlu589mUPhQXQb9BtMrkEan8RZSL4Vo2iFgMCxjTOnfA2dW1~JpL0ddGM28OQITya-1YDgNZFmyX0Me-~RjJjTg31YNozDoosIQ-Uvz2s5aUrzI0gt0r3M4PFUThb0eefd51Yb-eEQMpBb-Hd~EU07yw46ljy2uP4tiEPlWt0l0YR8nbeH0Eg6i3fCoSVgWpSeRjJ9vJeHvwGymO2rPHCSCPgIVwwyqNYpgkqGWnn9Qg97Wc-zrTBiRJp0Dn4lcYvkbbeBrblZDOy6PnPFp33-WZ7lcaVeR6uNGqphQxCYv8pbti5Q9QYcc6IzYpvzsgDCbIVhuzQ9Px2-l6qVg6S-i-cYwQfxBYnVSyVmryuGSkIha2AezYJk2~0k7-byeJ0q57Re~aZy6boIDa2qtaOyi-RDbCWAoIIfOycwkAvqf5nG8KOVwGzvFEjYuExyP3f9ZlAAAA";
-			int		boot_port 	= 52896;
-			String	boot_nid	= "6d3dh2bwrafjdx4ba46zb6jvbnnt2g3r";
+			int		dht_port;
+			NID		dht_nid;
+			
+			if ( use_existing_nid ){
 				
-			NodeInfo ninf = new NodeInfo( new NID( Base32.decode( boot_nid )), new Destination( boot_dest ), boot_port );
+				dht_port = Integer.parseInt( dht_port_str );
+				dht_nid	= new NID( Base32.decode( dht_NID_str ));
+
+			}else{
 				
-			dht.setBootstrapNode( ninf );
+				dht_port = 10000 + RandomUtils.nextInt( 65535 - 10000 );
+				dht_nid = NodeInfo.generateNID(session.getMyDestination().calculateHash(), dht_port, ctx.random());
+				
+				dht_props.setProperty( "dest", session.getMyDestination().toBase64());
+				dht_props.setProperty( "port", String.valueOf( dht_port ));
+				dht_props.setProperty( "nid", Base32.encode( dht_nid.getData()));
+				
+				writeProperties( dht_config, dht_props );
+			}
+			
+			dht = new DHTI2P(
+					config_dir,
+					session,
+					dht_port,
+					dht_nid );
+			
+			if ( !is_bootstrap_node ){
+				
+				String 	boot_dest 	= "N0e4jfsxy~NYzyr-0bY1nwpnhTza8fn1wWr6IHHOmaIEnbEvgltJvyJn8LWvwlu589mUPhQXQb9BtMrkEan8RZSL4Vo2iFgMCxjTOnfA2dW1~JpL0ddGM28OQITya-1YDgNZFmyX0Me-~RjJjTg31YNozDoosIQ-Uvz2s5aUrzI0gt0r3M4PFUThb0eefd51Yb-eEQMpBb-Hd~EU07yw46ljy2uP4tiEPlWt0l0YR8nbeH0Eg6i3fCoSVgWpSeRjJ9vJeHvwGymO2rPHCSCPgIVwwyqNYpgkqGWnn9Qg97Wc-zrTBiRJp0Dn4lcYvkbbeBrblZDOy6PnPFp33-WZ7lcaVeR6uNGqphQxCYv8pbti5Q9QYcc6IzYpvzsgDCbIVhuzQ9Px2-l6qVg6S-i-cYwQfxBYnVSyVmryuGSkIha2AezYJk2~0k7-byeJ0q57Re~aZy6boIDa2qtaOyi-RDbCWAoIIfOycwkAvqf5nG8KOVwGzvFEjYuExyP3f9ZlAAAA";
+				int		boot_port 	= 52896;
+				String	boot_nid	= "6d3dh2bwrafjdx4ba46zb6jvbnnt2g3r";
+					
+				NodeInfo ninf = new NodeInfo( new NID( Base32.decode( boot_nid )), new Destination( boot_dest ), boot_port );
+					
+				dht.setBootstrapNode( ninf );
+			}
+			
+			logger.log( "MyDest: " + session.getMyDestination().toBase64());
+			logger.log( "        " + Base32.encode( session.getMyDestination().calculateHash().getData()).toUpperCase() + ".b32.i2p"  + ", existing=" + use_existing_key );
+			logger.log( "MyNID:  " + Base32.encode( dht_nid.getData()) + ", existing=" + use_existing_nid );
 		}
-		
-		logger.log( "MyDest: " + session.getMyDestination().toBase64());
-		logger.log( "        " + Base32.encode( session.getMyDestination().calculateHash().getData()).toUpperCase() + ".b32.i2p"  + ", existing=" + use_existing_key );
-		logger.log( "MyNID:  " + Base32.encode( dht.getNID().getData()) + ", existing=" + use_existing_nid );
 	}
 	
 	public Destination
@@ -545,7 +598,7 @@ I2PHelperRouter
 		return( session.lookupDest( new Hash( hash ), 30*1000 ));
 	}
 	
-	protected DHT
+	protected I2PHelperDHT
 	getDHT()
 	{
 		return( dht );
@@ -587,8 +640,8 @@ I2PHelperRouter
 	protected void
 	logInfo()
 	{
-		DHT		dht		= this.dht;
-		Router router 	= this.router;
+		I2PHelperDHT	dht		= this.dht;
+		Router 			router 	= this.router;
 		
 		if ( dht == null ){
 			

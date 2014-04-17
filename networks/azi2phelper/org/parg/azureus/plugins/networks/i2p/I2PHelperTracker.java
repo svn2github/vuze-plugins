@@ -32,11 +32,11 @@ import org.parg.azureus.plugins.networks.i2p.dht.DHT;
 public class 
 I2PHelperTracker 
 {
-	private DHT			dht;
+	private I2PHelperDHT			dht;
 	
 	protected
 	I2PHelperTracker(
-		DHT		_dht )
+		I2PHelperDHT		_dht )
 	{
 		dht		= _dht;
 	}
