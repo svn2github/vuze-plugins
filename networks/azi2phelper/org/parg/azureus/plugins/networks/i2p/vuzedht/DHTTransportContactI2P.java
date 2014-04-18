@@ -69,6 +69,12 @@ DHTTransportContactI2P
 		id		= node.getNID().getData();
 	}
 	
+	protected NodeInfo
+	getNode()
+	{
+		return( node );
+	}
+	
 	public int
 	getMaxFailForLiveCount()
 	{
@@ -176,6 +182,8 @@ DHTTransportContactI2P
 		DHTTransportReplyHandler	handler )
 	{
 		System.out.println( "sendPing" );
+		
+		transport.sendPing( handler, this );
 	}
 	
 	public void
@@ -265,7 +273,7 @@ DHTTransportContactI2P
 	public void
 	remove()
 	{
-		
+		transport.removeContact( this );
 	}
 	
 	public void

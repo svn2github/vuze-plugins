@@ -50,6 +50,8 @@ DHTI2P
 {
 	public static final int		DHT_NETWORK		= 10;
 	
+	private static final int	REQUEST_TIMEOUT	= 45*1000;
+			
 	private DHT 						dht;
 	private DHTTransportI2P				transport;
 	private DHTPluginStorageManager 	storage_manager;
@@ -70,7 +72,7 @@ DHTI2P
 		
 		storage_manager = new DHTPluginStorageManager( DHT_NETWORK, this, storage_dir );
 
-		transport = new DHTTransportI2P( session, my_node );
+		transport = new DHTTransportI2P( session, my_node,REQUEST_TIMEOUT );
 				
 		Properties	props = new Properties();
 		
@@ -223,6 +225,8 @@ DHTI2P
 		storage_manager.exportContacts( dht );
 		
 		dht.destroy();
+		
+		transport.destroy();
 	}
 	
 	public void
