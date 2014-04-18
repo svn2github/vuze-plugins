@@ -57,11 +57,7 @@ I2PHelperDHT
 		long			maxWait, 
 		int 			annMax, 
 		long 			annMaxWait );
-	
-	public void
-	setBootstrapNode(
-		NodeInfo		node );
-	
+		
 	public void
 	requestBootstrap();
 	

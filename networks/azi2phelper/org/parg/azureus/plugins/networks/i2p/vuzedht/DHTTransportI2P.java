@@ -22,14 +22,19 @@
 package org.parg.azureus.plugins.networks.i2p.vuzedht;
 
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
 import org.parg.azureus.plugins.networks.i2p.dht.NID;
+import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 
 import net.i2p.client.I2PSession;
 import net.i2p.client.I2PSessionMuxedListener;
 import net.i2p.data.Base32;
+import net.i2p.data.DataFormatException;
+import net.i2p.data.Destination;
+import net.i2p.data.Hash;
 
 import com.aelitis.azureus.core.dht.transport.DHTTransport;
 import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
@@ -49,6 +54,7 @@ DHTTransportI2P
 	private static final byte PROTOCOL_VERSION_MIN	= 1;
 	
 	private I2PSession					session;
+	private NodeInfo					my_node;
 	private int							query_port;
 	private int							reply_port;
 	private NID							my_nid;
@@ -64,26 +70,35 @@ DHTTransportI2P
 	protected
 	DHTTransportI2P(
 		I2PSession 		_session,
-		int				_query_port,
-		NID				_my_nid )
+		NodeInfo		_my_node )
 	{
 		session 	= _session;
-		query_port	= _query_port;
+		my_node		= _my_node;
+		
+		query_port	= my_node.getPort();
 		reply_port	= query_port+1;
-		my_nid		= _my_nid;
+		my_nid		= my_node.getNID();
 		
 		stats = new DHTTransportStatsI2P();
-		
-		String my_host = Base32.encode(session.getMyDestination().calculateHash().getData()) + ".b32.i2p";
-		
-		InetSocketAddress address = InetSocketAddress.createUnresolved( my_host, query_port );
-		
-		local_contact = new DHTTransportContactI2P( this, address, my_nid.getData());
+				
+		local_contact = new DHTTransportContactI2P( this, my_node );
 		
         session.addMuxedSessionListener( this, I2PSession.PROTO_DATAGRAM_RAW, reply_port );
         session.addMuxedSessionListener( this, I2PSession.PROTO_DATAGRAM, query_port );
 	}
+	
+	protected DHTTransportContactI2P
+	importContact(
+		NodeInfo		node,
+		boolean			is_bootstrap )
+	{
+		DHTTransportContactI2P	contact = new DHTTransportContactI2P( this, node );
 		
+		request_handler.contactImported( contact, is_bootstrap );
+		
+		return( contact );
+	}
+	
     public void 
     messageAvailable(
     	I2PSession 		session, 
@@ -207,6 +222,37 @@ DHTTransportI2P
 		timeout	= millis;
 	}
 	
+	protected void
+	exportContact(
+		DataOutputStream		os,
+		NodeInfo				node )
+		
+		throws IOException, DHTTransportException
+	{
+		os.writeByte( 0 );	// version
+		
+		DHTUtilsI2P.serialiseByteArray( os, node.getNID().getData(), 255 );
+		
+		os.writeInt( node.getPort());
+		
+		DHTUtilsI2P.serialiseByteArray( os, node.getHash().getData(), 255 );
+			
+		Destination dest = node.getDestination();
+		
+		byte[] b_dest;
+		
+		if ( dest == null ){
+			
+			b_dest = new byte[0];
+			
+		}else{
+			
+			b_dest = dest.toByteArray();
+		}
+		
+		DHTUtilsI2P.serialiseByteArray( os, b_dest, 255 );
+	}
+	
 	public DHTTransportContact
 	importContact(
 		DataInputStream		is,
@@ -214,7 +260,38 @@ DHTTransportI2P
 	
 		throws IOException, DHTTransportException
 	{
-		return( null );
+		is.readByte();
+		
+		byte[]	b_nid = DHTUtilsI2P.deserialiseByteArray( is, 255 );
+		
+		int port = is.readInt();
+		
+		byte[]	b_hash = DHTUtilsI2P.deserialiseByteArray( is, 255 );
+
+		byte[]	b_dest = DHTUtilsI2P.deserialiseByteArray( is, 255 );
+
+		NodeInfo node;
+		
+		if ( b_dest.length == 0 ){
+			
+			node = new NodeInfo( new NID(b_nid), new Hash( b_hash ), port );
+			
+		}else{
+			
+			Destination dest = new Destination();
+			
+			try{
+				dest.fromByteArray( b_dest );
+			
+			}catch( DataFormatException e ){
+				
+				throw( new IOException( e ));
+			}
+			
+			node = new NodeInfo( new NID(b_nid), dest, port );
+		}
+		
+		return( new DHTTransportContactI2P( this, node ));
 	}
 	
 	public void

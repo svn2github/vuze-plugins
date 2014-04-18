@@ -504,6 +504,14 @@ I2PHelperRouter
 			
 		boolean	use_existing_nid = dht_port_str != null && dht_NID_str != null;
 			
+		
+		String 	boot_dest 	= "N0e4jfsxy~NYzyr-0bY1nwpnhTza8fn1wWr6IHHOmaIEnbEvgltJvyJn8LWvwlu589mUPhQXQb9BtMrkEan8RZSL4Vo2iFgMCxjTOnfA2dW1~JpL0ddGM28OQITya-1YDgNZFmyX0Me-~RjJjTg31YNozDoosIQ-Uvz2s5aUrzI0gt0r3M4PFUThb0eefd51Yb-eEQMpBb-Hd~EU07yw46ljy2uP4tiEPlWt0l0YR8nbeH0Eg6i3fCoSVgWpSeRjJ9vJeHvwGymO2rPHCSCPgIVwwyqNYpgkqGWnn9Qg97Wc-zrTBiRJp0Dn4lcYvkbbeBrblZDOy6PnPFp33-WZ7lcaVeR6uNGqphQxCYv8pbti5Q9QYcc6IzYpvzsgDCbIVhuzQ9Px2-l6qVg6S-i-cYwQfxBYnVSyVmryuGSkIha2AezYJk2~0k7-byeJ0q57Re~aZy6boIDa2qtaOyi-RDbCWAoIIfOycwkAvqf5nG8KOVwGzvFEjYuExyP3f9ZlAAAA";
+		int		boot_port 	= 52896;
+		String	boot_nid	= "6d3dh2bwrafjdx4ba46zb6jvbnnt2g3r";
+			
+		NodeInfo boot_ninf = new NodeInfo( new NID( Base32.decode( boot_nid )), new Destination( boot_dest ), boot_port );
+
+		
 		if ( !is_vuze_dht ){
 			
 			KRPC	snark_dht;
@@ -530,14 +538,8 @@ I2PHelperRouter
 			}
 			
 			if ( !is_bootstrap_node ){
-				
-				String 	boot_dest 	= "N0e4jfsxy~NYzyr-0bY1nwpnhTza8fn1wWr6IHHOmaIEnbEvgltJvyJn8LWvwlu589mUPhQXQb9BtMrkEan8RZSL4Vo2iFgMCxjTOnfA2dW1~JpL0ddGM28OQITya-1YDgNZFmyX0Me-~RjJjTg31YNozDoosIQ-Uvz2s5aUrzI0gt0r3M4PFUThb0eefd51Yb-eEQMpBb-Hd~EU07yw46ljy2uP4tiEPlWt0l0YR8nbeH0Eg6i3fCoSVgWpSeRjJ9vJeHvwGymO2rPHCSCPgIVwwyqNYpgkqGWnn9Qg97Wc-zrTBiRJp0Dn4lcYvkbbeBrblZDOy6PnPFp33-WZ7lcaVeR6uNGqphQxCYv8pbti5Q9QYcc6IzYpvzsgDCbIVhuzQ9Px2-l6qVg6S-i-cYwQfxBYnVSyVmryuGSkIha2AezYJk2~0k7-byeJ0q57Re~aZy6boIDa2qtaOyi-RDbCWAoIIfOycwkAvqf5nG8KOVwGzvFEjYuExyP3f9ZlAAAA";
-				int		boot_port 	= 52896;
-				String	boot_nid	= "6d3dh2bwrafjdx4ba46zb6jvbnnt2g3r";
-					
-				NodeInfo ninf = new NodeInfo( new NID( Base32.decode( boot_nid )), new Destination( boot_dest ), boot_port );
-					
-				snark_dht.setBootstrapNode( ninf );
+									
+				snark_dht.setBootstrapNode( boot_ninf );
 			}
 			
 			logger.log( "MyDest: " + session.getMyDestination().toBase64());
@@ -566,23 +568,10 @@ I2PHelperRouter
 				writeProperties( dht_config, dht_props );
 			}
 			
-			dht = new DHTI2P(
-					config_dir,
-					session,
-					dht_port,
-					dht_nid );
-			
-			if ( !is_bootstrap_node ){
-				
-				String 	boot_dest 	= "N0e4jfsxy~NYzyr-0bY1nwpnhTza8fn1wWr6IHHOmaIEnbEvgltJvyJn8LWvwlu589mUPhQXQb9BtMrkEan8RZSL4Vo2iFgMCxjTOnfA2dW1~JpL0ddGM28OQITya-1YDgNZFmyX0Me-~RjJjTg31YNozDoosIQ-Uvz2s5aUrzI0gt0r3M4PFUThb0eefd51Yb-eEQMpBb-Hd~EU07yw46ljy2uP4tiEPlWt0l0YR8nbeH0Eg6i3fCoSVgWpSeRjJ9vJeHvwGymO2rPHCSCPgIVwwyqNYpgkqGWnn9Qg97Wc-zrTBiRJp0Dn4lcYvkbbeBrblZDOy6PnPFp33-WZ7lcaVeR6uNGqphQxCYv8pbti5Q9QYcc6IzYpvzsgDCbIVhuzQ9Px2-l6qVg6S-i-cYwQfxBYnVSyVmryuGSkIha2AezYJk2~0k7-byeJ0q57Re~aZy6boIDa2qtaOyi-RDbCWAoIIfOycwkAvqf5nG8KOVwGzvFEjYuExyP3f9ZlAAAA";
-				int		boot_port 	= 52896;
-				String	boot_nid	= "6d3dh2bwrafjdx4ba46zb6jvbnnt2g3r";
-					
-				NodeInfo ninf = new NodeInfo( new NID( Base32.decode( boot_nid )), new Destination( boot_dest ), boot_port );
-					
-				dht.setBootstrapNode( ninf );
-			}
-			
+			NodeInfo my_node_info = new NodeInfo( dht_nid, session.getMyDestination(), dht_port );
+
+			dht = new DHTI2P( config_dir, session, my_node_info, is_bootstrap_node?null:boot_ninf );
+						
 			logger.log( "MyDest: " + session.getMyDestination().toBase64());
 			logger.log( "        " + Base32.encode( session.getMyDestination().calculateHash().getData()).toUpperCase() + ".b32.i2p"  + ", existing=" + use_existing_key );
 			logger.log( "MyNID:  " + Base32.encode( dht_nid.getData()) + ", existing=" + use_existing_nid );

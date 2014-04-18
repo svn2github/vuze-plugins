@@ -26,6 +26,12 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.List;
 
+import net.i2p.data.Base32;
+import net.i2p.data.Destination;
+
+import org.gudy.azureus2.core3.util.Debug;
+import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
+
 import com.aelitis.azureus.core.dht.netcoords.DHTNetworkPosition;
 import com.aelitis.azureus.core.dht.transport.DHTTransport;
 import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
@@ -39,7 +45,10 @@ DHTTransportContactI2P
 	implements DHTTransportContact
 {
 	private DHTTransportI2P		transport;
+	
+	private NodeInfo			node;
 	private InetSocketAddress	address;
+	
 	private byte[]				id;
 	
 	
@@ -48,12 +57,16 @@ DHTTransportContactI2P
 	protected
 	DHTTransportContactI2P(
 		DHTTransportI2P		_transport,
-		InetSocketAddress	_address,
-		byte[]				_id )
+		NodeInfo			_node )
 	{
 		transport 	= _transport;
-		address		= _address;
-		id			= _id;
+		node		= _node;
+		
+		String 	host = Base32.encode( node.getHash().getData())  + ".b32.i2p";
+		
+		address = InetSocketAddress.createUnresolved( host, node.getPort());
+
+		id		= node.getNID().getData();
 	}
 	
 	public int
@@ -133,6 +146,8 @@ DHTTransportContactI2P
 	isAlive(
 		long		timeout )
 	{
+		System.out.println( "isAlive" );
+		
 		return( true );	// derp
 	}
 
@@ -141,7 +156,7 @@ DHTTransportContactI2P
 		DHTTransportReplyHandler	handler,
 		long						timeout )
 	{
-		
+		System.out.println( "isAlive2" );
 	}
 	
 	public boolean
@@ -160,7 +175,7 @@ DHTTransportContactI2P
 	sendPing(
 		DHTTransportReplyHandler	handler )
 	{
-		
+		System.out.println( "sendPing" );
 	}
 	
 	public void
@@ -168,14 +183,18 @@ DHTTransportContactI2P
 		DHTTransportReplyHandler	handler,
 		long						timeout )
 	{
+		Debug.out( "Not Supported" );
 		
+		handler.failed( this, new Exception( "Not Supported" ));
 	}
 
 	public void
 	sendStats(
 		DHTTransportReplyHandler	handler )
 	{
+		Debug.out( "Not Supported" );
 		
+		handler.failed( this, new Exception( "Not Supported" ));
 	}
 	
 	public void
@@ -185,7 +204,7 @@ DHTTransportContactI2P
 		DHTTransportValue[][]		value_sets,
 		boolean						immediate )
 	{
-		
+		System.out.println( "sendStore" );
 	}
 	
 	public void
@@ -194,7 +213,9 @@ DHTTransportContactI2P
 		int							header_length,
 		List<Object[]>				key_details )
 	{
+		Debug.out( "Not Supported" );
 		
+		handler.failed( this, new Exception( "Not Supported" ));
 	}
 	
 	public void
@@ -202,7 +223,7 @@ DHTTransportContactI2P
 		DHTTransportReplyHandler	handler,
 		byte[]						id )
 	{
-		
+		System.out.println( "sendFindNode" );
 	}
 		
 	public void
@@ -212,7 +233,7 @@ DHTTransportContactI2P
 		int							max_values,
 		byte						flags )
 	{
-		
+		System.out.println( "sendFindValue" );
 	}
 		
 	public void
@@ -221,7 +242,9 @@ DHTTransportContactI2P
 		byte[]						key_block_request,
 		byte[]						key_block_signature )
 	{
+		Debug.out( "Not Supported" );
 		
+		handler.failed( this, new Exception( "Not Supported" ));	
 	}
 
 	public DHTTransportFullStats
@@ -236,7 +259,7 @@ DHTTransportContactI2P
 	
 		throws IOException, DHTTransportException
 	{
-			
+		transport.exportContact( os, node );
 	}
 	
 	public void

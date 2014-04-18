@@ -58,8 +58,8 @@ DHTI2P
 	DHTI2P(
 		File			dir,
 		I2PSession		session,
-		int				port,
-		NID				nid )
+		NodeInfo		my_node,
+		NodeInfo		boot_node )
 	{
 		File storage_dir = new File( dir, "dhtdata");
 		
@@ -70,7 +70,7 @@ DHTI2P
 		
 		storage_manager = new DHTPluginStorageManager( DHT_NETWORK, this, storage_dir );
 
-		transport = new DHTTransportI2P( session, port, nid );
+		transport = new DHTTransportI2P( session, my_node );
 				
 		Properties	props = new Properties();
 		
@@ -87,8 +87,15 @@ DHTI2P
 		
 		storage_manager.importContacts( dht );
 		
+		DHTTransportContactI2P boot_contact = boot_node==null?null:transport.importContact( boot_node, true );
+		
 		dht.integrate( false );
 		
+		if ( boot_contact != null ){
+		
+			boot_contact.remove();
+		}
+			
 		final int timer_period 	= 15*1000;
 		final int save_period	= 2*60*1000;
 		final int save_ticks	= save_period / timer_period;
