@@ -28,6 +28,7 @@ import java.util.List;
 
 import net.i2p.data.Base32;
 
+import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
 import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 
@@ -43,7 +44,7 @@ public class
 DHTTransportContactI2P 
 	implements DHTTransportContact
 {
-	private static byte[]	DEFAULT_TOKEN = {};
+	protected static byte[]	DEFAULT_TOKEN = {};
 	
 	private DHTTransportI2P		transport;
 	
@@ -237,7 +238,7 @@ DHTTransportContactI2P
 		DHTTransportValue[][]		value_sets,
 		boolean						immediate )
 	{
-		System.out.println( "sendStore" );
+		transport.sendStore( handler, this, keys, value_sets );
 	}
 	
 	public void
@@ -254,9 +255,10 @@ DHTTransportContactI2P
 	public void
 	sendFindNode(
 		DHTTransportReplyHandler	handler,
-		byte[]						id )
+		byte[]						id,
+		short						flags )
 	{		
-		transport.sendFindNode( handler, this, id );
+		transport.sendFindNode( handler, this, id, flags );
 	}
 		
 	public void
@@ -264,7 +266,7 @@ DHTTransportContactI2P
 		DHTTransportReplyHandler	handler,
 		byte[]						key,
 		int							max_values,
-		byte						flags )
+		short						flags )
 	{
 		transport.sendFindValue( handler, this, key );
 	}
@@ -329,6 +331,6 @@ DHTTransportContactI2P
 	public String
 	getString()
 	{
-		return( getName());
+		return( getName() + ",nid=" + ByteFormatter.encodeString( node.getNID().getData()));
 	}
 }

@@ -26,6 +26,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -34,6 +35,7 @@ import java.util.Map;
 
 import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.BEncoder;
+import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.HashWrapper;
 import org.gudy.azureus2.core3.util.RandomUtils;
@@ -63,6 +65,7 @@ import com.aelitis.azureus.core.dht.transport.DHTTransportFindValueReply;
 import com.aelitis.azureus.core.dht.transport.DHTTransportListener;
 import com.aelitis.azureus.core.dht.transport.DHTTransportProgressListener;
 import com.aelitis.azureus.core.dht.transport.DHTTransportReplyHandler;
+import com.aelitis.azureus.core.dht.transport.DHTTransportReplyHandlerAdapter;
 import com.aelitis.azureus.core.dht.transport.DHTTransportRequestHandler;
 import com.aelitis.azureus.core.dht.transport.DHTTransportStats;
 import com.aelitis.azureus.core.dht.transport.DHTTransportTransferHandler;
@@ -465,80 +468,127 @@ DHTTransportI2P
 	sendFindNode(
 		final DHTTransportReplyHandler		handler,
 		final DHTTransportContactI2P		contact,
-		byte[]								target )
+		byte[]								target,
+		short								flags )
 	{
-		System.out.println( "sendFindNode" );
+		System.out.println( "sendFindNode, flags=" + flags );
 		
-		try{
-	        stats.findNodeSent( null );
-
-	        Map<String, Object> map = new HashMap<String, Object>();
-	        
-	        map.put( "q", "find_node" );
-	        
-	        Map<String, Object> args = new HashMap<String, Object>();
-	        
-	        map.put( "a", args );
-	        
-	        args.put( "target", target );
-	        
-	        sendQuery( 
-	        	new ReplyHandler()
-	        	{
-	        		@Override
-	        		public void 
-	        		handleReply(
-	        			Map reply ) 
-	        		{
-	        			System.out.println( "good findNodeReply: " + reply );
-	        				        			
-	        			/* no token on findNode
-	        			byte[]	token = (byte[])reply.get( "token" );
-	        			if ( token != null ){
-	        			}
-	        			*/
-	        			
-	        			byte[]	nodes = (byte[])reply.get( "nodes" );
-	        			
-	        			DHTTransportContactI2P[]	contacts  = new DHTTransportContactI2P[nodes.length/NodeInfo.LENGTH];
-	        			
-	        			int	pos = 0;
-	        			
-	        			for ( int off = 0; off < nodes.length; off += NodeInfo.LENGTH ){
-	        				
-	        				NodeInfo node = new NodeInfo( nodes, off );
-	        				
-	        				contacts[pos++] = new DHTTransportContactI2P( DHTTransportI2P.this, node );
-	        			}
-	        			
-	        			handler.findNodeReply( contact, contacts );
-	        			
-	        			stats.findNodeOK();
-	        		}
-	        		
-	        		@Override
-	        		public void 
-	        		handleError(
-	        			DHTTransportException error) 
-	        		{
-	        			System.out.println( "error findNodeReply: " + Debug.getNestedExceptionMessage( error ));
-
-	        			handler.failed( contact, error );
-	        			
-	        			stats.findNodeFailed();
-	        		}
-	        	}, 
-	        	contact, map, true );
-	        	        
-		}catch( Throwable e ){
+		if (( flags & DHT.FLAG_LOOKUP_FOR_STORE ) != 0 ){
 			
-			if ( e instanceof DHTTransportException ){
+				// only way tokens get allocated is via findValue (get_peers)
+				// so we frig this by creating an obfuscated derived key that really shouldn't
+				// happen to return anything other than peers...
+			
+			byte[] new_target = new byte[target.length];
+						
+			RandomUtils.nextBytes( new_target );
+			
+			System.arraycopy( target, 0, new_target, 0, target.length - 8 );
+			
+			sendFindValue( 
+				new DHTTransportReplyHandlerAdapter()
+				{
+					public void
+					findValueReply(
+						DHTTransportContact 	contact,
+						DHTTransportValue[]		values,
+						byte					diversification_type,
+						boolean					more_to_come )
+					{
+						handler.findNodeReply( contact, new DHTTransportContact[0] );
+					}
+					
+					public void
+					findValueReply(
+						DHTTransportContact 	contact,
+						DHTTransportContact[]	contacts )
+					{
+						handler.findNodeReply( contact, contacts );
+					}
+					
+					public void 
+					failed(
+						DHTTransportContact 	contact,
+						Throwable 				error) 
+					{
+						handler.failed( contact, error );
+					}
+				},
+				contact,
+				new_target );
+			
+		}else{
+			try{
+		        stats.findNodeSent( null );
+	
+		        Map<String, Object> map = new HashMap<String, Object>();
+		        
+		        map.put( "q", "find_node" );
+		        
+		        Map<String, Object> args = new HashMap<String, Object>();
+		        
+		        map.put( "a", args );
+		        
+		        args.put( "target", target );
+		        
+		        sendQuery( 
+		        	new ReplyHandler()
+		        	{
+		        		@Override
+		        		public void 
+		        		handleReply(
+		        			Map reply ) 
+		        		{
+		        			System.out.println( "good findNodeReply: " + reply );
+		        				        			
+		        			/* no token on findNode
+		        			byte[]	token = (byte[])reply.get( "token" );
+		        			if ( token != null ){
+		        			}
+		        			*/
+		        			
+		        			byte[]	nodes = (byte[])reply.get( "nodes" );
+		        			
+		        			DHTTransportContactI2P[]	contacts  = new DHTTransportContactI2P[nodes.length/NodeInfo.LENGTH];
+		        			
+		        			int	pos = 0;
+		        			
+		        			for ( int off = 0; off < nodes.length; off += NodeInfo.LENGTH ){
+		        				
+		        				NodeInfo node = new NodeInfo( nodes, off );
+		        				
+		        				contacts[pos++] = new DHTTransportContactI2P( DHTTransportI2P.this, node );
+		        			}
+		        			
+		        			handler.findNodeReply( contact, contacts );
+		        			
+		        			stats.findNodeOK();
+		        		}
+		        		
+		        		@Override
+		        		public void 
+		        		handleError(
+		        			DHTTransportException error) 
+		        		{
+		        			System.out.println( "error findNodeReply: " + Debug.getNestedExceptionMessage( error ));
+	
+		        			handler.failed( contact, error );
+		        			
+		        			stats.findNodeFailed();
+		        		}
+		        	}, 
+		        	contact, map, true );
+		        	        
+			}catch( Throwable e ){
 				
-				handler.failed( contact, (DHTTransportException)e) ;
-				
-			}else{
-				
-				handler.failed( contact, new DHTTransportException( "findNode failed", e )) ;
+				if ( e instanceof DHTTransportException ){
+					
+					handler.failed( contact, (DHTTransportException)e) ;
+					
+				}else{
+					
+					handler.failed( contact, new DHTTransportException( "findNode failed", e )) ;
+				}
 			}
 		}
     }
@@ -584,7 +634,7 @@ DHTTransportI2P
 		final DHTTransportContactI2P		contact,
 		byte[]								target )
 	{
-		System.out.println( "sendFindValue" );
+		System.out.println( "sendFindValue: contact=" + contact.getString() + ", target=" + ByteFormatter.encodeString( target ));
 		
 		try{
 	        stats.findValueSent( null );
@@ -718,9 +768,22 @@ DHTTransportI2P
 			
 			List<byte[]>	peers = new ArrayList<byte[]>( values.length );
 			
+				// Snark removes the peer itself from the list returned so a peer can't read its own
+				// values stored at a node. This in itself isn't so bad, but what is worse is that
+				// Snark will end up returning "nodes" if there was only the one value stored which
+				// results in an exhaustive search by the caller in the case where there is only
+				// one announcer.... I'm not going to do this
+			
+			byte[]	caller_hash = originator.getNode().getHash().getData();
+			
 			for ( DHTTransportValue value: values ){
 				
-				peers.add( value.getValue());
+				byte[]	peer_hash = value.getValue();
+				
+				if ( !Arrays.equals( caller_hash, peer_hash )){
+					
+					peers.add( value.getValue());
+				}
 			}
 			
 			resps.put( "values", peers );
@@ -742,6 +805,102 @@ DHTTransportI2P
 		System.out.println( "    findValue->" + map);
 
 		sendResponse( originator, message_id, map );
+	}
+	
+	protected void
+	sendStore(
+		final DHTTransportReplyHandler	handler,
+		final DHTTransportContactI2P	contact,
+		byte[][]						keys,
+		DHTTransportValue[][]			value_sets )
+	{
+		byte[]	token = contact.getRandomID2();
+		
+		System.out.println( "sendStore: keys=" + keys.length + ", token=" + token + ", contact=" + contact.getString());
+		
+		try{
+			if ( token == null || token == DHTTransportContactI2P.DEFAULT_TOKEN ){
+
+				throw( new DHTTransportException( "No token available for store operation" ));
+			}
+
+			stats.storeSent( null );
+
+			for ( int i=0;i<keys.length;i++){
+
+				final boolean	report_result = (i==keys.length-1);
+
+				try{
+					Map<String, Object> map = new HashMap<String, Object>();
+
+					map.put( "q", "announce_peer" );
+
+					Map<String, Object> args = new HashMap<String, Object>();
+
+					map.put( "a", args );
+
+					System.out.println( "   storeKey: " + ByteFormatter.encodeString( keys[i] ));
+					
+					args.put( "info_hash", keys[i] );
+
+					args.put( "port", 6881 );		// not used but for completeness
+
+					args.put( "token", token );
+
+					sendQuery( 
+							new ReplyHandler()
+							{
+								@Override
+								public void 
+								handleReply(
+									Map 	reply ) 
+								{
+									System.out.println( "good sendStoreReply" );
+
+									if ( report_result ){
+
+										handler.storeReply( contact, new byte[]{ DHT.DT_NONE });
+
+										stats.storeOK();
+									}
+								}
+
+								@Override
+								public void 
+								handleError(
+										DHTTransportException error) 
+								{
+									System.out.println( "error sendStoreReply: " + Debug.getNestedExceptionMessage( error ));
+
+									if ( report_result ){
+
+										handler.failed( contact, error );
+
+										stats.storeFailed();
+									}
+								}
+							}, 
+							contact, map, false );		// NOT repliable. Note however that we still get a reply as the target has (or should have) our dest cached against the token...
+
+				}catch( Throwable e ){
+
+					if ( report_result ){
+
+						throw( e );
+					}
+				}
+			}     
+		}catch( Throwable e ){
+
+			if ( e instanceof DHTTransportException ){
+
+				handler.failed( contact, (DHTTransportException)e) ;
+
+			}else{
+
+				handler.failed( contact, new DHTTransportException( "sendStore failed", e )) ;
+			}
+		}	
 	}
 	
 	private void
@@ -826,12 +985,10 @@ DHTTransportI2P
 	    	port++;
 	    }
 	    
-	    if ( repliable ){
-	    	
-	    	synchronized( requests ){
+    	
+    	synchronized( requests ){
 	    		
-	    		requests.put( new HashWrapper( msg_id ), new Request( handler ));
-	    	}
+    		requests.put( new HashWrapper( msg_id ), new Request( handler ));
 	    }
 	    
 	    boolean	ok = false;
@@ -843,7 +1000,7 @@ DHTTransportI2P
 	    	
 	    }finally{
 	    	
-	    	if ( repliable && !ok ){
+	    	if ( !ok ){
 	    	
 	    		synchronized( requests ){
 	    		
@@ -891,7 +1048,7 @@ DHTTransportI2P
     sendMessage(
     	Destination 			dest, 
     	int 					toPort, 
-    	Map<String, Object> 	map, 
+    	Map					 	map, 
     	boolean 				repliable ) 
     	
     	throws Exception

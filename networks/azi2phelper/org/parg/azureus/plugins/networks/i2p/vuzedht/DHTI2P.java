@@ -87,6 +87,7 @@ DHTI2P
 		
 		props.put( DHT.PR_CACHE_REPUBLISH_INTERVAL, 	new Integer( 0 ));	// disabled :(
 		props.put( DHT.PR_ORIGINAL_REPUBLISH_INTERVAL, 	new Integer( 40*60*1000 ));
+		props.put( DHT.PR_ENCODE_KEYS, 					0 );		// raw keys, no sha1'ing them
 
 		/*
 		int		K 		= getProp( PR_CONTACTS_PER_NODE, 			DHTControl.K_DEFAULT );
@@ -220,7 +221,7 @@ DHTI2P
 		
 		dht.get(	ih,
 					"Get for " + ByteFormatter.encodeString( ih ),
-					DHT.FLAG_RAW_KEY,
+					DHT.FLAG_NONE,
 					max,
 					maxWait,
 					false,
@@ -236,8 +237,9 @@ DHTI2P
 						@Override
 						public void searching(DHTTransportContact contact, int level,
 								int active_searches) {
-							// TODO Auto-generated method stub
 							
+							System.out.println( "get - searching " + contact.getName() + ", level=" + level );
+
 						}
 						
 						@Override
@@ -286,44 +288,45 @@ DHTI2P
 		dht.put(	ih,
 					"Put for " + ByteFormatter.encodeString( ih ),
 					new byte[1],
-					DHT.FLAG_RAW_KEY,
+					DHT.FLAG_NONE,
 					new DHTOperationListener() {
 						
 						@Override
 						public void wrote(DHTTransportContact contact, DHTTransportValue value) {
-							// TODO Auto-generated method stub
-							
+							System.out.println( "put - wrote to " + contact.getName());
+
+							result.add(((DHTTransportContactI2P)contact).getNode().getHash());
 						}
 						
 						@Override
 						public void searching(DHTTransportContact contact, int level,
 								int active_searches) {
-							// TODO Auto-generated method stub
-							
+						
+							System.out.println( "put - searching " + contact.getName() + ", level=" + level );
 						}
 						
 						@Override
 						public void read(DHTTransportContact contact, DHTTransportValue value) {
-							// TODO Auto-generated method stub
 							
-							result.add( new Hash( value.getValue()));
+							
+							
 						}
 						
 						@Override
 						public void found(DHTTransportContact contact, boolean is_closest) {
-							// TODO Auto-generated method stub
 							
+							System.out.println( "put - found " + contact.getName());
 						}
 						
 						@Override
 						public boolean diversified(String desc) {
-							// TODO Auto-generated method stub
+						
 							return false;
 						}
 						
 						@Override
 						public void complete(boolean timeout) {
-							// TODO Auto-generated method stub
+						
 							sem.release();
 						}
 					});
