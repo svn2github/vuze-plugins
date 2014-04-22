@@ -480,17 +480,28 @@ I2PHelperPlugin
 					
 						log.log( "lookup -> " + dest.toBase64());
 					}		
-				}else if ( cmd.equals( "announce" )){
+				}else if ( cmd.equals( "get" )){
 					
 					if ( bits.length != 2 ){
 						
-						throw( new Exception( "usage: announce <base16_infohash>"));
+						throw( new Exception( "usage: get <base16_infohash>"));
 					}
 					
 					byte[] hash = decodeHash( bits[1] );
 				
-					tracker.announce( hash );
+					tracker.get( hash );
+				
+				}else if ( cmd.equals( "put" )){
 					
+					if ( bits.length != 2 ){
+						
+						throw( new Exception( "usage: put <base16_infohash>"));
+					}
+					
+					byte[] hash = decodeHash( bits[1] );
+				
+					tracker.put( hash );
+
 				}else if ( cmd.equals( "ping_dest" )){
 					
 					if ( bits.length != 3 ){

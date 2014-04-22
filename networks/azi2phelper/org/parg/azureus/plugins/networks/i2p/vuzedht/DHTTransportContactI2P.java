@@ -27,7 +27,6 @@ import java.net.InetSocketAddress;
 import java.util.List;
 
 import net.i2p.data.Base32;
-import net.i2p.data.Destination;
 
 import org.gudy.azureus2.core3.util.Debug;
 import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
@@ -44,6 +43,8 @@ public class
 DHTTransportContactI2P 
 	implements DHTTransportContact
 {
+	private static byte[]	DEFAULT_TOKEN = {};
+	
 	private DHTTransportI2P		transport;
 	
 	private NodeInfo			node;
@@ -52,7 +53,7 @@ DHTTransportContactI2P
 	private byte[]				id;
 	
 	
-	private int	random_id;
+	private byte[]				random_id	= DEFAULT_TOKEN;
 	
 	protected
 	DHTTransportContactI2P(
@@ -111,15 +112,35 @@ DHTTransportContactI2P
 		return( 0 );
 	}
 	
+	public int
+	getRandomIDType()
+	{
+		return( RANDOM_ID_TYPE2 );
+	}
+	
 	public void
 	setRandomID(
 		int	id )
 	{
-		random_id	= id;
+		System.out.println( "nuhuh" );
 	}
 	
 	public int
 	getRandomID()
+	{
+		System.out.println( "nuhuh" );
+		return(0);
+	}
+	
+	public void
+	setRandomID2(
+		byte[]		id )
+	{
+		random_id = id;
+	}
+	
+	public byte[]
+	getRandomID2()
 	{
 		return( random_id );
 	}
@@ -128,6 +149,12 @@ DHTTransportContactI2P
 	getName()
 	{
 		return( address.toString());
+	}
+	
+	public byte[]
+	getBloomKey()
+	{
+		return( node.getHash().getData());
 	}
 	
 	public InetSocketAddress
@@ -181,8 +208,6 @@ DHTTransportContactI2P
 	sendPing(
 		DHTTransportReplyHandler	handler )
 	{
-		System.out.println( "sendPing" );
-		
 		transport.sendPing( handler, this );
 	}
 	
@@ -230,8 +255,8 @@ DHTTransportContactI2P
 	sendFindNode(
 		DHTTransportReplyHandler	handler,
 		byte[]						id )
-	{
-		System.out.println( "sendFindNode" );
+	{		
+		transport.sendFindNode( handler, this, id );
 	}
 		
 	public void
@@ -241,7 +266,7 @@ DHTTransportContactI2P
 		int							max_values,
 		byte						flags )
 	{
-		System.out.println( "sendFindValue" );
+		transport.sendFindValue( handler, this, key );
 	}
 		
 	public void

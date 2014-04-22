@@ -26,7 +26,6 @@ import java.util.*;
 import net.i2p.data.Hash;
 
 import org.gudy.azureus2.core3.util.SystemTime;
-import org.parg.azureus.plugins.networks.i2p.dht.DHT;
 
 
 public class 
@@ -43,7 +42,7 @@ I2PHelperTracker
 	
 	
 	protected void
-	announce(
+	get(
 		byte[]		torrent_hash )
 	{		
 		int	num_want 		= 30;
@@ -55,6 +54,22 @@ I2PHelperTracker
 		
 		Collection<Hash> peer_hashes = dht.getPeersAndNoAnnounce( torrent_hash, num_want, get_timeout, num_put, put_timeout );
 		
-		System.out.println( "Announce -> " + peer_hashes.size() + ", elapsed=" + (SystemTime.getMonotonousTime() - start ));
+		System.out.println( "get -> " + peer_hashes.size() + ", elapsed=" + (SystemTime.getMonotonousTime() - start ));
+	}
+	
+	protected void
+	put(
+		byte[]		torrent_hash )
+	{		
+		int	num_want 		= 30;
+		int	get_timeout		= 5*60*1000;
+		int	num_put			= 1;
+		int	put_timeout		= 3*60*1000;
+		
+		long	start = SystemTime.getMonotonousTime();
+		
+		Collection<Hash> peer_hashes = dht.getPeersAndAnnounce( torrent_hash, num_want, get_timeout, num_put, put_timeout );
+		
+		System.out.println( "put -> " + peer_hashes.size() + ", elapsed=" + (SystemTime.getMonotonousTime() - start ));
 	}
 }

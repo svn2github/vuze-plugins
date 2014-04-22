@@ -58,6 +58,14 @@ I2PHelperDHT
 		int 			annMax, 
 		long 			annMaxWait );
 		
+	public Collection<Hash> 
+	getPeersAndAnnounce(
+		byte[] 			ih, 
+		int 			max, 
+		long			maxWait, 
+		int 			annMax, 
+		long 			annMaxWait );
+	
 	public void
 	requestBootstrap();
 	

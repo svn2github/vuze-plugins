@@ -22,6 +22,7 @@
 package org.parg.azureus.plugins.networks.i2p.vuzedht;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +32,8 @@ import net.i2p.client.I2PSession;
 import net.i2p.data.Destination;
 import net.i2p.data.Hash;
 
+import org.gudy.azureus2.core3.util.AESemaphore;
+import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.SimpleTimer;
 import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
@@ -42,6 +45,10 @@ import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 import com.aelitis.azureus.core.dht.DHT;
 import com.aelitis.azureus.core.dht.DHTFactory;
 import com.aelitis.azureus.core.dht.DHTLogger;
+import com.aelitis.azureus.core.dht.DHTOperationListener;
+import com.aelitis.azureus.core.dht.control.DHTControl;
+import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
+import com.aelitis.azureus.core.dht.transport.DHTTransportValue;
 import com.aelitis.azureus.plugins.dht.impl.DHTPluginStorageManager;
 
 public class 
@@ -78,7 +85,18 @@ DHTI2P
 		
 			// need to check out the republish / cache forward logic required
 		
-		props.put( DHT.PR_CACHE_REPUBLISH_INTERVAL, new Integer( 1*60*60*1000 ));
+		props.put( DHT.PR_CACHE_REPUBLISH_INTERVAL, 	new Integer( 0 ));	// disabled :(
+		props.put( DHT.PR_ORIGINAL_REPUBLISH_INTERVAL, 	new Integer( 40*60*1000 ));
+
+		/*
+		int		K 		= getProp( PR_CONTACTS_PER_NODE, 			DHTControl.K_DEFAULT );
+		int		B 		= getProp( PR_NODE_SPLIT_FACTOR, 			DHTControl.B_DEFAULT );
+		int		max_r	= getProp( PR_MAX_REPLACEMENTS_PER_NODE, 	DHTControl.MAX_REP_PER_NODE_DEFAULT );
+		int		s_conc 	= getProp( PR_SEARCH_CONCURRENCY, 			DHTControl.SEARCH_CONCURRENCY_DEFAULT );
+		int		l_conc 	= getProp( PR_LOOKUP_CONCURRENCY, 			DHTControl.LOOKUP_CONCURRENCY_DEFAULT );
+		int		o_rep 	= getProp( PR_ORIGINAL_REPUBLISH_INTERVAL, 	DHTControl.ORIGINAL_REPUBLISH_INTERVAL_DEFAULT );
+		int		c_rep 	= getProp( PR_CACHE_REPUBLISH_INTERVAL, 	DHTControl.CACHE_REPUBLISH_INTERVAL_DEFAULT );
+		*/
 		
 		dht = DHTFactory.create( 
 				transport, 
@@ -196,7 +214,123 @@ DHTI2P
 		int 			annMax, 
 		long 			annMaxWait )
 	{
-		return( null );
+		final Collection<Hash> result = new ArrayList<Hash>();
+		
+		final AESemaphore sem = new AESemaphore( "" );
+		
+		dht.get(	ih,
+					"Get for " + ByteFormatter.encodeString( ih ),
+					DHT.FLAG_RAW_KEY,
+					max,
+					maxWait,
+					false,
+					false,
+					new DHTOperationListener() {
+						
+						@Override
+						public void wrote(DHTTransportContact contact, DHTTransportValue value) {
+							// TODO Auto-generated method stub
+							
+						}
+						
+						@Override
+						public void searching(DHTTransportContact contact, int level,
+								int active_searches) {
+							// TODO Auto-generated method stub
+							
+						}
+						
+						@Override
+						public void read(DHTTransportContact contact, DHTTransportValue value) {
+							// TODO Auto-generated method stub
+							
+							result.add( new Hash( value.getValue()));
+						}
+						
+						@Override
+						public void found(DHTTransportContact contact, boolean is_closest) {
+							// TODO Auto-generated method stub
+							
+						}
+						
+						@Override
+						public boolean diversified(String desc) {
+							// TODO Auto-generated method stub
+							return false;
+						}
+						
+						@Override
+						public void complete(boolean timeout) {
+							// TODO Auto-generated method stub
+							sem.release();
+						}
+					});
+			
+		sem.reserve();
+		
+		return( result );
+	}
+	
+	public Collection<Hash> 
+	getPeersAndAnnounce(
+		byte[] 			ih, 
+		int 			max, 
+		long			maxWait, 
+		int 			annMax, 
+		long 			annMaxWait )
+	{
+		final Collection<Hash> result = new ArrayList<Hash>();
+		
+		final AESemaphore sem = new AESemaphore( "" );
+		
+		dht.put(	ih,
+					"Put for " + ByteFormatter.encodeString( ih ),
+					new byte[1],
+					DHT.FLAG_RAW_KEY,
+					new DHTOperationListener() {
+						
+						@Override
+						public void wrote(DHTTransportContact contact, DHTTransportValue value) {
+							// TODO Auto-generated method stub
+							
+						}
+						
+						@Override
+						public void searching(DHTTransportContact contact, int level,
+								int active_searches) {
+							// TODO Auto-generated method stub
+							
+						}
+						
+						@Override
+						public void read(DHTTransportContact contact, DHTTransportValue value) {
+							// TODO Auto-generated method stub
+							
+							result.add( new Hash( value.getValue()));
+						}
+						
+						@Override
+						public void found(DHTTransportContact contact, boolean is_closest) {
+							// TODO Auto-generated method stub
+							
+						}
+						
+						@Override
+						public boolean diversified(String desc) {
+							// TODO Auto-generated method stub
+							return false;
+						}
+						
+						@Override
+						public void complete(boolean timeout) {
+							// TODO Auto-generated method stub
+							sem.release();
+						}
+					});
+			
+		sem.reserve();
+		
+		return( result );
 	}
 	
 	public void

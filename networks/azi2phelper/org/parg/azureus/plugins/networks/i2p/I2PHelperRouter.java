@@ -570,11 +570,11 @@ I2PHelperRouter
 			
 			NodeInfo my_node_info = new NodeInfo( dht_nid, session.getMyDestination(), dht_port );
 
-			dht = new DHTI2P( config_dir, session, my_node_info, is_bootstrap_node?null:boot_ninf );
-						
 			logger.log( "MyDest: " + session.getMyDestination().toBase64());
 			logger.log( "        " + Base32.encode( session.getMyDestination().calculateHash().getData()).toUpperCase() + ".b32.i2p"  + ", existing=" + use_existing_key );
 			logger.log( "MyNID:  " + Base32.encode( dht_nid.getData()) + ", existing=" + use_existing_nid );
+
+			dht = new DHTI2P( config_dir, session, my_node_info, is_bootstrap_node?null:boot_ninf );						
 		}
 	}
 	
