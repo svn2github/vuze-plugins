@@ -69,6 +69,12 @@ I2PHelperDHT
 	public void
 	requestBootstrap();
 	
+	/**
+	 * Used by the bootstrap server
+	 * @param number
+	 * @return
+	 */
+	
 	public List<NodeInfo>
 	getNodesForBootstrap(
 		int			number );

@@ -638,7 +638,12 @@ I2PHelperRouter
 			
 		}else{
 			
-			logger.log( dht.renderStatusHTML());
+			String html = dht.renderStatusHTML();
+			
+			if ( html.length() > 0 ){
+				logger.log( html );
+			}
+			
 			logger.log( dht.getStats());
 		}
 		

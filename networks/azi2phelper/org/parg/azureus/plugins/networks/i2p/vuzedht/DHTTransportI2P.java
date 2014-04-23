@@ -24,7 +24,6 @@ package org.parg.azureus.plugins.networks.i2p.vuzedht;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -33,6 +32,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.BEncoder;
 import org.gudy.azureus2.core3.util.ByteFormatter;
@@ -383,6 +383,61 @@ DHTTransportI2P
 
 	private HashMap<HashWrapper,Request>		requests = new HashMap<HashWrapper, Request>();
 	
+	protected boolean
+	sendPing(
+		NodeInfo		node )
+	{
+		final boolean[] result = { false };
+		
+		try{
+	        stats.pingSent( null );
+	
+	        Map<String, Object> map = new HashMap<String, Object>();
+	        	        
+	        map.put( "q", "ping" );
+	        
+	        Map<String, Object> args = new HashMap<String, Object>();
+	        
+	        map.put( "a", args );
+	        
+	        final AESemaphore sem = new AESemaphore( "i2p:wait" );
+	        
+	        sendQuery( 
+	        	new ReplyHandler()
+	        	{
+	        		@Override
+	        		public void 
+	        		handleReply(
+	        			Map reply ) 
+	        		{	        			
+	        			stats.pingOK();
+	        			
+	        			result[0] = true;
+	        			
+	        			sem.release();
+	        		}
+	        		
+	        		@Override
+	        		public void 
+	        		handleError(
+	        			DHTTransportException error) 
+	        		{
+	        			
+	        			stats.pingFailed();
+	        			
+	        			sem.release();
+	        		}
+	        	}, 
+	        	node, map, true );
+	        
+	        sem.reserve();
+	        
+		}catch( Throwable e ){
+		}
+		
+		return( result[0] );
+	}
+	
 	public void
 	sendPing(
 		final DHTTransportReplyHandler		handler,
@@ -463,6 +518,72 @@ DHTTransportI2P
 		sendResponse( originator, message_id, map );
 	}
 	   
+	protected boolean
+	sendFindNode(
+		NodeInfo		node,
+		byte[]			target )
+	{
+		final boolean[] result = { false };
+		
+		try{
+	        stats.findNodeSent( null );
+	
+	        Map<String, Object> map = new HashMap<String, Object>();
+	        
+	        map.put( "q", "find_node" );
+	        
+	        Map<String, Object> args = new HashMap<String, Object>();
+	        
+	        map.put( "a", args );
+	        
+	        args.put( "target", target );
+	        
+	        final AESemaphore sem = new AESemaphore( "i2p:wait" );
+	        
+	        sendQuery( 
+	        	new ReplyHandler()
+	        	{
+	        		@Override
+	        		public void 
+	        		handleReply(
+	        			Map reply ) 
+	        		{
+	        			byte[]	nodes = (byte[])reply.get( "nodes" );
+	        				        				        			
+	        			for ( int off = 0; off < nodes.length; off += NodeInfo.LENGTH ){
+	        				
+	        				NodeInfo node = new NodeInfo( nodes, off );
+	        				
+	        				request_handler.contactImported( new DHTTransportContactI2P( DHTTransportI2P.this, node ), false );
+	        			}
+	        			
+	        			stats.findNodeOK();
+	        			
+	        			result[0] = true;
+	        			
+	        			sem.release();
+	        		}
+	        		
+	        		@Override
+	        		public void 
+	        		handleError(
+	        			DHTTransportException error) 
+	        		{
+	        			
+	        			stats.findNodeFailed();
+	        			
+	        			sem.release();
+	        		}
+	        	}, 
+	        	node, map, true );
+	        
+	        sem.reserve();
+	        
+		}catch( Throwable e ){
+		}
+		
+		return( result[0] );
+	}
 	
 	public void
 	sendFindNode(
@@ -932,10 +1053,52 @@ DHTTransportI2P
 	
 		// -------------
 	
-    private void 
+	protected boolean
+	lookupDest(
+		NodeInfo		node )
+	{
+    	Destination	dest = node.getDestination();
+    	
+    	if ( dest == null ) {
+
+    		try{
+    			dest = session.lookupDest( node.getHash(), DEST_LOOKUP_TIMEOUT );
+            
+	            if (dest != null ){
+	            
+	                node.setDestination(dest);
+	                
+	                return( true );
+	            }
+    		}catch( Throwable e ){
+    		}
+    		
+    		return( false );
+    		
+    	}else{
+    		
+    		return( true );
+    	}
+	}
+	
+	private void 
     sendQuery(
     	ReplyHandler				handler,
     	DHTTransportContactI2P		contact,
+    	Map					 		map, 
+    	boolean 					repliable ) 
+    	
+    	throws Exception
+    {
+	   	NodeInfo node = contact.getNode();
+	   
+		sendQuery( handler, node, map, repliable );
+    }
+   
+    private void 
+    sendQuery(
+    	ReplyHandler				handler,
+    	NodeInfo					node,
     	Map					 		map, 
     	boolean 					repliable ) 
     	
@@ -945,9 +1108,7 @@ DHTTransportI2P
     		
            	throw( new DHTTransportException( "Session closed" ));
     	}
-    	
-    	NodeInfo node = contact.getNode();
-    	
+    	   	
     	Destination	dest = node.getDestination();
     	
     	if ( dest == null ) {

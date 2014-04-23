@@ -362,7 +362,11 @@ I2PHelperPlugin
 					public void
 					run()
 					{
-						I2PHelperRouter my_router = router = new I2PHelperRouter( false, false, I2PHelperPlugin.this );
+						boolean	is_bootstrap_node	= false;
+						boolean	is_vuze_dht			= true;
+						
+						I2PHelperRouter my_router = router = 
+								new I2PHelperRouter( is_bootstrap_node, is_vuze_dht, I2PHelperPlugin.this );
 						
 						try{
 							if ( ext_i2p_param.getValue()){
@@ -543,6 +547,14 @@ I2PHelperPlugin
 					
 					dht.requestBootstrap();
 					
+				}else if ( cmd.equals( "boottest" )){
+					
+					List<NodeInfo> nodes = dht.getNodesForBootstrap(8);
+					
+					for ( NodeInfo node: nodes ){
+						
+						log.log( "    " + node.toString());
+					}
 				}else{
 			
 					log.log( "Usage: print|info..." );
