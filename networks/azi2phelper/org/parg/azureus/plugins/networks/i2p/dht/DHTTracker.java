@@ -6,7 +6,7 @@ package org.parg.azureus.plugins.networks.i2p.dht;
 
 import java.util.*;
 
-import org.parg.azureus.plugins.networks.i2p.I2pHelperAdapter;
+import org.parg.azureus.plugins.networks.i2p.I2PHelperAdapter;
 
 import net.i2p.I2PAppContext;
 import net.i2p.data.DataHelper;
@@ -187,7 +187,7 @@ class DHTTracker {
     
     public void
     print(
-    	I2pHelperAdapter logger )
+    	I2PHelperAdapter logger )
     {
     	logger.log( "Torrents: " + _torrents.size());
     	

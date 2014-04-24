@@ -51,7 +51,7 @@ import org.klomp.snark.bencode.BDecoder;
 import org.klomp.snark.bencode.BEncoder;
 import org.klomp.snark.bencode.BEValue;
 import org.klomp.snark.bencode.InvalidBEncodingException;
-import org.parg.azureus.plugins.networks.i2p.I2pHelperAdapter;
+import org.parg.azureus.plugins.networks.i2p.I2PHelperAdapter;
 
 
 /**
@@ -92,7 +92,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
 
     private final I2PAppContext _context;
     private final Log _log;
-    private final I2pHelperAdapter	_adapter;
+    private final I2PHelperAdapter	_adapter;
     private boolean force_bootstrap;
     
     /** our tracker */
@@ -184,14 +184,14 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
      */
     	// PARG - added constructor to allow using fixed NID
     
-    public KRPC(I2PAppContext ctx, String baseName, I2PSession session, I2pHelperAdapter logger) {
+    public KRPC(I2PAppContext ctx, String baseName, I2PSession session, I2PHelperAdapter logger) {
     	
     	 this( 		ctx, baseName, session,
     			 	TrackerClient.PORT + 10 + ctx.random().nextInt(65535 - 20 - TrackerClient.PORT ),
     			 	null, logger );
     }
     
-    public KRPC(I2PAppContext ctx, String baseName, I2PSession session, int qport, NID nid, I2pHelperAdapter logger ) {
+    public KRPC(I2PAppContext ctx, String baseName, I2PSession session, int qport, NID nid, I2PHelperAdapter logger ) {
         _context = ctx;
         _session = session;
         _log = ctx.logManager().getLog(KRPC.class);

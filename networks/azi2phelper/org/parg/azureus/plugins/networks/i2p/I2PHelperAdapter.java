@@ -22,7 +22,7 @@
 package org.parg.azureus.plugins.networks.i2p;
 
 public interface 
-I2pHelperAdapter 
+I2PHelperAdapter 
 {
 	public void
 	log(

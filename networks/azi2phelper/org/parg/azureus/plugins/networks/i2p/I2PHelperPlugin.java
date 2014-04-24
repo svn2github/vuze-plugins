@@ -57,7 +57,9 @@ import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.UnloadablePlugin;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
+import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManager;
+import org.gudy.azureus2.plugins.ui.UIManagerListener;
 import org.gudy.azureus2.plugins.ui.config.ActionParameter;
 import org.gudy.azureus2.plugins.ui.config.BooleanParameter;
 import org.gudy.azureus2.plugins.ui.config.InfoParameter;
@@ -70,6 +72,7 @@ import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.parg.azureus.plugins.networks.i2p.dht.DHT;
 import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
+import org.parg.azureus.plugins.networks.i2p.swt.I2PHelperView;
 
 import com.aelitis.azureus.core.proxy.AEProxyFactory;
 import com.aelitis.azureus.core.proxy.AEProxyFactory.PluginProxy;
@@ -79,7 +82,7 @@ import com.aelitis.azureus.plugins.upnp.UPnPPlugin;
 
 public class 
 I2PHelperPlugin 
-	implements UnloadablePlugin, I2pHelperAdapter
+	implements UnloadablePlugin, I2PHelperAdapter
 {	
 	/*
 	 *	Router: commented out System.setProperties for timezone, http agent etc in static initialiser
@@ -104,7 +107,10 @@ I2PHelperPlugin
 	private LoggerChannel 			log;
 	private BasicPluginConfigModel 	config_model;
 	private BasicPluginViewModel	view_model;
+	private LocaleUtilities			loc_utils;
 
+	private I2PHelperView			ui_view;
+	
 	private boolean					plugin_enabled;
 	
 	private I2PHelperRouter			router;
@@ -141,7 +147,7 @@ I2PHelperPlugin
 				throw( new PluginException( "Another instance of Vuze is running, can't initialize plugin" ));
 			}
 			
-			final LocaleUtilities loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
+			loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
 			
 			log	= plugin_interface.getLogger().getTimeStampedChannel( "I2PHelper");
 			
@@ -305,6 +311,7 @@ I2PHelperPlugin
 							info_param.setEnabled( plugin_enabled  && !use_ext_i2p);
 							use_upnp.setEnabled( plugin_enabled  && !use_ext_i2p );
 							
+							ext_i2p_param.setEnabled( plugin_enabled );
 							ext_i2p_port_param.setEnabled( plugin_enabled && use_ext_i2p );
 							
 							command_text_param.setEnabled( plugin_enabled );
@@ -353,7 +360,7 @@ I2PHelperPlugin
 						public void
 						closedownInitiated()
 						{
-							unload();
+							unload( true );
 						}
 					});
 					
@@ -380,7 +387,7 @@ I2PHelperPlugin
 							
 							if ( !unloaded ){
 								
-								tracker = new I2PHelperTracker( my_router.getDHT());
+								tracker = new I2PHelperTracker( I2PHelperPlugin.this, my_router.getDHT());
 								
 								while( !unloaded ){
 									
@@ -407,6 +414,26 @@ I2PHelperPlugin
 						}
 					}
 				}.start();
+				
+				plugin_interface.getUIManager().addUIListener(
+						new UIManagerListener()
+						{
+							public void
+							UIAttached(
+								UIInstance		instance )
+							{
+								if ( instance.getUIType() == UIInstance.UIT_SWT ){
+									
+									ui_view = new I2PHelperView( I2PHelperPlugin.this, instance, "azi2phelper.name" );
+								}
+							}
+
+							public void
+							UIDetached(
+								UIInstance		instance )
+							{
+							}
+						});
 			}
 		}catch( Throwable e ){
 			
@@ -424,12 +451,25 @@ I2PHelperPlugin
 		}
 	}
 	
+	public String
+	getMessageText(
+		String		key )
+	{
+		return( loc_utils.getLocalisedMessageText(key));
+	}
+	
+	public I2PHelperRouter
+	getRouter()
+	{
+		return( router );
+	}
+	
 	private static void
 	executeCommand(
 		String				cmd_str,
 		I2PHelperRouter		router,
 		I2PHelperTracker	tracker,
-		I2pHelperAdapter		log )
+		I2PHelperAdapter	log )
 		
 		throws Exception
 	{
@@ -618,9 +658,11 @@ I2PHelperPlugin
 		
 			log( "External bootstrap failed: " + Debug.getNestedExceptionMessage(e));
 			
-				// retry if we got a timeout
+				// retry if we got a timeout or malformed socks error reply
 			
-			return( Debug.getNestedExceptionMessage(e).toLowerCase().contains( "timeout" ));
+			String msg = Debug.getNestedExceptionMessage(e).toLowerCase();
+			
+			return( msg.contains( "timeout" ) || msg.contains( "malformed" ));
 		}
 		
 		return( false );
@@ -685,6 +727,13 @@ I2PHelperPlugin
 	public void
 	unload()
 	{
+		unload( false );
+	}
+	
+	public void
+	unload(
+		boolean	for_closedown )
+	{
 		synchronized( this ){
 			
 			unloaded = true;
@@ -715,18 +764,26 @@ I2PHelperPlugin
 			lock_file = null;
 		}
 		
-		if ( config_model != null ){
+		if ( !for_closedown ){
 			
-			config_model.destroy();
+			if ( config_model != null ){
+				
+				config_model.destroy();
+				
+				config_model = null;
+			}
 			
-			config_model = null;
-		}
-		
-		if ( view_model != null ){
+			if ( view_model != null ){
+				
+				view_model.destroy();
+				
+				view_model = null;
+			}
 			
-			view_model.destroy();
-			
-			view_model = null;
+			if ( ui_view != null ){
+				
+				ui_view.unload();
+			}
 		}
 	}
 	
@@ -843,8 +900,8 @@ I2PHelperPlugin
 		
 		final I2PHelperRouter[] f_router = { null };
 		
-		I2pHelperAdapter adapter = 
-			new I2pHelperAdapter() 
+		I2PHelperAdapter adapter = 
+			new I2PHelperAdapter() 
 			{
 				public void 
 				log(
@@ -901,7 +958,7 @@ I2PHelperPlugin
 			//router.initialise( config_dir, 29903 ); // 7654 );
 			//router.initialise( config_dir, 7654 );
 
-			I2PHelperTracker tracker = new I2PHelperTracker( router.getDHT());
+			I2PHelperTracker tracker = new I2PHelperTracker( adapter, router.getDHT());
 			
 			I2PHelperConsole console = new I2PHelperConsole();
 			

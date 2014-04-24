@@ -31,12 +31,15 @@ import org.gudy.azureus2.core3.util.SystemTime;
 public class 
 I2PHelperTracker 
 {
-	private I2PHelperDHT			dht;
+	private I2PHelperDHT				dht;
+	private I2PHelperAdapter			adapter;
 	
 	protected
 	I2PHelperTracker(
+		I2PHelperAdapter	_adapter,
 		I2PHelperDHT		_dht )
 	{
+		adapter	= _adapter;
 		dht		= _dht;
 	}
 	
@@ -54,7 +57,14 @@ I2PHelperTracker
 		
 		Collection<Hash> peer_hashes = dht.getPeersAndNoAnnounce( torrent_hash, num_want, get_timeout, num_put, put_timeout );
 		
-		System.out.println( "get -> " + peer_hashes.size() + ", elapsed=" + (SystemTime.getMonotonousTime() - start ));
+			// Note that we can get duplicates here as use the target node as the originator node (don't actually know the originator in I2P DHT...)
+		
+		adapter.log( "get -> " + peer_hashes.size() + ", elapsed=" + (SystemTime.getMonotonousTime() - start ));
+		
+		for ( Hash hash: peer_hashes ){
+			
+			adapter.log( "    " + hash );
+		}
 	}
 	
 	protected void
@@ -70,6 +80,6 @@ I2PHelperTracker
 		
 		Collection<Hash> peer_hashes = dht.getPeersAndAnnounce( torrent_hash, num_want, get_timeout, num_put, put_timeout );
 		
-		System.out.println( "put -> " + peer_hashes.size() + ", elapsed=" + (SystemTime.getMonotonousTime() - start ));
+		adapter.log( "put -> " + peer_hashes.size() + ", elapsed=" + (SystemTime.getMonotonousTime() - start ));
 	}
 }

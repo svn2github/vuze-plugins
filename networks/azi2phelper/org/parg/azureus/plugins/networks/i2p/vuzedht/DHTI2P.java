@@ -37,6 +37,7 @@ import net.i2p.data.Hash;
 
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.ByteFormatter;
+import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.SimpleTimer;
 import org.gudy.azureus2.core3.util.SystemTime;
@@ -45,6 +46,7 @@ import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.gudy.azureus2.core3.util.TimerEventPeriodic;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperDHT;
+import org.parg.azureus.plugins.networks.i2p.I2PHelperAdapter;
 import org.parg.azureus.plugins.networks.i2p.dht.NID;
 import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 
@@ -73,6 +75,8 @@ DHTI2P
 	private DHTTransportI2P				transport;
 	private DHTPluginStorageManager 	storage_manager;
 	
+	private I2PHelperAdapter			adapter;
+	
 	private NodeInfo					bootstrap_node;
 	
 	private TimerEventPeriodic		timer;
@@ -82,6 +86,7 @@ DHTI2P
 	final int save_ticks		= save_period / timer_period;
 	
 	private int		bootstrap_check_tick_count	= 1;
+	private boolean	force_bootstrap;
 	private long 	next_bootstrap;
 	private int		consec_bootstraps;
 	private long	last_external_bootstrap;
@@ -95,11 +100,14 @@ DHTI2P
 	
 	public 
 	DHTI2P(
-		File			dir,
-		I2PSession		session,
-		NodeInfo		my_node,
-		NodeInfo		boot_node )
+		File				dir,
+		I2PSession			session,
+		NodeInfo			my_node,
+		NodeInfo			boot_node,
+		I2PHelperAdapter	_adapter )
 	{
+		adapter	= _adapter;
+		
 		File storage_dir = new File( dir, "dhtdata");
 		
 		if ( !storage_dir.isDirectory()){
@@ -187,14 +195,14 @@ DHTI2P
 	log(
 		String	str )
 	{
-		System.out.println( str );
+		adapter.log( str );
 	}
 		
 	public void
 	log(
 		Throwable	e )
 	{
-		e.printStackTrace();
+		adapter.log( Debug.getNestedExceptionMessage(e));
 	}
 	
 	public void
@@ -202,7 +210,7 @@ DHTI2P
 		int		log_type,
 		String	str )
 	{
-		System.out.println( str );
+		adapter.log( str );
 	}
 	
 	public boolean
@@ -218,6 +226,12 @@ DHTI2P
 		// this currently prevents the speed-tester from being created (which is what we want) so
 		// if this gets changed that will need to be prevented by another means
 		return( null );
+	}
+	
+	public DHT
+	getDHT()
+	{
+		return( dht );
 	}
 	
 	/*
@@ -237,9 +251,27 @@ DHTI2P
 	heardAbout(
 		Map			map )
 	{
-		log( "heardAbout not supported" );
-		
-		return( null );
+    	try{
+	    	byte[]	nid_bytes 	= (byte[])map.get( "n" );
+	    	int		port 		= ((Number)map.get( "p" )).intValue();
+	    	byte[]	dest_bytes	= (byte[])map.get( "d" );
+	    	
+	    	NID nid = new NID( nid_bytes );
+	    	
+	    	Destination destination = new Destination();
+	    
+	    	destination.fromByteArray( dest_bytes );
+	    	
+	    	NodeInfo ni = new NodeInfo( nid, destination, port );
+	    	
+	    	transport.importContact( ni, false );
+	    	
+	    	return( ni );
+	    	
+    	}catch( Throwable e ){
+    		
+    		return( null );
+    	}
 	}
 	
 	public void
@@ -371,6 +403,8 @@ DHTI2P
 	public void
 	requestBootstrap()
 	{
+		force_bootstrap = true;
+
 		if ( bootstrap_node == null ){
 			
 			log( "No bootstrap node" );
@@ -386,20 +420,10 @@ DHTI2P
 			boot_contact.remove();
 		}
 	}
-		
-	private boolean
-	tryExternalBootstrap()
-	{
-		System.out.println( "TODO ext boot" );
-		
-		return( false );
-	}
 	
 	private void
 	checkForBootstrap()
-	{
-		boolean	force_bootstrap = false;
-		
+	{		
         int	live_node_count = 0;           
         
         try{  
@@ -472,7 +496,8 @@ DHTI2P
         				
         				force_bootstrap = false;
         				
-        				consec_bootstraps = 0;
+        				consec_bootstraps 		= 0;
+        				last_external_bootstrap	= 0;
         			}
         			
         			log( "Bootstrapping..." );
@@ -519,7 +544,7 @@ DHTI2P
         					
         					last_external_bootstrap = now;
         					
-        					if ( tryExternalBootstrap()){
+        					if ( adapter.tryExternalBootstrap()){
         						
         							// reschedule with a 2 min delay
         						
@@ -800,7 +825,7 @@ DHTI2P
 	{
 		dht.print( true );
 		
-		System.out.println( transport.getStats().getString());
+		log( transport.getStats().getString());
 	}
 	
 	public String

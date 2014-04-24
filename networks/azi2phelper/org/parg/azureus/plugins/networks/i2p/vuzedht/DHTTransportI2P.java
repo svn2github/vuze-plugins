@@ -32,6 +32,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.BEncoder;
@@ -41,6 +42,7 @@ import org.gudy.azureus2.core3.util.HashWrapper;
 import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.SimpleTimer;
 import org.gudy.azureus2.core3.util.SystemTime;
+import org.gudy.azureus2.core3.util.ThreadPool;
 import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.gudy.azureus2.core3.util.TimerEventPeriodic;
@@ -62,6 +64,7 @@ import com.aelitis.azureus.core.dht.transport.DHTTransport;
 import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
 import com.aelitis.azureus.core.dht.transport.DHTTransportException;
 import com.aelitis.azureus.core.dht.transport.DHTTransportFindValueReply;
+import com.aelitis.azureus.core.dht.transport.DHTTransportFullStats;
 import com.aelitis.azureus.core.dht.transport.DHTTransportListener;
 import com.aelitis.azureus.core.dht.transport.DHTTransportProgressListener;
 import com.aelitis.azureus.core.dht.transport.DHTTransportReplyHandler;
@@ -78,6 +81,8 @@ public class
 DHTTransportI2P
 	implements DHTTransport, I2PSessionMuxedListener
 {
+	private static final boolean TRACE = false;
+	
 	private static final byte PROTOCOL_VERSION		= 1;
 	private static final byte PROTOCOL_VERSION_MIN	= 1;
 	
@@ -89,7 +94,7 @@ DHTTransportI2P
 	private int							reply_port;
 	private NID							my_nid;
 	
-	private DHTTransportStatsImpl		stats;
+	private DHTTransportStatsI2P		stats;
 	
 	private DHTTransportContactI2P		local_contact;
 	
@@ -112,6 +117,8 @@ DHTTransportI2P
 				}
 			};
 	
+	private ThreadPool	destination_lookup_pool 	= new ThreadPool("DHTTransportI2P::destlookup", 5, true );
+
 	private volatile boolean			destroyed;
 	
 	protected
@@ -281,6 +288,20 @@ DHTTransportI2P
 		request_timeout	= millis;
 	}
 	
+	protected DHTTransportFullStats
+	getFullStats(
+		DHTTransportContactI2P	contact )
+	{
+		if ( contact == local_contact ){
+			
+			return( request_handler.statsRequest( contact ));
+		}
+		
+		Debug.out( "Status not supported for remote contacts" );
+		
+		return( null );
+	}
+	
 	protected void
 	exportContact(
 		DataOutputStream		os,
@@ -379,7 +400,7 @@ DHTTransportI2P
 	
 		// RPCs
 	
-	final int DEST_LOOKUP_TIMEOUT = 10*1000;
+	final int DEST_LOOKUP_TIMEOUT = 20*1000;
 
 	private HashMap<HashWrapper,Request>		requests = new HashMap<HashWrapper, Request>();
 	
@@ -443,7 +464,7 @@ DHTTransportI2P
 		final DHTTransportReplyHandler		handler,
 		final DHTTransportContactI2P		contact )
 	{
-		System.out.println( "sendPing" );
+		if ( TRACE ) trace( "sendPing" );
 		
 		try{
 	        stats.pingSent( null );
@@ -464,7 +485,7 @@ DHTTransportI2P
 	        		handleReply(
 	        			Map reply ) 
 	        		{
-	        			System.out.println( "good pingReply" );
+	        			if ( TRACE ) trace( "good pingReply" );
 	        			
 	        			handler.pingReply( contact, -1 );
 	        			
@@ -476,7 +497,7 @@ DHTTransportI2P
 	        		handleError(
 	        			DHTTransportException error) 
 	        		{
-	        			System.out.println( "error pingReply: " + Debug.getNestedExceptionMessage( error ));
+	        			if ( TRACE ) trace( "error pingReply: " + Debug.getNestedExceptionMessage( error ));
 
 	        			handler.failed( contact, error );
 	        			
@@ -505,7 +526,7 @@ DHTTransportI2P
 		
 		throws Exception
 	{
-		System.out.println( "receivePing" );
+		if ( TRACE ) trace( "receivePing" );
 
 		request_handler.pingRequest( originator );
 
@@ -592,7 +613,7 @@ DHTTransportI2P
 		byte[]								target,
 		short								flags )
 	{
-		System.out.println( "sendFindNode, flags=" + flags );
+		if ( TRACE ) trace( "sendFindNode, flags=" + flags );
 		
 		if (( flags & DHT.FLAG_LOOKUP_FOR_STORE ) != 0 ){
 			
@@ -660,7 +681,7 @@ DHTTransportI2P
 		        		handleReply(
 		        			Map reply ) 
 		        		{
-		        			System.out.println( "good findNodeReply: " + reply );
+		        			if ( TRACE ) trace( "good findNodeReply: " + reply );
 		        				        			
 		        			/* no token on findNode
 		        			byte[]	token = (byte[])reply.get( "token" );
@@ -691,7 +712,7 @@ DHTTransportI2P
 		        		handleError(
 		        			DHTTransportException error) 
 		        		{
-		        			System.out.println( "error findNodeReply: " + Debug.getNestedExceptionMessage( error ));
+		        			if ( TRACE ) trace( "error findNodeReply: " + Debug.getNestedExceptionMessage( error ));
 	
 		        			handler.failed( contact, error );
 		        			
@@ -722,7 +743,7 @@ DHTTransportI2P
 		
 		throws Exception
 	{
-		System.out.println( "receiveFindNode" );
+		if ( TRACE ) trace( "receiveFindNode" );
 
 		DHTTransportContact[] contacts = request_handler.findNodeRequest( originator, target );
 
@@ -755,7 +776,7 @@ DHTTransportI2P
 		final DHTTransportContactI2P		contact,
 		byte[]								target )
 	{
-		System.out.println( "sendFindValue: contact=" + contact.getString() + ", target=" + ByteFormatter.encodeString( target ));
+		if ( TRACE ) trace( "sendFindValue: contact=" + contact.getString() + ", target=" + ByteFormatter.encodeString( target ));
 		
 		try{
 	        stats.findValueSent( null );
@@ -778,7 +799,7 @@ DHTTransportI2P
 	        		handleReply(
 	        			Map reply ) 
 	        		{
-	        			System.out.println( "good sendFindValue: " + reply );
+	        			if ( TRACE ) trace( "good sendFindValue: " + reply );
 	        			
 	        			byte[]	token = (byte[])reply.get( "token" );
 	        			
@@ -831,7 +852,7 @@ DHTTransportI2P
 	        		handleError(
 	        			DHTTransportException error) 
 	        		{
-	        			System.out.println( "error sendFindValue: " + Debug.getNestedExceptionMessage( error ));
+	        			if ( TRACE ) trace( "error sendFindValue: " + Debug.getNestedExceptionMessage( error ));
 
 	        			handler.failed( contact, error );
 	        			
@@ -862,7 +883,7 @@ DHTTransportI2P
 		
 		throws Exception
 	{
-		System.out.println( "receiveFindValue" );
+		if ( TRACE ) trace( "receiveFindValue" );
 
 		DHTTransportFindValueReply reply = request_handler.findValueRequest( originator, hash, NUM_WANT, (byte)0 );
 
@@ -923,7 +944,7 @@ DHTTransportI2P
 			resps.put( "nodes", nodes );
 		}
 		
-		System.out.println( "    findValue->" + map);
+		if ( TRACE ) trace( "    findValue->" + map);
 
 		sendResponse( originator, message_id, map );
 	}
@@ -937,7 +958,7 @@ DHTTransportI2P
 	{
 		byte[]	token = contact.getRandomID2();
 		
-		System.out.println( "sendStore: keys=" + keys.length + ", token=" + token + ", contact=" + contact.getString());
+		if ( TRACE ) trace( "sendStore: keys=" + keys.length + ", token=" + token + ", contact=" + contact.getString());
 		
 		try{
 			if ( token == null || token == DHTTransportContactI2P.DEFAULT_TOKEN ){
@@ -960,7 +981,7 @@ DHTTransportI2P
 
 					map.put( "a", args );
 
-					System.out.println( "   storeKey: " + ByteFormatter.encodeString( keys[i] ));
+					if ( TRACE ) trace( "   storeKey: " + ByteFormatter.encodeString( keys[i] ));
 					
 					args.put( "info_hash", keys[i] );
 
@@ -976,7 +997,7 @@ DHTTransportI2P
 								handleReply(
 									Map 	reply ) 
 								{
-									System.out.println( "good sendStoreReply" );
+									if ( TRACE ) trace( "good sendStoreReply" );
 
 									if ( report_result ){
 
@@ -991,7 +1012,7 @@ DHTTransportI2P
 								handleError(
 										DHTTransportException error) 
 								{
-									System.out.println( "error sendStoreReply: " + Debug.getNestedExceptionMessage( error ));
+									if ( TRACE ) trace( "error sendStoreReply: " + Debug.getNestedExceptionMessage( error ));
 
 									if ( report_result ){
 
@@ -1032,7 +1053,7 @@ DHTTransportI2P
 		
 		throws Exception
 	{
-		System.out.println( "receiveStore" );
+		if ( TRACE ) trace( "receiveStore" );
 		
 		byte[][]				keys 	= new byte[][]{ hash };
 		
@@ -1057,28 +1078,23 @@ DHTTransportI2P
 	lookupDest(
 		NodeInfo		node )
 	{
-    	Destination	dest = node.getDestination();
-    	
-    	if ( dest == null ) {
-
-    		try{
-    			dest = session.lookupDest( node.getHash(), DEST_LOOKUP_TIMEOUT );
+		try{
+				// blocking ok here as this method only used for bootstrap test logic which is
+				// already async. Also we want to force the lookup regardless of whether or not
+				// we have a dest
+			
+			Destination dest = session.lookupDest( node.getHash(), DEST_LOOKUP_TIMEOUT );
+        
+            if ( dest != null ){
             
-	            if (dest != null ){
-	            
-	                node.setDestination(dest);
-	                
-	                return( true );
-	            }
-    		}catch( Throwable e ){
-    		}
-    		
-    		return( false );
-    		
-    	}else{
-    		
-    		return( true );
-    	}
+                node.setDestination(dest);
+                
+                return( true );
+            }
+		}catch( Throwable e ){
+		}
+		
+		return( false );
 	}
 	
 	private void 
@@ -1097,10 +1113,10 @@ DHTTransportI2P
    
     private void 
     sendQuery(
-    	ReplyHandler				handler,
-    	NodeInfo					node,
-    	Map					 		map, 
-    	boolean 					repliable ) 
+    	final ReplyHandler				handler,
+    	final NodeInfo					node,
+    	final Map				 		map, 
+    	final boolean 					repliable ) 
     	
     	throws Exception
     {
@@ -1113,18 +1129,61 @@ DHTTransportI2P
     	
     	if ( dest == null ) {
 
-            dest = session.lookupDest( node.getHash(), DEST_LOOKUP_TIMEOUT );
+    		if ( TRACE ) trace( "Scheduling dest lookup: active=" + destination_lookup_pool.getRunningCount() + ", queued=" + destination_lookup_pool.getQueueSize());
+    		
+    		destination_lookup_pool.run(
+    			new AERunnable() 
+    			{
+					public void 
+					runSupport() 
+					{
+						try{
+							long	start = SystemTime.getMonotonousTime();
+							
+							Destination dest = session.lookupDest( node.getHash(), DEST_LOOKUP_TIMEOUT );
             
-            if (dest != null ){
+							if ( dest != null ){
             
-                node.setDestination(dest);
-                
-            }else{
-            	
-            	throw( new DHTTransportException( "Destination lookup failed" ));
-            }
+								if ( TRACE ) trace( "Destination lookup ok - elapsed=" + (SystemTime.getMonotonousTime()-start));
+								
+								node.setDestination( dest );
+								
+					    		sendQuery( handler, dest, node.getPort(), map, repliable );
+					    		
+							}else{
+								
+								throw( new DHTTransportException( "Destination lookup failed" ));
+							}
+						}catch( Throwable e ){
+							
+							if ( e instanceof DHTTransportException ){
+								
+								handler.handleError((DHTTransportException)e);
+								
+							}else{
+								
+								handler.handleError( new DHTTransportException( "Destination lookup failed", e ));
+							}
+						}
+					}
+    			});
+    	}else{
+    		
+    		sendQuery( handler, dest, node.getPort(), map, repliable );
     	}
-
+    }
+    
+    private void 
+    sendQuery(
+    	ReplyHandler				handler,
+    	Destination					dest,
+    	int							port,
+    	Map				 			map, 
+    	boolean 					repliable ) 
+    	
+    	throws Exception
+    {
+    	
 	    map.put( "y", "q" );
 	
 	    	// i2p uses 8 byte random message ids and supports receiving up to 16 byte ids
@@ -1138,15 +1197,12 @@ DHTTransportI2P
 	    Map<String, Object> args = (Map<String, Object>) map.get("a");
 	
 	    args.put("id", my_nid.getData());
-	    
-	    int port = node.getPort();
-	    
+	    	    
 	    if ( !repliable ){
 	    	
 	    	port++;
 	    }
 	    
-    	
     	synchronized( requests ){
 	    		
     		requests.put( new HashWrapper( msg_id ), new Request( handler ));
@@ -1246,6 +1302,9 @@ DHTTransportI2P
             opts.setSendLeaseSet( false );
         }
         
+        stats.total_packets_sent++;
+        stats.total_bytes_sent += payload.length;
+        
         if ( session.sendMessage(
            		dest, 
            		payload, 
@@ -1311,6 +1370,10 @@ DHTTransportI2P
     	int 			from_port, 
     	byte[]			payload ) 
     {
+    	stats.total_packets_received++;
+    	
+    	stats.total_bytes_received += payload.length;
+    	
     	try{
 	    	Map		map = BDecoder.decode( payload );
 	
@@ -1401,7 +1464,7 @@ DHTTransportI2P
 
         	if ( token == null ){
         		
-        		System.out.println( "Token missing, store deined" );
+        		if ( TRACE ) trace( "Token missing, store deined" );
         		
         		return;
         	}
@@ -1413,7 +1476,7 @@ DHTTransportI2P
         	
         	if ( node == null ){
         		
-        		System.out.println( "Token invalid/expired, store deined" );
+        		if ( TRACE ) trace( "Token invalid/expired, store deined" );
         		
         		return;
         	}
@@ -1483,6 +1546,8 @@ DHTTransportI2P
     	}
     	
     	if ( timed_out != null ){
+    		
+    		stats.total_request_timeouts += timed_out.size();
     		
     		for ( Request r: timed_out ){
     			
@@ -1593,6 +1658,13 @@ DHTTransportI2P
 		timer_event.cancel();
 	}
 	
+	private void
+	trace(
+		String	str )
+	{
+		System.out.println( str );
+	}
+	
 	private interface
 	ReplyHandler
 	{
@@ -1636,6 +1708,12 @@ DHTTransportI2P
 	DHTTransportStatsI2P
 		extends DHTTransportStatsImpl
 	{
+		private long	total_request_timeouts;
+		private long	total_packets_sent;
+		private long	total_packets_received;
+		private long	total_bytes_sent;
+		private long	total_bytes_received;
+
 		private 
 		DHTTransportStatsI2P()
 		{
@@ -1644,47 +1722,47 @@ DHTTransportI2P
 		
 		public DHTTransportStats snapshot() {
 			
-			DHTTransportStatsImpl res = new DHTTransportStatsI2P();
+			DHTTransportStatsI2P res = new DHTTransportStatsI2P();
 			
 			snapshotSupport( res );
+			
+			res.total_request_timeouts		= total_request_timeouts;
+			res.total_packets_sent			= total_packets_sent;
+			res.total_packets_received		= total_packets_received;
+			res.total_bytes_sent			= total_bytes_sent;
+			res.total_bytes_received		= total_bytes_received;
 			
 			return( res );
 		}
 		
 		@Override
 		public int getRouteablePercentage() {
-			// TODO Auto-generated method stub
-			return 0;
+			return( 100 );
 		}
 		
 		@Override
 		public long getRequestsTimedOut() {
-			// TODO Auto-generated method stub
-			return 0;
+			return( total_request_timeouts );
 		}
 		
 		@Override
 		public long getPacketsSent() {
-			// TODO Auto-generated method stub
-			return 0;
+			return( total_packets_sent );
 		}
 		
 		@Override
 		public long getPacketsReceived() {
-			// TODO Auto-generated method stub
-			return 0;
+			return( total_packets_received );
 		}
 		
 		@Override
 		public long getBytesSent() {
-			// TODO Auto-generated method stub
-			return 0;
+			return( total_bytes_sent );
 		}
 		
 		@Override
 		public long getBytesReceived() {
-			// TODO Auto-generated method stub
-			return 0;
+			return( total_bytes_received );
 		}
 	}
 	

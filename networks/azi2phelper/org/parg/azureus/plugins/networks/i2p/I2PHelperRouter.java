@@ -65,7 +65,7 @@ I2PHelperRouter
 
 	private boolean					is_bootstrap_node;
 	private boolean					is_vuze_dht;
-	private I2pHelperAdapter		logger;
+	private I2PHelperAdapter		logger;
 	
 	private static final boolean	FULL_STATS = false;
 	
@@ -79,7 +79,7 @@ I2PHelperRouter
 	I2PHelperRouter(
 		boolean					bootstrap_node,
 		boolean					use_vuze_dht,
-		I2pHelperAdapter		_logger )
+		I2PHelperAdapter		_logger )
 	{
 		is_bootstrap_node	= bootstrap_node;
 		is_vuze_dht			= use_vuze_dht;
@@ -574,7 +574,7 @@ I2PHelperRouter
 			logger.log( "        " + Base32.encode( session.getMyDestination().calculateHash().getData()).toUpperCase() + ".b32.i2p"  + ", existing=" + use_existing_key );
 			logger.log( "MyNID:  " + Base32.encode( dht_nid.getData()) + ", existing=" + use_existing_nid );
 
-			dht = new DHTI2P( config_dir, session, my_node_info, is_bootstrap_node?null:boot_ninf );						
+			dht = new DHTI2P( config_dir, session, my_node_info, is_bootstrap_node?null:boot_ninf, logger );						
 		}
 	}
 	
@@ -584,10 +584,12 @@ I2PHelperRouter
 	
 		throws Exception
 	{
+			// just used for testing, leave blocking
+		
 		return( session.lookupDest( new Hash( hash ), 30*1000 ));
 	}
 	
-	protected I2PHelperDHT
+	public I2PHelperDHT
 	getDHT()
 	{
 		return( dht );

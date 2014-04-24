@@ -285,7 +285,7 @@ DHTTransportContactI2P
 	public DHTTransportFullStats
 	getStats()
 	{
-		return( null );
+		return( transport.getFullStats( this ));
 	}
 	
 	public void
