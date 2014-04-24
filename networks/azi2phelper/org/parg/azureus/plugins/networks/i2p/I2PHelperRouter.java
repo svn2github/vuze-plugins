@@ -69,8 +69,10 @@ I2PHelperRouter
 	
 	private static final boolean	FULL_STATS = false;
 	
-	private Router 			router;
-	private I2PSession 		session;
+	private Router 				router;
+	private I2PSession 			session;
+	private I2PSocketManager 	socket_manager;
+
 	private I2PHelperDHT	dht;
 	
 	private boolean		destroyed;
@@ -393,9 +395,7 @@ I2PHelperRouter
 		I2PAppContext ctx = I2PAppContext.getGlobalContext();
 
 		ctx.logManager().setDefaultLimit( "ERROR" ); // "WARN" );
-		
-		I2PSocketManager manager;
-		
+				
 		
         // outbound speed limit
         // "i2cp.outboundBytesPerSecond"
@@ -452,7 +452,7 @@ I2PHelperRouter
     		InputStream is = new FileInputStream( dest_key_file );
     	
     		try{
-    			manager = I2PSocketManagerFactory.createManager( is, i2p_host, i2p_internal_port, opts );
+    			socket_manager = I2PSocketManagerFactory.createManager( is, i2p_host, i2p_internal_port, opts );
     	
     		}finally{
     		
@@ -460,10 +460,10 @@ I2PHelperRouter
     		}
         }else{
         	
-        	manager = I2PSocketManagerFactory.createManager( i2p_host, i2p_internal_port, opts );
+        	socket_manager = I2PSocketManagerFactory.createManager( i2p_host, i2p_internal_port, opts );
         }
 		
-		if ( manager == null ){
+		if ( socket_manager == null ){
 			
 			throw( new Exception ( "Failed to create socket manager" ));
 		}
@@ -472,7 +472,7 @@ I2PHelperRouter
 		
 		while( true ){
 			
-			session = manager.getSession();
+			session = socket_manager.getSession();
 			
 			if ( session != null ){
 				
@@ -587,6 +587,12 @@ I2PHelperRouter
 			// just used for testing, leave blocking
 		
 		return( session.lookupDest( new Hash( hash ), 30*1000 ));
+	}
+	
+	public I2PSocketManager
+	getSocketManager()
+	{
+		return( socket_manager );
 	}
 	
 	public I2PHelperDHT

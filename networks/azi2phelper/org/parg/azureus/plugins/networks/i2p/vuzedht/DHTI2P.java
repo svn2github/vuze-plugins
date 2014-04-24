@@ -36,6 +36,7 @@ import net.i2p.data.Destination;
 import net.i2p.data.Hash;
 
 import org.gudy.azureus2.core3.util.AESemaphore;
+import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.RandomUtils;
@@ -164,6 +165,8 @@ DHTI2P
 				
 				private int	tick_count = 0;
 				
+				private volatile boolean bootstrapping;
+				
 				@Override
 				public void
 				perform(
@@ -185,7 +188,27 @@ DHTI2P
 					
 					if ( tick_count % bootstrap_check_tick_count == 0 ){
 					
-						checkForBootstrap();
+						if ( !bootstrapping ){
+							
+							bootstrapping = true;
+							
+							new AEThread2( "I2P:bootcheck" )
+							{
+								public void
+								run()
+								{
+									try{
+										checkForBootstrap();
+										
+									}catch( Throwable e ){
+										
+									}finally{
+									
+										bootstrapping = false;
+									}
+								}
+							}.start();
+						}
 					}
 				}
 			});
@@ -307,7 +330,7 @@ DHTI2P
 					max,
 					maxWait,
 					false,
-					false,
+					true,		// high priority
 					new DHTOperationAdapter() 
 					{	
 						public void 

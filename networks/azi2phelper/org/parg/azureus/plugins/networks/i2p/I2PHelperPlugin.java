@@ -70,7 +70,6 @@ import org.gudy.azureus2.plugins.ui.config.StringParameter;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
-import org.parg.azureus.plugins.networks.i2p.dht.DHT;
 import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 import org.parg.azureus.plugins.networks.i2p.swt.I2PHelperView;
 
@@ -961,6 +960,8 @@ I2PHelperPlugin
 			I2PHelperTracker tracker = new I2PHelperTracker( adapter, router.getDHT());
 			
 			I2PHelperConsole console = new I2PHelperConsole();
+			
+			I2PHelperSocksProxy	socks_proxy = new I2PHelperSocksProxy( router, adapter );
 			
 			I2PHelperBootstrapServer bootstrap_server = null;
 			
