@@ -211,7 +211,7 @@ I2PHelperSocksProxy
 	}
 	
 	private void
-	closed(
+	removeConnection(
 		SOCKSProxyConnection	connection )
 	{
 		synchronized( this ){
@@ -299,15 +299,7 @@ I2PHelperSocksProxy
 		public InetAddress
 		getLocalAddress()
 		{
-			try{
-				return( InetAddress.getLocalHost() );
-				
-			}catch( Throwable e ){
-				
-				Debug.printStackTrace(e);
-				
-				return( null );
-			}
+			return( local_address );
 		}
 		
 		public int
@@ -324,69 +316,83 @@ I2PHelperSocksProxy
 		{				
 			trace( "connect request to " + _address.getUnresolvedAddress() + "/" + _address.getAddress() + "/" + _address.getPort());
 			
-			if ( _address.getAddress() != null ){
-									
-				trace( "    delegating resolved" );
-				
-				AESocksProxyPlugableConnection	delegate = proxy_connection.getProxy().getDefaultPlugableConnection( proxy_connection );
-				
-				proxy_connection.setDelegate( delegate );
-				
-				delegate.connect( _address );
-				
-			}else{ 
-				
-				final String	externalised_address = AEProxyFactory.getAddressMapper().externalise(_address.getUnresolvedAddress());
+			boolean		handling_connection = false;
 			
-				if ( !externalised_address.toLowerCase().endsWith(".i2p")){
-															
-					trace( "    delegating unresolved" );
-
+			try{
+				if ( _address.getAddress() != null ){
+						
+					trace( "    delegating resolved" );
+						
 					AESocksProxyPlugableConnection	delegate = proxy_connection.getProxy().getDefaultPlugableConnection( proxy_connection );
-					
-					proxy_connection.enableDNSLookups();
-					
+						
 					proxy_connection.setDelegate( delegate );
-					
+						
 					delegate.connect( _address );
 
-				}else{
-
-					connect_pool.run(
-						new AERunnable()
-						{
-							public void
-							runSupport()
-							{									
-								trace( "    delegating to I2P" );
-								
-								try{
-									
-										// remove the .i2p
-									
-									String new_externalised_address = externalised_address.substring( 0, externalised_address.length() - 4 );
-									
-							        socket = connectToAddress( new_externalised_address );
-							       	
-							        proxy_connection.connected();
-							        
-							        
-								}catch( Throwable e ){
+				}else{ 
+					
+					final String	externalised_address = AEProxyFactory.getAddressMapper().externalise(_address.getUnresolvedAddress());
+				
+					if ( !externalised_address.toLowerCase().endsWith(".i2p")){
+																
+						trace( "    delegating unresolved" );
+	
+						AESocksProxyPlugableConnection	delegate = proxy_connection.getProxy().getDefaultPlugableConnection( proxy_connection );
+						
+						proxy_connection.enableDNSLookups();
+						
+						proxy_connection.setDelegate( delegate );
+						
+						delegate.connect( _address );
+	
+					}else{
+	
+						connect_pool.run(
+							new AERunnable()
+							{
+								public void
+								runSupport()
+								{									
+									trace( "    delegating to I2P" );
 									
 									try{
-										proxy_connection.close();
 										
-									}catch( Throwable f ){
+											// remove the .i2p
 										
-										f.printStackTrace();
+										String new_externalised_address = externalised_address.substring( 0, externalised_address.length() - 4 );
+										
+								        socket = connectToAddress( new_externalised_address );
+								       	
+								        proxy_connection.connected();
+								        
+								        
+									}catch( Throwable e ){
+										
+										try{
+											proxy_connection.close();
+											
+										}catch( Throwable f ){
+											
+											f.printStackTrace();
+										}
+										
+											//e.printStackTrace();
+										
+										trace( "I2PSocket creation fails: " + Debug.getNestedExceptionMessage(e) );
 									}
-									
-									//e.printStackTrace();
-									
-									trace( "I2PSocket creation fails: " + Debug.getNestedExceptionMessage(e) );
 								}
-							}
-						});
+							});
+						
+						handling_connection = true;
+					}
+				}
+			}finally{
+				
+				if ( !handling_connection ){
+					
+						// we've handed over control for this connection and won't hear about it again
+					
+					removeConnection( this );
 				}
 			}
 		}
@@ -446,7 +452,7 @@ I2PHelperSocksProxy
 				}
 			}
 			
-			closed( this );
+			removeConnection( this );
 		}
 		
 		protected class

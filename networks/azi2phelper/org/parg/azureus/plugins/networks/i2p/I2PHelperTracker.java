@@ -82,4 +82,10 @@ I2PHelperTracker
 		
 		adapter.log( "put -> " + peer_hashes.size() + ", elapsed=" + (SystemTime.getMonotonousTime() - start ));
 	}
+	
+	public void
+	destroy()
+	{
+		
+	}
 }

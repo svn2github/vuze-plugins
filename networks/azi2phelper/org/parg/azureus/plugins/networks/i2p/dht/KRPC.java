@@ -2201,6 +2201,8 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
 									}
 			            		}
 		            		}
+		            		
+		            		bad_sent++;
 	            		}
 	            	}
             	}

@@ -371,45 +371,66 @@ I2PHelperPlugin
 						boolean	is_bootstrap_node	= false;
 						boolean	is_vuze_dht			= true;
 						
-						I2PHelperRouter my_router = router = 
-								new I2PHelperRouter( is_bootstrap_node, is_vuze_dht, I2PHelperPlugin.this );
-						
-						try{
-							if ( ext_i2p_param.getValue()){
-								
-								my_router.initialise( plugin_dir, ext_i2p_port_param.getValue());
-										
-							}else{
-							
-								my_router.initialise( plugin_dir, f_int_port, f_ext_port );
-							}
-							
-							if ( !unloaded ){
-								
-								tracker = new I2PHelperTracker( I2PHelperPlugin.this, my_router.getDHT());
-								
-								while( !unloaded ){
+						while( !unloaded ){
+														
+							try{
+								I2PHelperRouter my_router	= null;
+
+								try{
+									my_router = router = 
+											new I2PHelperRouter( is_bootstrap_node, is_vuze_dht, I2PHelperPlugin.this );
 									
-									try{
-										my_router.logInfo();
-									
-									}catch( Throwable e ){
+									if ( ext_i2p_param.getValue()){
+											
+										my_router.initialise( plugin_dir, ext_i2p_port_param.getValue());
+													
+									}else{
 										
+										my_router.initialise( plugin_dir, f_int_port, f_ext_port );
+									}
+										
+									if ( !unloaded ){
+										
+										tracker = new I2PHelperTracker( I2PHelperPlugin.this, my_router.getDHT());
+										
+										while( !unloaded ){
+											
+											try{
+												my_router.logInfo();
+											
+											}catch( Throwable e ){
+												
+											}
+											
+											Thread.sleep(60*1000);
+										}
 									}
 									
-									Thread.sleep(60*1000);
+								}finally{
+									
+									if ( my_router != null ){
+										
+										my_router.destroy();
+			
+										if ( router == my_router ){
+																		
+											router = null;
+										}
+									}
+								}
+							}catch( Throwable e ){
+								
+								log( "Router initialisation fail: " + Debug.getNestedExceptionMessage( e ));
+								
+								if ( !unloaded ){
+										
+									try{
+										Thread.sleep(15*1000);
+										
+									}catch( Throwable f ){
+									}
 								}
 							}
-						}catch( Throwable e ){
-							
-							e.printStackTrace();
-						}
-						
-						my_router.destroy();
-
-						if ( router == my_router ){
-															
-							router = null;
 						}
 					}
 				}.start();
@@ -738,50 +759,58 @@ I2PHelperPlugin
 			unloaded = true;
 		}
 		
-		if ( router != null ){
-			
-			router.destroy();
-			
-			router = null;
-		}
-		
-		if ( lock_stream != null ){
-			
-			try{
-				lock_stream.close();
+		try{
+			if ( router != null ){
 				
-			}catch( Throwable e ){
+				router.destroy();
+				
+				router = null;
 			}
 			
-			lock_stream = null;
-		}
-		
-		if ( lock_file != null ){
-			
-			lock_file.delete();
-			
-			lock_file = null;
-		}
-		
-		if ( !for_closedown ){
-			
-			if ( config_model != null ){
+			if ( !for_closedown ){
 				
-				config_model.destroy();
+				if ( config_model != null ){
+					
+					config_model.destroy();
+					
+					config_model = null;
+				}
 				
-				config_model = null;
+				if ( view_model != null ){
+					
+					view_model.destroy();
+					
+					view_model = null;
+				}
+				
+				if ( ui_view != null ){
+					
+					ui_view.unload();
+				}
+				
+				if ( tracker != null ){
+					
+					tracker.destroy();
+				}
+			}
+		}finally{
+			
+			if ( lock_stream != null ){
+				
+				try{
+					lock_stream.close();
+					
+				}catch( Throwable e ){
+				}
+				
+				lock_stream = null;
 			}
 			
-			if ( view_model != null ){
+			if ( lock_file != null ){
 				
-				view_model.destroy();
+				lock_file.delete();
 				
-				view_model = null;
-			}
-			
-			if ( ui_view != null ){
-				
-				ui_view.unload();
+				lock_file = null;
 			}
 		}
 	}

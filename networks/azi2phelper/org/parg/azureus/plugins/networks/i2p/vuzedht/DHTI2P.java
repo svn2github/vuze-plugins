@@ -466,10 +466,19 @@ DHTI2P
     		while( rc_it.hasNext()){
     			
     			DHTRouterContact r_contact = rc_it.next();
-    			
+
+       			if ( router.isID( r_contact.getID())){
+       				
+       				rc_it.remove();
+       				
+       				all_nodes_count--;
+       				
+       				continue;
+       			}
+
     			DHTTransportContactI2P t_cn = (DHTTransportContactI2P)((DHTControlContact)r_contact.getAttachment()).getTransportContact();
     			
-    			NodeInfo node = t_cn.getNode();
+     			NodeInfo node = t_cn.getNode();
 
            		NID nid = node.getNID();
 
@@ -742,6 +751,8 @@ DHTI2P
 							
             				router.contactDead( rc.getID(), false);
 						}
+            			
+            			bad_sent++;
             		}
             	}
         	}
