@@ -33,9 +33,11 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 import net.i2p.I2PAppContext;
@@ -44,11 +46,13 @@ import net.i2p.client.streaming.I2PSocket;
 import net.i2p.client.streaming.I2PSocketManager;
 import net.i2p.data.Destination;
 
-import org.gudy.azureus2.core3.util.AEMonitor;
+import org.gudy.azureus2.core3.tracker.protocol.PRHelpers;
 import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.RandomUtils;
+import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.core3.util.ThreadPool;
 
 import com.aelitis.azureus.core.proxy.AEProxyConnection;
@@ -87,16 +91,18 @@ I2PHelperSocksProxy
 	private I2PHelperRouter		router;
 	private I2PHelperAdapter	adapter;
 	
-	private I2PSocketManager	socket_manager;
 	private NamingService		name_service;
 	
 	private AESocksProxy 		proxy;
 	
+	private Map<String,String>	intermediate_host_map	= new HashMap<String, String>();
+
 	private boolean				destroyed;
 	
 	protected
 	I2PHelperSocksProxy(
 		I2PHelperRouter			_router,
+		int						_port,
 		I2PHelperAdapter		_adapter )
 	
 		throws AEProxyException
@@ -105,10 +111,8 @@ I2PHelperSocksProxy
 		adapter = _adapter;
 				
 		name_service = I2PAppContext.getGlobalContext().namingService();
-		
-		socket_manager = router.getSocketManager();
-		
-		proxy = AESocksProxyFactory.create( 0, 120*1000, 120*1000, this );
+				
+		proxy = AESocksProxyFactory.create( _port, 120*1000, 120*1000, this );
 		
 		adapter.log( "Intermediate SOCKS proxy started on port " + proxy.getPort());
 	}
@@ -117,6 +121,45 @@ I2PHelperSocksProxy
 	getPort()
 	{
 		return( proxy.getPort());
+	}
+	
+	protected String
+	getIntermediateHost(
+		String		host )
+		
+		throws AEProxyException
+	{
+		synchronized( this ){
+			
+			if ( destroyed ){
+				
+				throw( new AEProxyException( "Proxy destroyed" ));
+			}
+	
+			while( true ){
+				
+				int	address = 0x0a000000 + RandomUtils.nextInt( 0x00ffffff );
+								
+				String intermediate_host = PRHelpers.intToAddress( address );
+				
+				if ( !intermediate_host_map.containsKey( intermediate_host )){
+					
+					intermediate_host_map.put( intermediate_host, host );
+					
+					return( intermediate_host );
+				}
+			}
+		}
+	}
+	
+	protected void
+	removeIntermediateHost(
+		String		intermediate )
+	{
+		synchronized( this ){
+			
+			intermediate_host_map.remove( intermediate );
+		}
 	}
 	
 	public AESocksProxyPlugableConnection
@@ -147,10 +190,42 @@ I2PHelperSocksProxy
 			
 			connections.add( con );
 			
-			System.out.println( "total connections=" + connections.size());
+			System.out.println( "total connections=" + connections.size() + ", ih=" + intermediate_host_map.size());
 			
 			return( con );
 		}
+	}
+	
+	private I2PSocketManager
+	getSocketManager()
+	
+		throws Exception
+	{
+		long	start = SystemTime.getMonotonousTime();
+		
+		while( SystemTime.getMonotonousTime() - start < 60*1000 ){
+			
+			if ( destroyed ){
+				
+				throw( new Exception( "SOCKS proxy destroyed" ));
+			}
+			
+			I2PSocketManager sm = router.getSocketManager();
+			
+			if ( sm != null ){
+				
+				return( sm );
+			}
+			
+			try{
+				Thread.sleep(1000);
+				
+			}catch( Throwable e ){
+				
+			}
+		}
+		
+		throw( new Exception( "Timeout waiting for socket manager" ));
 	}
 	
 	private I2PSocket
@@ -186,7 +261,7 @@ I2PHelperSocksProxy
 				throw( new Exception( "Failed to resolve address '" + address + "'" ));
 			}
 			
-			I2PSocket socket = socket_manager.connect( remote_dest );
+			I2PSocket socket = getSocketManager().connect( remote_dest );
 						
 			return( socket );
 			
@@ -218,7 +293,7 @@ I2PHelperSocksProxy
 			
 			connections.remove( connection );
 			
-			System.out.println( "total connections=" + connections.size());
+			System.out.println( "total connections=" + connections.size() + ", ih=" + intermediate_host_map.size());
 		}
 	}
 	
@@ -313,13 +388,30 @@ I2PHelperSocksProxy
 			AESocksProxyAddress		_address )
 			
 			throws IOException
-		{				
-			trace( "connect request to " + _address.getUnresolvedAddress() + "/" + _address.getAddress() + "/" + _address.getPort());
+		{
+			InetAddress resolved 	= _address.getAddress();
+			String		unresolved	= _address.getUnresolvedAddress();
 			
+			if ( resolved != null ){
+				
+				synchronized( this ){
+					
+					String	intermediate = intermediate_host_map.remove( resolved.getHostAddress());
+					
+					if ( intermediate != null ){
+						
+						resolved	= null;
+						unresolved	= intermediate;
+					}
+				}
+			}
+			
+			trace( "connect request to " + unresolved + "/" + resolved + "/" + _address.getPort());
+					
 			boolean		handling_connection = false;
 			
 			try{
-				if ( _address.getAddress() != null ){
+				if ( resolved != null ){
 						
 					trace( "    delegating resolved" );
 						
@@ -331,7 +423,7 @@ I2PHelperSocksProxy
 
 				}else{ 
 					
-					final String	externalised_address = AEProxyFactory.getAddressMapper().externalise(_address.getUnresolvedAddress());
+					final String	externalised_address = AEProxyFactory.getAddressMapper().externalise( unresolved );
 				
 					if ( !externalised_address.toLowerCase().endsWith(".i2p")){
 																

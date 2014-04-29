@@ -21,6 +21,8 @@
 
 package org.parg.azureus.plugins.networks.i2p;
 
+import net.i2p.client.streaming.I2PSocket;
+
 public interface 
 I2PHelperAdapter 
 {
@@ -30,4 +32,10 @@ I2PHelperAdapter
 	
 	public boolean
 	tryExternalBootstrap();
+	
+	public void
+	connectionAccepted(
+		I2PSocket		socket )
+		
+		throws Exception;
 }

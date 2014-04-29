@@ -32,29 +32,39 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.Socket;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.channels.ServerSocketChannel;
 
 
 
+import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 
+import net.i2p.client.streaming.I2PSocket;
 import net.i2p.data.Base32;
 import net.i2p.data.Base64;
 import net.i2p.data.Destination;
 
+import org.gudy.azureus2.core3.config.COConfigurationManager;
+import org.gudy.azureus2.core3.tracker.protocol.PRHelpers;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.RandomUtils;
+import org.gudy.azureus2.core3.util.SystemTime;
+import org.gudy.azureus2.core3.util.UrlUtils;
 import org.gudy.azureus2.plugins.PluginAdapter;
 import org.gudy.azureus2.plugins.PluginConfig;
 import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.UnloadablePlugin;
+import org.gudy.azureus2.plugins.ipc.IPCException;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
 import org.gudy.azureus2.plugins.ui.UIInstance;
@@ -108,6 +118,14 @@ I2PHelperPlugin
 	private BasicPluginViewModel	view_model;
 	private LocaleUtilities			loc_utils;
 
+	private IntParameter 			int_port_param;
+	private IntParameter 			ext_port_param;
+	private IntParameter 			socks_port_param;
+	private InfoParameter 			port_info_param;
+	
+	private int						active_int_port;
+	private int						active_ext_port;
+	
 	private I2PHelperView			ui_view;
 	
 	private boolean					plugin_enabled;
@@ -118,6 +136,9 @@ I2PHelperPlugin
 	private File			lock_file;
 	private InputStream		lock_stream;
 	
+	private I2PHelperSocksProxy					socks_proxy;
+	private Map<Proxy,ProxyMapEntry>			proxy_map 				= new IdentityHashMap<Proxy, ProxyMapEntry>();
+
 	private volatile boolean	unloaded;
 	
 	public void
@@ -189,10 +210,11 @@ I2PHelperPlugin
 			
 			final BooleanParameter enable_param = config_model.addBooleanParameter2( "enable", "azi2phelper.enable", true );
 
-			final IntParameter internal_port = config_model.addIntParameter2( "azi2phelper.internal.port", "azi2phelper.internal.port", 0 );
-			final IntParameter external_port = config_model.addIntParameter2( "azi2phelper.external.port", "azi2phelper.external.port", 0 );
-						
-			int	int_port = internal_port.getValue();
+			int_port_param 		= config_model.addIntParameter2( "azi2phelper.internal.port", "azi2phelper.internal.port", 0 );
+			ext_port_param	 	= config_model.addIntParameter2( "azi2phelper.external.port", "azi2phelper.external.port", 0 );
+			socks_port_param 	= config_model.addIntParameter2( "azi2phelper.socks.port", "azi2phelper.socks.port", 0 );
+			
+			int	int_port = int_port_param.getValue();
 			
 			boolean port_changed = false;
 			
@@ -215,7 +237,10 @@ I2PHelperPlugin
 				}
 			}
 			
-			int	ext_port = external_port.getValue();
+			active_int_port	= int_port;
+
+			
+			int	ext_port = ext_port_param.getValue();
 			
 			if ( ext_port == 0 ){
 				
@@ -237,14 +262,29 @@ I2PHelperPlugin
 				}
 			}
 
-			final InfoParameter info_param = config_model.addInfoParameter2( "azi2phelper.port.info", int_port + "/" + ext_port );
+			active_ext_port	= ext_port;
+			
+			int	sock_port = socks_port_param.getValue();
+			
+			if ( sock_port != 0 ){
+				
+				if  ( !testPort( sock_port )){
+					
+					log( "Testing of explicitly configured SOCKS port " + sock_port + " failed - this isn't good" );
+				}
+			}
+			
+			port_info_param = config_model.addInfoParameter2( "azi2phelper.port.info", "" );
 
+			updatePortInfo();
+			
 			final BooleanParameter use_upnp = config_model.addBooleanParameter2( "azi2phelper.upnp.enable", "azi2phelper.upnp.enable", true );
-
+			
+			final BooleanParameter always_socks = config_model.addBooleanParameter2( "azi2phelper.socks.always", "azi2phelper.socks.always", false );
+		
 			final BooleanParameter ext_i2p_param 		= config_model.addBooleanParameter2( "azi2phelper.use.ext", "azi2phelper.use.ext", false );
 			
 			final IntParameter ext_i2p_port_param 		= config_model.addIntParameter2( "azi2phelper.use.ext.port", "azi2phelper.use.ext.port", 7654 ); 
-
 			
 			
 			final StringParameter 	command_text_param = config_model.addStringParameter2( "azi2phelper.cmd.text", "azi2phelper.cmd.text", "" );
@@ -292,7 +332,7 @@ I2PHelperPlugin
 			final int f_int_port = int_port;
 			final int f_ext_port = ext_port;
 			
-			log( "Internal port=" + int_port +", external=" + ext_port );
+			log( "Internal port=" + int_port +", external=" + ext_port + ", socks=" + sock_port );
 						
 			ParameterListener enabler_listener =
 					new ParameterListener()
@@ -305,9 +345,10 @@ I2PHelperPlugin
 
 							boolean use_ext_i2p  	= ext_i2p_param.getValue();
 							
-							internal_port.setEnabled( plugin_enabled && !use_ext_i2p );
-							external_port.setEnabled( plugin_enabled && !use_ext_i2p);
-							info_param.setEnabled( plugin_enabled  && !use_ext_i2p);
+							int_port_param.setEnabled( plugin_enabled && !use_ext_i2p );
+							ext_port_param.setEnabled( plugin_enabled && !use_ext_i2p);
+							socks_port_param.setEnabled( plugin_enabled );
+							port_info_param.setEnabled( plugin_enabled  && !use_ext_i2p);
 							use_upnp.setEnabled( plugin_enabled  && !use_ext_i2p );
 							
 							ext_i2p_param.setEnabled( plugin_enabled );
@@ -368,9 +409,9 @@ I2PHelperPlugin
 					public void
 					run()
 					{
-						boolean	is_bootstrap_node	= false;
-						boolean	is_vuze_dht			= true;
-						
+						final boolean	is_bootstrap_node	= false;
+						final boolean	is_vuze_dht			= true;
+										
 						while( !unloaded ){
 														
 							try{
@@ -391,9 +432,24 @@ I2PHelperPlugin
 										
 									if ( !unloaded ){
 										
+										boolean	first_run = true;
+
 										tracker = new I2PHelperTracker( I2PHelperPlugin.this, my_router.getDHT());
 										
 										while( !unloaded ){
+											
+											if ( first_run ){
+												
+												if ( always_socks.getValue()){
+													
+													try{
+														getSocksProxy();
+														
+													}catch( Throwable e ){
+														
+													}
+												}
+											}
 											
 											try{
 												my_router.logInfo();
@@ -403,6 +459,8 @@ I2PHelperPlugin
 											}
 											
 											Thread.sleep(60*1000);
+											
+											first_run = false;
 										}
 									}
 									
@@ -478,10 +536,54 @@ I2PHelperPlugin
 		return( loc_utils.getLocalisedMessageText(key));
 	}
 	
+	private void
+	updatePortInfo()
+	{
+		String	socks_port;
+		
+		synchronized( this ){
+			
+			if ( socks_proxy != null ){
+				
+				socks_port = "" + socks_proxy.getPort();
+				
+			}else{
+				
+				socks_port = "inactive";
+			}
+		}
+		
+		port_info_param.setLabelText( active_int_port + "/" + active_ext_port + "/" + socks_port );
+	}
+	
 	public I2PHelperRouter
 	getRouter()
 	{
 		return( router );
+	}
+	
+	private I2PHelperSocksProxy
+	getSocksProxy()
+	
+		throws IPCException
+	{
+		synchronized( I2PHelperPlugin.this ){
+			
+			if ( socks_proxy == null ){
+			
+				try{
+					socks_proxy = new I2PHelperSocksProxy( router, socks_port_param.getValue(), I2PHelperPlugin.this );
+				
+					updatePortInfo();
+					
+				}catch( Throwable e ){
+				
+					throw( new IPCException( e ));
+				}
+			}
+			
+			return( socks_proxy );
+		}
 	}
 	
 	private static void
@@ -688,6 +790,23 @@ I2PHelperPlugin
 		return( false );
 	}
 	
+	public void 
+	connectionAccepted(
+		I2PSocket i2p_socket )
+		
+		throws Exception 
+	{
+		try{
+			Socket vuze_socket = new Socket( Proxy.NO_PROXY );
+			
+			vuze_socket.connect( new InetSocketAddress( "127.0.0.1", COConfigurationManager.getIntParameter( "TCP.Listen.Port" )));
+			
+		}catch( Throwable e ){
+			
+			i2p_socket.close();
+		}
+	}
+	
 	public void
 	log(
 		String	str )
@@ -743,6 +862,147 @@ I2PHelperPlugin
 			pi.getPluginProperties().put( "plugin.unload.disabled", String.valueOf( !b ));
 		}
 	}
+
+	public Object[]
+	getProxy(
+		String		reason,
+		String		host,
+		int			port )
+	
+		throws IPCException
+	{
+		if ( !host.toLowerCase().endsWith( ".i2p" )){
+			
+			return( null );
+		}
+		
+		synchronized( this ){
+			
+			if ( unloaded ){
+				
+				return( null );
+			}
+
+			I2PHelperSocksProxy socks_proxy = getSocksProxy();
+				
+			try{
+				int intermediate_port = socks_proxy.getPort();
+				
+				String intermediate_host = socks_proxy.getIntermediateHost( host );
+		
+				Proxy proxy = new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( "127.0.0.1", intermediate_port ));	
+								
+				proxy_map.put( proxy, new ProxyMapEntry( host, intermediate_host ));
+		
+				System.out.println( "proxy_map=" + proxy_map.size());
+				
+				//last_use_time	= SystemTime.getMonotonousTime();
+	
+				//proxy_request_count.incrementAndGet();
+					
+				return( new Object[]{ proxy, intermediate_host, port });
+				
+			}catch( Throwable e ){
+				
+				throw( new IPCException( e ));
+			}
+		}
+	}
+	
+	public Object[]
+	getProxy(
+		String		reason,
+		URL			url )
+		
+		throws IPCException
+	{
+		String 	host = url.getHost();
+				
+		if ( !host.toLowerCase().endsWith( ".i2p" )){
+			
+			return( null );
+		}
+		
+		synchronized( this ){
+			
+			if ( unloaded ){
+				
+				return( null );
+			}
+
+			I2PHelperSocksProxy socks_proxy = getSocksProxy();
+			
+			try{
+				int intermediate_port = socks_proxy.getPort();
+				
+				String intermediate_host = socks_proxy.getIntermediateHost( host );
+		
+				Proxy proxy = new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( "127.0.0.1", intermediate_port ));	
+								
+				proxy_map.put( proxy, new ProxyMapEntry( host, intermediate_host ));
+		
+				System.out.println( "proxy_map=" + proxy_map.size());
+	
+				//last_use_time	= SystemTime.getMonotonousTime();
+	
+				//proxy_request_count.incrementAndGet();
+					
+				url = UrlUtils.setHost( url, intermediate_host );
+	
+				return( new Object[]{ proxy, url, host });
+				
+			}catch( Throwable e ){
+				
+				throw( new IPCException( e ));
+			}
+		}
+	}
+	
+	public void
+	setProxyStatus(
+		Proxy		proxy,
+		boolean		good )
+	{
+		ProxyMapEntry	entry;
+		
+		synchronized( this ){
+			
+			entry = proxy_map.remove( proxy );
+		
+			if ( entry != null ){
+					
+				System.out.println( "proxy_map=" + proxy_map.size());
+
+				String 	host 				= entry.getHost();
+				
+				/*
+				if ( good ){
+					
+					proxy_request_ok.incrementAndGet();
+					
+				}else{
+					
+					proxy_request_failed.incrementAndGet();
+				}
+				
+				updateProxyHistory( host, good );
+				*/
+				
+				String	intermediate	= entry.getIntermediateHost();
+	
+				if ( intermediate != null ){
+					
+					if ( socks_proxy != null ){
+						
+						socks_proxy.removeIntermediateHost( intermediate );
+					}
+				}
+			}else{
+			
+				Debug.out( "Proxy entry missing!" );
+			}
+		}
+	}
 	
 	public void
 	unload()
@@ -765,6 +1025,13 @@ I2PHelperPlugin
 				router.destroy();
 				
 				router = null;
+			}
+			
+			if ( socks_proxy != null ){
+				
+				socks_proxy.destroy();
+				
+				socks_proxy = null;
 			}
 			
 			if ( !for_closedown ){
@@ -889,6 +1156,42 @@ I2PHelperPlugin
 		return( def );
 	}
 	
+	private class
+	ProxyMapEntry
+	{
+		private long	created = SystemTime.getMonotonousTime();
+		
+		private	String	host;
+		private String	intermediate_host;
+		
+		private
+		ProxyMapEntry(
+			String		_host,
+			String		_intermediate_host )
+		{
+			host				= _host;
+			intermediate_host	= _intermediate_host;
+		}
+		
+		private long
+		getCreateTime()
+		{
+			return( created );
+		}
+		
+		private String
+		getHost()
+		{
+			return( host );
+		}
+		
+		private String
+		getIntermediateHost()
+		{
+			return( intermediate_host );
+		}
+	}
+	
 	public static void
 	main(
 		String[]	args )
@@ -975,6 +1278,18 @@ I2PHelperPlugin
 					
 					return( false );
 				}
+				
+				@Override
+				public void 
+				connectionAccepted(
+					I2PSocket socket )
+					
+					throws Exception 
+				{
+					log( "incoming connections not supported" );
+					
+					socket.close();
+				}
 			};
 			
 		try{
@@ -990,7 +1305,7 @@ I2PHelperPlugin
 			
 			I2PHelperConsole console = new I2PHelperConsole();
 			
-			I2PHelperSocksProxy	socks_proxy = new I2PHelperSocksProxy( router, adapter );
+			I2PHelperSocksProxy	socks_proxy = new I2PHelperSocksProxy( router, 8964, adapter );
 			
 			I2PHelperBootstrapServer bootstrap_server = null;
 			

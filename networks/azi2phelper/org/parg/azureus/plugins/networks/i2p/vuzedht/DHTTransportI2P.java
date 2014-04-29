@@ -1821,7 +1821,7 @@ DHTTransportI2P
 		public int
 		getLifeTimeHours()
 		{
-			return( Integer.MAX_VALUE );
+			return( 0 );	// default is repub interval
 		}
 		
 		public byte
