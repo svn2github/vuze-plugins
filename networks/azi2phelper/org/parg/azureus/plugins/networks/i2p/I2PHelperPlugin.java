@@ -40,7 +40,6 @@ import java.nio.channels.ServerSocketChannel;
 
 
 
-import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,7 +50,6 @@ import net.i2p.data.Base64;
 import net.i2p.data.Destination;
 
 import org.gudy.azureus2.core3.config.COConfigurationManager;
-import org.gudy.azureus2.core3.tracker.protocol.PRHelpers;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.ByteFormatter;
@@ -553,7 +551,7 @@ I2PHelperPlugin
 			}
 		}
 		
-		port_info_param.setLabelText( active_int_port + "/" + active_ext_port + "/" + socks_port );
+		port_info_param.setValue( active_int_port + "/" + active_ext_port + "/" + socks_port );
 	}
 	
 	public I2PHelperRouter
@@ -797,9 +795,15 @@ I2PHelperPlugin
 		throws Exception 
 	{
 		try{
+			System.out.println( "Incoming from " + i2p_socket.getPeerDestination().calculateHash().toBase64());
+			
 			Socket vuze_socket = new Socket( Proxy.NO_PROXY );
 			
 			vuze_socket.connect( new InetSocketAddress( "127.0.0.1", COConfigurationManager.getIntParameter( "TCP.Listen.Port" )));
+			
+			vuze_socket.close();
+			
+			i2p_socket.close();
 			
 		}catch( Throwable e ){
 			

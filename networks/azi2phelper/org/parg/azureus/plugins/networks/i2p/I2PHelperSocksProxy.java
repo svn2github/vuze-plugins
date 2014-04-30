@@ -26,9 +26,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.Proxy;
-import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SocketChannel;
@@ -38,12 +35,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
 import net.i2p.I2PAppContext;
 import net.i2p.client.naming.NamingService;
 import net.i2p.client.streaming.I2PSocket;
 import net.i2p.client.streaming.I2PSocketManager;
+import net.i2p.client.streaming.I2PSocketOptions;
+import net.i2p.data.Base32;
 import net.i2p.data.Destination;
 
 import org.gudy.azureus2.core3.tracker.protocol.PRHelpers;
@@ -51,9 +51,9 @@ import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
-import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.core3.util.ThreadPool;
+import org.gudy.azureus2.core3.util.UrlUtils;
 
 import com.aelitis.azureus.core.proxy.AEProxyConnection;
 import com.aelitis.azureus.core.proxy.AEProxyException;
@@ -70,6 +70,9 @@ public class
 I2PHelperSocksProxy 
 	implements AESocksProxyPlugableConnectionFactory
 {
+	private static final boolean TRACE = false;
+	
+	
 	private InetAddress local_address;
 	
 	private Set<SOCKSProxyConnection>		connections = new HashSet<SOCKSProxyConnection>();
@@ -96,7 +99,8 @@ I2PHelperSocksProxy
 	private AESocksProxy 		proxy;
 	
 	private Map<String,String>	intermediate_host_map	= new HashMap<String, String>();
-
+	private int					next_intermediate_host	= 1;
+	
 	private boolean				destroyed;
 	
 	protected
@@ -138,8 +142,13 @@ I2PHelperSocksProxy
 	
 			while( true ){
 				
-				int	address = 0x0a000000 + RandomUtils.nextInt( 0x00ffffff );
-								
+				int	address = 0x0a000000 + ( next_intermediate_host++ );
+					
+				if ( next_intermediate_host > 0x00ffffff ){
+					
+					next_intermediate_host = 1;
+				}
+				
 				String intermediate_host = PRHelpers.intToAddress( address );
 				
 				if ( !intermediate_host_map.containsKey( intermediate_host )){
@@ -230,10 +239,13 @@ I2PHelperSocksProxy
 	
 	private I2PSocket
 	connectToAddress(
-		String		address )
+		String		address,
+		int			port )
 		
 		throws Exception
 	{
+		// System.out.println( "connectTo: " + address + ": " + port );
+		
 		if ( address.length() < 400 ){
 			
 			if ( !address.endsWith( ".i2p" )){
@@ -261,7 +273,15 @@ I2PHelperSocksProxy
 				throw( new Exception( "Failed to resolve address '" + address + "'" ));
 			}
 			
-			I2PSocket socket = getSocketManager().connect( remote_dest );
+			I2PSocketManager socket_manager = getSocketManager();
+			
+			Properties overrides = new Properties();
+			
+            I2PSocketOptions socket_opts = socket_manager.buildOptions( overrides );
+            
+            socket_opts.setPort( port );
+     
+			I2PSocket socket = socket_manager.connect( remote_dest, socket_opts );
 						
 			return( socket );
 			
@@ -301,7 +321,10 @@ I2PHelperSocksProxy
 	trace(
 		String		str )
 	{
-		adapter.log( str );
+		if ( TRACE ){
+		
+			adapter.log( str );
+		}
 	}
 	
 	protected void
@@ -385,7 +408,7 @@ I2PHelperSocksProxy
 
 		public void
 		connect(
-			AESocksProxyAddress		_address )
+			final AESocksProxyAddress		_address )
 			
 			throws IOException
 		{
@@ -453,7 +476,7 @@ I2PHelperSocksProxy
 										
 										String new_externalised_address = externalised_address.substring( 0, externalised_address.length() - 4 );
 										
-								        socket = connectToAddress( new_externalised_address );
+								        socket = connectToAddress( new_externalised_address, _address.getPort());
 								       	
 								        proxy_connection.connected();
 								        
@@ -620,6 +643,8 @@ I2PHelperSocksProxy
 										Debug.out("I2PluginConnection: target buffer should be null" );
 									}
 									
+									// System.out.println( new String( buffer, 0, len ));
+									
 									target_buffer = ByteBuffer.wrap( buffer, 0, len );
 									
 									read();
@@ -756,8 +781,207 @@ I2PHelperSocksProxy
 										
 										trace( "I2PCon: " + getStateName() + " : write Starts -> I2P - " + len );
 										
-										output_stream.write( source_buffer.array(), 0, len );
-						
+											/*	The I2PTunnel code ends up spewing headers like this:
+											 	GET / HTTP/1.1
+												Host: ladedahdedededed.b32.i2p
+												Cookie: PHPSESSID=derptyderp
+												Cache-Control: max-age=0
+												Accept-Encoding: 
+												X-Accept-Encoding: x-i2p-gzip;q=1.0, identity;q=0.5, deflate;q=0, gzip;q=0, *;q=0
+												User-Agent: MYOB/6.66 (AN/ON)
+												Connection: close
+												
+												Some services insist on the referrer being removed otherwise the throw 'permission denied' errors
+												Also probably makes sense to switch the Host: record to always be the b32 address.
+												
+												Note the switch in accept-encoding. This doesn't appear to be required from some testing
+												I've done but again something to look out for
+												
+																							
+											 	I2PTunnelHTTPServer adds the following headers, might be worth a look one day
+										     	private static final String HASH_HEADER = "X-I2P-DestHash";
+										    	private static final String DEST64_HEADER = "X-I2P-DestB64";
+										    	private static final String DEST32_HEADER = "X-I2P-DestB32";
+									        	addEntry(headers, HASH_HEADER, peerHash.toBase64());
+									        	addEntry(headers, DEST32_HEADER, Base32.encode(peerHash.getData()) + ".b32.i2p");
+									        	addEntry(headers, DEST64_HEADER, socket.getPeerDestination().toBase64());
+
+												str = str.replace( "Connection: keep-alive", "Connection: close" );
+
+											 */
+										
+											// gonna be lazy here and assume that if this is an HTTP request then the
+											// headers are present in the initial buffer read
+										
+										byte[] 	array 			= source_buffer.array();
+										int		array_offset	= 0;
+										
+										if ( outward_bytes == 0 ){
+																				
+											for ( int i=0;i<len-3;i++){
+												
+												if ( 	array[i] 	== '\r' &&
+														array[i+1]	== '\n' &&
+														array[i+2]	== '\r' &&
+														array[i+3]	== '\n' ){
+													
+													String str = new String( array, 0, i+2, "ISO8859-1" );
+
+													String[] lines = str.split( "\r\n" );
+													
+													boolean is_http = false;
+													
+													List<String>	headers = new ArrayList<String>();
+													
+													for ( int j=0;j<lines.length;j++){
+													
+														String line = lines[j].trim();
+														
+														if ( j == 0 ){
+															
+															int pos1 = line.indexOf(' ');
+															int pos2 = line.lastIndexOf( ' ' );
+															
+															if ( pos1 != -1 && pos2 != -1 ){
+																
+																String method = line.substring( 0,  pos1 ).toUpperCase(Locale.US);
+																
+																if ( method.equals( "GET" ) || method.equals( "HEAD" ) || method.equals( "POST")){
+																	
+																	String protocol = line.substring( pos2 + 1 ).toUpperCase( Locale.US );
+																	
+																	if ( protocol.startsWith( "HTTP" )){
+																		
+																		is_http = true;
+																	}
+																}
+															}
+														
+															if ( !is_http ){
+																
+																break;
+																
+															}else{
+																
+																String url_part = line.substring( pos1+1, pos2 ).trim();
+																
+																int	pos = url_part.indexOf( '?' );
+																
+																if ( pos != -1 ){
+																																		
+																	String[]	args = url_part.substring( pos+1 ).split( "&" );
+																	
+																	Map<String,String> arg_map = new HashMap<String,String>();
+																	
+																	for ( String arg: args ){
+																		
+																		String[] bits = arg.split( "=" );
+																		
+																		if ( bits.length == 2 ){
+																			String 	lhs = bits[0];
+																			String	rhs = bits[1];
+																			
+																			arg_map.put( lhs, rhs );
+																		}
+																	}
+																	
+																	if ( 	arg_map.containsKey( "info_hash" ) &&
+																			arg_map.containsKey( "peer_id" ) &&
+																			arg_map.containsKey( "uploaded" )){
+																		
+																		StringBuffer sb = new StringBuffer( 1024 );
+																		
+																		sb.append( line.substring( 0, pos + 1 + pos1 + 1 ));
+																		
+																		sb.append( "info_hash=" + arg_map.get( "info_hash" ));
+																		sb.append( "&peer_id=" + arg_map.get( "peer_id" ));
+																		sb.append( "&port=6881" );
+																		sb.append( "&ip=" + router.getSocketManager().getSession().getMyDestination().toBase64() + ".i2p" );
+																		sb.append( "&uploaded=" + arg_map.get( "uploaded" ));
+																		sb.append( "&downloaded=" + arg_map.get( "downloaded" ));
+																		sb.append( "&left=" + arg_map.get( "left" ));
+																		sb.append( "&compact=1" );
+																		
+																		String event = arg_map.get( "event" );
+																		
+																		if ( event != null ){
+																			sb.append( "&event=" + event );
+																		}
+																		
+																		String num_want = arg_map.get( "numwant" );
+																		
+																		if ( num_want != null ){
+																			sb.append( "&numwant=" + num_want );
+																		}else{
+																			//if ( event != null )
+																		}
+																		
+																		sb.append( line.substring( pos2 ));
+																		
+																		line = sb.toString();
+																		
+																		System.out.println( line );
+																	}
+																}
+																
+																headers.add( line );
+															}
+														}else{
+														
+															String[] bits = line.split( ":", 2 );
+															
+															if ( bits.length != 2 ){
+																
+																headers.add( line );
+																
+															}else{
+															
+																String	kw = bits[0].toUpperCase( Locale.US );
+																
+																if ( kw.equals( "REFERER" )){
+																	
+																	// skip it
+																	
+																}else if ( kw.equals( "HOST" )){
+																	
+																	headers.add( "Host: " + Base32.encode( socket.getPeerDestination().calculateHash().getData()) + ".b32.i2p" );
+																	
+																}else{
+																	headers.add( line );
+																}
+															}
+														}
+													}
+													
+													if ( is_http ){
+														
+														StringBuilder sb = new StringBuilder( len+128 );
+														
+														for ( String header: headers ){
+															
+															sb.append( header );
+															sb.append( "\r\n" );
+														}
+														
+														sb.append( "\r\n" );
+														
+														output_stream.write( sb.toString().getBytes( "ISO8859-1" ));
+													
+														array_offset = i+4;
+													}
+													
+													break;
+												}																				
+											}
+										}
+										
+										int	rem = len - array_offset;
+										
+										if ( rem > 0 ){
+
+											output_stream.write( array, array_offset, rem );
+										}
+										
 										source_buffer.position( 0 );
 										
 										source_buffer.limit( source_buffer.capacity());

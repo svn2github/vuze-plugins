@@ -505,6 +505,9 @@ I2PHelperRouter
 		
 			// some older trackers require ip to be explicitly set to the full destination name :(
 		
+		/*
+		 * don't do this anymore, the socks proxy adds this in when required
+		 * 
 	    String explicit_ips = COConfigurationManager.getStringParameter( "Override Ip", "" ).trim();
 
 	    if ( !explicit_ips.contains( full_dest )){
@@ -537,7 +540,8 @@ I2PHelperRouter
 	    	
 	    	COConfigurationManager.setParameter( "Override Ip", explicit_ips );
 	    }
-	    
+	    */
+		
 		socket_manager	= sm;
 				
 		server_socket = socket_manager.getServerSocket();
