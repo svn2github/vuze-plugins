@@ -5207,7 +5207,7 @@ XMWebUIPlugin
 				map.put("index", i);
 
   			torrentGet_files(map, file_fields, host, baseURL, download, file);
-  			if (file_fields != null && file_fields.size() == 0) {
+  			if (file_fields != null && file_fields.size() > 0) {
   				torrentGet_fileStats(map, file_fields, file);
   			}
 
@@ -5313,7 +5313,7 @@ XMWebUIPlugin
 				map.put("index", i);
 
   			torrentGet_file_stub(map, file_fields, host, sf);
-  			if (file_fields != null && file_fields.size() == 0) {
+  			if (file_fields != null && file_fields.size() > 0) {
   				torrentGet_fileStats_stub(map, file_fields, sf);
   			}
 
