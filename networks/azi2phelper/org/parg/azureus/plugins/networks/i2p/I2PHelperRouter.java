@@ -556,18 +556,30 @@ I2PHelperRouter
 					try{
 						I2PSocket socket = server_socket.accept();
 						
-						try{
-						
-							logger.connectionAccepted( socket );
-						
-						}catch( Throwable e ){
+						if ( socket == null ){
 							
-							Debug.out( e );
-							
-							try{
-								socket.close();
+							if ( destroyed ){
 								
-							}catch( Throwable f ){
+								break;
+								
+							}else{
+								
+								Thread.sleep(500);
+							}
+						}else{
+							try{
+							
+								logger.connectionAccepted( socket );
+							
+							}catch( Throwable e ){
+								
+								Debug.out( e );
+								
+								try{
+									socket.close();
+									
+								}catch( Throwable f ){
+								}
 							}
 						}
 					}catch( Throwable e ){

@@ -183,7 +183,7 @@ I2PHelperSocksProxy
 				throw( new AEProxyException( "Proxy destroyed" ));
 			}
 			
-			if ( connections.size() > 32 ){
+			if ( connections.size() > 512 ){
 				
 				try{
 					connection.close();
@@ -253,6 +253,8 @@ I2PHelperSocksProxy
 			}
 		}
 		
+		boolean	logit = true;
+
 		try{
 			Destination remote_dest;
 			
@@ -274,6 +276,13 @@ I2PHelperSocksProxy
 			
 			I2PSocketManager socket_manager = getSocketManager();
 			
+			if ( remote_dest.getHash().equals( socket_manager.getSession().getMyDestination().getHash())){
+				
+				logit = false;
+				
+				throw( new Exception( "Attempting to connect to ourselves" ));
+			}
+			
 			Properties overrides = new Properties();
 			
             I2PSocketOptions socket_opts = socket_manager.buildOptions( overrides );
@@ -286,18 +295,19 @@ I2PHelperSocksProxy
 			
 		}catch( Throwable e ){
 			
-			String msg = Debug.getNestedExceptionMessage(e).toLowerCase();
-			
-			boolean	logit = true;
-			
-			if ( msg.contains( "timeout" ) || msg.contains( "timed out" ) || msg.contains( "reset" ) || msg.contains( "resolve" )){
-				
-				logit = false;
-			}
-			
 			if ( logit ){
 				
-				e.printStackTrace();
+				String msg = Debug.getNestedExceptionMessage(e).toLowerCase();
+							
+				if ( msg.contains( "timeout" ) || msg.contains( "timed out" ) || msg.contains( "reset" ) || msg.contains( "resolve" )){
+					
+					logit = false;
+				}
+			
+				if ( logit ){
+				
+					e.printStackTrace();
+				}
 			}
 			
 			throw( new IOException( Debug.getNestedExceptionMessage(e)));
@@ -943,7 +953,14 @@ I2PHelperSocksProxy
 																	
 																}else if ( kw.equals( "HOST" )){
 																	
-																	headers.add( "Host: " + Base32.encode( socket.getPeerDestination().calculateHash().getData()) + ".b32.i2p" );
+																	Destination peer_dest = socket.getPeerDestination();
+																	
+																	if ( peer_dest == null ){
+																		
+																		throw( new IOException( "Socked closed" ));
+																	}
+																	
+																	headers.add( "Host: " + Base32.encode( peer_dest.calculateHash().getData()) + ".b32.i2p" );
 																	
 																}else{
 																	headers.add( line );
