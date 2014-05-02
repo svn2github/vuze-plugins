@@ -30,6 +30,7 @@ import java.io.File;
 
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
@@ -81,6 +82,7 @@ import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 import org.parg.azureus.plugins.networks.i2p.swt.I2PHelperView;
 
+import com.aelitis.azureus.core.proxy.AEProxyAddressMapper;
 import com.aelitis.azureus.core.proxy.AEProxyFactory;
 import com.aelitis.azureus.core.proxy.AEProxyFactory.PluginProxy;
 import com.aelitis.azureus.plugins.upnp.UPnPMapping;
@@ -794,21 +796,138 @@ I2PHelperPlugin
 		
 		throws Exception 
 	{
+		Socket vuze_socket = new Socket( Proxy.NO_PROXY );
+		
 		try{
-			System.out.println( "Incoming from " + i2p_socket.getPeerDestination().calculateHash().toBase64());
+			Destination dest = i2p_socket.getPeerDestination();
 			
-			Socket vuze_socket = new Socket( Proxy.NO_PROXY );
+			if ( dest == null ){
+				
+				i2p_socket.close();
+				
+				return;
+			}
 			
-			vuze_socket.connect( new InetSocketAddress( "127.0.0.1", COConfigurationManager.getIntParameter( "TCP.Listen.Port" )));
+			String peer_ip = Base32.encode( dest.calculateHash().getData()) + ".b32.i2p";
 			
-			vuze_socket.close();
+			System.out.println( "Incoming from " + peer_ip );
 			
-			i2p_socket.close();
+			vuze_socket.bind( null );
 			
+			int local_port = vuze_socket.getLocalPort();
+			
+				// we need to pass the peer_ip to the core so that it doesn't just see '127.0.0.1'
+			
+			final AEProxyAddressMapper.PortMapping mapping = AEProxyFactory.getAddressMapper().registerPortMapping( local_port, peer_ip );
+			
+			System.out.println( "local port=" + local_port );
+			
+			boolean	ok = false;
+			
+			try{
+				vuze_socket.connect( new InetSocketAddress( "127.0.0.1", COConfigurationManager.getIntParameter( "TCP.Listen.Port" )));
+			
+				Runnable	on_complete = 
+					new Runnable()
+					{
+						private int done_count;
+						
+						public void
+						run()
+						{
+							synchronized( this ){
+								
+								done_count++;
+								
+								if ( done_count < 2 ){
+									
+									return;
+								}
+							}
+							
+							mapping.unregister();
+						}
+					};
+					
+				runPipe( i2p_socket.getInputStream(), vuze_socket.getOutputStream(), on_complete );
+			
+				runPipe( vuze_socket.getInputStream(), i2p_socket.getOutputStream(), on_complete );
+			
+				ok = true;
+				
+			}finally{
+				
+				if ( !ok ){
+					
+					mapping.unregister();
+				}
+			}
 		}catch( Throwable e ){
 			
-			i2p_socket.close();
+			e.printStackTrace();
+			
+			try{
+				i2p_socket.close();
+				
+			}catch( Throwable f ){		
+			}
+			
+			if ( vuze_socket != null ){
+				
+				try{
+					vuze_socket.close();
+					
+				}catch( Throwable f ){
+				}
+			}
 		}
+	}
+	
+	private void
+	runPipe(
+		final InputStream		from,
+		final OutputStream		to,
+		final Runnable			on_complete )
+	{
+		new AEThread2( "I2P.in.pipe" )
+		{
+			public void
+			run()
+			{
+				try{
+					byte[]	buffer = new byte[16*1024];
+					
+					while( !unloaded ){
+					
+						int	len = from.read( buffer );
+						
+						if ( len <= 0 ){
+							
+							break;
+						}
+						
+						to.write( buffer, 0, len );
+					}
+				}catch( Throwable e ){
+					
+				}finally{
+					
+					try{
+						from.close();
+						
+					}catch( Throwable e ){
+					}
+					
+					try{
+						to.close();
+						
+					}catch( Throwable e ){
+					}
+					
+					on_complete.run();
+				}
+			}
+		}.start();
 	}
 	
 	public void
