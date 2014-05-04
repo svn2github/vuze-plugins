@@ -90,7 +90,6 @@ DHTI2P
 	private boolean	force_bootstrap;
 	private long 	next_bootstrap;
 	private int		consec_bootstraps;
-	private long	last_external_bootstrap;
 
 	private int refresh_ping_ok;
 	private int refresh_ping_fail;
@@ -525,11 +524,8 @@ DHTI2P
         					( next_bootstrap == 0 || ( now > next_bootstrap )))){
         			
         			if ( force_bootstrap ){
-        				
-        				force_bootstrap = false;
-        				
+        				        				
         				consec_bootstraps 		= 0;
-        				last_external_bootstrap	= 0;
         			}
         			
         			log( "Bootstrapping..." );
@@ -571,19 +567,11 @@ DHTI2P
         				
         				log( "Bootstrap not resolved" );
         				
-        				if ( 	last_external_bootstrap == 0 || 
-        						now - last_external_bootstrap >= 30*60*1000 ){
-        					
-        					last_external_bootstrap = now;
-        					
-        					if ( adapter.tryExternalBootstrap()){
-        						
-        							// reschedule with a 2 min delay
-        						
-        						last_external_bootstrap = now - 28*60*1000;
-        					}
-        				}
+        				adapter.tryExternalBootstrap( force_bootstrap );
         			}
+        			
+        			force_bootstrap = false;
+        			
         		}else{
         			
         				// try and grab some more nodes from existing non-dead ones

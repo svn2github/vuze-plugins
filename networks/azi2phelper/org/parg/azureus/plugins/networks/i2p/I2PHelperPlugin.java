@@ -725,69 +725,105 @@ I2PHelperPlugin
 		}	
 	}
 	
-	public boolean
-	tryExternalBootstrap()
+	private static final int EXTERNAL_BOOTSTRAP_PERIOD = 30*60*1000;
+	
+	private long		last_external_bootstrap;
+	private long		last_external_bootstrap_import;
+	private List<Map>	last_external_bootstrap_nodes;
+	
+	public void
+	tryExternalBootstrap(
+		boolean		force )
 	{
-		log.log( "External bootstrap requested" );
+		long	now = SystemTime.getMonotonousTime();
 		
-		try{
-			PluginProxy proxy = AEProxyFactory.getPluginProxy( "I2P bootstrap", new URL( BOOTSTRAP_SERVER ));
+		if ( 	force ||
+				last_external_bootstrap == 0 || 
+				now - last_external_bootstrap >= EXTERNAL_BOOTSTRAP_PERIOD ){
+			
+			last_external_bootstrap = now;
 		
-			if ( proxy != null ){
-				
-				boolean	worked = false;
-				
-				try{
-					HttpURLConnection url_connection = (HttpURLConnection)proxy.getURL().openConnection( proxy.getProxy());
+			log( "External bootstrap requested" );
+			
+			try{
+				PluginProxy proxy = AEProxyFactory.getPluginProxy( "I2P bootstrap", new URL( BOOTSTRAP_SERVER ));
+			
+				if ( proxy != null ){
 					
-					url_connection.setConnectTimeout( 3*60*1000 );
-					url_connection.setReadTimeout( 30*1000 );
-			
-					url_connection.connect();
-			
+					boolean	worked = false;
+					
 					try{
-						InputStream	is = url_connection.getInputStream();
-			
-						Map map = BDecoder.decode( new BufferedInputStream( is ));
+						HttpURLConnection url_connection = (HttpURLConnection)proxy.getURL().openConnection( proxy.getProxy());
 						
-						List<Map> nodes = (List<Map>)map.get( "nodes" );
-						
-						log( "I2P Bootstrap server returned " + nodes.size() + " nodes" );
-						
-						for ( Map m: nodes ){
-							
-							NodeInfo ni = router.getDHT().heardAbout( m );
-							
-							if ( ni != null ){
-								
-								log( "    imported " + ni );
-							}
-						}
-			
-					}finally{
-			
-						url_connection.disconnect();
-					}
-				}finally{
-					
-					proxy.setOK( worked );
-				}	
-			}else{
+						url_connection.setConnectTimeout( 3*60*1000 );
+						url_connection.setReadTimeout( 30*1000 );
 				
-				throw( new Exception( "No plugin proxy available" ));
+						url_connection.connect();
+				
+						try{
+							InputStream	is = url_connection.getInputStream();
+				
+							Map map = BDecoder.decode( new BufferedInputStream( is ));
+							
+							List<Map> nodes = (List<Map>)map.get( "nodes" );
+							
+							log( "I2P Bootstrap server returned " + nodes.size() + " nodes" );
+							
+							last_external_bootstrap_nodes 	= nodes;
+							last_external_bootstrap_import	= now;
+							
+							for ( Map m: nodes ){
+								
+								NodeInfo ni = router.getDHT().heardAbout( m );
+								
+								if ( ni != null ){
+									
+									log( "    imported " + ni );
+								}
+							}
+				
+						}finally{
+				
+							url_connection.disconnect();
+						}
+					}finally{
+						
+						proxy.setOK( worked );
+					}	
+				}else{
+					
+					throw( new Exception( "No plugin proxy available" ));
+				}
+			}catch( Throwable e ){
+			
+				log( "External bootstrap failed: " + Debug.getNestedExceptionMessage(e));
+				
+					// retry if we got a timeout or malformed socks error reply
+				
+				String msg = Debug.getNestedExceptionMessage(e).toLowerCase();
+				
+				if ( msg.contains( "timeout" ) || msg.contains( "malformed" )){
+					
+					// reschedule with a 2 min delay
+					
+					last_external_bootstrap = now - (EXTERNAL_BOOTSTRAP_PERIOD - 2*60*1000 );
+				}
 			}
-		}catch( Throwable e ){
-		
-			log( "External bootstrap failed: " + Debug.getNestedExceptionMessage(e));
+		}else{
 			
-				// retry if we got a timeout or malformed socks error reply
-			
-			String msg = Debug.getNestedExceptionMessage(e).toLowerCase();
-			
-			return( msg.contains( "timeout" ) || msg.contains( "malformed" ));
+			if ( 	last_external_bootstrap_nodes != null &&
+					now - last_external_bootstrap_import >= 3*60*1000 ){
+				
+				log( "Injecting cached bootstrap nodes" );
+				
+				last_external_bootstrap_import = now;
+				
+				for ( Map m: last_external_bootstrap_nodes ){
+					
+					router.getDHT().heardAbout( m );
+				}
+			}
 		}
-		
-		return( false );
 	}
 	
 	public void 
@@ -1364,8 +1400,9 @@ I2PHelperPlugin
 					System.out.println( str );
 				}
 				
-				public boolean
-				tryExternalBootstrap()
+				public void
+				tryExternalBootstrap(
+					boolean	force )
 				{
 					log( "External bootstrap test" );
 					
@@ -1398,8 +1435,6 @@ I2PHelperPlugin
 						
 						log( "External bootstrap failed: " + Debug.getNestedExceptionMessage(e));
 					}
-					
-					return( false );
 				}
 				
 				@Override
@@ -1457,7 +1492,7 @@ I2PHelperPlugin
 						
 					}else if ( line.equals( "extboot" )){
 						
-						adapter.tryExternalBootstrap();
+						adapter.tryExternalBootstrap( true );
 						
 					}else{
 						

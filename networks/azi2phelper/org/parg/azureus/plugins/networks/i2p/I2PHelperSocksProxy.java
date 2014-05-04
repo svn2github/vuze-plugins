@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
+import java.net.NoRouteToHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SocketChannel;
@@ -295,7 +296,11 @@ I2PHelperSocksProxy
 			
 		}catch( Throwable e ){
 			
-			if ( logit ){
+			if ( e instanceof NoRouteToHostException ){
+				
+				logit = false;
+				
+			}else if ( logit ){
 				
 				String msg = Debug.getNestedExceptionMessage(e).toLowerCase();
 							

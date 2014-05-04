@@ -30,8 +30,9 @@ I2PHelperAdapter
 	log(
 		String	str );
 	
-	public boolean
-	tryExternalBootstrap();
+	public void
+	tryExternalBootstrap(
+		boolean		force );
 	
 	public void
 	connectionAccepted(
