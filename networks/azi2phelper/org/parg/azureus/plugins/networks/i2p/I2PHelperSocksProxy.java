@@ -673,7 +673,7 @@ I2PHelperSocksProxy
 										
 									}else if ( e instanceof IOException ){
 										
-										String message = e.getMessage();
+										String message = Debug.getNestedExceptionMessage( e );
 										
 										if ( message != null ){
 											

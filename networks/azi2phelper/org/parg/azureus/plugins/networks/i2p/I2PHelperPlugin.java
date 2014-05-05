@@ -63,9 +63,11 @@ import org.gudy.azureus2.plugins.PluginConfig;
 import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.UnloadablePlugin;
+import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.ipc.IPCException;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
+import org.gudy.azureus2.plugins.torrent.Torrent;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
@@ -844,58 +846,67 @@ I2PHelperPlugin
 				return;
 			}
 			
-			String peer_ip = Base32.encode( dest.calculateHash().getData()) + ".b32.i2p";
+			byte[]	peer_hash = dest.calculateHash().getData();
 			
-			System.out.println( "Incoming from " + peer_ip );
+			String peer_ip = Base32.encode( peer_hash ) + ".b32.i2p";
 			
-			vuze_socket.bind( null );
+			System.out.println( "Incoming from " + peer_ip + ", port=" + i2p_socket.getLocalPort());
 			
-			int local_port = vuze_socket.getLocalPort();
-			
-				// we need to pass the peer_ip to the core so that it doesn't just see '127.0.0.1'
-			
-			final AEProxyAddressMapper.PortMapping mapping = AEProxyFactory.getAddressMapper().registerPortMapping( local_port, peer_ip );
-			
-			System.out.println( "local port=" + local_port );
-			
-			boolean	ok = false;
-			
-			try{
-				vuze_socket.connect( new InetSocketAddress( "127.0.0.1", COConfigurationManager.getIntParameter( "TCP.Listen.Port" )));
-			
-				Runnable	on_complete = 
-					new Runnable()
-					{
-						private int done_count;
-						
-						public void
-						run()
+			if ( i2p_socket.getLocalPort() == 80 ){
+				
+				handleMaggotRequest( i2p_socket, peer_hash );
+				
+			}else{
+				
+				vuze_socket.bind( null );
+				
+				int local_port = vuze_socket.getLocalPort();
+				
+					// we need to pass the peer_ip to the core so that it doesn't just see '127.0.0.1'
+				
+				final AEProxyAddressMapper.PortMapping mapping = AEProxyFactory.getAddressMapper().registerPortMapping( local_port, peer_ip );
+				
+				System.out.println( "local port=" + local_port );
+				
+				boolean	ok = false;
+				
+				try{
+					vuze_socket.connect( new InetSocketAddress( "127.0.0.1", COConfigurationManager.getIntParameter( "TCP.Listen.Port" )));
+				
+					Runnable	on_complete = 
+						new Runnable()
 						{
-							synchronized( this ){
-								
-								done_count++;
-								
-								if ( done_count < 2 ){
-									
-									return;
-								}
-							}
+							private int done_count;
 							
-							mapping.unregister();
-						}
-					};
-					
-				runPipe( i2p_socket.getInputStream(), vuze_socket.getOutputStream(), on_complete );
-			
-				runPipe( vuze_socket.getInputStream(), i2p_socket.getOutputStream(), on_complete );
-			
-				ok = true;
+							public void
+							run()
+							{
+								synchronized( this ){
+									
+									done_count++;
+									
+									if ( done_count < 2 ){
+										
+										return;
+									}
+								}
+								
+								mapping.unregister();
+							}
+						};
+						
+					runPipe( i2p_socket.getInputStream(), vuze_socket.getOutputStream(), on_complete );
 				
-			}finally{
+					runPipe( vuze_socket.getInputStream(), i2p_socket.getOutputStream(), on_complete );
 				
-				if ( !ok ){
+					ok = true;
 					
-					mapping.unregister();
+				}finally{
+					
+					if ( !ok ){
+						
+						mapping.unregister();
+					}
 				}
 			}
 		}catch( Throwable e ){
@@ -917,6 +928,127 @@ I2PHelperPlugin
 				}
 			}
 		}
+	}
+	
+	private void 
+	handleMaggotRequest(
+		final I2PSocket 	i2p_socket,
+		byte[]				peer_hash )
+		
+		throws Exception 
+	{
+		// TODO: rate limit on peer_hash and also max active conc
+		
+		new AEThread2( "I2P.maggot" )
+		{
+			public void
+			run()
+			{
+				try{
+					InputStream is = i2p_socket.getInputStream();
+					
+					byte[]	buffer = new byte[1024];
+					
+					String	header = "";
+					
+					while( true ){
+						
+						int len = is.read( buffer );
+						
+						if ( len <= 0 ){
+							
+							break;
+						}
+						
+						header += new String( buffer, 0, len, "ISO8859-1" );
+						
+						if ( header.contains( "\r\n\r\n" )){
+							
+							String[]	lines = header.split( "\r\n" );
+							
+							String 	line = lines[0].trim();
+							
+							if ( line.startsWith( "GET " )){
+								
+								line = line.substring( 4 ).trim();
+								
+								int pos = line.lastIndexOf( ' ' );
+								
+								String url = line.substring( 0, pos ).trim();
+								
+								pos = url.lastIndexOf( '/' );
+									
+								if ( pos >= 0 ){
+									
+									url = url.substring(pos+1);
+								}
+								
+								String[] bits = url.split( ":" );
+								
+								byte[]	info_hash 		= ByteFormatter.decodeString( bits[0].trim());
+								byte[]	torrent_sha1  	= ByteFormatter.decodeString( bits[1].trim());
+								
+								System.out.println( "Maggot request: " + url );
+								
+								Download download = plugin_interface.getDownloadManager().getDownload( info_hash );
+								
+								if ( download != null ){
+									
+									Torrent torrent = download.getTorrent();
+									
+									if ( torrent != null && !torrent.isPrivate()){
+										
+										String torrent_name = torrent.getName() + ".torrent";
+										
+										byte[] torrent_data = torrent.writeToBEncodedData();
+										
+											// could check the sha1 sometime...
+										
+										OutputStream os = i2p_socket.getOutputStream();
+										
+										os.write(( 
+											"HTTP/1.0 200 OK\r\n" + 
+											"Content-Length: " + torrent_data.length + "\r\n" +
+											"Content-Disposition: attachment; filename=\"" + torrent_name + "\"\r\n" +
+											"Content-Description: " + torrent_name + "\r\n" +
+											"Content-Type: application/x-bittorrent\r\n" +
+											"\r\n").getBytes( "UTF-8" ));
+										
+										os.write( torrent_data );
+										
+										os.flush();
+									}
+								}
+							}
+							
+							break;
+						}
+						
+						if ( header.length() > 8192 ){
+							
+							throw( new Exception( "Error reading header" ));
+						}
+					}
+					
+				}catch( Throwable e ){
+					
+				}finally{
+					
+					try{
+						try{
+							i2p_socket.getOutputStream().close();
+							
+						}catch( Throwable e ){
+						}
+						
+						i2p_socket.close();
+						
+					}catch( Throwable e ){
+						
+					}
+				}
+			}
+		}.start();
 	}
 	
 	private void

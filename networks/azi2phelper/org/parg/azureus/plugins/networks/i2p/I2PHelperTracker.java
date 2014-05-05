@@ -23,6 +23,8 @@ package org.parg.azureus.plugins.networks.i2p;
 
 import java.util.*;
 
+import net.i2p.data.Base32;
+import net.i2p.data.Base64;
 import net.i2p.data.Hash;
 
 import org.gudy.azureus2.core3.util.SystemTime;
@@ -63,7 +65,7 @@ I2PHelperTracker
 		
 		for ( Hash hash: peer_hashes ){
 			
-			adapter.log( "    " + hash );
+			adapter.log( "    " + Base32.encode( hash.getData()) + ".b32.i2p" );
 		}
 	}
 	
