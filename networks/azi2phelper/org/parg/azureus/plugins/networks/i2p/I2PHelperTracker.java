@@ -36,7 +36,7 @@ I2PHelperTracker
 	private I2PHelperDHT				dht;
 	private I2PHelperAdapter			adapter;
 	
-	private DHTTrackerPlugin			tracker;
+	private I2PDHTTrackerPlugin			tracker;
 	
 	protected
 	I2PHelperTracker(
@@ -50,7 +50,7 @@ I2PHelperTracker
 		
 		if ( pi != null ){
 			
-			tracker = new DHTTrackerPlugin( adapter, dht );
+			tracker = new I2PDHTTrackerPlugin( adapter, dht );
 		}
 	}
 	

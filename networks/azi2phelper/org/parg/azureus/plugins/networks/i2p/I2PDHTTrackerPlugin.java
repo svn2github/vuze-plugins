@@ -75,7 +75,7 @@ import com.aelitis.azureus.plugins.dht.DHTPlugin;
  */
 
 public class 
-DHTTrackerPlugin 
+I2PDHTTrackerPlugin 
 	implements DownloadManagerListener, DownloadListener, DownloadAttributeListener, DownloadTrackerListener
 {
 	private static final int	ANNOUNCE_TIMEOUT			= 5*60*1000;
@@ -170,7 +170,7 @@ DHTTrackerPlugin
 				
 	
 	protected
-	DHTTrackerPlugin(
+	I2PDHTTrackerPlugin(
 		I2PHelperAdapter	_adapter,
 		I2PHelperDHT		_dht )
 	{	
@@ -198,7 +198,7 @@ DHTTrackerPlugin
 	{
 		is_running	= true;
 		
-		plugin_interface.getDownloadManager().addListener( DHTTrackerPlugin.this );
+		plugin_interface.getDownloadManager().addListener( I2PDHTTrackerPlugin.this );
 		
 		timer = plugin_interface.getUtilities().createTimer("DHTI2P Tracker", true );
 		
@@ -238,16 +238,16 @@ DHTTrackerPlugin
 		
 		org.gudy.azureus2.plugins.download.DownloadManager dm = plugin_interface.getDownloadManager();
 		
-		dm.removeListener( DHTTrackerPlugin.this );
+		dm.removeListener( I2PDHTTrackerPlugin.this );
 		
 		for ( Download download: dm.getDownloads()){
 			
-			download.removeAttributeListener(DHTTrackerPlugin.this, ta_networks, DownloadAttributeListener.WRITTEN);
-			download.removeAttributeListener(DHTTrackerPlugin.this, ta_peer_sources, DownloadAttributeListener.WRITTEN);
+			download.removeAttributeListener(I2PDHTTrackerPlugin.this, ta_networks, DownloadAttributeListener.WRITTEN);
+			download.removeAttributeListener(I2PDHTTrackerPlugin.this, ta_peer_sources, DownloadAttributeListener.WRITTEN);
 			
-			download.removeTrackerListener( DHTTrackerPlugin.this );
+			download.removeTrackerListener( I2PDHTTrackerPlugin.this );
 			
-			download.removeListener( DHTTrackerPlugin.this );
+			download.removeListener( I2PDHTTrackerPlugin.this );
 		}
 	}
 	
@@ -351,12 +351,12 @@ DHTTrackerPlugin
 				}
 			}
 			
-			download.addAttributeListener(DHTTrackerPlugin.this, ta_networks, DownloadAttributeListener.WRITTEN);
-			download.addAttributeListener(DHTTrackerPlugin.this, ta_peer_sources, DownloadAttributeListener.WRITTEN);
+			download.addAttributeListener(I2PDHTTrackerPlugin.this, ta_networks, DownloadAttributeListener.WRITTEN);
+			download.addAttributeListener(I2PDHTTrackerPlugin.this, ta_peer_sources, DownloadAttributeListener.WRITTEN);
 			
-			download.addTrackerListener( DHTTrackerPlugin.this );
+			download.addTrackerListener( I2PDHTTrackerPlugin.this );
 			
-			download.addListener( DHTTrackerPlugin.this );
+			download.addListener( I2PDHTTrackerPlugin.this );
 			
 			checkDownloadForRegistration( download, true );
 		}
@@ -368,9 +368,9 @@ DHTTrackerPlugin
 	{
 		if ( is_running ){
 			
-			download.removeTrackerListener( DHTTrackerPlugin.this );
+			download.removeTrackerListener( I2PDHTTrackerPlugin.this );
 	
-			download.removeListener( DHTTrackerPlugin.this );
+			download.removeListener( I2PDHTTrackerPlugin.this );
 			
 			try{
 				this_mon.enter();

@@ -22,14 +22,8 @@
 package org.parg.azureus.plugins.networks.i2p.vuzedht;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
+
 
 import net.i2p.client.I2PSession;
 import net.i2p.data.Base32;
@@ -338,6 +332,8 @@ DHTI2P
 					true,		// high priority
 					new DHTOperationAdapter() 
 					{	
+						private Set<String>	hosts = new HashSet<String>();
+						
 						public void 
 						searching(
 							DHTTransportContact 	contact, 
@@ -354,7 +350,19 @@ DHTI2P
 							DHTTransportValue 		value)
 						{
 							String host =  Base32.encode( value.getValue()) + ".b32.i2p";
-														
+							
+								// filter out duplicates
+							
+							synchronized( hosts ){
+								
+								if ( hosts.contains( host )){
+									
+									return;
+								}
+								
+								hosts.add( host );
+							}
+							
 							listener.valueRead( host );
 						}
 						

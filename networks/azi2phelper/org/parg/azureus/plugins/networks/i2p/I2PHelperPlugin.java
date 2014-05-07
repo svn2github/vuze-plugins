@@ -1069,6 +1069,11 @@ I2PHelperPlugin
 							valueRead(
 								String 	host ) 
 							{
+								if ( progress.cancelled()){
+									
+									return;
+								}
+								
 								progress.reportActivity( "I2P: Found " + host );
 								
 								synchronized( result ){
@@ -1091,7 +1096,7 @@ I2PHelperPlugin
 											public void
 											run()
 											{
-												while( true ){
+												while( !progress.cancelled()){
 													
 													String host;
 													
@@ -1139,6 +1144,11 @@ I2PHelperPlugin
 									        				ByteArrayOutputStream baos = new ByteArrayOutputStream( 64*1024 );
 									        				
 									        				while( true ){
+									        					
+									        					if ( progress.cancelled()){
+									        						
+									        						throw( new Exception( "Cancelled" ));
+									        					}
 									        					
 									        					byte[]	buffer = new byte[65536];
 									        					
@@ -1238,7 +1248,16 @@ I2PHelperPlugin
 			}
 		}.start();
 		
-		wait_sem.reserve();
+		while( true ){
+			
+			if ( !wait_sem.reserve(1000)){
+			
+				if ( progress.cancelled()){
+					
+					break;
+				}
+			}
+		}
 		
 		synchronized( result ){
 			
