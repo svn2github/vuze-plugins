@@ -44,6 +44,7 @@ import java.nio.channels.ServerSocketChannel;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -281,8 +282,39 @@ I2PHelperPlugin
 			config_model.addLabelParameter2( "azi2phelper.info1" );
 			config_model.addLabelParameter2( "azi2phelper.info2" );
 			
+			config_model.addHyperlinkParameter2( "azi2phelper.i2p.link", loc_utils.getLocalisedMessageText( "azi2phelper.i2p.link.url" ));
+
 			final BooleanParameter enable_param = config_model.addBooleanParameter2( "enable", "azi2phelper.enable", true );
 
+			final IntParameter up_limit_param 		= config_model.addIntParameter2( I2PHelperRouter.PARAM_SEND_KBS, I2PHelperRouter.PARAM_SEND_KBS, I2PHelperRouter.PARAM_SEND_KBS_DEFAULT, 0, Integer.MAX_VALUE );
+			final IntParameter down_limit_param 	= config_model.addIntParameter2( I2PHelperRouter.PARAM_RECV_KBS, I2PHelperRouter.PARAM_RECV_KBS, I2PHelperRouter.PARAM_RECV_KBS_DEFAULT, 0, Integer.MAX_VALUE );
+
+			final Map<String,Object>	router_properties = new HashMap<String, Object>();
+			
+			ParameterListener rate_change_listener = 
+				new ParameterListener()
+				{
+					public void 
+					parameterChanged(
+						Parameter param) 
+					{
+						router_properties.put( I2PHelperRouter.PARAM_SEND_KBS, up_limit_param.getValue());
+						router_properties.put( I2PHelperRouter.PARAM_RECV_KBS, down_limit_param.getValue());
+
+						I2PHelperRouter current_router = router;
+						
+						if ( current_router != null ){
+							
+							current_router.updateProperties();
+						}
+					}
+				};
+			
+			rate_change_listener.parameterChanged( null );
+			
+			up_limit_param.addListener( rate_change_listener );
+			down_limit_param.addListener( rate_change_listener );
+			
 			int_port_param 		= config_model.addIntParameter2( "azi2phelper.internal.port", "azi2phelper.internal.port", 0 );
 			ext_port_param	 	= config_model.addIntParameter2( "azi2phelper.external.port", "azi2phelper.external.port", 0 );
 			socks_port_param 	= config_model.addIntParameter2( "azi2phelper.socks.port", "azi2phelper.socks.port", 0 );
@@ -358,6 +390,12 @@ I2PHelperPlugin
 			final BooleanParameter ext_i2p_param 		= config_model.addBooleanParameter2( "azi2phelper.use.ext", "azi2phelper.use.ext", false );
 			
 			final IntParameter ext_i2p_port_param 		= config_model.addIntParameter2( "azi2phelper.use.ext.port", "azi2phelper.use.ext.port", 7654 ); 
+			
+			config_model.createGroup( 
+				"azi2phelper.internals.group",
+				new Parameter[]{ 
+						int_port_param, ext_port_param, socks_port_param,
+						port_info_param, use_upnp, always_socks, ext_i2p_param,ext_i2p_port_param });
 			
 			
 			final StringParameter 	command_text_param = config_model.addStringParameter2( "azi2phelper.cmd.text", "azi2phelper.cmd.text", "" );
@@ -490,9 +528,9 @@ I2PHelperPlugin
 							try{
 								I2PHelperRouter my_router	= null;
 
-								try{
+								try{																
 									my_router = router = 
-											new I2PHelperRouter( is_bootstrap_node, is_vuze_dht, I2PHelperPlugin.this );
+											new I2PHelperRouter( router_properties, is_bootstrap_node, is_vuze_dht, I2PHelperPlugin.this );
 									
 									if ( ext_i2p_param.getValue()){
 											
@@ -1975,7 +2013,7 @@ I2PHelperPlugin
 			};
 			
 		try{
-			I2PHelperRouter router = f_router[0] = new I2PHelperRouter( bootstrap, vuze_dht, adapter );
+			I2PHelperRouter router = f_router[0] = new I2PHelperRouter( new HashMap<String, Object>(), bootstrap, vuze_dht, adapter );
 			
 				// 19817 must be used for bootstrap node
 			

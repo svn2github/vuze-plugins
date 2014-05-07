@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.Vector;
@@ -58,6 +59,10 @@ import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.DisplayFormatters;
 import org.gudy.azureus2.core3.util.RandomUtils;
+import org.gudy.azureus2.plugins.ui.config.IntParameter;
+import org.gudy.azureus2.plugins.ui.config.Parameter;
+import org.gudy.azureus2.plugins.ui.config.ParameterListener;
+import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.parg.azureus.plugins.networks.i2p.dht.*;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTI2P;
 
@@ -67,13 +72,22 @@ I2PHelperRouter
 {
 	private static final String 	i2p_host 	= "127.0.0.1";
 
+	public static final String	PARAM_SEND_KBS			= "azi2phelper.rate.send.max";
+	public static final int		PARAM_SEND_KBS_DEFAULT	= 50;
+	
+	public static final String	PARAM_RECV_KBS			= "azi2phelper.rate.recv.max";
+	public static final int		PARAM_RECV_KBS_DEFAULT	= 50;
+	
+	private Map<String,Object>		properties;
 	private boolean					is_bootstrap_node;
 	private boolean					is_vuze_dht;
 	private I2PHelperAdapter		logger;
 	
+	
 	private static final boolean	FULL_STATS = false;
 	
-	private volatile Router 				router;
+	private volatile Router 			router;
+	
 	private volatile I2PSession 			session;
 	private volatile I2PSocketManager 		socket_manager;
 	private volatile I2PServerSocket		server_socket;
@@ -84,13 +98,103 @@ I2PHelperRouter
 	
 	protected
 	I2PHelperRouter(
+		Map<String,Object>		_properties,
 		boolean					bootstrap_node,
 		boolean					use_vuze_dht,
 		I2PHelperAdapter		_logger )
 	{
-		is_bootstrap_node	= bootstrap_node;
+		properties			= _properties;
+		is_bootstrap_node	= bootstrap_node;		// could be props one day
 		is_vuze_dht			= use_vuze_dht;
 		logger				= _logger;
+	}
+	
+	private int
+	getIntegerParameter(
+		String		name )
+	{
+		int	def;
+		
+		if ( name == PARAM_SEND_KBS ){
+			
+			def = PARAM_SEND_KBS_DEFAULT;
+			
+		}else if ( name == PARAM_RECV_KBS ){
+				
+			def = PARAM_RECV_KBS_DEFAULT;
+			
+		}else{
+			
+			Debug.out( "Unknown parameter: " + name );
+			
+			return( 0 );
+		}
+		
+		Object val = properties.get( name );
+		
+		if ( val instanceof Number ){
+			
+			return(((Number)val).intValue());
+		}else{
+			
+			return( def );
+		}
+	}
+	
+	private void
+	addRateLimitProperties(
+		Properties		props )
+	{
+			// router bandwidth
+			
+		int	base_in 		= is_bootstrap_node?500:getIntegerParameter(PARAM_RECV_KBS);
+		
+		if ( base_in <= 0 ){
+			base_in = 100*1024;	// unlimited - 100MB/sec
+		}
+		int burst_in_ks 	= base_in+(base_in/10);
+		int burst_in_k		= burst_in_ks*20;
+		
+		int	base_out 		= is_bootstrap_node?500:getIntegerParameter(PARAM_SEND_KBS);
+		
+		if ( base_out <= 0 ){
+			base_out = 100*1024;	// unlimited - 100MB/sec
+		}
+		int burst_out_ks 	= base_out+(base_out/10);
+		int burst_out_k		= burst_out_ks*20;
+	
+		
+		int share_pct	= is_bootstrap_node?75:25;
+		
+		props.put( "i2np.bandwidth.inboundBurstKBytes", burst_in_k );
+		props.put( "i2np.bandwidth.inboundBurstKBytesPerSecond", burst_in_ks );
+		props.put( "i2np.bandwidth.inboundKBytesPerSecond", base_in );
+		
+		props.put( "i2np.bandwidth.outboundBurstKBytes", burst_out_k );
+		props.put( "i2np.bandwidth.outboundBurstKBytesPerSecond", burst_out_ks );
+		props.put( "i2np.bandwidth.outboundKBytesPerSecond", base_out );	
+		
+		props.put( "router.sharePercentage", share_pct );
+	}
+	
+	public Map<String,Object>
+	getProperties()
+	{
+		return( properties );
+	}
+	
+	public void
+	updateProperties()
+	{
+		Properties props = new Properties();
+		
+		addRateLimitProperties( props );
+		
+		normalizeProperties( props );
+		
+		router.saveConfig( props, null );
+		
+		router.getContext().bandwidthLimiter().reinitialize();
 	}
 	
 	private Properties
@@ -224,21 +328,7 @@ I2PHelperRouter
 			router_props.put( "i2np.udp.port", i2p_external_port );
 			router_props.put( "i2np.udp.internalPort", i2p_external_port );
 	
-				// router bandwidth
-				// TODO: review!
-			
-			int	base 		= is_bootstrap_node?500:50;
-			int burst_ks 	= base+(base/10);
-			int burst_k		= burst_ks*20;
-			
-			int share_pct	= is_bootstrap_node?75:25;
-			
-			router_props.put( "i2np.bandwidth.inboundBurstKBytes", burst_k );
-			router_props.put( "i2np.bandwidth.inboundBurstKBytesPerSecond", burst_ks );
-			router_props.put( "i2np.bandwidth.inboundKBytesPerSecond", base );
-			router_props.put( "i2np.bandwidth.outboundBurstKBytes", burst_k );
-			router_props.put( "i2np.bandwidth.outboundBurstKBytesPerSecond", burst_ks );
-			router_props.put( "i2np.bandwidth.outboundKBytesPerSecond", base );
+			addRateLimitProperties( router_props );
 			
 				// router pools
 					
@@ -250,9 +340,7 @@ I2PHelperRouter
 			router_props.put( "router.outboundPool.length", 2 );
 			router_props.put( "router.outboundPool.lengthVariance", 0 );
 			router_props.put( "router.outboundPool.quantity", 2 );
-			
-			router_props.put( "router.sharePercentage", share_pct );
-						
+									
 			normalizeProperties( router_props );
 			
 			writeProperties( router_config, router_props );
