@@ -288,19 +288,19 @@ I2PDHTTrackerPlugin
 						
 			if ( torrent != null && networks != null ){
 				
-				boolean	public_net = false;
+				boolean	i2p_net = false;
 				
 				for (int i=0;i<networks.length;i++){
 					
-					if ( networks[i].equalsIgnoreCase( "Public" )){
+					if ( networks[i].equalsIgnoreCase( "I2P" )){
 							
-						public_net	= true;
+						i2p_net	= true;
 						
 						break;
 					}
 				}
 				
-				if ( public_net && !torrent.isPrivate()){
+				if ( i2p_net && !torrent.isPrivate()){
 	
 					boolean	our_download =  torrent.wasCreatedByUs();
 	
@@ -1412,7 +1412,7 @@ I2PDHTTrackerPlugin
 										public String
 										getSource()
 										{
-											return( PEPeerSource.PS_PLUGIN );
+											return( PEPeerSource.PS_DHT );
 										}
 										
 										public String

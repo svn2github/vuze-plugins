@@ -47,6 +47,7 @@ import java.util.Arrays;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import net.i2p.I2PAppContext;
 import net.i2p.client.streaming.I2PSocket;
@@ -96,6 +97,8 @@ import org.parg.azureus.plugins.networks.i2p.swt.I2PHelperView;
 import com.aelitis.azureus.core.proxy.AEProxyAddressMapper;
 import com.aelitis.azureus.core.proxy.AEProxyFactory;
 import com.aelitis.azureus.core.proxy.AEProxyFactory.PluginProxy;
+import com.aelitis.azureus.core.util.bloom.BloomFilter;
+import com.aelitis.azureus.core.util.bloom.BloomFilterFactory;
 import com.aelitis.azureus.plugins.upnp.UPnPMapping;
 import com.aelitis.azureus.plugins.upnp.UPnPPlugin;
 import com.aelitis.net.magneturi.MagnetURIHandler;
@@ -1250,8 +1253,12 @@ I2PHelperPlugin
 		
 		while( true ){
 			
-			if ( !wait_sem.reserve(1000)){
+			if ( wait_sem.reserve(1000)){
 			
+				break;
+				
+			}else{
+				
 				if ( progress.cancelled()){
 					
 					break;
@@ -1259,11 +1266,24 @@ I2PHelperPlugin
 			}
 		}
 		
-		synchronized( result ){
+		boolean	worked = false;
+		
+		try{
+			synchronized( result ){
 			
-			return( result[0] );
+				worked = result[0] != null;
+				
+				return( result[0] );
+			}
+		}finally{
+			
+			progress.reportActivity( "Maggot lookup " + (worked?"succeeded":"failed" ));
 		}
 	}
+	
+	private AtomicInteger	active_maggot_requests 	= new AtomicInteger();
+	private BloomFilter		maggot_bloom			= null;
+	private long			maggot_bloom_create_time;
 	
 	private void 
 	handleMaggotRequest(
@@ -1272,7 +1292,33 @@ I2PHelperPlugin
 		
 		throws Exception 
 	{
-			// TODO: rate limit on peer_hash and also max active conc
+		BloomFilter	bloom = maggot_bloom;
+		
+		if ( bloom == null ){
+			
+			maggot_bloom = bloom = BloomFilterFactory.createAddRemove4Bit( 128 );
+			
+			maggot_bloom_create_time = SystemTime.getMonotonousTime();
+			
+		}else{
+			
+			if ( SystemTime.getMonotonousTime() - maggot_bloom_create_time > 3*60*1000 ){
+				
+				maggot_bloom = null;
+			}
+		}
+		
+		if ( bloom.add( peer_hash ) > 3 ){
+			
+			throw( new Exception( "Too many maggot requests from " + ByteFormatter.encodeString( peer_hash )));
+		}
+		
+		if ( active_maggot_requests.incrementAndGet() > 3 ){
+			
+			active_maggot_requests.decrementAndGet();
+			
+			throw( new Exception( "Too many active maggot requests" ));
+		}
 		
 		new AEThread2( "I2P.maggot" )
 		{
@@ -1381,6 +1427,8 @@ I2PHelperPlugin
 					}catch( Throwable e ){
 						
 					}
+					
+					active_maggot_requests.decrementAndGet();
 				}
 			}
 		}.start();
