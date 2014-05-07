@@ -1157,20 +1157,35 @@ I2PHelperPlugin
 									        					baos.write( buffer, 0, len );
 									        				}
 									        				
-									        				byte[] torrent_bytes = baos.toByteArray();
-									        				
-									        				TOTorrent torrent = TOTorrentFactory.deserialiseFromBEncodedByteArray( torrent_bytes );
-									        				
-									        				if ( torrent != null && Arrays.equals( torrent.getHash(), hash )){
+									        				byte[] response_bytes = baos.toByteArray();
+									        													        					
+									        				for ( int i=4;i<response_bytes.length;i++){
 									        					
-									        					synchronized( result ){
-									        					
-									        						if ( result[0] == null ){
+									        					if ( 	response_bytes[i-4] == '\r' && 
+									        							response_bytes[i-3] == '\n' &&
+									       								response_bytes[i-2] == '\r' &&
+									       								response_bytes[i-1] == '\n' ){
 									        							
-									        							result[0] = torrent_bytes;
-									        							
-									        							wait_sem.release();
-									        						}
+									        						byte[] torrent_bytes = new byte[response_bytes.length-i];
+									        						
+									        						System.arraycopy( response_bytes, i, torrent_bytes, 0, torrent_bytes.length );
+									        						
+											        				TOTorrent torrent = TOTorrentFactory.deserialiseFromBEncodedByteArray( torrent_bytes );
+											        				
+											        				if ( torrent != null && Arrays.equals( torrent.getHash(), hash )){
+											        					
+											        					synchronized( result ){
+											        					
+											        						if ( result[0] == null ){
+											        							
+											        							result[0] = torrent_bytes;
+											        							
+											        							wait_sem.release();
+											        						}
+											        					}
+											        				}
+											        				
+											        				break;
 									        					}
 									        				}
 								        				}finally{
@@ -1897,7 +1912,7 @@ I2PHelperPlugin
 			
 				// 19817 must be used for bootstrap node
 			
-			router.initialise( config_dir, 17654, bootstrap?19817:23014 );
+			router.initialise( config_dir, 17654, bootstrap?19817:28513 );
 			//router.initialise( config_dir, 29903 ); // 7654 );
 			//router.initialise( config_dir, 7654 );
 
