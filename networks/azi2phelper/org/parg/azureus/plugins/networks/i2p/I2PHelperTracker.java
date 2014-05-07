@@ -24,10 +24,10 @@ package org.parg.azureus.plugins.networks.i2p;
 import java.util.*;
 
 import net.i2p.data.Base32;
-import net.i2p.data.Base64;
 import net.i2p.data.Hash;
 
 import org.gudy.azureus2.core3.util.SystemTime;
+import org.gudy.azureus2.plugins.PluginInterface;
 
 
 public class 
@@ -36,6 +36,8 @@ I2PHelperTracker
 	private I2PHelperDHT				dht;
 	private I2PHelperAdapter			adapter;
 	
+	private DHTTrackerPlugin			tracker;
+	
 	protected
 	I2PHelperTracker(
 		I2PHelperAdapter	_adapter,
@@ -43,7 +45,35 @@ I2PHelperTracker
 	{
 		adapter	= _adapter;
 		dht		= _dht;
+		
+		PluginInterface	pi = adapter.getPluginInterface();
+		
+		if ( pi != null ){
+			
+			tracker = new DHTTrackerPlugin( adapter, dht );
+		}
 	}
+	
+	protected void
+	get(
+		byte[]						hash,
+		String						reason,
+		int							num_want,
+		long						timeout,
+		I2PHelperDHTListener		listener )
+	{
+		dht.get( hash, reason, num_want, timeout, listener );
+	}
+	
+	protected void
+	put(
+		byte[]						hash,
+		String						reason,
+		I2PHelperDHTListener		listener )
+	{
+		dht.put( hash, reason, listener );
+	}
+	
 	
 	
 	protected void
@@ -88,6 +118,9 @@ I2PHelperTracker
 	public void
 	destroy()
 	{
-		
+		if ( tracker != null ){
+			
+			tracker.unload();
+		}
 	}
 }

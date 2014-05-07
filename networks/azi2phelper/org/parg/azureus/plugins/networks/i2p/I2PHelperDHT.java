@@ -33,6 +33,9 @@ import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 public interface 
 I2PHelperDHT 
 {
+	public String
+	getLocalAddress();
+	
 	public NodeInfo
 	getNodeInfo(
 		byte[]		hash );
@@ -49,6 +52,20 @@ I2PHelperDHT
 	public void
 	ping(
 		NodeInfo		node );
+	
+	public void
+	get(
+		byte[] 						ih, 
+		String						reason,
+		int 						max, 
+		long						maxWait,
+		I2PHelperDHTListener		listener );
+		
+	public void
+	put(
+		byte[] 						ih, 
+		String						reason,
+		I2PHelperDHTListener		listener );
 	
 	public Collection<Hash> 
 	getPeersAndNoAnnounce(

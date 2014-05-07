@@ -33,6 +33,7 @@ import net.i2p.client.SendMessageOptions;
 import net.i2p.client.datagram.I2PDatagramDissector;
 import net.i2p.client.datagram.I2PDatagramMaker;
 import net.i2p.client.datagram.I2PInvalidDatagramException;
+import net.i2p.data.Base32;
 import net.i2p.data.DataFormatException;
 import net.i2p.data.DataHelper;
 import net.i2p.data.Destination;
@@ -52,6 +53,7 @@ import org.klomp.snark.bencode.BEncoder;
 import org.klomp.snark.bencode.BEValue;
 import org.klomp.snark.bencode.InvalidBEncodingException;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperAdapter;
+import org.parg.azureus.plugins.networks.i2p.I2PHelperDHTListener;
 
 
 /**
@@ -405,6 +407,32 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
         return nodes;
     }
 
+	public String
+	getLocalAddress()
+	{
+		return( Base32.encode( _myNodeInfo.getHash().getData()) + ".b32.i2p" );
+	}
+	
+	public void
+	get(
+		byte[] 						ih,
+		String						reason,
+		int 						max, 
+		long						maxWait,
+		final I2PHelperDHTListener	listener )
+	{
+		throw( new RuntimeException( "no imp" ));
+	}
+	
+	public void
+	put(
+		byte[] 						ih,
+		String						reason,
+		final I2PHelperDHTListener	listener )
+	{
+		throw( new RuntimeException( "no imp" ));
+	}
+	
     /**
      *  Get peers for a torrent, and announce to the closest node we find.
      *  This is an iterative lookup in the DHT.

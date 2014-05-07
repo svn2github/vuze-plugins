@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import net.i2p.client.I2PSession;
+import net.i2p.data.Base32;
 import net.i2p.data.Destination;
 import net.i2p.data.Hash;
 
@@ -48,6 +49,7 @@ import org.gudy.azureus2.core3.util.TimerEventPeriodic;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperDHT;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperAdapter;
+import org.parg.azureus.plugins.networks.i2p.I2PHelperDHTListener;
 import org.parg.azureus.plugins.networks.i2p.dht.NID;
 import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 
@@ -55,8 +57,6 @@ import com.aelitis.azureus.core.dht.DHT;
 import com.aelitis.azureus.core.dht.DHTFactory;
 import com.aelitis.azureus.core.dht.DHTLogger;
 import com.aelitis.azureus.core.dht.DHTOperationAdapter;
-import com.aelitis.azureus.core.dht.DHTOperationListener;
-import com.aelitis.azureus.core.dht.control.DHTControl;
 import com.aelitis.azureus.core.dht.control.DHTControlContact;
 import com.aelitis.azureus.core.dht.router.DHTRouter;
 import com.aelitis.azureus.core.dht.router.DHTRouterContact;
@@ -96,6 +96,8 @@ DHTI2P
 	private int refresh_find_node_ok;
 	private int refresh_find_node_fail;
 	
+	private String		my_address;
+	
 	private boolean					destroyed;
 	
 	public 
@@ -115,6 +117,8 @@ DHTI2P
 			storage_dir.mkdirs();
 		}
 	
+		my_address = Base32.encode( my_node.getHash().getData()) + ".b32.i2p";
+		
 		bootstrap_node	= boot_node;
 		
 		storage_manager = new DHTPluginStorageManager( DHT_NETWORK, this, storage_dir );
@@ -250,6 +254,12 @@ DHTI2P
 		return( null );
 	}
 	
+	public String
+	getLocalAddress()
+	{
+		return( my_address );
+	}
+	
 	public DHT
 	getDHT()
 	{
@@ -309,6 +319,83 @@ DHTI2P
 		NodeInfo		node )
 	{
 		log( "ping not supported" );
+	}
+	
+	public void
+	get(
+		byte[] 						ih,
+		String						reason,
+		int 						max, 
+		long						maxWait,
+		final I2PHelperDHTListener	listener )
+	{
+		dht.get(	ih,
+					reason + " for " + ByteFormatter.encodeString( ih ),
+					DHT.FLAG_NONE,
+					max,
+					maxWait,
+					false,
+					true,		// high priority
+					new DHTOperationAdapter() 
+					{	
+						public void 
+						searching(
+							DHTTransportContact 	contact, 
+							int 					level,
+							int 					active_searches )
+						{
+							
+							listener.searching( contact.getName());
+						}
+						
+						public void 
+						read(
+							DHTTransportContact 	contact, 
+							DHTTransportValue 		value)
+						{
+							String host =  Base32.encode( value.getValue()) + ".b32.i2p";
+														
+							listener.valueRead( host );
+						}
+						
+						public void 
+						complete(
+							boolean timeout ) 
+						{
+							listener.complete( timeout );
+						}
+					});
+	}
+	
+	public void
+	put(
+		byte[] 						ih,
+		String						reason,
+		final I2PHelperDHTListener	listener )
+	{
+		dht.put(	ih,
+					reason + " for " + ByteFormatter.encodeString( ih ),
+					new byte[1],
+					DHT.FLAG_NONE,
+					new DHTOperationAdapter() 
+					{	
+						public void 
+						searching(
+							DHTTransportContact 	contact, 
+							int 					level,
+							int 					active_searches )
+						{
+							
+							listener.searching( contact.getName());
+						}
+						
+						public void 
+						complete(
+							boolean timeout ) 
+						{
+							listener.complete( timeout );
+						}
+					});
 	}
 	
 	public Collection<Hash> 

@@ -1,5 +1,5 @@
 /*
- * Created on Mar 26, 2014
+ * Created on May 6, 2014
  * Created by Paul Gardner
  * 
  * Copyright 2014 Azureus Software, Inc.  All rights reserved.
@@ -21,27 +21,18 @@
 
 package org.parg.azureus.plugins.networks.i2p;
 
-import org.gudy.azureus2.plugins.PluginInterface;
-
-import net.i2p.client.streaming.I2PSocket;
-
 public interface 
-I2PHelperAdapter 
+I2PHelperDHTListener 
 {
 	public void
-	log(
-		String	str );
-	
-	public PluginInterface
-	getPluginInterface();
+	searching(
+		String		host );
 	
 	public void
-	tryExternalBootstrap(
-		boolean		force );
+	valueRead(
+		String		host );
 	
 	public void
-	connectionAccepted(
-		I2PSocket		socket )
-		
-		throws Exception;
+	complete(
+		boolean		timeout );
 }
