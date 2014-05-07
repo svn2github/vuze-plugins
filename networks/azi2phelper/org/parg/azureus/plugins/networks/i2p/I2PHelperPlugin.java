@@ -456,12 +456,15 @@ I2PHelperPlugin
 
 							boolean use_ext_i2p  	= ext_i2p_param.getValue();
 							
+							up_limit_param.setEnabled( plugin_enabled && !use_ext_i2p );
+							down_limit_param.setEnabled( plugin_enabled && !use_ext_i2p );
+							
 							int_port_param.setEnabled( plugin_enabled && !use_ext_i2p );
 							ext_port_param.setEnabled( plugin_enabled && !use_ext_i2p);
 							socks_port_param.setEnabled( plugin_enabled );
-							port_info_param.setEnabled( plugin_enabled  && !use_ext_i2p);
+							port_info_param.setEnabled( plugin_enabled );
 							use_upnp.setEnabled( plugin_enabled  && !use_ext_i2p );
-							
+							always_socks.setEnabled( plugin_enabled);
 							ext_i2p_param.setEnabled( plugin_enabled );
 							ext_i2p_port_param.setEnabled( plugin_enabled && use_ext_i2p );
 							
