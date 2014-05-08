@@ -1205,6 +1205,11 @@ DHTTransportI2P
 	    
     	synchronized( requests ){
 	    		
+    		if ( destroyed ){
+    			
+    			throw( new DHTTransportException( "Transport destroyed" ));
+    		}
+    		
     		requests.put( new HashWrapper( msg_id ), new Request( handler ));
 	    }
 	    
@@ -1653,7 +1658,21 @@ DHTTransportI2P
 	protected void
 	destroy()
 	{
-		destroyed	= true;
+		synchronized( requests ){
+			
+			destroyed	= true;			
+
+			for ( Request request: requests.values() ){
+				
+				try{
+					request.handler.handleError( new DHTTransportException( "Transport destroyed" ));
+					
+				}catch( Throwable e ){
+					
+					Debug.out( e );
+				}
+			}
+		}
 		
 		timer_event.cancel();
 	}

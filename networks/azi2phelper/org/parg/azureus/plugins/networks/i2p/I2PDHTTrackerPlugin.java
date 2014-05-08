@@ -152,7 +152,7 @@ I2PDHTTrackerPlugin
 	private Map<Download,int[]>					scrape_injection_map = new WeakHashMap<Download,int[]>();
 	
 	private Random				random = new Random();
-	private boolean				is_running;				
+	private volatile boolean	is_running;				
 	
 	private AEMonitor			this_mon	= new AEMonitor( "DHTTrackerPlugin" );
 				
@@ -200,6 +200,11 @@ I2PDHTTrackerPlugin
 				perform(
 					UTTimerEvent event) 
 				{
+					if ( !is_running ){
+						
+						return;
+					}
+					
 					ticks++;
 					
 					processRegistrations( ticks%8==0 );
