@@ -24,7 +24,6 @@ package org.parg.azureus.plugins.networks.i2p.vuzedht;
 import java.io.File;
 import java.util.*;
 
-
 import net.i2p.client.I2PSession;
 import net.i2p.data.Base32;
 import net.i2p.data.Destination;
@@ -56,6 +55,7 @@ import com.aelitis.azureus.core.dht.router.DHTRouter;
 import com.aelitis.azureus.core.dht.router.DHTRouterContact;
 import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
 import com.aelitis.azureus.core.dht.transport.DHTTransportValue;
+import com.aelitis.azureus.core.util.CopyOnWriteList;
 import com.aelitis.azureus.plugins.dht.impl.DHTPluginStorageManager;
 
 public class 
@@ -76,9 +76,13 @@ DHTI2P
 	
 	private TimerEventPeriodic		timer;
 	
-	final int timer_period 		= 15*1000;
-	final int save_period		= 2*60*1000;
-	final int save_ticks		= save_period / timer_period;
+	final int timer_period 			= 15*1000;
+	final int save_period			= 2*60*1000;
+	final int save_ticks			= save_period / timer_period;
+	final int cache_check_period	= 1*60*1000;
+	final int cache_check_ticks		= cache_check_period / timer_period;
+
+	final int get_cache_expiry		= 1*60*1000;
 	
 	private int		bootstrap_check_tick_count	= 1;
 	private boolean	force_bootstrap;
@@ -89,6 +93,8 @@ DHTI2P
 	private int refresh_ping_fail;
 	private int refresh_find_node_ok;
 	private int refresh_find_node_fail;
+	
+	private Map<String,GetCacheEntry>	get_cache = new HashMap<String, GetCacheEntry>();
 	
 	private String		my_address;
 	
@@ -178,6 +184,11 @@ DHTI2P
 					
 					tick_count++;
 					
+					if ( tick_count % cache_check_ticks == 0 ){
+						
+						checkCache();
+					}
+
 					if ( tick_count % save_ticks == 0 ){
 						
 						storage_manager.exportContacts( dht );
@@ -315,14 +326,68 @@ DHTI2P
 		log( "ping not supported" );
 	}
 	
+	private void
+	checkCache()
+	{
+		synchronized( get_cache ){
+			
+			if ( get_cache.size() > 0 ){
+			
+				long now = SystemTime.getMonotonousTime();
+				
+				Iterator<GetCacheEntry>	it = get_cache.values().iterator();
+				
+				while( it.hasNext()){
+					
+					GetCacheEntry entry = it.next();
+					
+					if ( entry.isComplete() && now - entry.getCreateTime() > get_cache_expiry ){
+						
+						it.remove();
+					}
+				}
+			}
+		}
+	}
+	
 	public void
 	get(
-		byte[] 						ih,
-		String						reason,
-		int 						max, 
-		long						maxWait,
-		final I2PHelperDHTListener	listener )
+		byte[] 					ih,
+		String					reason,
+		int 					max, 
+		long					maxWait,
+		I2PHelperDHTListener	listener )
 	{
+		String key = ByteFormatter.encodeString( ih ) + "/" + max + "/" + maxWait;
+		
+		GetCacheEntry 	cache_entry;
+		
+		synchronized( get_cache ){
+			
+			cache_entry = get_cache.get( key );
+			
+			if ( cache_entry != null && cache_entry.isComplete()){
+				
+				if ( SystemTime.getMonotonousTime() - cache_entry.getCreateTime() > get_cache_expiry ){
+					
+					cache_entry = null;
+				}
+			}
+			
+			if ( cache_entry == null ){
+				
+				cache_entry = new GetCacheEntry( listener );
+				
+				get_cache.put( key, cache_entry );
+				
+			}else{
+				
+				cache_entry.addListener( listener );
+				
+				return;
+			}
+		}
+		
 		dht.get(	ih,
 					reason + " for " + ByteFormatter.encodeString( ih ),
 					DHT.FLAG_NONE,
@@ -330,49 +395,7 @@ DHTI2P
 					maxWait,
 					false,
 					true,		// high priority
-					new DHTOperationAdapter() 
-					{	
-						private Set<String>	hosts = new HashSet<String>();
-						
-						public void 
-						searching(
-							DHTTransportContact 	contact, 
-							int 					level,
-							int 					active_searches )
-						{
-							
-							listener.searching( contact.getName());
-						}
-						
-						public void 
-						read(
-							DHTTransportContact 	contact, 
-							DHTTransportValue 		value)
-						{
-							String host =  Base32.encode( value.getValue()) + ".b32.i2p";
-							
-								// filter out duplicates
-							
-							synchronized( hosts ){
-								
-								if ( hosts.contains( host )){
-									
-									return;
-								}
-								
-								hosts.add( host );
-							}
-							
-							listener.valueRead( host );
-						}
-						
-						public void 
-						complete(
-							boolean timeout ) 
-						{
-							listener.complete( timeout );
-						}
-					});
+					cache_entry );
 	}
 	
 	public void
@@ -955,5 +978,149 @@ DHTI2P
 	getStats()
 	{
 		return( transport.getStats().getString());
+	}
+	
+	private static class
+	GetCacheEntry
+		extends DHTOperationAdapter
+	{
+		private long						create_time = SystemTime.getMonotonousTime();
+		
+		private Set<String>					hosts 		= new HashSet<String>();
+		
+		private CopyOnWriteList<I2PHelperDHTListener>	listeners 	= new CopyOnWriteList<I2PHelperDHTListener>();
+
+		private boolean		complete;
+		private boolean		timeout;
+		
+		private
+		GetCacheEntry(
+			I2PHelperDHTListener		listener )
+		{
+			listeners.add( listener );
+		}
+		
+		private long
+		getCreateTime()
+		{
+			return( create_time );
+		}
+		
+		private boolean
+		isComplete()
+		{
+			synchronized( this ){
+			
+				return( complete );
+			}
+		}
+		
+		private void
+		addListener(
+			I2PHelperDHTListener		listener )
+		{
+			boolean			was_complete;
+			boolean			was_timeout;
+			
+			synchronized( this ){
+				
+				was_complete	= complete;
+				was_timeout		= timeout;
+
+				if ( !was_complete ){
+					
+					listeners.add( listener );
+				}
+					
+					// prefer not to do this while locked but if we want to avoid this we'll have to
+					// deal with the fact that a 'complete' event might sneak in before we've informed
+					// the listener of the pending 'valueRead' events...
+				
+				for ( String host: hosts ){
+					
+					try{
+						listener.valueRead( host );
+						
+					}catch( Throwable e ){
+						
+						Debug.out( e );
+					}
+				}
+			}
+			
+			if ( was_complete ){
+				
+				listener.complete( was_timeout );
+			}
+		}
+		
+		public void 
+		searching(
+			DHTTransportContact 	contact, 
+			int 					level,
+			int 					active_searches )
+		{
+				// not important to get this exactly right
+			
+			for ( I2PHelperDHTListener listener: listeners ){
+			
+				listener.searching( contact.getName());
+			}
+		}
+		
+		public void 
+		read(
+			DHTTransportContact 	contact, 
+			DHTTransportValue 		value)
+		{
+			String host =  Base32.encode( value.getValue()) + ".b32.i2p";
+			
+			synchronized( this ){
+				
+				if ( !hosts.add( host )){
+					
+					return;
+				}
+			
+				for ( I2PHelperDHTListener listener: listeners ){
+			
+					try{
+						listener.valueRead( host );
+						
+					}catch( Throwable e ){
+						
+						Debug.out( e );
+					}
+				}
+			}
+		}
+		
+		public void 
+		complete(
+			boolean _timeout ) 
+		{
+			List<I2PHelperDHTListener> to_inform;
+			
+			synchronized( this ){
+			
+				complete = true;
+				timeout	= _timeout;
+				
+				to_inform = listeners.getList();
+				
+				listeners.clear();
+			}
+			
+			for ( I2PHelperDHTListener listener: to_inform ){
+				
+				try{
+					listener.complete( _timeout );
+					
+				}catch( Throwable e ){
+					
+					Debug.out( e );
+				}
+			}
+		}
 	}
 }

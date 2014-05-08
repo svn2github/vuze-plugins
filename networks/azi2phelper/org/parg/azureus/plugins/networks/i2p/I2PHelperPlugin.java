@@ -443,8 +443,14 @@ I2PHelperPlugin
 			final int f_int_port = int_port;
 			final int f_ext_port = ext_port;
 			
-			log( "Internal port=" + int_port +", external=" + ext_port + ", socks=" + sock_port );
-						
+			if ( plugin_enabled ){
+			
+				log( "Internal port=" + int_port +", external=" + ext_port + ", socks=" + sock_port );
+				
+			}else{
+				
+				log( "Plugin is disabled" );
+			}
 			ParameterListener enabler_listener =
 					new ParameterListener()
 					{
@@ -691,6 +697,11 @@ I2PHelperPlugin
 	
 		throws IPCException
 	{
+		if ( !plugin_enabled ){
+			
+			throw( new IPCException( "Plugin disabled" ));
+		}
+		
 		synchronized( I2PHelperPlugin.this ){
 			
 			if ( socks_proxy == null ){
@@ -1586,6 +1597,11 @@ I2PHelperPlugin
 	
 		throws IPCException
 	{
+		if ( !plugin_enabled ){
+			
+			return( null );
+		}
+		
 		if ( !host.toLowerCase().endsWith( ".i2p" )){
 			
 			return( null );
@@ -1631,6 +1647,11 @@ I2PHelperPlugin
 		
 		throws IPCException
 	{
+		if ( !plugin_enabled ){
+			
+			return( null );
+		}
+		
 		String 	host = url.getHost();
 				
 		if ( !host.toLowerCase().endsWith( ".i2p" )){
@@ -1775,9 +1796,12 @@ I2PHelperPlugin
 					tracker.destroy();
 				}
 				
-				MagnetURIHandler uri_handler = MagnetURIHandler.getSingleton();
+				if ( magnet_handler != null ){
 				
-				uri_handler.removeListener( magnet_handler );
+					MagnetURIHandler uri_handler = MagnetURIHandler.getSingleton();
+				
+					uri_handler.removeListener( magnet_handler );
+				}
 			}
 		}finally{
 			
