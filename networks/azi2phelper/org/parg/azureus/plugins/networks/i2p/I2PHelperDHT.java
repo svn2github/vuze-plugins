@@ -36,6 +36,12 @@ I2PHelperDHT
 	public String
 	getLocalAddress();
 	
+	public int
+	getQueryPort();
+	
+	public int
+	getReplyPort();
+	
 	public NodeInfo
 	getNodeInfo(
 		byte[]		hash );

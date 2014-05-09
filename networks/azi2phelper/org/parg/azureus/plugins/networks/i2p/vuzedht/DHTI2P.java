@@ -96,6 +96,7 @@ DHTI2P
 	
 	private Map<String,GetCacheEntry>	get_cache = new HashMap<String, GetCacheEntry>();
 	
+	private NodeInfo	my_node;
 	private String		my_address;
 	
 	private boolean					destroyed;
@@ -104,11 +105,12 @@ DHTI2P
 	DHTI2P(
 		File				dir,
 		I2PSession			session,
-		NodeInfo			my_node,
+		NodeInfo			_my_node,
 		NodeInfo			boot_node,
 		I2PHelperAdapter	_adapter )
 	{
-		adapter	= _adapter;
+		my_node		= _my_node;
+		adapter		= _adapter;
 		
 		File storage_dir = new File( dir, "dhtdata");
 		
@@ -265,6 +267,18 @@ DHTI2P
 		return( my_address );
 	}
 	
+	public int
+	getQueryPort()
+	{
+		return( transport.getPort());
+	}
+	
+	public int
+	getReplyPort()
+	{
+		return( transport.getReplyPort());
+	}
+	
 	public DHT
 	getDHT()
 	{
@@ -316,7 +330,7 @@ DHTI2P
 		Destination		destination,
 		int				port )
 	{
-		log( "ping not supported" );
+		transport.sendPing( destination, port );
 	}
 	
 	public void

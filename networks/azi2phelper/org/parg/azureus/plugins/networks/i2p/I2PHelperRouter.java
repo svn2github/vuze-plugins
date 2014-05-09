@@ -54,15 +54,10 @@ import net.i2p.router.RouterContext;
 import net.i2p.router.TunnelManagerFacade;
 import net.i2p.router.transport.FIFOBandwidthLimiter;
 
-import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.DisplayFormatters;
 import org.gudy.azureus2.core3.util.RandomUtils;
-import org.gudy.azureus2.plugins.ui.config.IntParameter;
-import org.gudy.azureus2.plugins.ui.config.Parameter;
-import org.gudy.azureus2.plugins.ui.config.ParameterListener;
-import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.parg.azureus.plugins.networks.i2p.dht.*;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTI2P;
 
@@ -657,7 +652,7 @@ I2PHelperRouter
 						}else{
 							try{
 							
-								logger.connectionAccepted( socket );
+								logger.incomingConnection( socket );
 							
 							}catch( Throwable e ){
 								

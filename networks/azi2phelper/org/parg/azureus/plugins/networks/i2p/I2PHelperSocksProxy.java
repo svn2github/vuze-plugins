@@ -292,6 +292,8 @@ I2PHelperSocksProxy
      
 			I2PSocket socket = socket_manager.connect( remote_dest, socket_opts );
 						
+			adapter.outgoingConnection( socket );
+			
 			return( socket );
 			
 		}catch( Throwable e ){

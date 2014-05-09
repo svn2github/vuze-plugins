@@ -256,6 +256,18 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
     
     	// PARG
     
+    public int
+    getQueryPort()
+    {
+    	return( _qPort );
+    }
+    
+    public int
+    getReplyPort()
+    {
+    	return( _rPort );
+    }
+    
     public void
     requestBootstrap()
     {

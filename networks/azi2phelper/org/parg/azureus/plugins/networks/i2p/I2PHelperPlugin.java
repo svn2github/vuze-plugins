@@ -46,6 +46,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -95,6 +97,7 @@ import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 import org.parg.azureus.plugins.networks.i2p.swt.I2PHelperView;
 
+import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
 import com.aelitis.azureus.core.proxy.AEProxyAddressMapper;
 import com.aelitis.azureus.core.proxy.AEProxyFactory;
 import com.aelitis.azureus.core.proxy.AEProxyFactory.PluginProxy;
@@ -158,6 +161,8 @@ I2PHelperPlugin
 	private I2PHelperSocksProxy					socks_proxy;
 	private Map<Proxy,ProxyMapEntry>			proxy_map 				= new IdentityHashMap<Proxy, ProxyMapEntry>();
 
+	private I2PHelperMessageHandler		message_handler;
+	
 	private MagnetURIHandlerListener	magnet_handler =
 		new MagnetURIHandlerListener()
 		{
@@ -212,6 +217,29 @@ I2PHelperPlugin
 				return( Integer.MIN_VALUE );
 			}
 		};
+		
+	private int DEST_HISTORY_MAX	= 100;
+	
+	private Map<String,Destination>		dest_map = 
+		new LinkedHashMap<String,Destination>(DEST_HISTORY_MAX,0.75f,true)
+		{
+			protected boolean 
+			removeEldestEntry(
+		   		Map.Entry<String,Destination> eldest) 
+			{
+				return size() > DEST_HISTORY_MAX;
+			}
+		};
+		
+	private static final int EXTERNAL_BOOTSTRAP_PERIOD = 30*60*1000;
+		
+	private long		last_external_bootstrap;
+	private long		last_external_bootstrap_import;
+	private List<Map>	last_external_bootstrap_nodes;
+		
+	private static final int NODES_FROM_PEERS_MAX	= 10;
+	private LinkedList<NodeInfo>	bootstrap_nodes_from_peers = new LinkedList<NodeInfo>();
+	
 		
 	private volatile boolean	unloaded;
 	
@@ -485,6 +513,8 @@ I2PHelperPlugin
 			enabler_listener.parameterChanged( null );
 					
 			if ( plugin_enabled ){
+				
+				message_handler = new I2PHelperMessageHandler( I2PHelperPlugin.this );
 				
 				plugin_interface.addListener(
 					new PluginAdapter()
@@ -859,13 +889,7 @@ I2PHelperPlugin
 			}
 		}	
 	}
-	
-	private static final int EXTERNAL_BOOTSTRAP_PERIOD = 30*60*1000;
-	
-	private long		last_external_bootstrap;
-	private long		last_external_bootstrap_import;
-	private List<Map>	last_external_bootstrap_nodes;
-	
+		
 	public void
 	tryExternalBootstrap(
 		boolean		force )
@@ -945,6 +969,34 @@ I2PHelperPlugin
 				}
 			}
 		}else{
+			List<NodeInfo>	temp = null;
+			
+			synchronized( bootstrap_nodes_from_peers ){
+				
+				if ( bootstrap_nodes_from_peers.size() > 0 ){
+					
+					temp = new ArrayList<NodeInfo>( bootstrap_nodes_from_peers );
+					
+					bootstrap_nodes_from_peers.clear();
+				}
+			}
+			
+			if ( temp != null ){
+			
+				log( "Injecting bootstrap nodes from peers" );
+				
+				for ( NodeInfo ni: temp ){
+					
+						// these have no NID yet
+					
+					router.getDHT().ping( ni.getDestination(), ni.getPort());
+				}
+				
+				if ( temp.size() > 5 ){
+					
+					return;
+				}
+			}
 			
 			if ( 	last_external_bootstrap_nodes != null &&
 					now - last_external_bootstrap_import >= 3*60*1000 ){
@@ -961,8 +1013,60 @@ I2PHelperPlugin
 		}
 	}
 	
+	public void
+	handleDHTPort(
+		String		host,
+		int			port )
+	{
+		Destination dest;
+		
+		synchronized( dest_map ){
+			
+			dest = dest_map.get( host );
+		}
+		
+		if ( dest != null ){
+			
+			NodeInfo ni = new NodeInfo( dest, port );
+			
+			synchronized( bootstrap_nodes_from_peers ){
+				
+				if ( !bootstrap_nodes_from_peers.contains( ni )){
+					
+					bootstrap_nodes_from_peers.addFirst( ni );
+					
+					if ( bootstrap_nodes_from_peers.size() > NODES_FROM_PEERS_MAX ){
+						
+						bootstrap_nodes_from_peers.removeLast();
+					}
+				}
+			}
+		}
+	}
+	
 	public void 
-	connectionAccepted(
+	outgoingConnection(
+		I2PSocket i2p_socket )
+		
+		throws Exception
+	{
+		Destination dest = i2p_socket.getPeerDestination();
+		
+		if ( dest != null ){
+			
+			byte[]	peer_hash = dest.calculateHash().getData();
+			
+			String peer_ip = Base32.encode( peer_hash ) + ".b32.i2p";
+
+			synchronized( dest_map ){
+				
+				dest_map.put( peer_ip, dest );
+			}
+		}
+	}
+	
+	public void 
+	incomingConnection(
 		I2PSocket i2p_socket )
 		
 		throws Exception 
@@ -990,6 +1094,11 @@ I2PHelperPlugin
 				handleMaggotRequest( i2p_socket, peer_hash );
 				
 			}else{
+				
+				synchronized( dest_map ){
+					
+					dest_map.put( peer_ip, dest );
+				}
 				
 				vuze_socket.bind( null );
 				
@@ -1802,6 +1911,13 @@ I2PHelperPlugin
 				
 					uri_handler.removeListener( magnet_handler );
 				}
+				
+				if ( message_handler != null ){
+					
+					message_handler.destroy();
+					
+					message_handler = null;
+				}
 			}
 		}finally{
 			
@@ -2022,7 +2138,7 @@ I2PHelperPlugin
 				}
 				
 				public void 
-				connectionAccepted(
+				incomingConnection(
 					I2PSocket socket )
 					
 					throws Exception 
@@ -2030,6 +2146,11 @@ I2PHelperPlugin
 					log( "incoming connections not supported" );
 					
 					socket.close();
+				}
+				public void 
+				outgoingConnection(
+					I2PSocket socket )
+				{	
 				}
 				
 				public PluginInterface

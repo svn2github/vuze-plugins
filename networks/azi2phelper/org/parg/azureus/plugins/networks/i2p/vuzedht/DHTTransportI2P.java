@@ -266,6 +266,12 @@ DHTTransportI2P
 		return( query_port );
 	}
 	
+	public int
+	getReplyPort()
+	{
+		return( reply_port );
+	}
+	
 	public void
 	setPort(
 		int	port )
@@ -404,9 +410,27 @@ DHTTransportI2P
 
 	private HashMap<HashWrapper,Request>		requests = new HashMap<HashWrapper, Request>();
 	
+	public void
+	sendPing(
+		Destination		dest,
+		int				port )
+	{
+			// used to help bootstrap 
+		
+		sendPing( new NodeInfo( dest, port ), false );
+	}
+	
 	protected boolean
 	sendPing(
 		NodeInfo		node )
+	{
+		return( sendPing( node, true ));
+	}
+	
+	private boolean
+	sendPing(
+		NodeInfo		node,
+		boolean			wait_for_reply )
 	{
 		final boolean[] result = { false };
 		
@@ -442,8 +466,7 @@ DHTTransportI2P
 	        		public void 
 	        		handleError(
 	        			DHTTransportException error) 
-	        		{
-	        			
+	        		{	        			
 	        			stats.pingFailed();
 	        			
 	        			sem.release();
@@ -451,7 +474,10 @@ DHTTransportI2P
 	        	}, 
 	        	node, map, true );
 	        
-	        sem.reserve();
+	        if ( wait_for_reply ){
+	        
+	        	sem.reserve();
+	        }
 	        
 		}catch( Throwable e ){
 		}

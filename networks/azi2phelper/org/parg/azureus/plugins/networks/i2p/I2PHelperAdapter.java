@@ -40,7 +40,13 @@ I2PHelperAdapter
 		boolean		force );
 	
 	public void
-	connectionAccepted(
+	incomingConnection(
+		I2PSocket		socket )
+		
+		throws Exception;
+	
+	public void
+	outgoingConnection(
 		I2PSocket		socket )
 		
 		throws Exception;
