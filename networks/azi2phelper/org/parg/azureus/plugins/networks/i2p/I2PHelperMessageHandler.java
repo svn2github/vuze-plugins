@@ -665,27 +665,10 @@ I2PHelperMessageHandler
 
 			throws MessageException
 		{
-			int	pos = data.position( DirectByteBuffer.SS_MSG );
-			
-			byte[] dict_bytes = new byte[ Math.min( 128, data.remaining( DirectByteBuffer.SS_MSG )) ];
-						
-			data.get( DirectByteBuffer.SS_MSG, dict_bytes );
-			
-			try{
-				Map root = BDecoder.decode( dict_bytes );
-
-				data.position( DirectByteBuffer.SS_MSG, pos + BEncoder.encode( root ).length );			
+			 Map root = MessagingUtil.convertBencodedByteStreamToPayload(data, 2, getID());		
 									
-				return( new LTI2PPEX( root, data ));
-				
-			}catch( Throwable e ){
-				
-				e.printStackTrace();
-				
-				throw( new MessageException( "decode failed", e ));
-			}
+			 return( new LTI2PPEX( root, data ));
 		}
-
 
 		public void 
 		destroy()
