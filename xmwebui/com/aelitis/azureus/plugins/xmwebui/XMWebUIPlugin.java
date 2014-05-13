@@ -1450,6 +1450,10 @@ XMWebUIPlugin
 				// RPC v15
 				method_Free_Space(args, result);
 	
+			}else if ( method.equals( "torrent-rename-path" )){
+				// RPC v15
+				method_Torrent_Rename_Path(args, result);
+	
 			}else if ( method.equals( "tags-get-list" )){
 				// Vuze RPC v3
 				method_Tags_Get_List(args, result);
@@ -2152,6 +2156,28 @@ XMWebUIPlugin
 		// TODO
 		log("blocklist-update not supported");
 	}
+	
+	private void
+	method_Torrent_Rename_Path(
+			Map args, 
+			Map result)
+	{
+		/*
+   Request arguments:
+
+   string                           | value type & description
+   ---------------------------------+-------------------------------------------------
+   "ids"                            | array      the torrent torrent list, as described in 3.1
+                                    |            (must only be 1 torrent)
+   "path"                           | string     the path to the file or folder that will be renamed
+   "name"                           | string     the file or folder's new name
+
+   Response arguments: "path", "name", and "id", holding the torrent ID integer
+		 */
+		System.out.println( "unhandled method: torrent-rename-path - " + args );
+	}
+
+
 
 	private void 
 	method_Torrent_Set_Location(
@@ -2442,7 +2468,9 @@ XMWebUIPlugin
 		
 		long	uploaded_ever 	= l_uploaded_ever==null?-1:l_uploaded_ever.longValue();
 		long	downloaded_ever = l_downloaded_ever==null?-1:l_downloaded_ever.longValue();
-		
+
+		String name = (String) args.get("name");
+
 
 		for ( DownloadStub download_stub: downloads ){
 						
@@ -2465,6 +2493,11 @@ XMWebUIPlugin
 							Debug.out(e);
 						}
 					}
+				}
+				
+				if (name != null) {
+					DownloadManager core_download = PluginCoreUtils.unwrap(download);
+					core_download.getDownloadState().setDisplayName(name);
 				}
 				
 				if (queuePosition != null) {
