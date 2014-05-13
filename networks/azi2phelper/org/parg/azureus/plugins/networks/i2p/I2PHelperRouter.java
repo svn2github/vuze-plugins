@@ -67,11 +67,14 @@ I2PHelperRouter
 {
 	private static final String 	i2p_host 	= "127.0.0.1";
 
-	public static final String	PARAM_SEND_KBS			= "azi2phelper.rate.send.max";
-	public static final int		PARAM_SEND_KBS_DEFAULT	= 50;
+	public static final String	PARAM_SEND_KBS				= "azi2phelper.rate.send.max";
+	public static final int		PARAM_SEND_KBS_DEFAULT		= 50;
 	
-	public static final String	PARAM_RECV_KBS			= "azi2phelper.rate.recv.max";
-	public static final int		PARAM_RECV_KBS_DEFAULT	= 50;
+	public static final String	PARAM_RECV_KBS				= "azi2phelper.rate.recv.max";
+	public static final int		PARAM_RECV_KBS_DEFAULT		= 50;
+	
+	public static final String	PARAM_SHARE_PERCENT			= "azi2phelper.share.percent";
+	public static final int		PARAM_SHARE_PERCENT_DEFAULT	= 25;
 	
 	private Map<String,Object>		properties;
 	private boolean					is_bootstrap_node;
@@ -115,8 +118,12 @@ I2PHelperRouter
 			def = PARAM_SEND_KBS_DEFAULT;
 			
 		}else if ( name == PARAM_RECV_KBS ){
-				
+			
 			def = PARAM_RECV_KBS_DEFAULT;
+			
+		}else if ( name == PARAM_SHARE_PERCENT ){
+			
+			def = PARAM_SHARE_PERCENT_DEFAULT;
 			
 		}else{
 			
@@ -147,6 +154,13 @@ I2PHelperRouter
 		if ( base_in <= 0 ){
 			base_in = 100*1024;	// unlimited - 100MB/sec
 		}
+		
+			// got to keep some bytes flowing here
+		
+		if ( base_in < 10 ){
+			base_in = 10;
+		}
+		
 		int burst_in_ks 	= base_in+(base_in/10);
 		int burst_in_k		= burst_in_ks*20;
 		
@@ -155,11 +169,18 @@ I2PHelperRouter
 		if ( base_out <= 0 ){
 			base_out = 100*1024;	// unlimited - 100MB/sec
 		}
+		
+			// got to keep some bytes flowing here
+		
+		if ( base_out < 10 ){
+			base_out = 10;
+		}
+		
 		int burst_out_ks 	= base_out+(base_out/10);
 		int burst_out_k		= burst_out_ks*20;
 	
 		
-		int share_pct	= is_bootstrap_node?75:25;
+		int share_pct	= is_bootstrap_node?75:getIntegerParameter(PARAM_SHARE_PERCENT);
 		
 		props.put( "i2np.bandwidth.inboundBurstKBytes", burst_in_k );
 		props.put( "i2np.bandwidth.inboundBurstKBytesPerSecond", burst_in_ks );

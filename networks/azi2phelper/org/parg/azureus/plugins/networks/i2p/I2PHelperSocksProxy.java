@@ -199,7 +199,7 @@ I2PHelperSocksProxy
 			
 			connections.add( con );
 			
-			System.out.println( "total connections=" + connections.size() + ", ih=" + intermediate_host_map.size());
+			//System.out.println( "total connections=" + connections.size() + ", ih=" + intermediate_host_map.size());
 			
 			return( con );
 		}
@@ -329,7 +329,7 @@ I2PHelperSocksProxy
 			
 			connections.remove( connection );
 			
-			System.out.println( "total connections=" + connections.size() + ", ih=" + intermediate_host_map.size());
+			//System.out.println( "total connections=" + connections.size() + ", ih=" + intermediate_host_map.size());
 		}
 	}
 	

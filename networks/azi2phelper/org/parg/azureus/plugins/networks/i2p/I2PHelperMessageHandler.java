@@ -577,46 +577,8 @@ I2PHelperMessageHandler
 				
 				Map payload_map = new HashMap();
 
-				if ( added.length > 0 ){
-					
-					byte[]	hashes = new byte[added.length*32];
-					
-					int	pos = 0;
-					
-					for ( int i=0;i<added.length;i++){
-						
-						String host = added[i].getAddressString();
-						
-						if ( host.endsWith( ".b32.i2p" )){
-							
-							byte[] h = Base32.decode( host.substring( 0, host.length() - 8 ));
-							
-							if ( h.length == 32 ){
-								
-								System.arraycopy( h, 0, hashes, pos, 32 );
-								
-								pos += 32;
-							}
-						}
-					}
-					
-					if ( pos < hashes.length ){
-						
-						if ( pos > 0 ){
-							
-							byte[] temp = new byte[pos];
-							
-							System.arraycopy( hashes, 0, temp, 0, pos );
-							
-							hashes = temp;
-						}
-					}
-					
-					if ( pos > 0 ){
-					
-						payload_map.put( "added", hashes );
-					}
-				}
+				encodePeers( added, payload_map, "added" );
+				encodePeers( dropped, payload_map, "dropped" );
 					
 				//System.out.println( "Sending " + payload_map );
 				
@@ -626,6 +588,56 @@ I2PHelperMessageHandler
 			return new DirectByteBuffer[]{ buffer };  
 		}
 
+		private void
+		encodePeers(
+			PeerItem[]		peers,
+			Map				map,
+			String			key )
+		{
+			int peers_length = peers.length;
+			
+			if ( peers_length > 0 ){
+				
+				byte[]	hashes = new byte[peers_length*32];
+				
+				int	pos = 0;
+				
+				for ( int i=0;i<peers_length;i++){
+					
+					String host = peers[i].getAddressString();
+					
+					if ( host.endsWith( ".b32.i2p" )){
+						
+						byte[] h = Base32.decode( host.substring( 0, host.length() - 8 ));
+						
+						if ( h.length == 32 ){
+							
+							System.arraycopy( h, 0, hashes, pos, 32 );
+							
+							pos += 32;
+						}
+					}
+				}
+				
+				if ( pos < hashes.length ){
+					
+					if ( pos > 0 ){
+						
+						byte[] temp = new byte[pos];
+						
+						System.arraycopy( hashes, 0, temp, 0, pos );
+						
+						hashes = temp;
+					}
+				}
+				
+				if ( pos > 0 ){
+				
+					map.put( key, hashes );
+				}
+			}
+		}
+		
 		public PeerItem[] 
 		getAddedPeers()
 		{

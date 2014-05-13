@@ -61,6 +61,7 @@ import net.i2p.data.Base64;
 import net.i2p.data.Destination;
 
 import org.gudy.azureus2.core3.config.COConfigurationManager;
+import org.gudy.azureus2.core3.config.impl.TransferSpeedValidator;
 import org.gudy.azureus2.core3.torrent.TOTorrent;
 import org.gudy.azureus2.core3.torrent.TOTorrentFactory;
 import org.gudy.azureus2.core3.util.AESemaphore;
@@ -69,7 +70,11 @@ import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.RandomUtils;
+import org.gudy.azureus2.core3.util.SimpleTimer;
 import org.gudy.azureus2.core3.util.SystemTime;
+import org.gudy.azureus2.core3.util.TimerEvent;
+import org.gudy.azureus2.core3.util.TimerEventPerformer;
+import org.gudy.azureus2.core3.util.TimerEventPeriodic;
 import org.gudy.azureus2.core3.util.UrlUtils;
 import org.gudy.azureus2.plugins.PluginAdapter;
 import org.gudy.azureus2.plugins.PluginConfig;
@@ -98,6 +103,7 @@ import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 import org.parg.azureus.plugins.networks.i2p.swt.I2PHelperView;
 
 import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
+import com.aelitis.azureus.core.networkmanager.NetworkManager;
 import com.aelitis.azureus.core.proxy.AEProxyAddressMapper;
 import com.aelitis.azureus.core.proxy.AEProxyFactory;
 import com.aelitis.azureus.core.proxy.AEProxyFactory.PluginProxy;
@@ -314,8 +320,11 @@ I2PHelperPlugin
 
 			final BooleanParameter enable_param = config_model.addBooleanParameter2( "enable", "azi2phelper.enable", true );
 
+			final BooleanParameter link_rates_param = config_model.addBooleanParameter2( "azi2phelper.link.rates", "azi2phelper.link.rates", false );
+			
 			final IntParameter up_limit_param 		= config_model.addIntParameter2( I2PHelperRouter.PARAM_SEND_KBS, I2PHelperRouter.PARAM_SEND_KBS, I2PHelperRouter.PARAM_SEND_KBS_DEFAULT, 0, Integer.MAX_VALUE );
 			final IntParameter down_limit_param 	= config_model.addIntParameter2( I2PHelperRouter.PARAM_RECV_KBS, I2PHelperRouter.PARAM_RECV_KBS, I2PHelperRouter.PARAM_RECV_KBS_DEFAULT, 0, Integer.MAX_VALUE );
+			final IntParameter share_percent_param 	= config_model.addIntParameter2( I2PHelperRouter.PARAM_SHARE_PERCENT, I2PHelperRouter.PARAM_SHARE_PERCENT, I2PHelperRouter.PARAM_SHARE_PERCENT_DEFAULT, 10, 100 );
 
 			final Map<String,Object>	router_properties = new HashMap<String, Object>();
 			
@@ -328,6 +337,7 @@ I2PHelperPlugin
 					{
 						router_properties.put( I2PHelperRouter.PARAM_SEND_KBS, up_limit_param.getValue());
 						router_properties.put( I2PHelperRouter.PARAM_RECV_KBS, down_limit_param.getValue());
+						router_properties.put( I2PHelperRouter.PARAM_SHARE_PERCENT, share_percent_param.getValue());
 
 						I2PHelperRouter current_router = router;
 						
@@ -342,6 +352,83 @@ I2PHelperPlugin
 			
 			up_limit_param.addListener( rate_change_listener );
 			down_limit_param.addListener( rate_change_listener );
+			share_percent_param.addListener( rate_change_listener );
+			
+			ParameterListener link_listener = 
+				new ParameterListener()
+				{
+					private TimerEventPeriodic event;
+					
+					public void 
+					parameterChanged(
+						Parameter 	param ) 
+					{
+						if ( link_rates_param.getValue()){
+							
+							if ( event == null ){
+								
+								syncRates();
+								
+								event = SimpleTimer.addPeriodicEvent(
+									"I2PRateLinker",
+									15*1000,
+									new TimerEventPerformer()
+									{
+										public void 
+										perform(
+											TimerEvent event) 
+										{
+											if ( !link_rates_param.getValue()){
+												
+												return;
+											}
+											
+											syncRates();
+										}
+									});
+							}
+						}else{
+							
+							if ( event != null ){
+								
+								event.cancel();
+								
+								event = null;
+							}
+						}
+					}
+					
+					private void
+					syncRates()
+					{
+						int dl_limit = NetworkManager.getMaxDownloadRateBPS() / 1024;
+						
+						int ul_limit;
+						
+						if (NetworkManager.isSeedingOnlyUploadRate()){
+							
+							ul_limit= NetworkManager.getMaxUploadRateBPSSeedingOnly() / 1024;
+							
+						}else{
+							
+							ul_limit = NetworkManager.getMaxUploadRateBPSNormal() / 1024;
+						}
+						
+						if ( up_limit_param.getValue() != ul_limit ){
+							
+							up_limit_param.setValue( ul_limit );
+						}
+						
+						if ( down_limit_param.getValue() != dl_limit ){
+							
+							down_limit_param.setValue( dl_limit );
+						}
+					}
+				};
+			
+			link_listener.parameterChanged( null );
+				
+			link_rates_param.addListener( link_listener );
 			
 			int_port_param 		= config_model.addIntParameter2( "azi2phelper.internal.port", "azi2phelper.internal.port", 0 );
 			ext_port_param	 	= config_model.addIntParameter2( "azi2phelper.external.port", "azi2phelper.external.port", 0 );
@@ -490,17 +577,21 @@ I2PHelperPlugin
 
 							boolean use_ext_i2p  	= ext_i2p_param.getValue();
 							
-							up_limit_param.setEnabled( plugin_enabled && !use_ext_i2p );
-							down_limit_param.setEnabled( plugin_enabled && !use_ext_i2p );
+							boolean	enabled_not_ext = plugin_enabled && !use_ext_i2p;
 							
-							int_port_param.setEnabled( plugin_enabled && !use_ext_i2p );
-							ext_port_param.setEnabled( plugin_enabled && !use_ext_i2p);
+							link_rates_param.setEnabled( enabled_not_ext );
+							up_limit_param.setEnabled( enabled_not_ext );
+							down_limit_param.setEnabled( enabled_not_ext );
+							share_percent_param.setEnabled( enabled_not_ext );
+							
+							int_port_param.setEnabled( enabled_not_ext );
+							ext_port_param.setEnabled( enabled_not_ext);
 							socks_port_param.setEnabled( plugin_enabled );
 							port_info_param.setEnabled( plugin_enabled );
-							use_upnp.setEnabled( plugin_enabled  && !use_ext_i2p );
+							use_upnp.setEnabled( enabled_not_ext );
 							always_socks.setEnabled( plugin_enabled);
 							ext_i2p_param.setEnabled( plugin_enabled );
-							ext_i2p_port_param.setEnabled( plugin_enabled && use_ext_i2p );
+							ext_i2p_port_param.setEnabled( enabled_not_ext );
 							
 							command_text_param.setEnabled( plugin_enabled );
 							command_exec_param.setEnabled( plugin_enabled );
@@ -1087,7 +1178,7 @@ I2PHelperPlugin
 			
 			String peer_ip = Base32.encode( peer_hash ) + ".b32.i2p";
 			
-			System.out.println( "Incoming from " + peer_ip + ", port=" + i2p_socket.getLocalPort());
+			// System.out.println( "Incoming from " + peer_ip + ", port=" + i2p_socket.getLocalPort());
 			
 			if ( i2p_socket.getLocalPort() == 80 ){
 				
@@ -1108,7 +1199,7 @@ I2PHelperPlugin
 				
 				final AEProxyAddressMapper.PortMapping mapping = AEProxyFactory.getAddressMapper().registerPortMapping( local_port, peer_ip );
 				
-				System.out.println( "local port=" + local_port );
+				// System.out.println( "local port=" + local_port );
 				
 				boolean	ok = false;
 				
@@ -1734,7 +1825,7 @@ I2PHelperPlugin
 								
 				proxy_map.put( proxy, new ProxyMapEntry( host, intermediate_host ));
 		
-				System.out.println( "proxy_map=" + proxy_map.size());
+				//System.out.println( "proxy_map=" + proxy_map.size());
 				
 				//last_use_time	= SystemTime.getMonotonousTime();
 	
@@ -1786,7 +1877,7 @@ I2PHelperPlugin
 								
 				proxy_map.put( proxy, new ProxyMapEntry( host, intermediate_host ));
 		
-				System.out.println( "proxy_map=" + proxy_map.size());
+				//System.out.println( "proxy_map=" + proxy_map.size());
 	
 				//last_use_time	= SystemTime.getMonotonousTime();
 	
@@ -1816,7 +1907,7 @@ I2PHelperPlugin
 		
 			if ( entry != null ){
 					
-				System.out.println( "proxy_map=" + proxy_map.size());
+				// System.out.println( "proxy_map=" + proxy_map.size());
 
 				String 	host 				= entry.getHost();
 				
