@@ -242,14 +242,20 @@ public class DictionaryDownloader implements iTask
                                     e.printStackTrace();
                                 }
                             }
-                            DictionaryDownloader.semaphore.release();
-                            return false;
+                            if(DictionaryDownloader.semaphore != null)
+                            {
+                                DictionaryDownloader.semaphore.release();
+                            }
+                            return true;
                         }
 
                         
                         public void failed(ResourceDownloader downloader, ResourceDownloaderException e)
                         {
-                            DictionaryDownloader.semaphore.release();
+                            if(DictionaryDownloader.semaphore != null)
+                            {
+                                DictionaryDownloader.semaphore.release();
+                            }
                         }
                     });
                     DictionaryDownloader.resourceDownloader.asyncDownload();

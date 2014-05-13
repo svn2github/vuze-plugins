@@ -247,34 +247,38 @@ public class ArchiveFile
     {
         return this.path;
     }
-
+    public URL[] findPath(String path)
+    {
+        return this.findResources(null, null, null, null, null, path);
+    }
     public URL[] findRessources(String resourceName, String extension)
     {
-        return this.findResources(resourceName, null, null, null, extension);
+        return this.findResources(resourceName, null, null, null, extension, null);
     }
 
     public URL[] findContainsRessources(String contains, String extension)
     {
-        return this.findResources(null, contains, null, null, extension);
+        return this.findResources(null, contains, null, null, extension, null);
     }
 
     public URL[] findStartsWithRessources(String startsWith, String extension)
     {
-        return this.findResources(null, null, startsWith, null, extension);
+        return this.findResources(null, null, startsWith, null, extension, null);
     }
 
     public URL[] findEndsWithRessources(String endsWith, String extension)
     {
-        return this.findResources(null, null, null, endsWith, extension);
+        return this.findResources(null, null, null, endsWith, extension, null);
     }
 
-    private URL[] findResources(String equals, String contains, String startsWith, String endsWith, String extension)
+    private URL[] findResources(String equals, String contains, String startsWith, String endsWith, String extension, String path)
     {
         equals = (equals == null) ? null : equals.toLowerCase(Locale.US);
         contains = (contains == null) ? null : contains.toLowerCase(Locale.US);
         startsWith = (startsWith == null) ? null : startsWith.toLowerCase(Locale.US);
         endsWith = (endsWith == null) ? null : endsWith.toLowerCase(Locale.US);
-        extension = extension.toLowerCase(Locale.US);
+        extension = (extension == null) ? null : extension.toLowerCase(Locale.US);
+        path = (path == null) ? null : path.toLowerCase(Locale.US);
         URL[] resourcesURLs = new URL[0];
         Enumeration<JarEntry> entries = this.entries();
         while (entries.hasMoreElements())
@@ -295,25 +299,40 @@ public class ArchiveFile
                     }
                     if (archiveFile != null)
                     {
-                        URL[] resourcesChildURLs = archiveFile.findResources(equals, contains, startsWith, endsWith, extension);
+                        URL[] resourcesChildURLs = archiveFile.findResources(equals, contains, startsWith, endsWith, extension, path);
                         URL[] newTable = new URL[resourcesURLs.length + resourcesChildURLs.length];
                         System.arraycopy(resourcesURLs, 0, newTable, 0, resourcesURLs.length);
                         System.arraycopy(resourcesChildURLs, 0, newTable, resourcesURLs.length, resourcesChildURLs.length);
                         resourcesURLs = newTable;
                     }
                 }
-                else if (jarEntryExtension.equalsIgnoreCase(extension) == true)
+                else
                 {
-                    String jarEntryName = Path.getFilenameWithoutExtension(jarEntry.getName().toLowerCase(Locale.US));
-                    if (((equals != null && jarEntryName.equals(equals)) || (contains != null && jarEntryName.contains(contains)) || (startsWith != null && jarEntryName.startsWith(startsWith)) || (endsWith != null && jarEntryName.endsWith(endsWith))))
+                    if (extension != null && jarEntryExtension.equalsIgnoreCase(extension) == false)
                     {
-                        URL url = Path.getUrl(this.getName() + jarEntry.getName());
-                        URL[] newTable = new URL[resourcesURLs.length + 1];
-                        System.arraycopy(resourcesURLs, 0, newTable, 0, resourcesURLs.length);
-                        resourcesURLs = newTable;
-                        resourcesURLs[resourcesURLs.length - 1] = url;
+                        continue;
                     }
-
+                    if (equals != null || contains != null || startsWith != null || endsWith != null)
+                    {
+                        String jarEntryName = Path.getFilenameWithoutExtension(jarEntry.getName().toLowerCase(Locale.US));
+                        if (((equals != null && jarEntryName.equals(equals) == false) ||
+                                (contains != null && jarEntryName.contains(contains) == false) ||
+                                (startsWith != null && jarEntryName.startsWith(startsWith) == false) ||
+                                (endsWith != null && jarEntryName.endsWith(endsWith) == false)))
+                        {
+                            continue;
+                        }
+                    }
+                    if (path != null && jarEntry.getName().equalsIgnoreCase(path) == false)
+                    {
+                        continue;
+                    }
+                    
+                    URL url = Path.getUrl(this.getName() + jarEntry.getName());
+                    URL[] newTable = new URL[resourcesURLs.length + 1];
+                    System.arraycopy(resourcesURLs, 0, newTable, 0, resourcesURLs.length);
+                    resourcesURLs = newTable;
+                    resourcesURLs[resourcesURLs.length - 1] = url;
                 }
 
             }

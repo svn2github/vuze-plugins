@@ -88,7 +88,6 @@ public class TranslateManager
                     }
                     catch (IOException e)
                     {
-                        e.printStackTrace();
                     }
                     finally
                     {
@@ -98,7 +97,6 @@ public class TranslateManager
                         }
                         catch (IOException e)
                         {
-                            e.printStackTrace();
                         }
                     }
                     if (TranslateManager.semaphore != null)
@@ -111,7 +109,6 @@ public class TranslateManager
                 
                 public void failed(ResourceDownloader downloader, ResourceDownloaderException e)
                 {
-                    e.printStackTrace();
                     if (TranslateManager.semaphore != null)
                     {
                         TranslateManager.semaphore.release();

@@ -140,6 +140,11 @@ public class LocalizablePluginInterface implements iTask
             pluginVersion = associatedPluginInterface.getPluginVersion();
         }
 
+        if(pluginVersion == null)
+        {
+            pluginVersion = "";
+        }
+        
         properties.put("plugin.id", pluginId);
         properties.put("plugin.name", pluginName);
         properties.put("plugin.version", pluginVersion);   
@@ -335,7 +340,8 @@ public class LocalizablePluginInterface implements iTask
         }
   
         Map<URL, PluginInterface> jarUrls = new HashMap<URL, PluginInterface>();
-        
+        List<URL> excludeJarUrls = new ArrayList<URL>();
+            
         List<PluginInterface> pluginInterfaces = new ArrayList<PluginInterface>();
         pluginInterfaces.addAll(Arrays.asList(i18nAZ.getPluginInterface().getPluginManager().getPluginInterfaces()));
         pluginInterfaces.addAll(Arrays.asList(NotInstalledPluginManager.toArray()));
@@ -369,11 +375,30 @@ public class LocalizablePluginInterface implements iTask
                 {
                     if (urls[j].getFile() == null || urls[j].getFile().endsWith("/") == false)
                     {
-                        if ("file".equals(urls[j].getProtocol()) == true && Path.getFile(urls[j]).getName().equalsIgnoreCase("swt.jar") == false)
+                        if ("file".equals(urls[j].getProtocol()) == true)
                         {
-                            if (jarUrls.containsKey(urls[j]) == false)
+                            if (jarUrls.containsKey(urls[j]) == false && excludeJarUrls.contains(urls[j]) == false)
                             {
-                                jarUrls.put(urls[j], pluginInterface);
+                                ArchiveFile archiveFile = null;
+                                try
+                                {
+                                    archiveFile = new ArchiveFile(urls[j]);
+                                }
+                                catch (IOException e)
+                                {
+                                }
+                                if(archiveFile != null)
+                                {
+                                    URL[] result = archiveFile.findPath("org/eclipse/swt/SWT.class");
+                                    if(result.length == 0)
+                                    {
+                                        jarUrls.put(urls[j], pluginInterface);
+                                    }
+                                    else
+                                    {
+                                        excludeJarUrls.add(urls[j]);
+                                    }                                    
+                                }
                             }
                         }
                     }
@@ -397,7 +422,7 @@ public class LocalizablePluginInterface implements iTask
                     i18nAZ.viewInstance.updateProgressBar((float)index /  (float)(jarUrls.size()-1) * (float)100);
                     i18nAZ.viewInstance.updateLoadingMessage("Recherche des fichiers de langues...\n" + entry.getValue().getPluginID());
                 }
-                    pluginId = entry.getValue().getPluginID();
+                pluginId = entry.getValue().getPluginID();
                 pluginInterfaceVersion = entry.getValue().getPluginVersion();
             }
 
@@ -420,7 +445,11 @@ public class LocalizablePluginInterface implements iTask
                     {
                         if (pluginInterfaceVersion != "<none>")
                         {
-                            int comp = PluginUtils.comparePluginVersions(pluginInterfaceVersion, (String) properties.get("plugin.version"));
+                            int comp = 1;
+                            if(pluginInterfaceVersion != null)
+                            {
+                                comp =  PluginUtils.comparePluginVersions(pluginInterfaceVersion, (String) properties.get("plugin.version"));
+                            }
                             if (comp <= 0)
                             {
                                 search = false;

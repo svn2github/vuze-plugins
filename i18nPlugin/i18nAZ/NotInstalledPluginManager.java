@@ -788,16 +788,19 @@ public class NotInstalledPluginManager implements iTask
             if (pluginInterface != null)
             {
                 String pluginInterfaceVersion = pluginInterface.getPluginVersion();
-                int comp = pluginInterfaceVersion==null?-1:PluginUtils.comparePluginVersions(pluginInterfaceVersion, remotePlugins[i].getVersion());	//PARG
-                if (comp >= 0)
+                if(pluginInterfaceVersion != null)
                 {
-                    for (int j = 0; notInstalledPluginInterfaces != null && j < notInstalledPluginInterfaces.length; j++)
+                    int comp = PluginUtils.comparePluginVersions(pluginInterfaceVersion, remotePlugins[i].getVersion());
+                    if (comp >= 0)
                     {
-                        NotInstalledPluginManager.remove(notInstalledPluginInterfaces[j]);
+                        for (int j = 0; notInstalledPluginInterfaces != null && j < notInstalledPluginInterfaces.length; j++)
+                        {
+                            NotInstalledPluginManager.remove(notInstalledPluginInterfaces[j]);
+                        }
+                        destFile.delete();
+                        continue;
                     }
-                    destFile.delete();
-                    continue;
-                }
+                }                
             }
             
             if (update == false)

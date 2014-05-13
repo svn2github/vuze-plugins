@@ -108,8 +108,16 @@ public class NotInstalledPluginDownloader implements iTask
             if (pluginInterface != null)
             {
                 String pluginInterfaceVersion = pluginInterface.getPluginVersion();
-                int comp = pluginInterfaceVersion==null?-1:PluginUtils.comparePluginVersions(pluginInterfaceVersion, remotePlugins[i].getVersion());	// PARG
-                if (comp >= 0)
+                if (pluginInterfaceVersion != null)
+                {
+                    int comp = PluginUtils.comparePluginVersions(pluginInterfaceVersion, remotePlugins[i].getVersion());
+                    if (comp >= 0)
+                    {
+                        destFile.delete();
+                        download = false;
+                    }
+                }
+                else
                 {
                     destFile.delete();
                     download = false;
@@ -203,14 +211,20 @@ public class NotInstalledPluginDownloader implements iTask
                         {
                             NotInstalledPluginDownloader.notifyListeners(new NotInstalledPluginDownloaderEvent(destFile));
                         }
-                        NotInstalledPluginDownloader.semaphore.release();
-                        return false;
+                        if(NotInstalledPluginDownloader.semaphore != null)
+                        {
+                            NotInstalledPluginDownloader.semaphore.release();
+                        }
+                        return true;
                     }
 
                     
                     public void failed(ResourceDownloader downloader, ResourceDownloaderException e)
                     {
-                        NotInstalledPluginDownloader.semaphore.release();
+                        if(NotInstalledPluginDownloader.semaphore != null)
+                        {
+                            NotInstalledPluginDownloader.semaphore.release();
+                        }
                     }
                 });
                 NotInstalledPluginDownloader.resourceDownloaderAlternate.asyncDownload();
