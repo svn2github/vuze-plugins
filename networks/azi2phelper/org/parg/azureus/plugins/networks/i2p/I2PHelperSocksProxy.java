@@ -936,7 +936,7 @@ I2PHelperSocksProxy
 																		
 																		line = sb.toString();
 																		
-																		System.out.println( line );
+																		// System.out.println( line );
 																	}
 																}
 																
