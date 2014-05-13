@@ -1,5 +1,5 @@
 /*
- * CommentedProperties.java
+ * LocaleProperties.java
  *
  * Created on March 21, 2014, 4:27 PM
  */
@@ -19,66 +19,74 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 
 /**
- * CommentedProperties class
+ * LocaleProperties class
  *   
  * @author Repris d'injustice
  */
-class CommentedProperties extends Properties
+public class LocaleProperties extends CommentedProperties
 {
-    private static final long serialVersionUID = 1L;
-    private boolean Loaded = false;
-    private boolean IsThrowable = false;
-    private Map<String, String[]> Comments = new HashMap<String, String[]>();
-    @Override
+    private static final long serialVersionUID = -2032039486662138686L;
+    Locale locale= null;
+    CountObject counts = null;    
+    LocaleProperties(Locale locale)
+    {     
+        this.locale= locale;
+        this.counts = new CountObject();
+    }
+    
+    
     public synchronized Object clone() 
     {
-        CommentedProperties commentedProperties = new CommentedProperties();
-        commentedProperties.Loaded = true;
-        for (Iterator<String> iterator = this.stringPropertyNames().iterator(); iterator.hasNext();)
+        LocaleProperties commentedProperties = new LocaleProperties(this.locale);
+        commentedProperties.loaded = true;
+        commentedProperties.counts = this.counts;
+        for (Enumeration<?> enumeration = this.propertyNames(); enumeration.hasMoreElements();)       
         {
-            String key = iterator.next();
+            String key = (String) enumeration.nextElement();
             commentedProperties.put(key, this.get(key));            
         }
-        for (Iterator<String> iterator = this.Comments.keySet().iterator(); iterator.hasNext();)
+        for (Iterator<String> iterator = this.comments.keySet().iterator(); iterator.hasNext();)
         {
             String key = iterator.next();
             commentedProperties.putComment(key, this.getComment(key));            
         }        
         return commentedProperties;
     }
-    @Override
+}
+class CommentedProperties extends Properties
+{
+    private static final long serialVersionUID = 1L;
+    protected boolean loaded = false;
+    private boolean isThrowable = false;
+    protected Map<String, String[]> comments = new HashMap<String, String[]>();
+    
+    
     public synchronized void clear() 
     {
         super.clear();
-        this.Comments.clear();
-        this.Loaded = false;
+        this.comments.clear();
+        this.loaded = false;
     }
     public synchronized void load(URL url) throws IOException
-    {
-        InputStream inputStream = null;
-        try
-        {
-            inputStream = url.openStream();
-        }
-        catch (IOException e)
-        {
-        }
+    {            
+        InputStream inputStream = Path.openInputStream(url);       
         if(inputStream != null)
         {
             this.load(inputStream);
-            inputStream.close();            
+            inputStream.close(); 
         }
     }
-    @Override
+    
     public synchronized void load(Reader reader) throws IOException
     {
         this.load0(new LineReader(reader));
     }
-    @Override
+    
     public synchronized void load(InputStream inStream) throws IOException
     {
         this.load0(new LineReader(inStream));
@@ -155,20 +163,20 @@ class CommentedProperties extends Properties
                 this.put(key, value);
                 if (CommentList.size() > 0)
                 {
-                    if (this.Comments.containsKey(key) == true)
+                    if (this.comments.containsKey(key) == true)
                     {
-                        String[] FoundedComments = this.Comments.get(key);
+                        String[] FoundedComments = this.comments.get(key);
                         for (int i = 0; i < FoundedComments.length; i++)
                         {
                             CommentList.add(i, FoundedComments[i]);
                         }
                     }
-                    this.Comments.put(key, CommentList.toArray(new String[CommentList.size()]));
+                    this.comments.put(key, CommentList.toArray(new String[CommentList.size()]));
                     CommentList.clear();
                 }
             }
         }
-        this.Loaded = true;
+        this.loaded = true;
     }
     class LineReader
     {
@@ -399,7 +407,7 @@ class CommentedProperties extends Properties
                     {
                         out[outLen++] = (char) value;
                     }
-                    else if (this.IsThrowable == true)
+                    else if (this.isThrowable == true)
                     {
                         throw new IllegalArgumentException("Malformed \\uxxxx encoding : \\u" + Unicode);
                     }
@@ -569,15 +577,15 @@ class CommentedProperties extends Properties
     {
         ArrayList<String> CommentList = new ArrayList<String>();
         CommentList.add(Comment);
-        if (this.Comments.containsKey(Key) == true)
+        if (this.comments.containsKey(Key) == true)
         {
-            String[] FoundedComments = this.Comments.get(Key);
+            String[] FoundedComments = this.comments.get(Key);
             for (int i = 0; i < FoundedComments.length; i++)
             {
                 CommentList.add(i, FoundedComments[i]);
             }
         }
-        this.Comments.put(Key, CommentList.toArray(new String[CommentList.size()]));
+        this.comments.put(Key, CommentList.toArray(new String[CommentList.size()]));
     }
     public void putComment(String Key, String[] Comments)
     {
@@ -589,17 +597,21 @@ class CommentedProperties extends Properties
     public String[] getComment(String Key)
     {
         String[] Comment = null;
-        if (this.Comments.containsKey(Key) == true)
+        if (this.comments.containsKey(Key) == true)
         {
-            Comment = this.Comments.get(Key);
+            Comment = this.comments.get(Key);
         }
         return Comment;
     }
 
-    @Override
-    public void store(Writer writer, String comments) throws IOException
+    
+    public void store(Writer writer, String commentString) throws IOException
     {
-        this.store0((writer instanceof BufferedWriter) ? (BufferedWriter) writer : new BufferedWriter(writer), comments, false);
+        this.store0((writer instanceof BufferedWriter) ? (BufferedWriter) writer : new BufferedWriter(writer), false);
+    }
+    public void store(URL url) throws IOException
+    {
+        this.store(Path.getFile(url));
     }
     public void store(File file ) throws IOException
     {
@@ -611,13 +623,13 @@ class CommentedProperties extends Properties
             output.close();
         }
     }
-    @Override
-    public void store(OutputStream out, String comments) throws IOException
+    
+    public void store(OutputStream out, String commentString) throws IOException
     {
-        this.store0(new BufferedWriter(new OutputStreamWriter(out, "8859_1")), comments, true);
+        this.store0(new BufferedWriter(new OutputStreamWriter(out, "8859_1")), true);
     }
 
-    private void store0(BufferedWriter bw, String comments, boolean escUnicode) throws IOException
+    private void store0(BufferedWriter bw, boolean escUnicode) throws IOException
     {
         synchronized (this)
         {
@@ -627,9 +639,9 @@ class CommentedProperties extends Properties
                 String val = (String) this.get(key);
                 key = this.saveConvert(key, true, escUnicode);
                 val = this.saveConvert(val, false, escUnicode);
-                if (this.Comments.containsKey(key) == true)
+                if (this.comments.containsKey(key) == true)
                 {
-                    String[] FoundedComments = this.Comments.get(key);
+                    String[] FoundedComments = this.comments.get(key);
                     for (int i = 0; i < FoundedComments.length; i++)
                     {
                         writeComments(bw, FoundedComments[i]);
@@ -645,6 +657,6 @@ class CommentedProperties extends Properties
 
     public boolean IsLoaded()
     {
-        return this.Loaded;
+        return this.loaded;
     }
 }

@@ -30,22 +30,25 @@ import org.eclipse.swt.widgets.TypedListener;
  */
 public class UndoRedo
 {
-    
+
     class EventListener
     {
         int eventType;
         Listener listener;
+
         EventListener(int eventType, Listener listener)
         {
             this.eventType = eventType;
             this.listener = listener;
         }
     }
+
     class UndoRedoObject
     {
         String text;
         Point selection;
     }
+
     private static final int MAX_STACK_SIZE = 500;
 
     private boolean onDo;
@@ -55,7 +58,7 @@ public class UndoRedo
 
     private String curentPairPluginKey = null;
     private StyledText styledText;
-       
+
     private List<EventListener> eventListeners = null;
 
     public UndoRedo(StyledText styledText)
@@ -63,105 +66,110 @@ public class UndoRedo
         this.styledText = styledText;
         this.styledText.addExtendedModifyListener(new ExtendedModifyListener()
         {
-            @Override
+            
             public void modifyText(ExtendedModifyEvent event)
             {
-                if(UndoRedo.this.onDo == true)
+                if (UndoRedo.this.onDo == true)
                 {
                     return;
                 }
                 UndoRedoObject undoRedoObject = new UndoRedoObject();
                 undoRedoObject.text = UndoRedo.this.styledText.getText();
                 undoRedoObject.selection = UndoRedo.this.styledText.getSelection();
-                synchronized(UndoRedo.this.undoStacks)
+
+                if (UndoRedo.this.curentPairPluginKey == null || UndoRedo.this.undoStacks.containsKey(UndoRedo.this.curentPairPluginKey) == false)
                 {
-                    if(UndoRedo.this.curentPairPluginKey == null || UndoRedo.this.undoStacks.containsKey(UndoRedo.this.curentPairPluginKey) == false)
+                    return;
+                }
+
+                List<UndoRedoObject> undoStack = UndoRedo.this.undoStacks.get(UndoRedo.this.curentPairPluginKey);
+                List<UndoRedoObject> redoStack = UndoRedo.this.redoStacks.get(UndoRedo.this.curentPairPluginKey);
+
+                if (undoStack.size() > 0)
+                {
+                    if (undoStack.get(0).text.equals(UndoRedo.this.styledText.getText()) == true)
                     {
                         return;
                     }
-
-                    List<UndoRedoObject> undoStack = UndoRedo.this.undoStacks.get(UndoRedo.this.curentPairPluginKey);                   
-                    
-                    if (undoStack.size() > 0)
-                    {
-                        if(undoStack.get(0).text.equals(UndoRedo.this.styledText.getText()) == true)
-                        {
-                            return;
-                        }
-                    }
-                    if (undoStack.size() == MAX_STACK_SIZE)                 
-                    {
-                        undoStack.remove(undoStack.size() - 1);                    
-                    }
-                    undoStack.add(0, undoRedoObject);
                 }
-              
+                if (undoStack.size() == MAX_STACK_SIZE)
+                {
+                    undoStack.remove(undoStack.size() - 1);
+                }
+                undoStack.add(0, undoRedoObject);
+                redoStack.clear();
+
                 UndoRedo.this.notifyListeners(SWT.CHANGED, null);
             }
         });
     }
-    synchronized public void addListener (int eventType, Listener listener) 
-    {       
-        if (listener == null) 
+
+    public void addListener(int eventType, Listener listener)
+    {
+        if (listener == null)
         {
             SWT.error(SWT.ERROR_NULL_ARGUMENT);
         }
-        
-        if (this.eventListeners == null) 
+
+        if (this.eventListeners == null)
         {
-            this.eventListeners = new ArrayList<EventListener>();            
+            this.eventListeners = new ArrayList<EventListener>();
         }
         this.eventListeners.add(new EventListener(eventType, listener));
     }
-    synchronized public boolean canRedo()
+
+    public boolean canRedo()
     {
-        if(this.curentPairPluginKey == null || this.undoStacks.containsKey(this.curentPairPluginKey) == false)
+        if (this.curentPairPluginKey == null || this.undoStacks.containsKey(this.curentPairPluginKey) == false)
         {
             return false;
         }
 
         List<UndoRedoObject> redoStack = this.redoStacks.get(this.curentPairPluginKey);
-        
+
         return redoStack.size() > 0;
     }
-    synchronized public boolean canUndo()
+
+    public boolean canUndo()
     {
-        if(this.curentPairPluginKey == null || this.undoStacks.containsKey(this.curentPairPluginKey) == false)
+        if (this.curentPairPluginKey == null || this.undoStacks.containsKey(this.curentPairPluginKey) == false)
         {
             return false;
         }
 
-        List<UndoRedoObject> undoStack = this.undoStacks.get(this.curentPairPluginKey);        
-        
+        List<UndoRedoObject> undoStack = this.undoStacks.get(this.curentPairPluginKey);
+
         return undoStack.size() > 1;
     }
-    synchronized private void clear()
+
+    private void clear()
     {
-        if(this.curentPairPluginKey == null || this.undoStacks.containsKey(this.curentPairPluginKey) == false)
+        if (this.curentPairPluginKey == null || this.undoStacks.containsKey(this.curentPairPluginKey) == false)
         {
             return;
         }
 
         List<UndoRedoObject> undoStack = this.undoStacks.get(this.curentPairPluginKey);
         List<UndoRedoObject> redoStack = this.redoStacks.get(this.curentPairPluginKey);
-        
+
         undoStack.clear();
         redoStack.clear();
-            
+
         this.styledText.setSelectionRange(this.styledText.getText().length(), 0);
 
         UndoRedoObject undoRedoObject = new UndoRedoObject();
         undoRedoObject.text = this.styledText.getText();
         undoRedoObject.selection = this.styledText.getSelection();
         undoStack.add(0, undoRedoObject);
-        
+
         this.notifyListeners(SWT.CHANGED, null);
     }
-    synchronized public void dispose()
+
+    public void dispose()
     {
-        List<Listener> listeners = new  ArrayList<Listener>();
+        List<Listener> listeners = new ArrayList<Listener>();
         listeners.addAll(Arrays.asList(this.styledText.getListeners(ST.ExtendedModify)));
-        
+
         for (int i = 0; i < listeners.size(); i++)
         {
             if (!(listeners.get(i) instanceof TypedListener))
@@ -171,39 +179,44 @@ public class UndoRedo
             TypedListener typedListener = (TypedListener) listeners.get(i);
             if (typedListener.getEventListener() instanceof ExtendedModifyListener)
             {
-                this.styledText.removeListener(ST.ExtendedModify, typedListener);               
+                this.styledText.removeListener(ST.ExtendedModify, typedListener);
             }
         }
     }
-    synchronized public void notifyListeners(int eventType, Event event) 
-    {       
-        if (event == null) event = new Event ();
+
+    public void notifyListeners(int eventType, Event event)
+    {
+        if (event == null)
+        {
+            event = new Event();
+        }
         event.type = eventType;
-        event.display = styledText.getDisplay();
-        event.widget = styledText;
-        event.data = this;        
-        
-        if (this.eventListeners != null) 
-        {            
-            for(int i = 0; i < this.eventListeners.size(); i++)
+        event.display = this.styledText.getDisplay();
+        event.widget = this.styledText;
+        event.data = this;
+
+        if (this.eventListeners != null)
+        {
+            for (int i = 0; i < this.eventListeners.size(); i++)
             {
-                if(this.eventListeners.get(i).eventType == eventType)
+                if (this.eventListeners.get(i).eventType == eventType)
                 {
-                    this.eventListeners.get(i).listener.handleEvent(event); 
-                }             
-            }         
+                    this.eventListeners.get(i).listener.handleEvent(event);
+                }
+            }
         }
     }
-    synchronized public void redo()
+
+    public void redo()
     {
-        if(this.curentPairPluginKey == null || this.undoStacks.containsKey(this.curentPairPluginKey) == false)
+        if (this.curentPairPluginKey == null || this.undoStacks.containsKey(this.curentPairPluginKey) == false)
         {
             return;
         }
 
         List<UndoRedoObject> undoStack = this.undoStacks.get(this.curentPairPluginKey);
         List<UndoRedoObject> redoStack = this.redoStacks.get(this.curentPairPluginKey);
-        
+
         if (redoStack.size() > 0)
         {
             this.onDo = true;
@@ -215,35 +228,37 @@ public class UndoRedo
             this.onDo = false;
         }
     }
-    synchronized public void removeListener(int eventType, Listener listener) 
-    {       
-        if (listener == null) 
+
+    public void removeListener(int eventType, Listener listener)
+    {
+        if (listener == null)
         {
             SWT.error(SWT.ERROR_NULL_ARGUMENT);
         }
-        
-        if (this.eventListeners != null) 
-        {            
-            for(int i =  this.eventListeners.size(); i >= 0 ; i--)
+
+        if (this.eventListeners != null)
+        {
+            for (int i = this.eventListeners.size(); i >= 0; i--)
             {
-                if(this.eventListeners.get(i).listener.equals(listener) && this.eventListeners.get(i).eventType == eventType)
+                if (this.eventListeners.get(i).listener.equals(listener) && this.eventListeners.get(i).eventType == eventType)
                 {
                     this.eventListeners.remove(i);
                 }
-            }         
+            }
         }
     }
-    synchronized public void set(String pluginName, String key)
+
+    public void set(String pluginName, String key)
     {
-        if(pluginName == null)
+        if (pluginName == null)
         {
             this.curentPairPluginKey = null;
         }
         else
         {
-            this.curentPairPluginKey = pluginName + "_" + key;            
+            this.curentPairPluginKey = pluginName + "_" + key;
         }
-             if( this.curentPairPluginKey == null || this.undoStacks.containsKey(this.curentPairPluginKey) == true)
+        if (this.curentPairPluginKey == null || this.undoStacks.containsKey(this.curentPairPluginKey) == true)
         {
             this.notifyListeners(SWT.CHANGED, null);
             return;
@@ -252,32 +267,32 @@ public class UndoRedo
         this.redoStacks.put(this.curentPairPluginKey, new LinkedList<UndoRedoObject>());
         this.clear();
     }
-    synchronized public void undo()
+
+    public void undo()
     {
-        if(this.curentPairPluginKey == null || this.undoStacks.containsKey(this.curentPairPluginKey) == false)
+        if (this.curentPairPluginKey == null || this.undoStacks.containsKey(this.curentPairPluginKey) == false)
         {
             return;
         }
 
         List<UndoRedoObject> undoStack = this.undoStacks.get(this.curentPairPluginKey);
         List<UndoRedoObject> redoStack = this.redoStacks.get(this.curentPairPluginKey);
-        
+
         if (undoStack.size() > 1)
         {
             this.onDo = true;
-            
+
             redoStack.add(0, undoStack.remove(0));
-             UndoRedoObject undoRedoObject = undoStack.get(0);
+            UndoRedoObject undoRedoObject = undoStack.get(0);
             this.styledText.setText(undoRedoObject.text);
             this.styledText.setSelection(undoRedoObject.selection);
             this.notifyListeners(SWT.CHANGED, null);
             this.onDo = false;
         }
     }
-    synchronized public void unset()
+
+    public void unset()
     {
         this.set(null, null);
     }
 }
-
-

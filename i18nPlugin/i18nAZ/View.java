@@ -1,21 +1,30 @@
 /*
- * Util.java
+ * View.java
  *
  * Created on February 24, 2004, 12:00 PM
  */
 package i18nAZ;
 
+import i18nAZ.FilterManager.PrebuildItem;
+import i18nAZ.FilterManager.State;
+import i18nAZ.LocalizablePluginManager.LocalizablePlugin;
+import i18nAZ.LocalizablePluginManager.LocalizablePlugin.LangFileObject;
+import i18nAZ.SpellChecker.SpellObject;
+import i18nAZ.SpellChecker.SpellObjectManager;
+import i18nAZ.SpellChecker.Suggestion;
+import i18nAZ.TargetLocaleManager.ExternalPath;
+import i18nAZ.TargetLocaleManager.ExternalPathCollection;
+import i18nAZ.TargetLocaleManager.TargetLocale;
+
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.math.RoundingMode;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.text.DecimalFormat;
-import java.text.NumberFormat;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -23,9 +32,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Properties;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+import java.util.zip.ZipOutputStream;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.ExtendedModifyEvent;
@@ -47,27 +59,27 @@ import org.eclipse.swt.events.MenuEvent;
 import org.eclipse.swt.events.MenuListener;
 import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
+import org.eclipse.swt.events.PaintEvent;
+import org.eclipse.swt.events.PaintListener;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
-import org.eclipse.swt.events.SelectionListener;
+import org.eclipse.swt.events.TraverseEvent;
+import org.eclipse.swt.events.TraverseListener;
 import org.eclipse.swt.events.VerifyEvent;
 import org.eclipse.swt.graphics.Color;
-import org.eclipse.swt.graphics.Cursor;
 import org.eclipse.swt.graphics.Font;
+import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.Point;
-import org.eclipse.swt.graphics.Rectangle;
-import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.layout.FormAttachment;
 import org.eclipse.swt.layout.FormData;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
-import org.eclipse.swt.layout.RowLayout;
-import org.eclipse.swt.widgets.Combo;
+import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
-import org.eclipse.swt.widgets.DirectoryDialog;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
+import org.eclipse.swt.widgets.FileDialog;
 import org.eclipse.swt.widgets.Item;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Listener;
@@ -75,15 +87,15 @@ import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.MenuItem;
 import org.eclipse.swt.widgets.MessageBox;
 import org.eclipse.swt.widgets.Shell;
-import org.eclipse.swt.widgets.Text;
+import org.eclipse.swt.widgets.TableColumn;
+import org.eclipse.swt.widgets.TableItem;
 import org.eclipse.swt.widgets.ToolBar;
 import org.eclipse.swt.widgets.ToolItem;
 import org.eclipse.swt.widgets.ToolTip;
 import org.gudy.azureus2.core3.config.COConfigurationManager;
-import org.gudy.azureus2.core3.util.BDecoder;
-import org.gudy.azureus2.core3.util.BEncoder;
-import org.gudy.azureus2.plugins.PluginInterface;
-import org.gudy.azureus2.plugins.logging.LoggerChannel;
+import org.gudy.azureus2.core3.internat.MessageText;
+import org.gudy.azureus2.core3.util.AERunnable;
+import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.ui.swt.Messages;
 import org.gudy.azureus2.ui.swt.Utils;
 import org.gudy.azureus2.ui.swt.mainwindow.IMenuConstants;
@@ -91,8 +103,11 @@ import org.gudy.azureus2.ui.swt.mainwindow.MenuFactory;
 import org.gudy.azureus2.ui.swt.plugins.UISWTViewEvent;
 import org.gudy.azureus2.ui.swt.pluginsimpl.UISWTViewCoreEventListener;
 import org.gudy.azureus2.ui.swt.pluginsimpl.UISWTViewImpl;
+import org.gudy.azureus2.ui.swt.shells.MessageBoxShell;
 
-import com.aelitis.azureus.ui.mdi.MdiEntry;
+import com.aelitis.azureus.ui.UserPrompterResultListener;
+import com.aelitis.azureus.ui.common.viewtitleinfo.ViewTitleInfo;
+import com.aelitis.azureus.ui.common.viewtitleinfo.ViewTitleInfoManager;
 import com.aelitis.azureus.ui.skin.SkinPropertiesImpl;
 import com.aelitis.azureus.ui.swt.imageloader.ImageLoader;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinButtonUtility;
@@ -102,10 +117,14 @@ import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectContainer;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinButtonUtility.ButtonListenerAdapter;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectText2;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectTextbox;
+import com.aelitis.azureus.ui.swt.utils.ColorCache;
 import com.aelitis.azureus.ui.swt.views.skin.sidebar.SideBar;
+import com.aelitis.azureus.ui.swt.views.skin.sidebar.SideBarEntrySWT;
+
+import dk.dren.hunspell.Hunspell.Dictionary;
 
 /**
- * View.java
+ * View class
  * 
  * @author Repris d'injustice
  */
@@ -113,9 +132,9 @@ class View implements UISWTViewCoreEventListener
 {
     static final String VIEWID = "i18nAZ";
 
-    static final String DATAKEY_LOCALE = "locale";
+    // static final String DATAKEY_LOCALE = "locale";
+    static final String DATAKEY_TARGET_LOCALE = "targetLocal";
     static final String DATAKEY_LANGUAGE_TAG = "languageTag";
-    static final String DATAKEY_FILE = "file";
     static final String DATAKEY_SELECTED_ROW = "selectedRow";
     static final String DATAKEY_SELECTED_COLUMN = "selectedColumn";
     static final String DATAKEY_DEFAULT_STYLES = "styles";
@@ -125,213 +144,288 @@ class View implements UISWTViewCoreEventListener
 
     static final String AZUREUS_LANG_FILE = "org.gudy.azureus2.internat.MessagesBundle";
 
-    static String AZUREUS_PLUGIN_NAME = "(core)";
+    static final int SHOW_LOADING = 1;
+    static final int SHOW_SPLASH_SCREEN = 2;
+    static final int SHOW_TREETABLE = 3;
+    static final int SHOW_WIZARD = 4;
 
-    private boolean isCreated = false;
+    final private AtomicBoolean viewCreated = new AtomicBoolean(false);
+    final private AtomicBoolean viewInitialized = new AtomicBoolean(false);
+    final private AtomicBoolean initialized = new AtomicBoolean(false);
+    private Boolean wizard = false;
+
+    final private AtomicBoolean onValid = new AtomicBoolean(false);
 
     private ImageLoader imageLoader = SWTSkinFactory.getInstance().getImageLoader(SWTSkinFactory.getInstance().getSkinProperties());
 
     private Display display = null;
 
-    private PluginInterface pluginInterface = null;
-    private PluginInterface[] pluginInterfaces = null;
+    private SideBarEntrySWT sideBarEntry = null;
 
-    private LoggerChannel loggerChannel = null;
+    private SWTSkinObjectContainer mainChildContainer = null; // parent: vuze
 
-    private SWTSkinButtonUtility addLanguageButton = null;
-    private SWTSkinButtonUtility exportLanguageButton = null;
-    public SWTSkinButtonUtility removeLanguageButton = null;
+    private SWTSkinObjectContainer headerContainer = null; // parent: mainChildContainer
+    private SWTSkinObjectContainer toolBarContainer = null; // parent: headerContainer
+    private SWTSkinButtonUtility addLanguageButton = null; // parent: toolBarContainer
+    private SWTSkinButtonUtility exportLanguageButton = null; // parent: toolBarContainer
+    private SWTSkinButtonUtility importLanguageButton = null; // parent: toolBarContainer
+    public SWTSkinButtonUtility removeLanguageButton = null; // parent: toolBarContainer
+    private SWTSkinButtonUtility emptyFilterButton = null; // parent: toolBarContainer
+    private SWTSkinButtonUtility unchangedFilterButton = null; // parent: toolBarContainer
+    private SWTSkinButtonUtility extraFilterButton = null; // parent: toolBarContainer
+    private SWTSkinButtonUtility multilineEditorButton = null; // parent: toolBarContainer
+    SWTSkinButtonUtility spellCheckerButton = null; // parent: toolBarContainer
+    private SWTSkinButtonUtility treeModeButton = null; // parent: toolBarContainer
+    private SWTSkinButtonUtility urlsFilterButton = null; // parent: toolBarContainer
+    private SWTSkinButtonUtility redirectKeysFilterButton = null; // parent: toolBarContainer
+    private SWTSkinButtonUtility helpButton = null; // parent: toolBarContainer
 
-    private SWTSkinButtonUtility emptyFilterButton = null;
-    private SWTSkinButtonUtility unchangedFilterButton = null;
-    private SWTSkinButtonUtility extraFilterButton = null;
-    private SWTSkinButtonUtility multilineEditorButton = null;
-    private SWTSkinButtonUtility treeModeButton = null;
-    private SWTSkinButtonUtility urlsFilterButton = null;
-    private SWTSkinButtonUtility redirectKeysFilterButton = null;
-    private SWTSkinButtonUtility helpButton = null;
+    private SWTSkinObjectText2 infoText = null; // parent: toolBarContainer
+    private SWTSkinObjectTextbox searchTextbox = null; // parent: toolBarContainer
 
-    private SWTSkinObjectText2 infoText = null;
-    private SWTSkinObjectTextbox searchTextbox = null;
+    private SWTSkinObjectContainer areaContainer = null; // parent: mainChildContainer
 
-    private Combo pluginsCombo = null;
+    private Composite pluginComposite = null; // parent: areaContainer
+    private TableCombo pluginsCombo = null; // parent: pluginComposite
+    private TableCombo filesCombo = null; // parent: pluginComposite
 
-    private ToolItem undoToolItem = null;
-    private ToolItem redoToolItem = null;
-    private ToolItem cutToolItem = null;
-    private ToolItem copyToolItem = null;
-    private ToolItem pasteToolItem = null;
-    private ToolItem selectAllToolItem = null;
-    private ToolItem upperCaseToolItem = null;
-    private ToolItem lowerCaseToolItem = null;
-    private ToolItem firstCaseToolItem = null;
-    private ToolItem trademarkToolItem = null;
-    private ToolItem validateToolItem = null;
-    private ToolItem cancelToolItem = null;
+    private Composite loadingComposite = null; // parent: areaContainer
+    private Composite loadingSubComposite = null; // parent: loadingComposite
+    private AnimatedCanvas animatedCanvas = null; // parent: loadingSubComposite
+    private Label bannerLabel = null; // parent: loadingSubComposite
+    private Label loadingMessageLabel = null; // parent: loadingComposite
+    private Label progressLabel = null; // parent: loadingComposite
 
-    private ToolBar toolBar = null;
+    private Composite wizardComposite = null; // parent: areaContainer
+    private Button wizardButton = null; // parent: areaContainer
 
-    private StyledText infoStyledText = null;
-    private StyledText editorStyledText = null;
+    private Composite footerComposite = null; // parent: areaContainer
 
-    private Label statusLabel = null;
+    private ToolBar toolBar = null; // parent: footerComposite
 
-    private BundleObject currentBundleObject;
-    private String defaultPath;
+    private ToolItem undoToolItem = null; // parent: toolBar
+    private ToolItem redoToolItem = null; // parent: toolBar
+    private ToolItem cutToolItem = null; // parent: toolBar
+    private ToolItem copyToolItem = null; // parent: toolBar
+    private ToolItem pasteToolItem = null; // parent: toolBar
+    private ToolItem selectAllToolItem = null; // parent: toolBar
+    private ToolItem upperCaseToolItem = null; // parent: toolBar
+    private ToolItem lowerCaseToolItem = null; // parent: toolBar
+    private ToolItem firstCaseToolItem = null; // parent: toolBar
+    private ToolItem trademarkToolItem = null; // parent: toolBar
+    private ToolItem translateToolItem = null; // parent: toolBar
+    private ToolItem validateToolItem = null; // parent: toolBar
+    private ToolItem cancelToolItem = null; // parent: toolBar
 
-    boolean emptyFilter = false;
-    boolean unchangedFilter = false;
-    boolean extraFilter = false;
+    private StyledText infoStyledText = null; // parent: footerComposite
+    private StyledText editorStyledText = null; // parent: footerComposite
 
-    boolean redirectKeysFilter = false;
-    int urlsFilter = 0;
+    private Label statusLabel = null; // parent: areaContainer
 
     private boolean multilineEditor = false;
 
-    private ArrayList<String> keys = new ArrayList<String>();
-
-    List<LocalesProperties> localesProperties = null;
-
-    Map<Pattern, Object> searchPatterns = null;
-    private HashSet<String> searchPrefixes = null;
-    private boolean regexSearch = false;
-
     Map<String, Item> deletableRows = new HashMap<String, Item>();
-
-    private PluginInterface selectedPluginInterface = null;
 
     private Clipboard clipboard = null;
 
-    private List<int[]> infoParams = null;
-    private List<Object[]> infoReferences = null;
-    private List<Object[]> infoUrls = null;
-
-    private List<int[]> editorParams = null;
-    private List<Object[]> editorReferences = null;
-    private List<Object[]> editorUrls = null;
-
-    HashSet<String> emptyFilterExcludedKey = new HashSet<String>();
-    HashSet<String> unchangedFilterExcludedKey = new HashSet<String>();
-    HashSet<String> extraFilterExcludedKey = new HashSet<String>();
-
-    HashSet<String> hideRedirectKeysFilterExcludedKey = new HashSet<String>();
-    Map<String, Integer> urlsFilterOverriddenStates = new HashMap<String, Integer>();
-
-    private Thread saveThread = null;
-
-    private List<SaveObject> saveObjects = new ArrayList<SaveObject>();
+    private SpellObject[] infoSpellObjects = null;
+    private SpellObjectManager editorSpellObjectManager = null;
 
     private MenuItem editMenu = null;
     private Menu dropDownMenu = null;
 
     UndoRedo undoRedo = null;
 
-    class LocalesProperties
-    {
-        Locale locale = null;
-        CommentedProperties commentedProperties = null;
+    private String loadingMessage = null;
+    private float progressPercent = -1;
 
-        LocalesProperties(Locale locale)
+    private List<SaveObject> saveObjects = new ArrayList<SaveObject>();
+    private Task saveTask = new Task("saveTask", 0, new iTask()
+    {
+        public void setInfo(final String info)
         {
-            this.locale = locale;
-            this.commentedProperties = null;
+            Utils.execSWTThread(new AERunnable()
+            {
+                
+                public void runSupport()
+                {
+                    synchronized (View.this.viewCreated)
+                    {
+                        if (View.this == null || View.this.viewCreated.get() == false)
+                        {
+                            return;
+                        }
+                    }
+                    if (View.this.statusLabel == null || View.this.statusLabel.isDisposed() == true)
+                    {
+                        return;
+                    }
+                    View.this.statusLabel.setText(info);
+                    View.this.areaContainer.getComposite().layout();
+                }
+            });
         }
-    }
 
-    class State
-    {
-        static final int NONE = 0;
-        static final int EMPTY = 1;
-        static final int UNCHANGED = 2;
-        static final int EXTRA = 4;
-        static final int URL = 8;
-        static final int REDIRECT_KEY = 16;
-    }
+        
+        public void check()
+        {
+            this.setInfo(i18nAZ.getLocalisedMessageText("i18nAZ.Messages.Status.Ready"));
+
+            Util.sleep(1000);
+
+            SaveObject saveObject = null;
+            if (View.this.saveObjects.size() == 0)
+            {
+                return;
+            }
+            saveObject = View.this.saveObjects.get(0);
+            View.this.saveObjects.remove(0);
+
+            String currentSaveName = Path.getFile(saveObject.getUrl()).getParentFile().getName() + File.separator + Path.getFile(saveObject.getUrl()).getName();
+            this.setInfo(i18nAZ.getLocalisedMessageText("i18nAZ.Messages.Status.Saving"));
+            final TargetLocale targetLocale = saveObject.targetLocale;
+            AEThread2 refreshThread = new AEThread2("i18nAZ.refreshThread")
+            {
+                
+                public void run()
+                {
+                    LocalizablePluginManager.getCurrentLangFile().refreshCount(targetLocale);
+                }
+            };
+            refreshThread.start();
+        
+            // clean empty reference
+            while (true)
+            {
+                boolean loop = false;
+                for (Enumeration<?> enumeration = saveObject.getLocaleProperties().propertyNames(); enumeration.hasMoreElements();)
+                {
+                    String key = (String) enumeration.nextElement();
+                    if (saveObject.getLocaleProperties().getProperty(key).equals("") == true)
+                    {
+                        saveObject.getLocaleProperties().remove(key);
+                        loop = true;
+                        break;
+                    }
+
+                }
+                if (loop == false)
+                {
+                    break;
+                }
+            }
+
+            String result = Util.saveLocaleProperties(saveObject.getLocaleProperties(), saveObject.getUrl());
+
+            // dispose
+            saveObject.dispose();
+            saveObject = null;
+
+            if (result != null)
+            {
+                String errorMessage = i18nAZ.getLocalisedMessageText("i18nAZ.Messages.Status.ErrorSave", new String[] { currentSaveName, result });
+                i18nAZ.logError(errorMessage);
+                this.setInfo(errorMessage);
+                Util.sleep(10000);
+                return;
+            }
+
+            // merge and store all bundle files for viewing in
+            // client
+            if (View.this.saveObjects.size() > 0)
+            {
+                return;
+            }
+
+            // merge file
+            result = i18nAZ.mergeBundleFile();
+            if (result != null)
+            {
+                String errorMessage = i18nAZ.getLocalisedMessageText("i18nAZ.Messages.Status.ErrorGlobalSave", new String[] { Path.getFilename(i18nAZ.mergedInternalFile), result });
+                i18nAZ.logError(errorMessage);
+                this.setInfo(errorMessage);
+                Util.sleep(10000);
+            }
+        }
+
+        
+        public void onStart()
+        {
+        }
+
+        
+        public void onStop(StopEvent e)
+        {
+        }
+    });
 
     class MenuOptions
     {
         static final int NONE = 0;
-        static final int ROW_COPY = 1;
-        static final int REMOVE_COLUMN = 2;
-        static final int EDITOR = 4;
-        static final int FILTERS = 8;
-        static final int TOPFILTERS = 16;
-        static final int SEARCH = 32;
-        static final int OPEN_URL = 64;
+        static final int COPY_KEY = 1;
+        static final int COPY_REFERENCE = 2;
+        static final int COPY_VALUE = 4;
+        static final int REMOVE_COLUMN = 8;
+        static final int EDITOR = 16;
+        static final int FILTERS = 32;
+        static final int TOPFILTERS = 64;
+        static final int SEARCH = 128;
+        static final int OPEN_URL = 256;
     }
 
     class SaveObject
     {
-        private CommentedProperties commentedProperties = null;
-        private File file = null;
-        private String currentKey = null;
+        private LocaleProperties LocaleProperties = null;
+        private URL url = null;
+        private TargetLocale targetLocale = null;
 
-        public SaveObject(CommentedProperties commentedProperties, File file, String currentKey)
+        public SaveObject(TargetLocale targetLocale)
         {
-            this.commentedProperties = (CommentedProperties) commentedProperties.clone();
-            this.file = new File(file.getAbsolutePath());
-            this.currentKey = currentKey;
+            this.targetLocale = (TargetLocale) targetLocale.clone();
+            this.LocaleProperties = (LocaleProperties) this.targetLocale.getProperties().clone();
+            this.url = Path.clone(this.targetLocale.getInternalPath());
         }
 
-        public CommentedProperties getCommentedProperties()
+        public LocaleProperties getLocaleProperties()
         {
-            return this.commentedProperties;
+            return this.LocaleProperties;
         }
 
-        public File getFile()
+        public URL getUrl()
         {
-            return this.file;
-        }
-
-        public String getCurrentKey()
-        {
-            return this.currentKey;
+            return this.url;
         }
 
         public void dispose()
         {
-            this.commentedProperties.clear();
-            this.commentedProperties = null;
-            this.file = null;
+            this.LocaleProperties.clear();
+            this.LocaleProperties = null;
+            this.url = null;
         }
     }
 
     // constructor
-    View(PluginInterface pluginInterface)
+    View()
     {
-        this.pluginInterface = pluginInterface;
+        i18nAZ.log("");
+        i18nAZ.log("View creating...");
 
-        View.AZUREUS_PLUGIN_NAME = this.getLocalisedMessageText("i18nAZ.Labels.DefaultPlugin");
-
-        this.loggerChannel = pluginInterface.getLogger().getChannel("i18nEditor");
-        this.loggerChannel.log(1, "i18nEditor View Startup");
-        try
+        if (COConfigurationManager.hasParameter("i18nAZ.defaultPath", true) == false)
         {
-            this.defaultPath = pluginInterface.getUtilities().getAzureusProgramDir();
-        }
-        catch (Exception e)
-        {
-            this.defaultPath = "";
-        }
-
-        this.localesProperties = new ArrayList<LocalesProperties>();
-        this.localesProperties.add(new LocalesProperties(new Locale("", "")));
-
-        List<?> original_list = COConfigurationManager.getListParameter("i18nAZ.LocalesSelected", new ArrayList<String>());
-        List<?> list = BDecoder.decodeStrings(BEncoder.cloneList(original_list));
-
-        Locale[] AvailableLocales = Locale.getAvailableLocales();
-        for (int i = 0; i < list.size(); i++)
-        {
-            for (int j = 0; j < AvailableLocales.length; j++)
+            try
             {
-                if (list.get(i).equals(AvailableLocales[j].toLanguageTag()))
-                {
-                    this.localesProperties.add(new LocalesProperties(AvailableLocales[j]));
-                    break;
-                }
+                COConfigurationManager.setParameter("i18nAZ.defaultPath", i18nAZ.vuzeDirectory.getAbsolutePath());
+            }
+            catch (Exception e)
+            {
+                COConfigurationManager.setParameter("i18nAZ.defaultPath", "");
             }
         }
+
+        // Load parameters
+        FilterManager.init();
+
+        this.multilineEditor = COConfigurationManager.getBooleanParameter("i18nAZ.multilineEditor");
 
         // HEADER
         SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.main.header.attach.bottom", "");
@@ -423,7 +517,7 @@ class View implements UISWTViewCoreEventListener
         SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.image.toolbar.2nd-view.lr-bg", "{template.imagedir}/tb/view_l_l.png,{template.imagedir}/tb/view_r_m.png,{template.imagedir}/tb/view_r_r.png");
         SWTSkinFactory.getInstance().getSkinProperties().addProperty("i18nAZ.image.toolbar.2nd-view.lr-bg-down", "{template.imagedir}/tb/view_l_l_down.png,{template.imagedir}/tb/view_r_m_down.png,{template.imagedir}/tb/view_r_r_down.png");
 
-        this.imageLoader.addSkinProperties(new SkinPropertiesImpl(pluginInterface.getPluginClassLoader(), "images", "images.properties"));
+        this.imageLoader.addSkinProperties(new SkinPropertiesImpl(i18nAZ.getPluginInterface().getPluginClassLoader(), "images", "images.properties"));
 
     }
 
@@ -449,13 +543,13 @@ class View implements UISWTViewCoreEventListener
         }
         else
         {
-            this.checkButton(button, checked == 1);
+            View.checkButton(button, checked == 1);
             button.addSelectionListener(new ButtonListenerAdapter()
             {
-                @Override
+                
                 public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
                 {
-                    View.this.checkButton(button);
+                    View.checkButton(button);
                 }
             });
         }
@@ -474,226 +568,85 @@ class View implements UISWTViewCoreEventListener
 
     private void addLanguage()
     {
-        TreeTableManager.getCurrent().setFocus();
+        if (TreeTableManager.getCurrent() != null)
+        {
+            TreeTableManager.getCurrent().setFocus();
+        }
 
         AddLanguageDialog addLanguageDialog = new AddLanguageDialog(SWTSkinFactory.getInstance().getShell().getShell());
         if (addLanguageDialog.localesSelected != null)
         {
+            Item column = null;
             for (int i = 0; i < addLanguageDialog.localesSelected.length; i++)
-            {                
-                this.localesProperties.add(new LocalesProperties(addLanguageDialog.localesSelected[i]));
+            {
+                TargetLocale targetLocale = TargetLocaleManager.add(addLanguageDialog.localesSelected[i]);
                 try
                 {
-                    this.addLocaleColumn(addLanguageDialog.localesSelected[i], addLanguageDialog.getLocalBundleObject());
+                    column = this.addLocaleColumn(targetLocale);
                 }
                 catch (Exception e)
                 {
                     e.printStackTrace();
                 }
             }
-            List<String> Locales = new ArrayList<String>();
-            for (int i = 0; i < this.localesProperties.size(); i++)
+            View.saveLocales();
+            if (column != null)
             {
-                Locale locale = this.localesProperties.get(i).locale;
-                if ((locale.toLanguageTag() != null) && (!locale.toLanguageTag().equals("")) && (!locale.toLanguageTag().equals("und")))
-                {
-                    Locales.add(locale.toLanguageTag());
-                }
+                TreeTableManager.Cursor.setColumn(column);
             }
-            COConfigurationManager.setParameter("i18nAZ.LocalesSelected", Locales);
-            COConfigurationManager.save();
-
             this.updateTreeTable();
 
             TreeTableManager.getCurrent().setFocus();
         }
     }
 
-    private void addLinkManager(final StyledText styledText, boolean hand)
+    private Item addLocaleColumn(TargetLocale targetLocale)
     {
-        styledText.setData(View.DATAKEY_TOOLTIP_HAND, hand);
-        if (styledText.getData(View.DATAKEY_TOOLTIP) == null)
-        {
-            styledText.setData(View.DATAKEY_TOOLTIP, new ToolTip(SWTSkinFactory.getInstance().getShell().getShell(), SWT.NULL));
-            ((ToolTip) styledText.getData(View.DATAKEY_TOOLTIP)).addListener(SWT.MouseExit, new Listener()
-            {
-                @Override
-                public void handleEvent(Event event)
-                {
-                    ((ToolTip) styledText.getData(View.DATAKEY_TOOLTIP)).setVisible(false);
-                }
-
-            });
-        }
-
-        Listener mouselistener = new Listener()
-        {
-            @Override
-            public void handleEvent(Event e)
-            {
-
-                boolean hand = (boolean) styledText.getData(View.DATAKEY_TOOLTIP_HAND);
-                ToolTip toolTip = (ToolTip) styledText.getData(View.DATAKEY_TOOLTIP);
-                StyleRange styleRange = null;
-                int offset = -1;
-                if (e.type != SWT.KeyUp && e.type != SWT.KeyDown)
-                {
-                    try
-                    {
-                        offset = styledText.getOffsetAtLocation(new Point(e.x, e.y));
-                        styleRange = styledText.getStyleRangeAtOffset(offset);
-                    }
-                    catch (IllegalArgumentException ie)
-                    {
-                    }
-                }
-                if (hand == false)
-                {
-                    styledText.setCursor(new Cursor(View.this.display, SWT.CURSOR_IBEAM));
-                }
-                if (styleRange != null && styleRange.data != null)
-                {
-                    if (hand == false)
-                    {
-                        if (styledText.isFocusControl() == false)
-                        {
-                            styledText.setFocus();
-                            styledText.setSelection(offset);
-                        }
-                    }
-                    if ((e.stateMask & SWT.MOD1) != 0 || e.keyCode == SWT.MOD1)
-                    {
-                        if (e.type == SWT.MouseUp)
-                        {
-                            Utils.launch((String) ((Object[]) styleRange.data)[2]);
-                            e.doit = false;
-                        }
-                        else
-                        {
-                            if (e.type == SWT.MouseDown)
-                            {
-                                e.doit = false;
-                            }
-                            if (hand == false)
-                            {
-                                styledText.setCursor(new Cursor(View.this.display, SWT.CURSOR_HAND));
-                            }
-                        }
-                    }
-                    else
-                    {
-
-                        Rectangle bounds = (Rectangle) Util.invoke(styledText, "getBoundsAtOffset", new Object[] { (int) ((Object[]) styleRange.data)[0] });
-                        Point point = styledText.toDisplay(bounds.x, bounds.y + bounds.height);
-                        toolTip.setText(View.this.getLocalisedMessageText("i18nAZ.ToolTips.FollowLink"));
-                        toolTip.setMessage((String) ((Object[]) styleRange.data)[2]);
-                        toolTip.setLocation(point);
-                        toolTip.setVisible(true);
-                        return;
-                    }
-                }
-
-                toolTip.setVisible(false);
-            }
-        };
-        styledText.addListener(SWT.MouseExit, mouselistener);
-        styledText.addListener(SWT.MouseEnter, mouselistener);
-        styledText.addListener(SWT.MouseMove, mouselistener);
-        styledText.addListener(SWT.MouseUp, mouselistener);
-        styledText.addListener(SWT.MouseDown, mouselistener);
-        styledText.addListener(SWT.KeyUp, mouselistener);
-        styledText.addListener(SWT.KeyDown, mouselistener);
-
-    }
-
-    private void addLocaleColumn(Locale locale, BundleObject bundleObject)
-    {
-        String localizedBundleName = this.currentBundleObject.getName();
-        if (TreeTableManager.getColumnCount() > 1)
-        {
-            localizedBundleName = localizedBundleName + "_" + locale.toLanguageTag().replace('-', '_');
-        }
-        File localFile = new File(this.getPluginInterface().getPluginDirectoryName().toString() + "\\internat\\" + this.currentBundleObject.getPluginName() + "\\" + localizedBundleName + BundleObject.EXTENSION);
-        File tempFile = new File(localFile.getAbsolutePath() + ".temp");
-
-        CommentedProperties localeProperties = Util.getLocaleProperties(localFile);
-        CommentedProperties tempProperties = Util.getLocaleProperties(tempFile);
-
-        if (localeProperties == null && tempProperties == null)
-        {
-            String OriginalLocalizedBundleName = bundleObject.getName();
-            if (TreeTableManager.getColumnCount() > 1)
-            {
-                OriginalLocalizedBundleName = OriginalLocalizedBundleName + "_" + locale.toLanguageTag().replace('-', '_');
-            }
-            URL OriginalBundleURL = null;
-            try
-            {
-                OriginalBundleURL = new URL(bundleObject.getUrl().toString() + OriginalLocalizedBundleName + BundleObject.EXTENSION);
-            }
-            catch (MalformedURLException e)
-            {
-                e.printStackTrace();
-            }
-            if (OriginalBundleURL != null && Util.jarEntryExists(OriginalBundleURL))
-            {
-                localeProperties = Util.getLocaleProperties(OriginalBundleURL);
-                if (localeProperties != null && localeProperties.IsLoaded() == true)
-                {
-                    Util.saveLocaleProperties(localeProperties, localFile);
-                }
-            }
-        }
-        if (localeProperties == null && tempProperties != null)
-        {
-            if (Util.saveLocaleProperties(tempProperties, localFile) == null)
-            {
-                localeProperties = tempProperties;
-            }
-            else
-            {
-                tempProperties.clear();
-                tempProperties = null;
-            }
-        }
-        if (localeProperties != null && tempProperties != null)
-        {
-            tempFile.delete();
-            tempProperties = null;
-        }
-
-        if (localeProperties != null && localeProperties.IsLoaded() == true)
-        {
-            for (Iterator<String> iterator = localeProperties.stringPropertyNames().iterator(); iterator.hasNext();)
-            {
-                String key = iterator.next();
-                if (this.keys.contains(key) == false)
-                {
-                    this.keys.add(key);
-                }
-            }
-        }
-        if (localeProperties == null)
-        {
-            localeProperties = new CommentedProperties();
-        }
-        this.getLocalesProperties(locale).commentedProperties = localeProperties;
         String headerText = "";
         String headerLanguageTag = "";
         int width = COConfigurationManager.getIntParameter("i18nAZ.columnWidth." + TreeTableManager.getColumnCount(), 200);
         if (TreeTableManager.getColumnCount() == 1)
         {
-            headerText = this.getLocalisedMessageText("i18nAZ.Columns.Reference");
+            headerText = i18nAZ.getLocalisedMessageText("i18nAZ.Columns.Reference");
         }
         else
         {
-            headerText = Util.getLocaleDisplay(locale, false);
-            headerLanguageTag = locale.toLanguageTag().replace("-", "");
+            headerText = Util.getLocaleDisplay(targetLocale.getLocale(), false);
+            headerLanguageTag = Util.getLanguageTag(targetLocale.getLocale()).replace("-", "");
+        }
+
+        if (targetLocale.isReadOnly() == true)
+        {
+            if (targetLocale.getProperties().IsLoaded() == false)
+            {
+                headerText += " [" + i18nAZ.getLocalisedMessageText("i18nAZ.Labels.NotFound") + "]";
+            }
+            else
+            {
+                headerText += " [" + i18nAZ.getLocalisedMessageText("i18nAZ.Labels.ReadOnly") + "]";
+            }
         }
         Item column = TreeTableManager.addColumn(headerText, width);
-        column.setData(View.DATAKEY_LOCALE, locale);
-        column.setData(View.DATAKEY_FILE, localFile);
+        column.setData(View.DATAKEY_TARGET_LOCALE, targetLocale);
         column.setData(View.DATAKEY_LANGUAGE_TAG, headerLanguageTag);
+
+        if (column instanceof TableColumn)
+        {
+            if (targetLocale.isReference() == true)
+            {
+                Util.addSortManager((TableColumn) column, Util.STRING_COMPARATOR);
+            }
+            else
+            {
+                Util.addSortManager((TableColumn) column, new Util.LocaleComparator(targetLocale.getLocale()));
+            }
+        }
+        if (targetLocale.isReference() == false)
+        {
+            column.setImage(Util.getLocaleImage(targetLocale.getLocale()));
+        }
+        this.updateToolTipColumnHeader(column);
+        return column;
     }
 
     private SWTSkinObject addSeparator(SWTSkinObjectContainer ToolBarContainer, Control LastControl)
@@ -711,18 +664,40 @@ class View implements UISWTViewCoreEventListener
         this.selectEditor();
     }
 
-    private void checkButton(SWTSkinButtonUtility button)
+    private static void checkButton(SWTSkinButtonUtility button)
     {
-        boolean checked = (boolean) button.getSkinObject().getData("checked") == false;
-        View.this.checkButton(button, checked);
+        boolean checked = (Boolean) button.getSkinObject().getData("checked") == false;
+        View.checkButton(button, checked);
     }
 
-    private void checkButton(SWTSkinButtonUtility button, boolean checked)
+    private static void checkButton(SWTSkinButtonUtility button, boolean checked)
     {
         String textID = (String) button.getSkinObject().getControl().getData(View.DATAKEY_TEXT_ID);
         button.getSkinObject().switchSuffix(checked ? "-selected" : "", 4, false);
         button.getSkinObject().setData("checked", checked);
         ToolTipText.set(button.getSkinObject().getControl(), textID + ((checked) ? ".Pressed" : ""));
+    }
+
+    private static void checkButton(SWTSkinButtonUtility button, int state, String imageId, String tooltipId)
+    {
+        switch (state)
+        {
+            case 0:
+                button.setImage(imageId);
+                View.checkButton(button, false);
+                ToolTipText.set(button.getSkinObject().getControl(), tooltipId + "State1");
+                break;
+            case 1:
+                button.setImage(imageId + "Off");
+                View.checkButton(button, true);
+                ToolTipText.set(button.getSkinObject().getControl(), tooltipId + "State2");
+                break;
+            case 2:
+                button.setImage(imageId + "On");
+                View.checkButton(button, true);
+                ToolTipText.set(button.getSkinObject().getControl(), tooltipId + "State3");
+                break;
+        }
     }
 
     private void createTopLevelMenuitem()
@@ -740,30 +715,50 @@ class View implements UISWTViewCoreEventListener
             this.dropDownMenu.addMenuListener(new MenuListener()
             {
 
-                @Override
+                
                 public void menuHidden(MenuEvent e)
                 {
                 }
 
-                @Override
+                
                 public void menuShown(MenuEvent e)
                 {
                     if (e.widget != null && e.widget.equals(View.this.dropDownMenu) == true)
                     {
 
-                        int visible = MenuOptions.SEARCH | MenuOptions.TOPFILTERS | MenuOptions.EDITOR | MenuOptions.ROW_COPY | MenuOptions.OPEN_URL;
+                        int visible = MenuOptions.SEARCH | MenuOptions.TOPFILTERS | MenuOptions.EDITOR | MenuOptions.COPY_KEY | MenuOptions.COPY_REFERENCE | MenuOptions.OPEN_URL;
                         int enabled = MenuOptions.SEARCH | MenuOptions.TOPFILTERS;
-
-                        if (TreeTableManager.Cursor.isFocusControl() == true && (boolean) TreeTableManager.Cursor.getRow().getData(TreeTableManager.DATAKEY_EXIST) == true)
+                        PrebuildItem prebuildItem = null;
+                        if (TreeTableManager.Cursor.getRow() != null)
                         {
-                            enabled |= MenuOptions.ROW_COPY;
+                            prebuildItem = (PrebuildItem) TreeTableManager.Cursor.getRow().getData(TreeTableManager.DATAKEY_PREBUILD_ITEM);
+                        }
+                        if (TreeTableManager.Cursor.isFocusControl() == true && prebuildItem != null && prebuildItem.isExist() == true && TreeTableManager.getColumnCount() > 1)
+                        {
+                            View.this.dropDownMenu.setData(TreeTableManager.DATAKEY_ITEM, TreeTableManager.Cursor.getRow());
+                            View.this.dropDownMenu.setData(TreeTableManager.DATAKEY_COLUMN_INDEX, TreeTableManager.Cursor.getColumn());
+
+                            visible |= MenuOptions.COPY_VALUE;
+                            String textData = TreeTableManager.getText(TreeTableManager.Cursor.getRow(), 0);
+                            if (textData.equals("") == false)
+                            {
+                                enabled |= MenuOptions.COPY_KEY;
+                            }
+                            textData = TreeTableManager.getText(TreeTableManager.Cursor.getRow(), 1);
+                            if (textData.equals("") == false)
+                            {
+                                enabled |= MenuOptions.COPY_REFERENCE;
+                            }
+                            if (TreeTableManager.Cursor.getColumn() >= 2)
+                            {
+                                enabled |= MenuOptions.COPY_VALUE;
+                            }
                         }
 
-                        if (View.this.editorStyledText.isFocusControl() == true)
+                        if (View.this.editorStyledText.isFocusControl() == true && TreeTableManager.getColumnCount() > 0)
                         {
                             enabled |= MenuOptions.EDITOR;
-                            int[] states = (int[]) TreeTableManager.Cursor.getRow().getData(TreeTableManager.DATAKEY_STATES);
-                            if ((states[1] & State.URL) != 0)
+                            if (prebuildItem != null && (prebuildItem.getStates()[1] & State.URL) != 0)
                             {
                                 try
                                 {
@@ -778,12 +773,12 @@ class View implements UISWTViewCoreEventListener
 
                         View.this.populateMenu(View.this.dropDownMenu, visible, enabled);
 
-                        View.this.dropDownMenu.getItems()[18].getMenu().getItems()[0].setSelection((boolean) View.this.emptyFilterButton.getSkinObject().getData("checked"));
-                        View.this.dropDownMenu.getItems()[18].getMenu().getItems()[1].setSelection((boolean) View.this.unchangedFilterButton.getSkinObject().getData("checked"));
-                        View.this.dropDownMenu.getItems()[18].getMenu().getItems()[2].setSelection((boolean) View.this.extraFilterButton.getSkinObject().getData("checked"));
-                        View.this.dropDownMenu.getItems()[18].getMenu().getItems()[4].setSelection((boolean) View.this.redirectKeysFilterButton.getSkinObject().getData("checked"));
-                        View.this.dropDownMenu.getItems()[18].getMenu().getItems()[6].setSelection(View.this.urlsFilter == 1);
-                        View.this.dropDownMenu.getItems()[18].getMenu().getItems()[7].setSelection(View.this.urlsFilter == 2);
+                        View.this.dropDownMenu.getItems()[18].getMenu().getItems()[0].setSelection((Boolean) View.this.emptyFilterButton.getSkinObject().getData("checked"));
+                        View.this.dropDownMenu.getItems()[18].getMenu().getItems()[1].setSelection((Boolean) View.this.unchangedFilterButton.getSkinObject().getData("checked"));
+                        View.this.dropDownMenu.getItems()[18].getMenu().getItems()[2].setSelection((Boolean) View.this.extraFilterButton.getSkinObject().getData("checked"));
+                        View.this.dropDownMenu.getItems()[18].getMenu().getItems()[4].setSelection((Boolean) View.this.redirectKeysFilterButton.getSkinObject().getData("checked"));
+                        View.this.dropDownMenu.getItems()[18].getMenu().getItems()[6].setSelection(FilterManager.getCurrentFilter().urls == 1);
+                        View.this.dropDownMenu.getItems()[18].getMenu().getItems()[7].setSelection(FilterManager.getCurrentFilter().urls == 2);
                     }
                 }
             });
@@ -791,34 +786,40 @@ class View implements UISWTViewCoreEventListener
         }
     }
 
-    @Override
+    
     public boolean eventOccurred(UISWTViewEvent e)
     {
         switch (e.getType())
         {
             case UISWTViewEvent.TYPE_CREATE:
-                if (this.isCreated)
+                synchronized (View.this.viewCreated)
                 {
-                    return false;
+                    if (this.viewCreated.get() == true)
+                    {
+                        return false;
+                    }
+                    this.viewCreated.set(true);
                 }
-                ((UISWTViewImpl) e.getView()).setTitle(this.getLocalisedMessageText("i18nAZ.SideBar.Title"));
-                if (SideBar.instance != null)
+                i18nAZ.log("View created !");
+
+                // set sidebar entry
+                this.setSideBar((UISWTViewImpl) e.getView());
+
+                synchronized (this.wizard)
                 {
-                    MdiEntry mdiEntry = SideBar.instance.getEntry(VIEWID);
-                    mdiEntry.setImageLeftID("i18nAZ.image.sidebar");
+                    if (this.wizard == false)
+                    {
+                        this.startInitialization();
+                    }
                 }
-                this.isCreated = true;
 
                 break;
 
             case UISWTViewEvent.TYPE_INITIALIZE:
+                i18nAZ.log("View initializing...");
                 this.saveObjects.clear();
-                this.keys.clear();
-
                 this.initialize((Composite) e.getData(), (SWTSkinObjectContainer) ((UISWTViewImpl) e.getView()).getSkinObject());
-
-                this.startSaveThread();
-
+                i18nAZ.log("View initialized !");
                 break;
             case UISWTViewEvent.TYPE_FOCUSGAINED:
                 this.createTopLevelMenuitem();
@@ -840,137 +841,284 @@ class View implements UISWTViewCoreEventListener
                 break;
 
             case UISWTViewEvent.TYPE_DESTROY:
-                if (this.isCreated == true)
+                synchronized (View.this.viewCreated)
                 {
-                    this.isCreated = false;
-
-                    this.pluginInterfaces = null;
-
-                    this.display = null;
-
-                    if (this.infoStyledText.getData(View.DATAKEY_TOOLTIP) != null)
+                    if (this.viewCreated.get() == false)
                     {
-                        ((ToolTip) this.infoStyledText.getData(View.DATAKEY_TOOLTIP)).dispose();
-                        this.infoStyledText.setData(View.DATAKEY_TOOLTIP, null);
+                        return false;
                     }
-                    if (this.editorStyledText.getData(View.DATAKEY_TOOLTIP) != null)
-                    {
-                        ((ToolTip) this.editorStyledText.getData(View.DATAKEY_TOOLTIP)).dispose();
-                        this.editorStyledText.setData(View.DATAKEY_TOOLTIP, null);
-                    }
-
-                    this.addLanguageButton = null;
-                    this.exportLanguageButton = null;
-                    this.removeLanguageButton = null;
-
-                    this.emptyFilterButton = null;
-                    this.unchangedFilterButton = null;
-                    this.extraFilterButton = null;
-                    this.multilineEditorButton = null;
-                    this.treeModeButton = null;
-                    this.urlsFilterButton = null;
-                    this.redirectKeysFilterButton = null;
-                    this.helpButton = null;
-                    this.infoText = null;
-                    this.searchTextbox = null;
-                    this.pluginsCombo = null;
-                    this.undoToolItem = null;
-                    this.redoToolItem = null;
-                    this.cutToolItem = null;
-                    this.copyToolItem = null;
-                    this.pasteToolItem = null;
-                    this.selectAllToolItem = null;
-                    this.upperCaseToolItem = null;
-                    this.lowerCaseToolItem = null;
-                    this.firstCaseToolItem = null;
-                    this.trademarkToolItem = null;
-                    this.validateToolItem = null;
-                    this.cancelToolItem = null;
-                    this.toolBar = null;
-                    this.infoStyledText = null;
-                    this.editorStyledText = null;
-                    this.statusLabel = null;
-
-                    if (this.undoRedo != null)
-                    {
-                        this.undoRedo.dispose();
-                        this.undoRedo = null;
-                    }
-                    if (this.clipboard != null)
-                    {
-                        this.clipboard.dispose();
-                        this.clipboard = null;
-                    }
-
-                    if (this.editMenu != null)
-                    {
-                        this.editMenu.dispose();
-                        this.editMenu = null;
-                        this.dropDownMenu = null;
-                    }
-
-                    TreeTableManager.dispose();
-                    if (this.saveThread != null && this.saveThread.isAlive())
-                    {
-                        try
-                        {
-                            this.saveThread.join();
-                        }
-                        catch (InterruptedException ie)
-                        {
-                            ie.printStackTrace();
-                        }
-                        this.saveThread = null;
-                    }
+                    this.viewCreated.set(false);
+                }
+                i18nAZ.log("");
+                i18nAZ.log("View destroying...");
+                synchronized (this.viewInitialized)
+                {
+                    this.viewInitialized.set(false);
                 }
 
+                this.display = null;
+
+                if (this.infoStyledText != null && this.infoStyledText.getData(View.DATAKEY_TOOLTIP) != null)
+                {
+                    ((ToolTip) this.infoStyledText.getData(View.DATAKEY_TOOLTIP)).dispose();
+                    this.infoStyledText.setData(View.DATAKEY_TOOLTIP, null);
+                }
+                if (this.infoStyledText != null && this.editorStyledText.getData(View.DATAKEY_TOOLTIP) != null)
+                {
+                    ((ToolTip) this.editorStyledText.getData(View.DATAKEY_TOOLTIP)).dispose();
+                    this.editorStyledText.setData(View.DATAKEY_TOOLTIP, null);
+                }
+
+                this.mainChildContainer = null;
+
+                this.headerContainer = null;
+                this.toolBarContainer = null;
+                this.areaContainer = null;
+                this.addLanguageButton = null;
+                this.exportLanguageButton = null;
+                this.importLanguageButton = null;
+                this.removeLanguageButton = null;
+                this.emptyFilterButton = null;
+                this.unchangedFilterButton = null;
+                this.extraFilterButton = null;
+                this.multilineEditorButton = null;
+                this.spellCheckerButton = null;
+                this.treeModeButton = null;
+                this.urlsFilterButton = null;
+                this.redirectKeysFilterButton = null;
+                this.helpButton = null;
+                this.infoText = null;
+                this.searchTextbox = null;
+
+                this.pluginComposite = null;
+                this.pluginsCombo = null;
+                this.filesCombo = null;
+
+                this.loadingComposite = null;
+                this.loadingSubComposite = null;
+                this.animatedCanvas = null;
+                this.bannerLabel = null;
+                this.loadingMessageLabel = null;
+                this.progressLabel = null;
+
+                this.footerComposite = null;
+
+                this.toolBar = null;
+                this.undoToolItem = null;
+                this.redoToolItem = null;
+                this.cutToolItem = null;
+                this.copyToolItem = null;
+                this.pasteToolItem = null;
+                this.selectAllToolItem = null;
+                this.upperCaseToolItem = null;
+                this.lowerCaseToolItem = null;
+                this.firstCaseToolItem = null;
+                this.trademarkToolItem = null;
+                this.translateToolItem = null;
+                this.validateToolItem = null;
+                this.cancelToolItem = null;
+                this.infoStyledText = null;
+                this.editorStyledText = null;
+                this.statusLabel = null;
+
+                if (this.undoRedo != null)
+                {
+                    this.undoRedo.dispose();
+                    this.undoRedo = null;
+                }
+                if (this.clipboard != null)
+                {
+                    this.clipboard.dispose();
+                    this.clipboard = null;
+                }
+
+                if (this.editMenu != null)
+                {
+                    this.editMenu.dispose();
+                    this.editMenu = null;
+                    this.dropDownMenu = null;
+                }
+                TargetLocaleManager.deleteCountListeners();
+                TreeTableManager.dispose();
+
+                if (this.saveTask != null)
+                {
+                    this.saveTask.stop();
+                }
+
+                LocalizablePluginManager.deleteListeners();
+                LocalizablePluginManager.stop();
+
+                LocalePropertiesLoader.stop();
+
+                i18nAZ.log("View destroyed !");
                 break;
         }
         return true;
     }
 
-    private void exportLanguage()
+    private void setSideBar(UISWTViewImpl uiSWTViewImpl)
+    {
+        // init count Object
+        final CountObject countObject = new CountObject();
+        uiSWTViewImpl.setTitle(i18nAZ.getLocalisedMessageText("i18nAZ.SideBar.Title"));
+        if (SideBar.instance != null)
+        {
+            this.sideBarEntry = (SideBarEntrySWT) SideBar.instance.getEntry(VIEWID);
+            this.sideBarEntry.setImageLeftID("i18nAZ.image.sidebar");
+            // this.sideBarEntry.setCloseable(false);
+            ViewTitleInfo viewTitleInfo = new ViewTitleInfo()
+            {
+                
+                public Object getTitleInfoProperty(int pid)
+                {
+                    if (pid == TITLE_INDICATOR_TEXT)
+                    {
+                        synchronized (countObject)
+                        {
+                            if (countObject.emptyCount > 0)
+                            {
+                                return String.valueOf(countObject.emptyCount);
+                            }
+                        }
+                    }
+                    else if (pid == TITLE_INDICATOR_TEXT_TOOLTIP)
+                    {
+                        return i18nAZ.getLocalisedMessageText("i18nAZ.ToolTips.Sidebar", new String[] { String.valueOf(countObject.entryCount), String.valueOf(countObject.emptyCount), String.valueOf(countObject.unchangedCount), String.valueOf(countObject.extraCount) });
+                    }
+
+                    return null;
+                }
+            };
+            this.sideBarEntry.setViewTitleInfo(viewTitleInfo);
+        }
+        TargetLocaleManager.addCountListener(new CountListener()
+        {
+            
+            public void countChanged(CountEvent e)
+            {
+                LocalizablePlugin[] localizablePlugins = LocalizablePluginManager.toArray();
+                synchronized (countObject)
+                {
+                    countObject.clear();
+                    for (int i = 0; i < localizablePlugins.length; i++)
+                    {
+                        CountObject childCountObject = localizablePlugins[i].getCounts();
+                        countObject.add(childCountObject);
+                    }
+                }
+                if (View.this.sideBarEntry != null)
+                {
+                    ViewTitleInfoManager.refreshTitleInfo(View.this.sideBarEntry.getViewTitleInfo());
+                }
+                if (e != null && e.langFileObject.equals(LocalizablePluginManager.getCurrentLangFile()))
+                {
+                    Utils.execSWTThread(new AERunnable()
+                    {
+                        
+                        public void runSupport()
+                        {
+                            View.this.updateInfoText();
+                        }
+                    });
+                }
+            }
+        });
+    }
+
+    private static void exportLanguage()
     {
         TreeTableManager.getCurrent().setFocus();
 
-        DirectoryDialog directoryDialog = new DirectoryDialog(SWTSkinFactory.getInstance().getShell().getShell(), SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL);
-        directoryDialog.setFilterPath(this.defaultPath);
-        directoryDialog.setText(this.getLocalisedMessageText("i18nAZ.Titles.Export") + this.currentBundleObject.getName() + "_*");
-        directoryDialog.setMessage(this.getLocalisedMessageText("i18nAZ.Labels.Export"));
-        String path = directoryDialog.open();
+        String destFilename = LocalizablePluginManager.getCurrentLangFile().getParent().getName() + ".zip";
+
+        FileDialog fileDialog = new FileDialog(SWTSkinFactory.getInstance().getShell().getShell(), SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL | SWT.SAVE);
+        fileDialog.setFilterPath(COConfigurationManager.getStringParameter("i18nAZ.defaultPath"));
+        fileDialog.setText(i18nAZ.getLocalisedMessageText("i18nAZ.Titles.Export"));
+        fileDialog.setFileName(destFilename);
+        fileDialog.setFilterExtensions(new String[] { "*.zip" });
+        fileDialog.setFilterNames(new String[] { i18nAZ.getLocalisedMessageText("i18nAZ.Labels.FilterExtensions.Zip") });
+        fileDialog.setOverwrite(true);
+
+        String path = fileDialog.open();
         if (path != null)
         {
-            this.defaultPath = path;
+            COConfigurationManager.setParameter("i18nAZ.defaultPath", new File(path).getParent());
+            String errorMessage = null;
             File pathFile = new File(path);
-            for (int i = 1; i < this.localesProperties.size(); i++)
+
+            ZipOutputStream zipOutputStream = null;
+            FileOutputStream fileOutputStream = null;
+            try
             {
-                Locale locale = this.localesProperties.get(i).locale;
-                String sFileName = this.currentBundleObject.getName() + "_" + locale.toLanguageTag().replace('-', '_') + BundleObject.EXTENSION;
-                Util.saveLocaleProperties(this.localesProperties.get(i).commentedProperties, new File(pathFile + File.separator + sFileName));
+                fileOutputStream = new FileOutputStream(pathFile);
+            }
+            catch (FileNotFoundException e)
+            {
+                errorMessage = "Error Zip Output Stream #1:" + e.getLocalizedMessage();
+            }
+            if (errorMessage == null)
+            {
+                zipOutputStream = new ZipOutputStream(fileOutputStream);
+                TargetLocale[] targetLocales = TargetLocaleManager.toArray();
+                LangFileObject[] langFileObjects = LocalizablePluginManager.getCurrentLangFile().getParent().toArray();
+                for (int i = 0; i < langFileObjects.length; i++)
+                {
+                    for (int j = 1; j < targetLocales.length; j++)
+                    {
+                        if (targetLocales[j].isReadOnly() == true)
+                        {
+                            continue;
+                        }
+                        LocaleProperties properties = langFileObjects[i].getProperties(targetLocales[j]);
+                        String fileName = langFileObjects[i].getFileName(targetLocales[j]);
+                        String folder = langFileObjects[i].getJarFolder().replace('/', '.') + "/";
+                        errorMessage = Util.addLocalePropertiesToZipOutputStream(zipOutputStream, properties, folder + fileName);
+                        if (errorMessage != null)
+                        {
+                            break;
+                        }
+                    }
+                }
+                try
+                {
+                    zipOutputStream.close();
+                }
+                catch (IOException e)
+                {
+                }
+            }
+            if (errorMessage != null)
+            {
+                errorMessage = i18nAZ.getLocalisedMessageText("i18nAZ.Messages.ExportFailed", errorMessage);
+                i18nAZ.logError(errorMessage);
+                pathFile.delete();
+                MessageBox messageBox = new MessageBox((Shell) SWTSkinFactory.getInstance().getShell(), SWT.ICON_ERROR);
+                messageBox.setMessage(errorMessage);
+                messageBox.open();
             }
         }
     }
 
-    private void formatStyledText(StyledText styledText, List<int[]> params, List<Object[]> references, List<Object[]> urls, boolean hand)
+    private static void formatStyledText(StyledText styledText, SpellObject[] spellObjects, boolean hand)
     {
         // found default styles
-        StyleRange styleRange = null;
         if (styledText.getData(View.DATAKEY_DEFAULT_STYLES) == null)
         {
             // set default style
-            styleRange = new StyleRange(0, styledText.getText().length(), styledText.getForeground(), styledText.getBackground());
+            StyleRange styleRange = new StyleRange(0, styledText.getText().length(), styledText.getForeground(), styledText.getBackground());
             styleRange.font = styledText.getFont();
             styledText.setStyleRange(styleRange);
 
             String languageTag = (String) TreeTableManager.getColumn(TreeTableManager.Cursor.getColumn()).getData(View.DATAKEY_LANGUAGE_TAG);
 
-            if (this.searchPatterns != null && (this.searchPrefixes == null || this.searchPrefixes.contains(languageTag) == true))
+            if (FilterManager.getCurrentFilter().isTextEnabled(languageTag) == true)
             {
-                for (Iterator<Entry<Pattern, Object>> iterator = this.searchPatterns.entrySet().iterator(); iterator.hasNext();)
+                for (Iterator<Entry<Pattern, Object>> iterator = FilterManager.getCurrentFilter().getPatterns(); iterator.hasNext();)
                 {
                     Entry<Pattern, Object> entry = iterator.next();
                     Pattern searchPattern = entry.getKey();
-                    boolean searchResult = (boolean) entry.getValue();
+                    boolean searchResult = (Boolean) entry.getValue();
                     Matcher matcher = searchPattern.matcher(styledText.getText());
                     matcher.reset();
                     while (matcher.find() == searchResult)
@@ -980,7 +1128,6 @@ class View implements UISWTViewCoreEventListener
                     }
                 }
             }
-
         }
         else
         {
@@ -988,195 +1135,528 @@ class View implements UISWTViewCoreEventListener
         }
 
         // set styles params
-        for (int i = 0; i < params.size(); i++)
+        for (int i = 0; i < spellObjects.length; i++)
         {
-            styleRange = new StyleRange(params.get(i)[0], params.get(i)[1], new Color(Display.getCurrent(), 163, 21, 21), null);
+            if (spellObjects[i].getType() != SpellChecker.TYPE_PARAM)
+            {
+                continue;
+            }
+            StyleRange styleRange = new StyleRange(spellObjects[i].getOffset(), spellObjects[i].getLength(), new Color(Display.getCurrent(), 163, 21, 21), null);
             styleRange.font = new Font(null, styledText.getFont().getFontData()[0].getName(), 9, SWT.BOLD);
             styledText.setStyleRange(styleRange);
         }
 
         // set styles references
-        for (int i = 0; i < references.size(); i++)
+        for (int i = 0; i < spellObjects.length; i++)
         {
-            styleRange = new StyleRange((int) references.get(i)[0], (int) references.get(i)[1], Display.getCurrent().getSystemColor(SWT.COLOR_BLUE), null);
+            if (spellObjects[i].getType() != SpellChecker.TYPE_REFERENCE)
+            {
+                continue;
+            }
+
+            StyleRange styleRange = new StyleRange(spellObjects[i].getOffset(), spellObjects[i].getLength(), Display.getCurrent().getSystemColor(SWT.COLOR_BLUE), null);
             styleRange.font = new Font(null, styledText.getFont().getFontData()[0].getName(), 9, SWT.NORMAL);
             styleRange.underline = true;
             styledText.setStyleRange(styleRange);
 
-            styleRange = new StyleRange((int) references.get(i)[0], 1, Display.getCurrent().getSystemColor(SWT.COLOR_DARK_RED), null);
+            styleRange = new StyleRange(spellObjects[i].getOffset(), 1, Display.getCurrent().getSystemColor(SWT.COLOR_DARK_RED), null);
             styleRange.font = new Font(null, styledText.getFont().getFontData()[0].getName(), 9, SWT.NORMAL);
             styledText.setStyleRange(styleRange);
 
-            styleRange = new StyleRange((int) references.get(i)[0] + (int) references.get(i)[1] - 1, 1, Display.getCurrent().getSystemColor(SWT.COLOR_DARK_RED), null);
+            styleRange = new StyleRange(spellObjects[i].getOffset() + spellObjects[i].getLength() - 1, 1, Display.getCurrent().getSystemColor(SWT.COLOR_DARK_RED), null);
             styleRange.font = new Font(null, styledText.getFont().getFontData()[0].getName(), 9, SWT.NORMAL);
             styledText.setStyleRange(styleRange);
         }
 
         // set styles urls
-        for (int i = 0; i < urls.size(); i++)
+        for (int i = 0; i < spellObjects.length; i++)
         {
-            styleRange = new StyleRange((int) urls.get(i)[0], (int) urls.get(i)[1], new Color(Display.getCurrent(), 0, 0, 0), null);
+            if (spellObjects[i].getType() != SpellChecker.TYPE_URL)
+            {
+                continue;
+            }
+            StyleRange styleRange = new StyleRange(spellObjects[i].getOffset(), spellObjects[i].getLength(), new Color(Display.getCurrent(), 0, 0, 0), null);
             styleRange.font = new Font(null, styledText.getFont().getFontData()[0].getName(), 9, SWT.NORMAL);
             styleRange.underline = true;
             if (hand == true)
             {
                 styleRange.underlineStyle = SWT.UNDERLINE_LINK;
             }
-            styleRange.data = urls.get(i);
+            styleRange.data = spellObjects[i];
             styledText.setStyleRange(styleRange);
         }
-    }
 
-    boolean find(int columnIndex, String value)
-    {
-
-        if (this.searchPrefixes != null)
+        // set styles misspelling
+        for (int i = 0; i < spellObjects.length; i++)
         {
-            String prefix = "";
-            switch (columnIndex)
-            {
-                case -1:
-                    prefix = "c";
-                    break;
-
-                case 0:
-                    prefix = "k";
-                    break;
-
-                case 1:
-                    prefix = "r";
-                    break;
-
-                default:
-                    prefix = (String) TreeTableManager.getColumn(columnIndex).getData(View.DATAKEY_LANGUAGE_TAG);
-                    break;
-
-            }
-            if (this.searchPrefixes.contains(prefix) == false)
-            {
-                return false;
-            }
-
-        }
-        for (Iterator<Entry<Pattern, Object>> iterator = this.searchPatterns.entrySet().iterator(); iterator.hasNext();)
-        {
-            Entry<Pattern, Object> entry = iterator.next();
-            Pattern searchPattern = entry.getKey();
-            boolean searchResult = (boolean) entry.getValue();
-            if (searchPattern.matcher(value).find() == searchResult)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    int[] getCounts(String topKey, int[] parentCounts, int columnIndex)
-    {
-        if (topKey.equals("") == true)
-        {
-            topKey = null;
-        }
-        List<Map<String, Object>> prebuildItems = this.getPrebuildItems(topKey, false);
-        return this.getCounts(prebuildItems, parentCounts, columnIndex);
-    }
-
-    int[] getCounts(List<Map<String, Object>> prebuildItems, int[] parentCounts, int columnIndex)
-    {
-        int[] counts = new int[6];
-        parentCounts = (parentCounts == null) ? new int[6] : parentCounts;
-        int entryCount = 0;
-        int emptyCount = 0;
-        int unchangedCount = 0;
-        int extraCount = 0;
-        int redirectKeyCount = 0;
-        int urlsCount = 0;
-        for (int i = 0; i < prebuildItems.size(); i++)
-        {
-            Map<String, Object> prebuildItem = prebuildItems.get(i);
-
-            if (prebuildItem.containsKey(TreeTableManager.DATAKEY_CHILDS) == true)
-            {
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> childPrebuildItems = (List<Map<String, Object>>) prebuildItem.get(TreeTableManager.DATAKEY_CHILDS);
-                counts = this.getCounts(childPrebuildItems, counts, columnIndex);
-            }
-
-            boolean Exist = (boolean) prebuildItem.get(TreeTableManager.DATAKEY_EXIST);
-            if (Exist == false)
+            if ((spellObjects[i].getType() & SpellChecker.TYPE_MISSPELLING) == 0)
             {
                 continue;
             }
-
-            int[] states = (int[]) prebuildItem.get(TreeTableManager.DATAKEY_STATES);
-
-            entryCount++;
-
-            if ((states[1] & State.REDIRECT_KEY) != 0)
+            StyleRange[] styleRanges = styledText.getStyleRanges(spellObjects[i].getOffset(), spellObjects[i].getLength());
+            if (styleRanges == null || styleRanges.length == 0)
             {
-                redirectKeyCount++;
-                continue;
+                styleRanges = new StyleRange[1];
+                styleRanges[0] = new StyleRange(spellObjects[i].getOffset(), spellObjects[i].getLength(), new Color(Display.getCurrent(), 0, 0, 0), null);
             }
-            if ((states[1] & State.URL) != 0)
+            for (int j = 0; j < styleRanges.length; j++)
             {
-                urlsCount++;
-                continue;
-            }
+                styleRanges[j].underline = true;
+                styleRanges[j].underlineStyle = SWT.UNDERLINE_SQUIGGLE;
 
-            boolean rowContainEmpty = false;
-            boolean rowContainUnchanged = false;
-            boolean rowContainExtra = false;
-
-            for (int j = 2; j < this.localesProperties.size() + 1; j++)
-            {
-                if (columnIndex == -1 || columnIndex == j)
+                if (spellObjects[i].getType() == SpellChecker.TYPE_MISSPELLING_ERROR)
                 {
-                    switch (states[j])
-                    {
-                        case State.EMPTY:
-                            rowContainEmpty = true;
-                            break;
+                    styleRanges[j].underlineColor = new Color(Display.getCurrent(), 255, 0, 0);
+                }
+                else
+                {
+                    styleRanges[j].underlineColor = new Color(Display.getCurrent(), 0, 255, 0);
+                }
+                styledText.setStyleRange(styleRanges[j]);
+            }
+        }
 
-                        case State.UNCHANGED:
-                            rowContainUnchanged = true;
-                            break;
+        // set styles translated words
+        for (int i = 0; i < spellObjects.length; i++)
+        {
+            if (spellObjects[i].getType() != SpellChecker.TYPE_TRANSLATED_WORDS)
+            {
+                continue;
+            }
+            if (spellObjects[i].getOffset() + spellObjects[i].getLength() > styledText.getText().length())
+            {
+                continue;
+            }
+            if (styledText.getText().substring(spellObjects[i].getOffset(), spellObjects[i].getOffset() + spellObjects[i].getLength()).equalsIgnoreCase(spellObjects[i].getValue()) == false)
+            {
+                continue;
+            }
+            StyleRange[] styleRanges = styledText.getStyleRanges(spellObjects[i].getOffset(), spellObjects[i].getLength());
+            if (styleRanges == null || styleRanges.length == 0)
+            {
+                styleRanges = new StyleRange[1];
+                styleRanges[0] = new StyleRange(spellObjects[i].getOffset(), spellObjects[i].getLength(), new Color(Display.getCurrent(), 0, 0, 0), null);
+            }
+            for (int j = 0; j < styleRanges.length; j++)
+            {
+                if (styleRanges[j].background != null && styleRanges[j].background.getRGB().equals(Display.getCurrent().getSystemColor(SWT.COLOR_YELLOW).getRGB()))
+                {
+                    continue;
+                }
+                styleRanges[j].background = new Color(Display.getCurrent(), 178, 214, 253);
+                styledText.setStyleRange(styleRanges[j]);
+            }
+        }
+    }
 
-                        case State.EXTRA:
-                            rowContainExtra = true;
-                            break;
-                    }
+    LangFileObject fillFilesCombo(LocalizablePlugin localizablePlugin)
+    {
+        LangFileObject langFileObject = null;
+        int selectedIndex = 0;
+        this.filesCombo.getTable().removeAll();
+
+        LangFileObject[] langFileObjects = localizablePlugin.toArray();
+        for (int i = 0; i < langFileObjects.length; i++)
+        {
+            TableItem tableItem = new TableItem(this.filesCombo.getTable(), SWT.NULL);
+            tableItem.setData(langFileObjects[i]);
+            tableItem.setText(langFileObjects[i].getLangFile());
+            tableItem.setImage(this.imageLoader.getImage("i18nAZ.image.files"));
+
+            if (LocalizablePluginManager.fileSelectedId != null == true)
+            {
+                if (langFileObjects[i].getId().equals(LocalizablePluginManager.fileSelectedId) == true)
+                {
+                    selectedIndex = i;
+                    LocalizablePluginManager.fileSelectedId = null;
                 }
             }
-            if (rowContainEmpty == true)
+            else
             {
-                emptyCount += 1;
-            }
-            if (rowContainUnchanged == true)
-            {
-                unchangedCount += 1;
-            }
-            if (rowContainExtra == true)
-            {
-                extraCount += 1;
+                if ((LocalizablePluginManager.getCurrentLangFile() == null && i == 0) || (LocalizablePluginManager.getCurrentLangFile() != null && langFileObjects[i].getId().equals(LocalizablePluginManager.getCurrentLangFile().getId()) == true))
+                {
+                    selectedIndex = i;
+                }
             }
         }
-        counts[0] += parentCounts[0] + entryCount;
-        counts[1] += parentCounts[1] + emptyCount;
-        counts[2] += parentCounts[2] + unchangedCount;
-        counts[3] += parentCounts[3] + extraCount;
-        counts[4] += parentCounts[4] + redirectKeyCount;
-        counts[5] += parentCounts[5] + urlsCount;
-        return counts;
+        if (selectedIndex < this.filesCombo.getItemCount() && this.filesCombo.getSelectionIndex() != selectedIndex)
+        {
+            this.filesCombo.select(selectedIndex);
+            langFileObject = langFileObjects[selectedIndex];
+        }
+        this.filesCombo.setVisibleItemCount((this.filesCombo.getItemCount() == 0) ? 1 : 20);
+        this.updateFilesCombo();
+        return langFileObject;
     }
 
-    BundleObject getCurrentBundleObject()
+    String translate(String value, Locale locale)
     {
-        return this.currentBundleObject;
+        if (View.this.multilineEditor == false)
+        {
+            value = Util.unescape(value);
+        }
+
+        String[] results = new String[1];
+        SpellObject[] translatedObjects = TranslateManager.translate(value, locale, results);
+        if (translatedObjects != null)
+        {
+            if (View.this.multilineEditor == false)
+            {
+                results[0] = Util.escape(results[0], false);
+            }
+            View.this.editorSpellObjectManager.setTranslatedObjects(translatedObjects);
+            return results[0];
+        }
+        return null;
+    }
+    void updateEditor()
+    {       
+        // get selected row
+        Item selectedRow = (Item) View.this.editorStyledText.getData(View.DATAKEY_SELECTED_ROW);
+
+        // get selected column
+        int selectedColumn = (Integer) View.this.editorStyledText.getData(View.DATAKEY_SELECTED_COLUMN);
+
+        // get locale properties for save
+        final TargetLocale selectedTargetLocale = (TargetLocale) TreeTableManager.getColumn(selectedColumn).getData(View.DATAKEY_TARGET_LOCALE);
+
+        // get reference
+        String reference = TreeTableManager.getText(selectedRow, 1);
+        if (View.this.multilineEditor == true)
+        {
+            reference = Util.unescape(reference);
+        }
+
+        // get old value
+        String oldValue = TreeTableManager.getText(selectedRow, selectedColumn);
+        if (View.this.multilineEditor == true)
+        {
+            oldValue = Util.unescape(oldValue);
+        }         
+        
+        final PrebuildItem prebuildItem = (PrebuildItem) selectedRow.getData(TreeTableManager.DATAKEY_PREBUILD_ITEM);
+        final LangFileObject langFileObject = LocalizablePluginManager.getCurrentLangFile();
+        
+        //enable/disable toolitems
+        View.this.selectAllToolItem.setEnabled(View.this.editorStyledText.getText().length() > 0);
+        View.this.upperCaseToolItem.setEnabled(View.this.editorStyledText.getText().length() > 0);
+        View.this.lowerCaseToolItem.setEnabled(View.this.editorStyledText.getText().length() > 0);
+        View.this.firstCaseToolItem.setEnabled(View.this.editorStyledText.getText().length() > 1);
+        View.this.validateToolItem.setEnabled(View.this.deletableRows.size() > 0 || oldValue.equals(View.this.editorStyledText.getText()) == false);
+        View.this.cancelToolItem.setEnabled(View.this.editorStyledText.getText().equals("") == true || (oldValue.equals(View.this.editorStyledText.getText()) == false && !(oldValue.equals("") == true && View.this.editorStyledText.getText().equals(reference) == true)));
+
+        // found params & references for editor
+        if (selectedTargetLocale != null)
+        {
+            final String value = View.this.editorStyledText.getText();
+            AEThread2 spellCheckThread = new AEThread2("i18nAZ.spellCheck")
+            {
+                
+                public void run()
+                {
+                    final SpellObject[] editorSpellObjects = View.this.editorSpellObjectManager.getSpellObjects(langFileObject, prebuildItem.getKey(),selectedTargetLocale.getLocale(), value, View.this.multilineEditor);
+                    Utils.execSWTThread(new AERunnable()
+                    {
+                        
+                        public void runSupport()
+                        {
+                            if (value.equals(View.this.editorStyledText.getText()) == false)
+                            {
+                                return;
+                            }
+
+                            // apply styles for editorStyledText
+                            View.formatStyledText(View.this.editorStyledText, editorSpellObjects, false);
+
+                            // search unknown params
+                            SpellObject[] unknownParams = SpellChecker.foundMissings(editorSpellObjects, View.this.infoSpellObjects, SpellChecker.TYPE_PARAM);
+                            for (int i = 0; i < unknownParams.length; i++)
+                            {
+                                // set not found param style
+                                StyleRange styleRange = new StyleRange(unknownParams[i].getOffset(), unknownParams[i].getLength(), new Color(Display.getCurrent(), 163, 21, 21), null);
+                                styleRange.font = new Font(null, View.this.editorStyledText.getFont().getFontData()[0].getName(), 9, SWT.BOLD);
+                                styleRange.underline = true;
+                                styleRange.underlineColor = Display.getCurrent().getSystemColor(SWT.COLOR_RED);
+                                styleRange.underlineStyle = SWT.UNDERLINE_SQUIGGLE;
+                                View.this.editorStyledText.setStyleRange(styleRange);
+                            }
+
+                            // Search unknown references
+                            SpellObject[] unknownReferences = SpellChecker.foundMissings(editorSpellObjects, View.this.infoSpellObjects, SpellChecker.TYPE_REFERENCE);
+                            for (int i = 0; i < unknownReferences.length; i++)
+                            {
+                                // set not found references style
+                                StyleRange styleRange = new StyleRange(unknownReferences[i].getOffset() + 1, unknownReferences[i].getLength() - 2, Display.getCurrent().getSystemColor(SWT.COLOR_BLUE), null);
+                                styleRange.font = new Font(null, View.this.editorStyledText.getFont().getFontData()[0].getName(), 9, SWT.NORMAL);
+                                styleRange.underline = true;
+                                styleRange.underlineColor = Display.getCurrent().getSystemColor(SWT.COLOR_RED);
+                                styleRange.underlineStyle = SWT.UNDERLINE_SQUIGGLE;
+                                View.this.editorStyledText.setStyleRange(styleRange);
+                            }
+                        }
+                    });
+                }
+            };
+            spellCheckThread.start();
+        }
+    }
+    void updateFilesCombo()
+    {
+        for (int i = 0; i < this.filesCombo.getTable().getItemCount(); i++)
+        {
+            TableItem tableItem = this.filesCombo.getTable().getItem(i);
+            LangFileObject langFileObject = (LangFileObject) tableItem.getData();
+
+            CountObject counts = langFileObject.getCounts();
+
+            String text1 = "";
+            Color color1 = tableItem.getDisplay().getSystemColor(SWT.COLOR_DARK_GRAY);
+
+            if (counts != null && counts.entryCount > 0)
+            {
+                double percent = (1 - ((double) counts.emptyCount) / ((double) counts.entryCount));
+                if (percent > 1)
+                {
+                    percent = 1;
+                }
+                DecimalFormat decimalFormat = new DecimalFormat("0.00 %");
+                //decimalFormat.setRoundingMode(RoundingMode.DOWN);
+                decimalFormat.setMaximumFractionDigits(2);
+                decimalFormat.setMinimumFractionDigits(2);
+
+                text1 = decimalFormat.format(percent);
+
+                if (percent == 0)
+                {
+                    color1 = tableItem.getDisplay().getSystemColor(SWT.COLOR_RED);
+                }
+                else if (percent == 1)
+                {
+                    color1 = new Color(tableItem.getDisplay(), 0, 128, 0);
+                }
+            }
+            tableItem.setText(1, text1);
+
+            tableItem.setForeground(1, color1);
+        }
     }
 
-    String getDefaultPath()
+    LangFileObject fillPluginsCombo()
     {
-        return this.defaultPath;
+        synchronized (this.viewInitialized)
+        {
+            if (this.viewInitialized.get() == false)
+            {
+                return null;
+            }
+        }
+        LangFileObject langFileObject = null;
+        int selectedIndex = 0;
+        this.pluginsCombo.getTable().removeAll();
+        LocalizablePlugin[] localizablePlugins = LocalizablePluginManager.toArray();
+        for (int i = 0; i < localizablePlugins.length; i++)
+        {
+            TableItem tableItem = new TableItem(View.this.pluginsCombo.getTable(), SWT.NULL);
+            tableItem.setData(localizablePlugins[i]);
+            tableItem.setText(localizablePlugins[i].getDisplayName());
+            Image[] sidebarImages = new Image[0];
+            if (localizablePlugins[i].getId().equals(LocalizablePluginManager.PLUGIN_CORE_ID) == false)
+            {
+                sidebarImages = this.imageLoader.getImages("image.sidebar." + localizablePlugins[i].getId());
+                if (sidebarImages.length == 0)
+                {
+                    sidebarImages = this.imageLoader.getImages(localizablePlugins[i].getId() + ".image.sidebar");
+                }
+                if (sidebarImages.length == 0)
+                {
+                    sidebarImages = this.imageLoader.getImages("image.sidebar.plugin");
+                }
+            }
+            else
+            {
+                sidebarImages = this.imageLoader.getImages("i18nAZ.image.vuze");
+            }
+            if (sidebarImages.length > 0)
+            {
+                tableItem.setImage(sidebarImages[0]);
+            }
+
+            if (LocalizablePluginManager.fileSelectedId != null == true)
+            {
+                if (localizablePlugins[i].getId().equals(LocalizablePluginManager.fileSelectedId.split("!")[0]) == true)
+                {
+
+                    selectedIndex = i;
+                }
+            }
+            else
+            {
+                if ((LocalizablePluginManager.getCurrentLangFile() == null && i == 0) || (LocalizablePluginManager.getCurrentLangFile() != null && localizablePlugins[i].getId().equals(LocalizablePluginManager.getCurrentLangFile().getParent().getId()) == true))
+                {
+                    selectedIndex = i;
+                }
+            }
+        }
+        if (this.pluginsCombo.isDropped() == true)
+        {
+            langFileObject = LocalizablePluginManager.getCurrentLangFile();
+        }
+        else if (selectedIndex < this.pluginsCombo.getItemCount() - 1 && this.pluginsCombo.getSelectionIndex() != selectedIndex)
+        {
+            this.pluginsCombo.clearSelection();
+            this.pluginsCombo.select(selectedIndex);
+            langFileObject = this.fillFilesCombo(localizablePlugins[selectedIndex]);
+        }
+
+        View.this.pluginsCombo.setVisibleItemCount((View.this.pluginsCombo.getItemCount() == 0) ? 1 : 20);
+
+        if (View.this.loadingComposite.getVisible() == false)
+        {
+            View.this.pluginComposite.setVisible(View.this.pluginsCombo.getItemCount() > 0);
+            Util.setHeightHint(View.this.pluginComposite, (View.this.pluginsCombo.getItemCount() > 0) ? -1 : 0);
+        }
+
+        this.updatePluginsCombo();
+        return langFileObject;
+    }
+
+    void updatePluginsCombo()
+    {
+        for (int i = 0; i < this.pluginsCombo.getTable().getItemCount(); i++)
+        {
+            TableItem tableItem = this.pluginsCombo.getTable().getItem(i);
+            LocalizablePlugin localizablePlugin = (LocalizablePlugin) tableItem.getData();
+
+            CountObject counts = localizablePlugin.getCounts();
+            String text1 = "";
+            String text2 = "";
+            Color color1 = tableItem.getDisplay().getSystemColor(SWT.COLOR_DARK_GRAY);
+            Color color2 = tableItem.getDisplay().getSystemColor(SWT.COLOR_DARK_GRAY);
+            LangFileObject[] langFileObjects = localizablePlugin.toArray();
+            if (counts.entryCount > 0)
+            {
+                if (langFileObjects.length > 1)
+                {
+                    text1 = "(" + String.valueOf(langFileObjects.length) + ")";
+                    tableItem.setForeground(1, tableItem.getDisplay().getSystemColor(SWT.COLOR_DARK_GRAY));
+                }
+                double percent = (1 - ((double) counts.emptyCount) / ((double) counts.entryCount));
+                if (percent > 1)
+                {
+                    percent = 1;
+                }
+                DecimalFormat decimalFormat = new DecimalFormat("0.00 %");
+                //decimalFormat.setRoundingMode(RoundingMode.DOWN);
+                decimalFormat.setMaximumFractionDigits(2);
+                decimalFormat.setMinimumFractionDigits(2);
+                text2 = decimalFormat.format(percent);
+                if (percent == 0)
+                {
+                    color2 = tableItem.getDisplay().getSystemColor(SWT.COLOR_RED);
+                }
+                else if (percent == 1)
+                {
+                    color2 = new Color(tableItem.getDisplay(), 0, 128, 0);
+                }
+            }
+            else
+            {
+                if (langFileObjects.length > 1)
+                {
+                    text2 = "(" + String.valueOf(langFileObjects.length) + ")";
+                }
+            }
+
+            tableItem.setText(1, text1);
+            tableItem.setText(2, text2);
+
+            tableItem.setForeground(1, color1);
+            tableItem.setForeground(2, color2);
+        }
+    }
+
+    void updateProgressBar()
+    {
+        this.updateProgressBar(this.progressPercent);
+    }
+
+    void updateProgressBar(final float percent)
+    {
+        this.progressPercent = percent;
+        if (this.display == null)
+        {
+            return;
+        }
+        if (this.display.getThread().equals(Thread.currentThread()) == false)
+        {
+            Utils.execSWTThread(new AERunnable()
+            {
+                
+                public void runSupport()
+                {
+                    View.this.updateProgressBar(View.this.progressPercent);
+                }
+            });
+            return;
+        }
+        if (this.progressLabel == null || this.progressLabel.isDisposed() == true)
+        {
+            return;
+        }
+        if (this.progressLabel.getListeners(SWT.Paint).length == 0)
+        {
+            this.progressLabel.addPaintListener(new PaintListener()
+            {
+                
+                public void paintControl(PaintEvent e)
+                {
+                    Control c = (Control) e.widget;
+
+                    Point size = c.getSize();
+                    e.gc.setBackground(ColorCache.getColor(e.display, "#23a7df"));
+                    float breakX = size.x * View.this.progressPercent / 100;
+                    e.gc.fillRectangle(0, (size.y - 2) / 2, (int) breakX, 2);
+                    e.gc.setBackground(ColorCache.getColor(e.display, "#cccccc"));
+                    e.gc.fillRectangle((int) breakX, (size.y - 2) / 2, size.x - (int) breakX, 2);
+                }
+            });
+        }
+        this.progressLabel.setVisible(this.progressPercent > -1);
+        this.progressLabel.redraw();
+    }
+
+    void updateLoadingMessage()
+    {
+        this.updateLoadingMessage(this.loadingMessage);
+    }
+
+    void updateLoadingMessage(final String message)
+    {
+        this.loadingMessage = message;
+        if (this.display == null)
+        {
+            return;
+        }
+        if (this.display.getThread().equals(Thread.currentThread()) == false)
+        {
+            Utils.execSWTThread(new AERunnable()
+            {
+                
+                public void runSupport()
+                {
+                    View.this.updateLoadingMessage(message);
+                }
+            });
+            return;
+        }
+        if (this.loadingMessageLabel == null || this.loadingMessageLabel.isDisposed() == true)
+        {
+            return;
+        }
+        this.loadingMessageLabel.setVisible(this.loadingMessage != null);
+        this.loadingMessageLabel.setText(this.loadingMessage != null ? this.loadingMessage : "");
+        this.loadingMessageLabel.getParent().layout();
+        this.loadingMessageLabel.update();
     }
 
     Display getDisplay()
@@ -1189,413 +1669,388 @@ class View implements UISWTViewCoreEventListener
         return this.imageLoader;
     }
 
-    LocalesProperties getLocalesProperties(Locale locale)
+    private void importLanguage()
     {
-        for (int i = 0; i < this.localesProperties.size(); i++)
+        TreeTableManager.getCurrent().setFocus();
+
+        if (LocalizablePluginManager.getCurrentLangFile() == null)
         {
-            if (this.localesProperties.get(i).locale == locale)
-            {
-                return this.localesProperties.get(i);
-            }
+            return;
         }
-        return null;
-    }
 
-    String getLocalisedMessageText(String key)
-    {
-        return this.getPluginInterface().getUtilities().getLocaleUtilities().getLocalisedMessageText(key);
-    }
+        FileDialog fileDialog = new FileDialog(SWTSkinFactory.getInstance().getShell().getShell(), SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL | SWT.OPEN | SWT.MULTI);
+        fileDialog.setFilterPath(COConfigurationManager.getStringParameter("i18nAZ.defaultPath"));
+        fileDialog.setText(i18nAZ.getLocalisedMessageText("i18nAZ.Titles.Import"));
+        fileDialog.setFilterExtensions(new String[] { "*.properties", "*.zip" });
+        fileDialog.setFilterNames(new String[] { i18nAZ.getLocalisedMessageText("i18nAZ.Labels.FilterExtensions.Properties"), i18nAZ.getLocalisedMessageText("i18nAZ.Labels.FilterExtensions.Zip") });
+        fileDialog.setFilterIndex(COConfigurationManager.getIntParameter("i18nAZ.filterIndex", 0));
+        fileDialog.setOverwrite(false);
 
-    String getLocalisedMessageText(String key, String param)
-    {
-        return this.getPluginInterface().getUtilities().getLocaleUtilities().getLocalisedMessageText(key, new String[] { param });
-    }
-
-    String getLocalisedMessageText(String key, String[] params)
-    {
-        return this.getPluginInterface().getUtilities().getLocaleUtilities().getLocalisedMessageText(key, params);
-    }
-
-    PluginInterface getPluginInterface()
-    {
-        return this.pluginInterface;
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> getPrebuildItems(String topKey, boolean sort)
-    {
-        List<Map<String, Object>> prebuildItems = new ArrayList<Map<String, Object>>();
-        if (this.localesProperties.size() > 0)
+        String result = fileDialog.open();
+        if (result != null)
         {
-            if (sort == true)
+            // get folder path
+            String folderPath = new File(result).getParent();
+
+            // set default path parameter
+            COConfigurationManager.setParameter("i18nAZ.defaultPath", folderPath);
+            COConfigurationManager.setParameter("i18nAZ.filterIndex", fileDialog.getFilterIndex());
+
+            // get file name
+            List<ImportObject> importObjects = new ArrayList<ImportObject>();
+
+            for (int i = 0; i < fileDialog.getFileNames().length; i++)
             {
-                Collections.sort(this.keys, new Comparator<String>()
-                {
-                    @Override
-                    public int compare(String key1, String key2)
-                    {
-                        String lowerkey1 = key1.toLowerCase(Locale.US);
-                        String lowerkey2 = key2.toLowerCase(Locale.US);
-
-                        int prefix_length = 0;
-                        for (int i = 0; i < Math.min(lowerkey1.length(), lowerkey2.length()); i++)
-                        {
-                            char lowerChar1 = lowerkey1.charAt(i);
-                            char lowerChar2 = lowerkey2.charAt(i);
-                            if (lowerChar1 != lowerChar2)
-                            {
-                                break;
-                            }
-                            if (lowerChar1 == '.')
-                            {
-                                prefix_length = i;
-
-                                break;
-                            }
-                        }
-                        if (prefix_length > 0)
-                        {
-                            int result = key2.substring(0, prefix_length).compareTo(key1.substring(0, prefix_length));
-                            if (result != 0)
-                            {
-                                return result;
-                            }
-                            return key1.substring(prefix_length).compareToIgnoreCase(key2.substring(prefix_length));
-                        }
-                        return key1.toString().compareToIgnoreCase(key2);
-                    }
-                });
+                // insert folder Path
+                importObjects.add(new ImportObject(Path.getUrl(folderPath + File.separator + fileDialog.getFileNames()[i])));
             }
 
-            List<Map<String, Object>> items = new ArrayList<Map<String, Object>>();
-            for (int i = 0; i < this.keys.size(); i++)
+            // found zip path
+            for (int i = importObjects.size() - 1; i >= 0; i--)
             {
-
-                boolean show = true;
-
-                boolean matchesSearch = this.searchPatterns == null;
-
-                // key
-                String key = this.keys.get(i);
-
-                if (topKey != null && key.startsWith(topKey) == false)
+                // check if zip file
+                ZipFile zipFile = null;
+                try
+                {
+                    zipFile = new ZipFile(Path.getFile(importObjects.get(i).url));
+                }
+                catch (IOException e)
                 {
                     continue;
                 }
-
-                String[] values = new String[this.localesProperties.size() + 1];
-                int[] states = new int[this.localesProperties.size() + 1];
-                values[0] = (TreeTableManager.isTreeMode() ? key.substring(key.lastIndexOf('.') + 1) : key);
-                if (matchesSearch == false && key != null)
+                Enumeration<? extends ZipEntry> entries = zipFile.entries();
+                ArrayList<URL> zipPaths = new ArrayList<URL>();
+                while (entries.hasMoreElements())
                 {
-                    matchesSearch = this.find(0, key);
-                }
-
-                // define show row values
-                boolean showRowEmpty = this.emptyFilter;
-                boolean showRowUnchanged = this.unchangedFilter;
-                boolean showRowExtra = this.extraFilter;
-                boolean hideRedirectKeysFilter = this.redirectKeysFilter;
-                int urlsFilterState = this.urlsFilter;
-
-                for (Iterator<String> iterator = this.emptyFilterExcludedKey.iterator(); iterator.hasNext();)
-                {
-                    if (key.startsWith(iterator.next() + "."))
+                    ZipEntry zipEntry = entries.nextElement();
+                    if (zipEntry.isDirectory() == false)
                     {
-                        showRowEmpty = !showRowEmpty;
-                        break;
+                        zipPaths.add(Path.getUrl(importObjects.get(i).url.toString() + "!/" + zipEntry.getName()));
                     }
                 }
-                for (Iterator<String> iterator = this.unchangedFilterExcludedKey.iterator(); iterator.hasNext();)
+                if (zipPaths.size() > 0)
                 {
-                    if (key.startsWith(iterator.next() + "."))
+                    for (int j = 0; j < zipPaths.size(); j++)
                     {
-                        showRowUnchanged = !showRowUnchanged;
-                        break;
+                        importObjects.add(new ImportObject(zipPaths.get(j)));
                     }
+                    zipPaths.clear();
+                    importObjects.remove(i);
                 }
-                for (Iterator<String> iterator = this.extraFilterExcludedKey.iterator(); iterator.hasNext();)
+                try
                 {
-                    if (key.startsWith(iterator.next() + "."))
-                    {
-                        showRowExtra = !showRowExtra;
-                        break;
-                    }
+                    zipFile.close();
                 }
-                for (Iterator<String> iterator = this.hideRedirectKeysFilterExcludedKey.iterator(); iterator.hasNext();)
+                catch (IOException e)
                 {
-                    if (key.startsWith(iterator.next() + "."))
-                    {
-                        hideRedirectKeysFilter = !hideRedirectKeysFilter;
-                        break;
-                    }
-                }
-                for (Iterator<Entry<String, Integer>> iterator = this.urlsFilterOverriddenStates.entrySet().iterator(); iterator.hasNext();)
-                {
-                    Entry<String, Integer> entry = iterator.next();
-                    if (key.startsWith(entry.getKey() + "."))
-                    {
-                        urlsFilterState = entry.getValue();
-                        break;
-                    }
-                }
-
-                // reference
-                CommentedProperties localeProperties = this.localesProperties.get(0).commentedProperties;
-                values[1] = Util.escape(localeProperties.getProperty(key), false);
-                states[1] = Util.getStateOfReference(values[1]);
-                if (matchesSearch == false && values[1] != null)
-                {
-                    matchesSearch = this.find(1, values[1]);
-                }
-
-                // comments
-                String[] commentsLines = new String[] {};
-
-                commentsLines = localeProperties.getComment(key);
-                if (matchesSearch == false && commentsLines != null)
-                {
-                    String comments = "";
-                    for (int k = 0; k < commentsLines.length; k++)
-                    {
-                        comments += commentsLines[k].replaceAll("\\n", "\\\\n") + "\n";
-                    }
-                    matchesSearch = this.find(-1, comments);
-                }
-
-                // show not redirect key
-                if (hideRedirectKeysFilter == true && (states[1] & State.REDIRECT_KEY) != 0)
-                {
-                    show = false;
-                }
-
-                // show/hide url
-                switch (urlsFilterState)
-                {
-                    case 1:
-                        if ((states[1] & State.URL) != 0)
-                        {
-                            show = false;
-                        }
-                        break;
-
-                    case 2:
-                        if ((states[1] & State.URL) == 0)
-                        {
-                            show = false;
-                        }
-                        break;
-                }
-
-                // values
-                String rowText = values[1];
-                boolean rowContainEmpty = false;
-                boolean rowContainUnchanged = false;
-                boolean rowContainExtra = false;
-
-                for (int j = 1; j < this.localesProperties.size(); j++)
-                {
-                    localeProperties = this.localesProperties.get(j).commentedProperties;
-                    values[j + 1] = Util.escape(localeProperties.getProperty(key), false);
-                    states[j + 1] = Util.getStateOfValue(values[1], values[j + 1]);
-                    if (matchesSearch == false)
-                    {
-                        matchesSearch = this.find(j + 1, values[j + 1]);
-                    }
-                    switch (states[j + 1])
-                    {
-                        case State.EMPTY:
-                            rowContainEmpty = true;
-                            break;
-
-                        case State.UNCHANGED:
-                            rowContainUnchanged = true;
-                            break;
-
-                        case State.EXTRA:
-                            rowContainExtra = true;
-                            break;
-                    }
-                    rowText += values[j + 1];
-                }
-                if (matchesSearch == false)
-                {
-                    show = false;
-                }
-
-                if (show == true && (showRowEmpty || showRowUnchanged || showRowExtra))
-                {
-                    show = (rowContainEmpty && showRowEmpty) || (rowContainUnchanged && showRowUnchanged) || (rowContainExtra && showRowExtra);
-                }
-                if (topKey != null)
-                {
-                    show = true;
-                }
-                if (rowText.equals("") == true)
-                {
-                    show = false;
-                }
-                if (show == true)
-                {
-                    Map<String, Object> item = new HashMap<String, Object>();
-                    item.put(TreeTableManager.DATAKEY_KEY, key);
-                    item.put(TreeTableManager.DATAKEY_COMMENTS, commentsLines);
-                    item.put(TreeTableManager.DATAKEY_VALUES, values);
-                    item.put(TreeTableManager.DATAKEY_STATES, states);
-                    item.put(TreeTableManager.DATAKEY_EXIST, true);
-                    items.add(item);
                 }
             }
-            for (int i = 0; i < items.size(); i++)
+            for (int i = 0; i < importObjects.size(); i++)
             {
-                String key = (String) items.get(i).get(TreeTableManager.DATAKEY_KEY);
-                if (TreeTableManager.isTreeMode() == true)
+                // set vars
+                String errorMessage = null;
+                String fileName = Path.getFilenameWithoutExtension(importObjects.get(i).url);
+                String extension = Path.getExtension(importObjects.get(i).url);
+
+                error: while (true)
                 {
-                    int nextDotIndex = -1;
-                    do
+                    // show error message
+                    if (errorMessage != null)
                     {
-                        Map<String, Object> item = null;
-                        String currentKey = key;
-                        nextDotIndex = key.indexOf('.', nextDotIndex + 1);
-                        if (nextDotIndex == -1)
-                        {
-                            item = items.get(i);
-                        }
-                        else
-                        {
-                            currentKey = key.substring(0, nextDotIndex);
-                            item = new HashMap<String, Object>();
-                            int parentLastDotIndex = currentKey.lastIndexOf('.');
-
-                            String[] values = new String[this.localesProperties.size() + 1];
-                            values[0] = currentKey.substring(parentLastDotIndex + 1);
-
-                            item.put(TreeTableManager.DATAKEY_KEY, currentKey);
-                            item.put(TreeTableManager.DATAKEY_COMMENTS, new String[] {});
-                            item.put(TreeTableManager.DATAKEY_VALUES, values);
-                            item.put(TreeTableManager.DATAKEY_STATES, new int[this.localesProperties.size() + 1]);
-                            item.put(TreeTableManager.DATAKEY_EXIST, false);
-                        }
-
-                        List<Map<String, Object>> foundedPrebuildItems = prebuildItems;
-                        List<Map<String, Object>> tempPrebuildItems = prebuildItems;
-                        do
-                        {
-                            boolean loop = false;
-                            for (int j = 0; j < tempPrebuildItems.size(); j++)
-                            {
-                                String parentKey = tempPrebuildItems.get(j).get(TreeTableManager.DATAKEY_KEY) + ".";
-                                if (currentKey.startsWith(parentKey) == true)
-                                {
-                                    if (tempPrebuildItems.get(j).containsKey(TreeTableManager.DATAKEY_CHILDS) == true)
-                                    {
-                                        foundedPrebuildItems = (List<Map<String, Object>>) tempPrebuildItems.get(j).get(TreeTableManager.DATAKEY_CHILDS);
-                                        tempPrebuildItems = (List<Map<String, Object>>) tempPrebuildItems.get(j).get(TreeTableManager.DATAKEY_CHILDS);
-                                        loop = true;
-                                    }
-                                    else
-                                    {
-                                        foundedPrebuildItems = new ArrayList<Map<String, Object>>();
-                                        tempPrebuildItems.get(j).put(TreeTableManager.DATAKEY_CHILDS, foundedPrebuildItems);
-                                    }
-                                    break;
-                                }
-                            }
-                            if (loop == false)
-                            {
-                                break;
-                            }
-                        }
-                        while (true);
-                        boolean found = false;
-                        for (int j = 0; j < foundedPrebuildItems.size(); j++)
-                        {
-                            if (currentKey.equals((foundedPrebuildItems.get(j).get(TreeTableManager.DATAKEY_KEY))) == true)
-                            {
-                                if ((boolean) item.get(TreeTableManager.DATAKEY_EXIST) == true && (boolean) foundedPrebuildItems.get(j).get(TreeTableManager.DATAKEY_EXIST) == false)
-                                {
-                                    if (foundedPrebuildItems.get(j).containsKey(TreeTableManager.DATAKEY_CHILDS) == true)
-                                    {
-                                        tempPrebuildItems.get(j).put(TreeTableManager.DATAKEY_CHILDS, foundedPrebuildItems.get(j).get(TreeTableManager.DATAKEY_CHILDS));
-                                    }
-                                    foundedPrebuildItems.set(j, item);
-                                }
-                                found = true;
-                                break;
-                            }
-                        }
-                        if (found == false)
-                        {
-                            foundedPrebuildItems.add(item);
-                        }
-                        if (nextDotIndex == -1)
-                        {
-                            break;
-                        }
+                        i18nAZ.logWarning(errorMessage);
+                        MessageBox messageBox = new MessageBox((Shell) SWTSkinFactory.getInstance().getShell(), SWT.ICON_ERROR);
+                        messageBox.setMessage(errorMessage);
+                        messageBox.open();
+                        return;
                     }
-                    while (true);
+
+                    // detect languageTag
+                    Locale locale = Util.getLocaleFromFilename(fileName);
+                    if (locale != null)
+                    {
+                        importObjects.get(i).locale = locale;
+                    }
+
+                    // check File is properties
+                    importObjects.get(i).properties = Util.getLocaleProperties(importObjects.get(i).locale, importObjects.get(i).url);
+                    if (importObjects.get(i).properties == null)
+                    {
+                        errorMessage = i18nAZ.getLocalisedMessageText("i18nAZ.Messages.InvalidMessageBundleFile");
+                        continue error;
+                    }
+
+                    if (importObjects.get(i).locale == null || extension.equalsIgnoreCase(".properties") == false)
+                    {
+                        errorMessage = i18nAZ.getLocalisedMessageText("i18nAZ.Messages.NotFoundLanguage", new String[] { fileName + extension });
+                        continue error;
+                    }
+                    break;
+                }
+            }
+            TargetLocale[] targetLocales = TargetLocaleManager.toArray();
+            for (int i = 0; i < importObjects.size(); i++)
+            {
+                boolean found = false;
+                for (int j = 0; j < targetLocales.length; j++)
+                {
+                    if (targetLocales[j].isReadOnly() == false && importObjects.get(i).locale.equals(targetLocales[j].getLocale()))
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+                if (found == true)
+                {
+                    importObjects.get(i).allowedActions |= ImportLanguageDialog.Actions.REPLACE;
+                    importObjects.get(i).allowedActions |= ImportLanguageDialog.Actions.OPEN_READ_ONLY;
                 }
                 else
                 {
-                    prebuildItems.add(items.get(i));
+                    importObjects.get(i).allowedActions |= ImportLanguageDialog.Actions.ADD;
                 }
             }
+
+            ImportLanguageDialog importLanguageDialog = new ImportLanguageDialog(SWTSkinFactory.getInstance().getShell().getShell(), importObjects);
+            importObjects = importLanguageDialog.importObjects;
+            boolean refreshColumns = false;
+            for (int i = 0; i < importObjects.size(); i++)
+            {
+                int originIndex = -1;
+                for (int j = 0; j < targetLocales.length; j++)
+                {
+                    if (importObjects.get(i).locale.equals(targetLocales[j].getLocale()) && (targetLocales[j].isReadOnly() == false))
+                    {
+                        originIndex = j;
+                    }
+                }
+                TargetLocale targetLocale = null;
+                switch (importObjects.get(i).selectedAction)
+                {
+                    case ImportLanguageDialog.Actions.OPEN_READ_ONLY:
+
+                        int lastIndex = -1;
+                        for (int j = originIndex; originIndex != -1 && j < targetLocales.length; j++)
+                        {
+                            if (importObjects.get(i).locale.equals(targetLocales[j].getLocale()))
+                            {
+                                if (targetLocales[j].isReadOnly() == true)
+                                {
+                                    if (targetLocales[j].isVisible() == false)
+                                    {
+                                        targetLocales[j].getExternalPaths().put(LocalizablePluginManager.getCurrentLangFile().getId(), new ExternalPath(LocalizablePluginManager.getCurrentLangFile().getId(), importObjects.get(i).url));
+                                        refreshColumns = true;
+                                        lastIndex = -1;
+                                        break;
+                                    }
+                                }
+                                lastIndex = j;
+                            }
+                        }
+                        if (lastIndex != -1)
+                        {
+                            ExternalPathCollection externalPaths = new ExternalPathCollection();
+                            externalPaths.put(LocalizablePluginManager.getCurrentLangFile().getId(), new ExternalPath(LocalizablePluginManager.getCurrentLangFile().getId(), importObjects.get(i).url));
+                            TargetLocaleManager.add(lastIndex + 1, importObjects.get(i).locale, externalPaths, importObjects.get(i).properties);
+                            refreshColumns = true;
+                        }
+                        break;
+                    case ImportLanguageDialog.Actions.REPLACE:
+                        if (originIndex != -1)
+                        {
+                            targetLocales[originIndex].setDefaultProperties(importObjects.get(i).properties);
+                            this.saveObjects.add(new SaveObject(targetLocales[originIndex]));
+                        }
+                        break;
+                    case ImportLanguageDialog.Actions.ADD:
+                        targetLocale = TargetLocaleManager.add(importObjects.get(i).locale, importObjects.get(i).properties);
+                        this.saveObjects.add(new SaveObject(targetLocale));
+                        refreshColumns = true;
+                        break;
+                    default:
+                        break;
+                }
+                importObjects.get(i).dispose();
+                importObjects.set(i, null);
+            }
+            importObjects.clear();
+            if (refreshColumns == true)
+            {
+                View.saveLocales();
+                this.updateTreeTable(refreshColumns, true);
+            }
         }
-        return prebuildItems;
     }
 
-    private void initialize(Composite composite, SWTSkinObjectContainer skinObjectContainer)
+    private void enable()
     {
-        this.loggerChannel.log(1, "Initialize");
+        synchronized (this.viewInitialized)
+        {
+            if (this.viewInitialized.get() == false)
+            {
+                return;
+            }
+        }
+        synchronized (this.initialized)
+        {
+            if (this.initialized.get() == false)
+            {
+                return;
+            }
+        }
+        synchronized (this.wizard)
+        {
+            if (this.wizard == true)
+            {
+                return;
+            }
+        }
+        i18nAZ.log("enabling...");
+        AEThread2 enableThread = new AEThread2("i18nAZ.enable")
+        {
+            
+            public void run()
+            {
+                Utils.execSWTThread(new AERunnable()
+                {
+                    
+                    public void runSupport()
+                    {
+                        synchronized (View.this.viewCreated)
+                        {
+                            if (View.this.viewCreated.get() == false)
+                            {
+                                return;
+                            }
+                        }
+                        View.this.createTopLevelMenuitem();
+                        View.checkButton(View.this.treeModeButton, TreeTableManager.isTreeMode());
+                        View.checkButton(View.this.redirectKeysFilterButton, FilterManager.getCurrentFilter().redirectKeys);
+                        View.checkButton(View.this.urlsFilterButton, FilterManager.getCurrentFilter().urls, "i18nAZ.image.toolbar.urlsFilter", "i18nAZ.ToolTips.UrlsFilter");
+                        View.checkButton(View.this.emptyFilterButton, FilterManager.getCurrentFilter().empty);
+                        View.checkButton(View.this.unchangedFilterButton, FilterManager.getCurrentFilter().unchanged);
+                        View.checkButton(View.this.extraFilterButton, FilterManager.getCurrentFilter().extra);
+                        View.checkButton(View.this.multilineEditorButton, View.this.multilineEditor);
 
-        this.clipboard = new Clipboard(Display.getCurrent());
+                        View.this.show(View.SHOW_SPLASH_SCREEN);
+                    }
+                });
+                Utils.execSWTThread(new AERunnable()
+                {
+                    
+                    public void runSupport()
+                    {
+                        synchronized (View.this.viewCreated)
+                        {
+                            if (View.this.viewCreated.get() == false)
+                            {
+                                return;
+                            }
+                        }
+                        LangFileObject langFileObject = View.this.fillPluginsCombo();
+                        LocalizablePluginManager.setCurrentLangFile(langFileObject);
 
-        this.display = composite.getDisplay();
+                        View.this.mainChildContainer.getComposite().setRedraw(false);
 
-        SWTSkinObjectContainer MainChildContainer = new SWTSkinObjectContainer(SWTSkinFactory.getInstance(), SWTSkinFactory.getInstance().getSkinProperties(), "i18nAZ.main", "i18nAZ.main", skinObjectContainer);
-        MainChildContainer.setControl(composite);
-        MainChildContainer.getComposite().setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+                        // enable button & combos
+                        View.this.multilineEditorButton.setDisabled(false);
+                        View.this.helpButton.setDisabled(false);
+                        View.this.pluginsCombo.setEnabled(true);
+                        View.this.filesCombo.setEnabled(true);
 
-        SWTSkinObjectContainer HeaderContainer = new SWTSkinObjectContainer(SWTSkinFactory.getInstance(), SWTSkinFactory.getInstance().getSkinProperties(), "i18nAZ.main.header", "i18nAZ.main.header", MainChildContainer);
-        HeaderContainer.getComposite().setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
+                        // fill treetable
+                        i18nAZ.log("fill treetable...");
+                        View.this.updateTreeTable(true, true);
+                        i18nAZ.log("treetable filled !");
+                    }
+                });
+                Util.sleep(500);
+                Utils.execSWTThread(new AERunnable()
+                {
+                    
+                    public void runSupport()
+                    {
+                        synchronized (View.this.viewCreated)
+                        {
+                            if (View.this.viewCreated.get() == false)
+                            {
+                                return;
+                            }
+                        }
+                        // show status label
 
-        SWTSkinObjectContainer ToolBarContainer = (SWTSkinObjectContainer) SWTSkinFactory.getInstance().createSkinObject("mdientry.toolbar.full", "mdientry.toolbar.full", HeaderContainer);
+                        Util.setGridData(View.this.statusLabel, SWT.FILL, SWT.NONE, true, false);
+                        View.this.statusLabel.setVisible(true);
+
+                        // show treetable
+                        View.this.show(View.SHOW_TREETABLE);
+
+                        // start save task
+                        View.this.saveTask.start();
+                    }
+                });
+            }
+        };
+        enableThread.start();
+    }
+
+    private void initializeMainToolBar()
+    {
+        this.headerContainer = new SWTSkinObjectContainer(SWTSkinFactory.getInstance(), SWTSkinFactory.getInstance().getSkinProperties(), "i18nAZ.main.header", "i18nAZ.main.header", this.mainChildContainer);
+        this.headerContainer.getComposite().setVisible(false);
+        Util.setGridData(this.headerContainer.getComposite(), SWT.FILL, SWT.TOP, true, false, SWT.DEFAULT, 0);
+
+        this.toolBarContainer = (SWTSkinObjectContainer) SWTSkinFactory.getInstance().createSkinObject("mdientry.toolbar.full", "mdientry.toolbar.full", this.headerContainer);
 
         Control lastControl = null;
 
         // ADD LANGUAGE BUTTON
-        this.addLanguageButton = this.addButton(ToolBarContainer, "addLanguage", "left", "i18nAZ.image.toolbar.add", "i18nAZ.ToolTips.AddLanguage", 10, lastControl);
+        this.addLanguageButton = this.addButton(this.toolBarContainer, "addLanguage", "left", "i18nAZ.image.toolbar.add", "i18nAZ.ToolTips.AddLanguage", 10, lastControl);
         this.addLanguageButton.addSelectionListener(new ButtonListenerAdapter()
         {
-            @Override
+            
             public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
             {
                 View.this.addLanguage();
             }
         });
-
+        this.addLanguageButton.setDisabled(true);
         lastControl = this.addLanguageButton.getSkinObject().getControl();
-        lastControl = this.addSeparator(ToolBarContainer, lastControl).getControl();
+        lastControl = this.addSeparator(this.toolBarContainer, lastControl).getControl();
 
-        // EXPORT BUTTON
-        this.exportLanguageButton = this.addButton(ToolBarContainer, "exportLanguage", "", "i18nAZ.image.toolbar.export", "i18nAZ.ToolTips.ExportLanguage", 0, lastControl);
-        this.exportLanguageButton.addSelectionListener(new ButtonListenerAdapter()
+        // IMPORT BUTTON
+        this.importLanguageButton = this.addButton(this.toolBarContainer, "importLanguage", "", "i18nAZ.image.toolbar.import", "i18nAZ.ToolTips.ImportLanguage", 0, lastControl);
+        this.importLanguageButton.addSelectionListener(new ButtonListenerAdapter()
         {
-            @Override
+            
             public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
             {
-                View.this.exportLanguage();
+                View.this.importLanguage();
             }
         });
+        this.importLanguageButton.setDisabled(true);
+        lastControl = this.importLanguageButton.getSkinObject().getControl();
+        lastControl = this.addSeparator(this.toolBarContainer, lastControl).getControl();
+
+        // EXPORT BUTTON
+        this.exportLanguageButton = this.addButton(this.toolBarContainer, "exportLanguage", "", "i18nAZ.image.toolbar.export", "i18nAZ.ToolTips.ExportLanguage", 0, lastControl);
+        this.exportLanguageButton.addSelectionListener(new ButtonListenerAdapter()
+        {
+            
+            public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
+            {
+                View.exportLanguage();
+            }
+        });
+        this.exportLanguageButton.setDisabled(true);
         lastControl = this.exportLanguageButton.getSkinObject().getControl();
-        lastControl = this.addSeparator(ToolBarContainer, lastControl).getControl();
+        lastControl = this.addSeparator(this.toolBarContainer, lastControl).getControl();
 
         // REMOVE BUTTON
-        this.removeLanguageButton = this.addButton(ToolBarContainer, "removeLanguage", "right", "image.toolbar.remove", "i18nAZ.ToolTips.RemoveLanguage", 0, lastControl);
+        this.removeLanguageButton = this.addButton(this.toolBarContainer, "removeLanguage", "right", "image.toolbar.remove", "i18nAZ.ToolTips.RemoveLanguage", 0, lastControl);
         this.removeLanguageButton.setDisabled(true);
         this.removeLanguageButton.addSelectionListener(new ButtonListenerAdapter()
         {
-            @Override
+            
             public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
             {
                 View.this.removeLanguage();
@@ -1605,384 +2060,500 @@ class View implements UISWTViewCoreEventListener
 
         // TREE MODE BUTTON
         TreeTableManager.setMode(COConfigurationManager.getBooleanParameter("i18nAZ.treeMode"));
-        this.treeModeButton = this.addButton(ToolBarContainer, "treeMode", TreeTableManager.isTreeMode(), "left", "i18nAZ.image.toolbar.treeMode", "i18nAZ.ToolTips.TreeMode", 10, lastControl);
+        this.treeModeButton = this.addButton(this.toolBarContainer, "treeMode", false, "left", "i18nAZ.image.toolbar.treeMode", "i18nAZ.ToolTips.TreeMode", 10, lastControl);
         this.treeModeButton.addSelectionListener(new ButtonListenerAdapter()
         {
-            @Override
+            
             public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
             {
                 TreeTableManager.getCurrent().setFocus();
 
-                TreeTableManager.setMode((boolean) buttonUtility.getSkinObject().getData("checked"));
+                TreeTableManager.setMode((Boolean) buttonUtility.getSkinObject().getData("checked"));
+
                 View.this.updateTreeTable(false);
                 COConfigurationManager.setParameter("i18nAZ.treeMode", TreeTableManager.isTreeMode());
                 COConfigurationManager.save();
             }
         });
+        this.treeModeButton.setDisabled(true);
         lastControl = this.treeModeButton.getSkinObject().getControl();
-        lastControl = this.addSeparator(ToolBarContainer, lastControl).getControl();
+        lastControl = this.addSeparator(this.toolBarContainer, lastControl).getControl();
 
         // SHOW REF BUTTON
-        this.redirectKeysFilter = COConfigurationManager.getBooleanParameter("i18nAZ.redirectKeysFilter");
-        this.redirectKeysFilterButton = this.addButton(ToolBarContainer, "redirectKeysFilter", this.redirectKeysFilter, "", "i18nAZ.image.toolbar.redirectKeysFilter", "i18nAZ.ToolTips.RedirectKeysFilter", 0, lastControl);
+        this.redirectKeysFilterButton = this.addButton(this.toolBarContainer, "redirectKeysFilter", false, "", "i18nAZ.image.toolbar.redirectKeysFilter", "i18nAZ.ToolTips.RedirectKeysFilter", 0, lastControl);
         this.redirectKeysFilterButton.addSelectionListener(new ButtonListenerAdapter()
         {
-            @Override
+            
             public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
             {
                 TreeTableManager.getCurrent().setFocus();
-                View.this.extraFilterExcludedKey.clear();
-                View.this.redirectKeysFilter = (boolean) buttonUtility.getSkinObject().getData("checked");
-                View.this.updateTreeTable();
-                COConfigurationManager.setParameter("i18nAZ.redirectKeysFilter", View.this.redirectKeysFilter);
+                View.this.setRedirectKeysFilter((Boolean) buttonUtility.getSkinObject().getData("checked"));
+                COConfigurationManager.setParameter("i18nAZ.redirectKeysFilter", FilterManager.getCurrentFilter().redirectKeys);
                 COConfigurationManager.save();
+                View.this.updateTreeTable();
             }
         });
+        this.redirectKeysFilterButton.setDisabled(true);
         lastControl = this.redirectKeysFilterButton.getSkinObject().getControl();
-        lastControl = this.addSeparator(ToolBarContainer, lastControl).getControl();
+        lastControl = this.addSeparator(this.toolBarContainer, lastControl).getControl();
 
         // SHOW URL BUTTON
-        this.urlsFilter = COConfigurationManager.getIntParameter("i18nAZ.urlsFilter", 0);
-        this.urlsFilterButton = this.addButton(ToolBarContainer, "urlsFilter", this.urlsFilter != 0, "right", "i18nAZ.image.toolbar.urlsFilter" + (this.urlsFilter == 2 ? "On" : (this.urlsFilter == 1 ? "Off" : "")), "i18nAZ.ToolTips.UrlsFilter", 0, lastControl);
-        View.this.setUrlsFilterState(this.urlsFilter);
+        this.urlsFilterButton = this.addButton(this.toolBarContainer, "urlsFilter", false, "right", "i18nAZ.image.toolbar.urlsFilter" + (FilterManager.getCurrentFilter().urls == 2 ? "On" : (FilterManager.getCurrentFilter().urls == 1 ? "Off" : "")), "i18nAZ.ToolTips.UrlsFilter", 0, lastControl);
         this.urlsFilterButton.addSelectionListener(new ButtonListenerAdapter()
         {
-            @Override
+            
             public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
             {
-                View.this.setUrlsFilterState();
+                TreeTableManager.getCurrent().setFocus();
+                switch (FilterManager.getCurrentFilter().urls)
+                {
+                    case 0:
+                        View.this.setUrlsFilterState(1);
+                        break;
+                    case 1:
+                        View.this.setUrlsFilterState(2);
+                        break;
+                    case 2:
+                        View.this.setUrlsFilterState(0);
+                        break;
+                }
+                COConfigurationManager.setParameter("i18nAZ.urlsFilter", FilterManager.getCurrentFilter().urls);
+                COConfigurationManager.save();
+                View.this.updateTreeTable();
             }
         });
+        this.urlsFilterButton.setDisabled(true);
         lastControl = this.urlsFilterButton.getSkinObject().getControl();
 
         // EMPTY FILTER BUTTTON
-        this.emptyFilter = COConfigurationManager.getBooleanParameter("i18nAZ.emptyFilter");
-        this.emptyFilterButton = this.addButton(ToolBarContainer, "emptyFilter", this.emptyFilter, "left", "i18nAZ.image.toolbar.emptyFilter", "i18nAZ.ToolTips.EmptyFilter", 10, lastControl);
+        this.emptyFilterButton = this.addButton(this.toolBarContainer, "emptyFilter", false, "left", "i18nAZ.image.toolbar.emptyFilter", "i18nAZ.ToolTips.EmptyFilter", 10, lastControl);
         this.emptyFilterButton.addSelectionListener(new ButtonListenerAdapter()
         {
-            @Override
+            
             public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
             {
                 TreeTableManager.getCurrent().setFocus();
-
-                View.this.setEmptyFilter((boolean) buttonUtility.getSkinObject().getData("checked"));
+                View.this.setEmptyFilter((Boolean) buttonUtility.getSkinObject().getData("checked"));
+                COConfigurationManager.setParameter("i18nAZ.emptyFilter", FilterManager.getCurrentFilter().empty);
+                COConfigurationManager.save();
                 View.this.updateTreeTable();
             }
         });
+        this.emptyFilterButton.setDisabled(true);
         lastControl = this.emptyFilterButton.getSkinObject().getControl();
-        lastControl = this.addSeparator(ToolBarContainer, lastControl).getControl();
+        lastControl = this.addSeparator(this.toolBarContainer, lastControl).getControl();
 
         // UNCHANGED FILTER BUTTTON
-        this.unchangedFilter = COConfigurationManager.getBooleanParameter("i18nAZ.unchangedFilter");
-        this.unchangedFilterButton = this.addButton(ToolBarContainer, "unchangedFilter", this.unchangedFilter, "", "i18nAZ.image.toolbar.unchangedFilter", "i18nAZ.ToolTips.UnchangedFilter", 0, lastControl);
+        this.unchangedFilterButton = this.addButton(this.toolBarContainer, "unchangedFilter", false, "", "i18nAZ.image.toolbar.unchangedFilter", "i18nAZ.ToolTips.UnchangedFilter", 0, lastControl);
         this.unchangedFilterButton.addSelectionListener(new ButtonListenerAdapter()
         {
-            @Override
+            
             public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
             {
                 TreeTableManager.getCurrent().setFocus();
-
-                View.this.setUnchangedFilter((boolean) buttonUtility.getSkinObject().getData("checked"));
+                View.this.setUnchangedFilter((Boolean) buttonUtility.getSkinObject().getData("checked"));
+                COConfigurationManager.setParameter("i18nAZ.unchangedFilter", FilterManager.getCurrentFilter().unchanged);
+                COConfigurationManager.save();
                 View.this.updateTreeTable();
             }
         });
+        this.unchangedFilterButton.setDisabled(true);
         lastControl = this.unchangedFilterButton.getSkinObject().getControl();
-        lastControl = this.addSeparator(ToolBarContainer, lastControl).getControl();
+        lastControl = this.addSeparator(this.toolBarContainer, lastControl).getControl();
 
         // EXTRA FILTER BUTTTON
-        this.extraFilter = COConfigurationManager.getBooleanParameter("i18nAZ.extraFilter");
-        this.extraFilterButton = this.addButton(ToolBarContainer, "extraFilter", this.extraFilter, "right", "i18nAZ.image.toolbar.extraFilter", "i18nAZ.ToolTips.ExtraFilter", 0, lastControl);
+        this.extraFilterButton = this.addButton(this.toolBarContainer, "extraFilter", false, "right", "i18nAZ.image.toolbar.extraFilter", "i18nAZ.ToolTips.ExtraFilter", 0, lastControl);
         this.extraFilterButton.addSelectionListener(new ButtonListenerAdapter()
         {
-            @Override
+            
             public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
             {
                 TreeTableManager.getCurrent().setFocus();
 
-                View.this.setExtraFilter((boolean) buttonUtility.getSkinObject().getData("checked"));
+                View.this.setExtraFilter((Boolean) buttonUtility.getSkinObject().getData("checked"));
+                COConfigurationManager.setParameter("i18nAZ.extraFilter", FilterManager.getCurrentFilter().extra);
+                COConfigurationManager.save();
                 View.this.updateTreeTable();
             }
         });
+        this.extraFilterButton.setDisabled(true);
         lastControl = this.extraFilterButton.getSkinObject().getControl();
 
         // MULTILINE EDITOR BUTTON
-        this.multilineEditor = COConfigurationManager.getBooleanParameter("i18nAZ.multilineEditor");
-        this.multilineEditorButton = this.addButton(ToolBarContainer, "multilineEditor", this.multilineEditor, "all", "i18nAZ.image.toolbar.multilineEditor", "i18nAZ.ToolTips.MultilineEditor", 10, lastControl);
+        this.multilineEditorButton = this.addButton(this.toolBarContainer, "multilineEditor", false, "left", "i18nAZ.image.toolbar.multilineEditor", "i18nAZ.ToolTips.MultilineEditor", 10, lastControl);
         this.multilineEditorButton.addSelectionListener(new ButtonListenerAdapter()
         {
-            @Override
+            
             public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
             {
-                String odlValue = null;
+                String oldValue = null;
+                Point selection = View.this.editorStyledText.getSelection();
+
                 if (View.this.editorStyledText.getVisible() == true)
                 {
-                    odlValue = View.this.editorStyledText.getText();
+                    oldValue = View.this.editorStyledText.getText();
                     if (View.this.multilineEditor == true)
                     {
-                        odlValue = Util.escape(odlValue, false);
+                        oldValue = Util.escape(oldValue, false);
+                    }
+                    else
+                    {
+                        int offset = 0;
+                        String[] result = new String[2];
+                        while ((offset = Util.findEscape(oldValue, offset, result)) != -1)
+                        {
+                            if (selection.x >= offset)
+                            {
+                                selection.x -= result[1].length() - 1;
+                            }
+                            if (selection.y >= offset)
+                            {
+                                selection.y -= result[1].length() - 1;
+                            }
+                            offset += result[0].length();
+                        }
                     }
                 }
-                View.this.multilineEditor = (boolean) buttonUtility.getSkinObject().getData("checked");
+                View.this.multilineEditor = (Boolean) buttonUtility.getSkinObject().getData("checked");
                 COConfigurationManager.setParameter("i18nAZ.multilineEditor", View.this.multilineEditor);
                 COConfigurationManager.save();
 
                 ToolTipText.set(View.this.validateToolItem, "i18nAZ.ToolTips.Validate" + ((View.this.multilineEditor == true) ? "" : ".Shortcut"));
 
                 View.this.updateStyledTexts();
-                if (odlValue != null)
+                if (oldValue != null)
                 {
                     if (View.this.multilineEditor == true)
                     {
-                        odlValue = Util.unescape(odlValue);
+                        oldValue = Util.unescape(oldValue);
                     }
-                    View.this.editorStyledText.setText(odlValue);
+                    else
+                    {
+                        int offset = 0;
+                        String[] result = new String[2];
+                        while ((offset = Util.findEscape(oldValue, offset, result)) != -1)
+                        {
+                            if (selection.x >= offset)
+                            {
+                                selection.x += result[1].length() - 1;
+                            }
+                            if (selection.y >= offset)
+                            {
+                                selection.y += result[1].length() - 1;
+                            }
+                            offset += result[0].length();
+                        }
+                    }
+                    View.this.editorStyledText.setText(oldValue);
                 }
+                View.this.editorStyledText.setSelection(selection);
+
             }
         });
+        this.multilineEditorButton.setDisabled(true);
         lastControl = this.multilineEditorButton.getSkinObject().getControl();
+        lastControl = this.addSeparator(this.toolBarContainer, lastControl).getControl();
 
-        // HELP BUTTON
-        this.helpButton = this.addButton(ToolBarContainer, "help", "all", "i18nAZ.image.toolbar.help", "i18nAZ.ToolTips.Help", 10, lastControl);
-        this.helpButton.addSelectionListener(new ButtonListenerAdapter()
+        // SPELLCHECKER BUTTON
+        this.spellCheckerButton = this.addButton(this.toolBarContainer, "spellChecker", "right", "i18nAZ.image.toolbar.spellChecker", "i18nAZ.ToolTips.SpellChecker", 0, lastControl);
+        this.spellCheckerButton.addSelectionListener(new ButtonListenerAdapter()
         {
-            @Override
+            
             public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
             {
-                String helpText = "";
-                String helpFullPath = "readme/readme_" + View.this.getPluginInterface().getUtilities().getLocaleUtilities().getCurrentLocale().toLanguageTag().replace('-', '_') + ".txt";
-                InputStream stream = View.this.getPluginInterface().getPluginClassLoader().getResourceAsStream(helpFullPath);
-                if (stream == null)
-                {
-                    helpFullPath = "readme/readme.txt";
-                    stream = View.this.getPluginInterface().getPluginClassLoader().getResourceAsStream(helpFullPath);
-                }
-                if (stream == null)
-                {
-                    helpText = "Error loading resource: " + helpFullPath;
-                }
-                else
-                {
-                    try
-                    {
-                        helpText = Util.readInputStreamAsString(stream, 65535, "utf8");
-                        stream.close();
-                    }
-                    catch (IOException e)
-                    {
-                        e.printStackTrace();
-                    }
-                }
+                View.this.valid(false, false);
 
-                // create shell
-                Shell shell = new Shell(SWTSkinFactory.getInstance().getShell().getShell(), SWT.DIALOG_TRIM | SWT.APPLICATION_MODAL);
-                shell.setImages(SWTSkinFactory.getInstance().getShell().getShell().getImages());
-                shell.setLayout(new FillLayout());
-                shell.setText(View.this.getLocalisedMessageText("i18nAZ.Titles.Help"));
-
-                // add help text
-                Label bannerLabel = new Label(shell, SWT.NULL);
-                bannerLabel.setImage(View.this.imageLoader.getImage("i18nAZ.image.banner"));
-
-                // add help text
-                Text helpLabel = new Text(shell, SWT.WRAP | SWT.MULTI | SWT.V_SCROLL);
-                helpLabel.setText(helpText);
-                helpLabel.setEditable(false);
-
-                // set shell size
-                shell.setSize(640, 480);
-
-                // open shell and center it to parent
-                Util.openShell(SWTSkinFactory.getInstance().getShell().getShell(), shell);
+                View.this.spellCheck();                
             }
         });
+        this.spellCheckerButton.setDisabled(true);
+        lastControl = this.spellCheckerButton.getSkinObject().getControl();
+
+        // HELP BUTTON
+        this.helpButton = this.addButton(this.toolBarContainer, "help", "all", "i18nAZ.image.toolbar.help", "i18nAZ.ToolTips.Help", 10, lastControl);
+        this.helpButton.addSelectionListener(new ButtonListenerAdapter()
+        {
+            
+            public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
+            {
+                HelpDialog.show();
+            }
+        });
+        this.helpButton.setDisabled(true);
         lastControl = this.helpButton.getSkinObject().getControl();
 
         // SEARCH TEXTBOX
-        this.regexSearch = COConfigurationManager.getBooleanParameter("i18nAZ.RegexSearch");
-        this.searchTextbox = (SWTSkinObjectTextbox) SWTSkinFactory.getInstance().createSkinObject("i18nAZ.main.header.search", "i18nAZ.main.header.search", ToolBarContainer);
+        this.searchTextbox = (SWTSkinObjectTextbox) SWTSkinFactory.getInstance().createSkinObject("i18nAZ.main.header.search", "i18nAZ.main.header.search", this.toolBarContainer);
         ToolTipText.set(this.searchTextbox.getTextControl(), "i18nAZ.ToolTips.Search");
-        this.searchTextbox.getTextControl().setBackground(Display.getCurrent().getSystemColor(this.regexSearch == true ? SWT.COLOR_INFO_BACKGROUND : SWT.COLOR_WIDGET_BACKGROUND));
+        this.searchTextbox.getTextControl().setBackground(Display.getCurrent().getSystemColor(FilterManager.getCurrentFilter().isRegexEnabled() == true ? SWT.COLOR_INFO_BACKGROUND : SWT.COLOR_WIDGET_BACKGROUND));
         this.searchTextbox.getTextControl().addModifyListener(new ModifyListener()
         {
-            @Override
+            
             public void modifyText(ModifyEvent e)
             {
+                boolean result = false;
                 if (View.this.searchTextbox.getText().equals("") == true)
                 {
-                    View.this.setSearch(null);
+                    result = FilterManager.getCurrentFilter().clearText();
+                }
+                if (result == true)
+                {
+                    View.this.updateTreeTable();
                 }
             }
         });
         this.searchTextbox.getTextControl().addKeyListener(new KeyAdapter()
         {
-            @Override
-            public void keyReleased(KeyEvent e)
-            {
-            }
-
-            @Override
+            
             public void keyPressed(KeyEvent e)
             {
                 if (e.stateMask == SWT.CTRL && e.keyCode == 'x')
                 {
-                    View.this.regexSearch = View.this.regexSearch == false;
-                    COConfigurationManager.setParameter("i18nAZ.RegexSearch", View.this.regexSearch);
+                    FilterManager.getCurrentFilter().setRegexEnabled(FilterManager.getCurrentFilter().isRegexEnabled() == false);
+                    COConfigurationManager.setParameter("i18nAZ.RegexSearch", FilterManager.getCurrentFilter().isRegexEnabled());
                     COConfigurationManager.save();
-                    View.this.searchTextbox.getTextControl().setBackground(Display.getCurrent().getSystemColor(View.this.regexSearch == true ? SWT.COLOR_INFO_BACKGROUND : SWT.COLOR_WHITE));
+                    View.this.searchTextbox.getTextControl().setBackground(Display.getCurrent().getSystemColor(FilterManager.getCurrentFilter().isRegexEnabled() == true ? SWT.COLOR_INFO_BACKGROUND : SWT.COLOR_WHITE));
                 }
             }
         });
-        this.searchTextbox.getTextControl().addSelectionListener(new SelectionListener()
+        this.searchTextbox.getTextControl().addSelectionListener(new SelectionAdapter()
         {
-            @Override
+            
             public void widgetDefaultSelected(SelectionEvent e)
             {
-                if ((e.detail & SWT.CANCEL) != 0)
+                boolean result = false;
+                if (View.this.searchTextbox.getText().equals("") == true || (e.detail & SWT.CANCEL) != 0)
                 {
-                    View.this.setSearch(null);
+                    result = FilterManager.getCurrentFilter().clearText();
                 }
                 else
                 {
-                    View.this.setSearch(View.this.searchTextbox.getText());
+                    result = FilterManager.getCurrentFilter().setText(View.this.searchTextbox.getText());
+                }
+                if (result == true)
+                {
+                    View.this.updateTreeTable();
                 }
             }
-
-            @Override
-            public void widgetSelected(SelectionEvent e)
+        });
+        this.searchTextbox.getTextControl().addFocusListener(new FocusAdapter()
+        {
+            
+            public void focusLost(FocusEvent e)
             {
-
+                boolean result = false;
+                if (View.this.searchTextbox.getText().equals("") == true)
+                {
+                    result = FilterManager.getCurrentFilter().clearText();
+                }
+                else
+                {
+                    result = FilterManager.getCurrentFilter().setText(View.this.searchTextbox.getText());
+                }
+                if (result == true)
+                {
+                    View.this.updateTreeTable();
+                }
             }
         });
+        this.searchTextbox.getControl().setEnabled(false);
 
         // INFO TEXT
-        this.infoText = (SWTSkinObjectText2) SWTSkinFactory.getInstance().createSkinObject("i18nAZ.main.header.info", "i18nAZ.main.header.info", ToolBarContainer);
+        this.infoText = (SWTSkinObjectText2) SWTSkinFactory.getInstance().createSkinObject("i18nAZ.main.header.info", "i18nAZ.main.header.info", this.toolBarContainer);
         FormData formData = (FormData) this.infoText.getControl().getLayoutData();
         formData.left = new FormAttachment(lastControl, 10);
+    }
 
-        SWTSkinObjectContainer AreaContainer = new SWTSkinObjectContainer(SWTSkinFactory.getInstance(), SWTSkinFactory.getInstance().getSkinProperties(), "i18nAZ.main.area", "i18nAZ.main.area", MainChildContainer);
-        AreaContainer.getComposite().setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+    private void initializeTableCombos()
+    {
+        this.pluginComposite = Util.getNewComposite(this.areaContainer.getComposite(), SWT.NULL, 2, SWT.FILL, SWT.NULL, true, false, 0);
+        this.pluginComposite.setVisible(false);
 
-        GridLayout gridLayout = null;
-
-        AreaContainer.getComposite().setLayout(new GridLayout(1, false));
-
-        Composite pluginComposite = new Composite(AreaContainer.getComposite(), SWT.NULL);
-        gridLayout = new GridLayout(2, false);
-        gridLayout.verticalSpacing = 0;
-        gridLayout.horizontalSpacing = 0;
-        gridLayout.marginHeight = 0;
-        gridLayout.marginWidth = 0;
-        pluginComposite.setLayout(gridLayout);
-        pluginComposite.setLayoutData(new GridData(SWT.FILL, SWT.NULL, true, false));
-
-        Label pluginsLabel = new Label(pluginComposite, SWT.NULL);
-        pluginsLabel.setLayoutData(new GridData(SWT.RIGHT, SWT.CENTER, true, false));
-        pluginsLabel.setText(this.getLocalisedMessageText("i18nAZ.Labels.Plugins"));
-
-        this.pluginsCombo = new Combo(pluginComposite, SWT.READ_ONLY);
-        GridData gridData = new GridData(SWT.FILL, SWT.NULL, false, false);
-        gridData.widthHint = 200;
-        this.pluginsCombo.setLayoutData(gridData);
+        this.pluginsCombo = new TableCombo(this.pluginComposite, SWT.BORDER | SWT.READ_ONLY);
+        Util.setGridData(this.pluginsCombo, SWT.FILL, SWT.NONE, false, false, 300, SWT.DEFAULT);
+        Util.setCustomHotColor(this.pluginsCombo.getTable());
         this.pluginsCombo.setCursor(new org.eclipse.swt.graphics.Cursor(Display.getCurrent(), SWT.CURSOR_HAND));
-        String PluginSelected = "";
-        if (COConfigurationManager.hasParameter("i18nAZ.PluginSelected", true))
+        this.pluginsCombo.defineColumns(new int[] { SWT.DEFAULT, 30, 60 }, new int[] { SWT.NULL, SWT.RIGHT, SWT.RIGHT });
+        this.pluginsCombo.addSelectionListener(new SelectionAdapter()
         {
-            PluginSelected = COConfigurationManager.getStringParameter("i18nAZ.PluginSelected");
-        }
-        int PluginSelectedIndex = 0;
-        this.selectedPluginInterface = null;
-        this.pluginInterfaces = Util.getPluginInterfaces();
-        for (int i = 0; i < this.pluginInterfaces.length; i++)
-        {
-            String PluginKey = "";
-            String PluginName = AZUREUS_PLUGIN_NAME;
-            PluginInterface pluginInterface = this.pluginInterfaces[i];
-            if (pluginInterface != null)
-            {
-                Properties PluginProperties = pluginInterface.getPluginProperties();
-                PluginKey = PluginProperties.getProperty("plugin.id") + "_" + PluginProperties.getProperty("plugin.version");
-                String LocalizedKey = "Views.plugins." + PluginProperties.getProperty("plugin.id") + ".title";
-                if (this.getPluginInterface().getUtilities().getLocaleUtilities().hasLocalisedMessageText(LocalizedKey) == true)
-                {
-                    PluginName = this.getLocalisedMessageText(LocalizedKey);
-                }
-                else
-                {
-                    PluginName = pluginInterface.getPluginName();
-                }
-            }
-            this.pluginsCombo.add(PluginName);
-            if (PluginKey.equals(PluginSelected))
-            {
-                PluginSelectedIndex = i;
-                this.selectedPluginInterface = pluginInterface;
-            }
-        }
-        this.pluginsCombo.select(PluginSelectedIndex);
-        this.pluginsCombo.addSelectionListener(new SelectionListener()
-        {
-            @Override
+            
             public void widgetSelected(SelectionEvent e)
             {
-                PluginInterface pluginInterface = View.this.pluginInterfaces[View.this.pluginsCombo.getSelectionIndex()];
-                String pluginKey = "";
-                if (pluginInterface != null)
+                LocalizablePlugin localizablePlugin = (LocalizablePlugin) View.this.pluginsCombo.getTable().getItem(View.this.pluginsCombo.getSelectionIndex()).getData();
+                String[] block = COConfigurationManager.getStringParameter("i18nAZ.FileSelectedId").split("!", 2);
+                String pluginSelectedId = block[0];
+                if (localizablePlugin.getId().equals(pluginSelectedId) == false)
                 {
-                    Properties pluginProperties = pluginInterface.getPluginProperties();
-                    pluginKey = pluginProperties.getProperty("plugin.id") + "_" + pluginProperties.getProperty("plugin.version");
+                    TreeTableManager.savePosition();
+                    LangFileObject langFileObject = View.this.fillFilesCombo(localizablePlugin);
+                    if (LocalizablePluginManager.setCurrentLangFile(langFileObject) == true)
+                    {
+                        View.this.updateTreeTable(false, false);
+                    }
                 }
-                COConfigurationManager.setParameter("i18nAZ.PluginSelected", pluginKey);
-                COConfigurationManager.save();
-                View.this.selectedPluginInterface = pluginInterface;
-                View.this.updateTreeTable(true, true);
             }
+        });
+        this.pluginsCombo.setEnabled(false);
 
-            @Override
-            public void widgetDefaultSelected(SelectionEvent e)
+        this.filesCombo = new TableCombo(this.pluginComposite, SWT.BORDER | SWT.READ_ONLY);
+        Util.setGridData(this.filesCombo, SWT.FILL, SWT.NONE, true, false);
+        Util.setCustomHotColor(this.filesCombo.getTable());
+        this.filesCombo.setCursor(new org.eclipse.swt.graphics.Cursor(Display.getCurrent(), SWT.CURSOR_HAND));
+        this.filesCombo.defineColumns(new int[] { SWT.DEFAULT, 60 }, new int[] { SWT.NULL, SWT.RIGHT });
+        this.filesCombo.addSelectionListener(new SelectionAdapter()
+        {
+            
+            public void widgetSelected(SelectionEvent e)
             {
-                this.widgetSelected(e);
+                LangFileObject langFileObject = LocalizablePluginManager.getCurrentLangFile().getParent().toArray()[View.this.filesCombo.getSelectionIndex()];
+                if (langFileObject.getId().equals(COConfigurationManager.getStringParameter("i18nAZ.FileSelectedId")) == false)
+                {
+                    COConfigurationManager.setParameter("i18nAZ.FileSelectedId", langFileObject.getId());
+                    COConfigurationManager.save();
+                    TreeTableManager.savePosition();
+                    LocalizablePluginManager.setCurrentLangFile(langFileObject);
+                    View.this.updateTreeTable(false, false);
+                }
+            }
+        });
+        this.filesCombo.setEnabled(false);
+
+    }
+
+    private void initializeLoadingComposite()
+    {
+        this.loadingComposite = Util.getNewComposite(this.areaContainer.getComposite(), SWT.NONE, 1, SWT.CENTER, SWT.CENTER, false, false, 0);
+        this.loadingComposite.setVisible(false);
+
+        // Create sub composite
+        this.loadingSubComposite = Util.getNewComposite(this.loadingComposite, SWT.NONE, 2, SWT.CENTER, SWT.BOTTOM, true, true);
+
+        // Create banner label
+        this.bannerLabel = new Label(this.loadingSubComposite, SWT.NONE);
+        this.bannerLabel.setImage(i18nAZ.viewInstance.getImageLoader().getImage("i18nAZ.image.banner"));
+        Util.setGridData(this.bannerLabel, SWT.RIGHT, SWT.BOTTOM, true, true, 0);
+
+        // Create animated loading canvas
+        this.animatedCanvas = new AnimatedCanvas(this.loadingSubComposite, SWT.NONE);
+        this.animatedCanvas.setImageID("i18nAZ.image.loading");
+        Util.setGridData(this.animatedCanvas, SWT.LEFT, SWT.BOTTOM, true, true, 0, 0);
+
+        // Create progress bar
+        this.progressLabel = new Label(this.loadingComposite, SWT.NONE);
+        this.updateProgressBar();
+        Util.setGridData(this.progressLabel, SWT.FILL, SWT.TOP, true, true, SWT.DEFAULT, 0, 30, 0, 2, 1);
+
+        // Create message label
+        this.loadingMessageLabel = new Label(this.loadingComposite, SWT.NONE);
+        this.updateLoadingMessage();
+        this.loadingMessageLabel.setForeground(this.loadingMessageLabel.getDisplay().getSystemColor(SWT.COLOR_DARK_GRAY));
+        this.loadingMessageLabel.setFont(new Font(this.loadingMessageLabel.getDisplay(), this.loadingMessageLabel.getFont().getFontData()[0].getName(), 8, SWT.NORMAL));
+
+        Util.setGridData(this.loadingMessageLabel, SWT.LEFT, SWT.TOP, 2, 1);
+    }
+
+    private void initializeWizardComposite()
+    {
+        // create composite
+        this.wizardComposite = new Composite(this.areaContainer.getComposite(), SWT.NONE);
+        Util.setGridData(this.wizardComposite, SWT.FILL, SWT.FILL, true, false);
+        GridLayout gridLayout = new GridLayout(2, false);
+        gridLayout.verticalSpacing = 0;
+        this.wizardComposite.setLayout(gridLayout);
+        this.wizardComposite.setVisible(false);
+
+        Util.setGridData(this.wizardComposite, SWT.FILL, SWT.FILL, true, false, 0);
+
+        // create label
+        Label label = new Label(this.wizardComposite, SWT.NULL);
+        label.setImage(i18nAZ.viewInstance.getImageLoader().getImage("i18nAZ.image.logo_48"));
+        Util.setGridData(label, SWT.FILL, SWT.CENTER, false, false, 60, 60);
+
+        // create label
+        label = new Label(this.wizardComposite, SWT.NULL);
+        label.setText(i18nAZ.getLocalisedMessageText("i18nAZ.Titles.Wizard"));
+        label.setFont(new Font(null, "Segoe UI Light", 20, SWT.NORMAL));
+        label.setForeground(this.display.getSystemColor(SWT.COLOR_DARK_GRAY));
+        Util.setGridData(label, SWT.LEFT, SWT.CENTER, true, false);
+
+        // create separator
+        label = new Label(this.wizardComposite, SWT.SEPARATOR | SWT.HORIZONTAL);
+        Util.setGridData(label, SWT.FILL, SWT.FILL, true, false, SWT.DEFAULT, 0, SWT.DEFAULT, 0, 2, 1);
+
+        // create composite
+        Composite composite = new Composite(this.wizardComposite, SWT.NONE);
+        composite.setBackground(this.display.getSystemColor(SWT.COLOR_WHITE));
+        composite.setLayout(new GridLayout(1, false));
+        Util.setGridData(composite, SWT.FILL, SWT.FILL, true, true, SWT.DEFAULT, 0, SWT.DEFAULT, 0, 2, 1);
+
+        // create label
+        label = new Label(composite, SWT.NULL);
+        label.setFont(new Font(null, "Segoe UI Light", 11, SWT.NORMAL));
+        label.setText(i18nAZ.getLocalisedMessageText("i18nAZ.Messages.Wizard"));
+        Util.setGridData(label, SWT.CENTER, SWT.CENTER, true, true);
+
+        // create separator
+        label = new Label(this.wizardComposite, SWT.SEPARATOR | SWT.HORIZONTAL);
+        Util.setGridData(label, SWT.FILL, SWT.FILL, true, false, SWT.DEFAULT, 0, SWT.DEFAULT, 0, 2, 1);
+
+        // create composite
+        composite = new Composite(this.wizardComposite, SWT.NONE);
+        composite.setLayout(new GridLayout(2, false));
+        Util.setGridData(composite, SWT.FILL, SWT.FILL, true, false, SWT.DEFAULT, 0, 70, 0, 2, 1);
+
+        // Create button label
+        this.wizardButton = new Button(composite, SWT.NULL);
+        this.wizardButton.setText(i18nAZ.getLocalisedMessageText("i18nAZ.Buttons.Next"));
+        this.wizardButton.addSelectionListener(new SelectionAdapter()
+        {
+
+            
+            public void widgetSelected(SelectionEvent e)
+            {
+                synchronized (View.this.wizard)
+                {
+                    /*
+                     * View.this.wizard = false; View.this.wizardComposite.setVisible(true); Util.setGridData(View.this.wizardComposite, SWT.CENTER, SWT.CENTER, true, false, 0);
+                     * 
+                     * View.this.loadingComposite.setVisible(true); Util.setGridData(View.this.loadingComposite, SWT.CENTER, SWT.CENTER, true, true);
+                     * 
+                     * Util.redraw(View.this.loadingComposite); View.this.startInitialization();
+                     */
+                }
+            }
+        });
+        Util.setGridData(this.wizardButton, SWT.RIGHT, SWT.CENTER, true, true, 100, SWT.DEFAULT);
+
+        // create cancel button
+        Button cancelButton = new Button(composite, SWT.PUSH);
+        cancelButton.setText(i18nAZ.getLocalisedMessageText("Button.cancel"));
+        Util.setGridData(cancelButton, SWT.RIGHT, SWT.CENTER, false, true, 100, SWT.DEFAULT);
+        cancelButton.addListener(SWT.Selection, new Listener()
+        {
+            
+            public void handleEvent(Event event)
+            {
             }
         });
 
-        TreeTableManager.initTreeTable(AreaContainer);
+    }
 
-        // Create info composite
-        Composite infoComposite = new Composite(AreaContainer.getComposite(), SWT.NULL);
-        gridLayout = new GridLayout(1, false);
-        gridLayout.verticalSpacing = 0;
-        gridLayout.horizontalSpacing = 0;
-        gridLayout.marginHeight = 0;
-        gridLayout.marginWidth = 0;
-        infoComposite.setLayout(gridLayout);
-
-        gridData = new GridData(SWT.FILL, SWT.NULL, true, false);
-        // gridData.heightHint = 0;
-        infoComposite.setLayoutData(gridData);
-
-        // Create info styled text composite
-        Composite infoStyledTextComposite = new Composite(infoComposite, SWT.BORDER);
-        infoStyledTextComposite.setBackground(Display.getCurrent().getSystemColor(SWT.COLOR_INFO_BACKGROUND));
-        gridData = new GridData(SWT.FILL, SWT.FILL, true, false);
-        infoStyledTextComposite.setLayout(new GridLayout(1, false));
-        infoStyledTextComposite.setLayoutData(gridData);
-
-        // Create info styled text
-        this.infoStyledText = new StyledText(infoStyledTextComposite, SWT.WRAP | SWT.MULTI);
+    private void initializeInfoLabel()
+    {
+        this.infoStyledText = new StyledText(this.footerComposite, SWT.BORDER | SWT.WRAP | SWT.MULTI);
+        this.infoStyledText.setMargins(5, 5, 5, 5);
         this.infoStyledText.setBackground(Display.getCurrent().getSystemColor(SWT.COLOR_INFO_BACKGROUND));
         this.infoStyledText.setFont(new Font(null, this.infoStyledText.getFont().getFontData()[0].getName(), 8, SWT.NORMAL));
         this.infoStyledText.setEditable(false);
-        this.infoStyledText.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
-        this.addLinkManager(this.infoStyledText, true);
+        Util.setGridData(this.infoStyledText, SWT.FILL, SWT.FILL, true, true, 0);
+        Util.addLinkManager(this.infoStyledText, true, false);
 
-        Composite toolBarComposite = new Composite(infoComposite, SWT.NULL);
-        RowLayout rowLayout = new RowLayout(SWT.NULL);
-        toolBarComposite.setLayout(rowLayout);
-        gridData = new GridData(SWT.FILL, SWT.FILL, true, false);
-        gridData.heightHint = 0;
-        toolBarComposite.setLayoutData(gridData);
-        toolBarComposite.setVisible(false);
+    }
 
-        this.toolBar = new ToolBar(toolBarComposite, SWT.FLAT);
+    private void initializeEditorToolBar()
+    {
+        this.toolBar = new ToolBar(this.footerComposite, SWT.FLAT);
+        Util.setGridData(this.toolBar, SWT.FILL, SWT.FILL, true, false, 0);
         this.toolBar.setFont(new Font(null, "Times New Roman", 11, SWT.NORMAL));
         ToolTipText.config(this.toolBar);
 
@@ -1991,7 +2562,7 @@ class View implements UISWTViewCoreEventListener
         ToolTipText.set(this.undoToolItem, "i18nAZ.ToolTips.Undo");
         this.undoToolItem.addSelectionListener(new SelectionAdapter()
         {
-            @Override
+            
             public void widgetSelected(SelectionEvent e)
             {
                 View.this.undoRedo.undo();
@@ -2004,7 +2575,7 @@ class View implements UISWTViewCoreEventListener
         ToolTipText.set(this.redoToolItem, "i18nAZ.ToolTips.Redo");
         this.redoToolItem.addSelectionListener(new SelectionAdapter()
         {
-            @Override
+            
             public void widgetSelected(SelectionEvent e)
             {
                 View.this.undoRedo.redo();
@@ -2019,7 +2590,7 @@ class View implements UISWTViewCoreEventListener
         ToolTipText.set(this.cutToolItem, "i18nAZ.ToolTips.Cut");
         this.cutToolItem.addSelectionListener(new SelectionAdapter()
         {
-            @Override
+            
             public void widgetSelected(SelectionEvent e)
             {
                 View.this.copyToolItem.notifyListeners(SWT.Selection, null);
@@ -2043,7 +2614,7 @@ class View implements UISWTViewCoreEventListener
         ToolTipText.set(this.copyToolItem, "i18nAZ.ToolTips.Copy");
         this.copyToolItem.addSelectionListener(new SelectionAdapter()
         {
-            @Override
+            
             public void widgetSelected(SelectionEvent e)
             {
                 String textData = null;
@@ -2070,7 +2641,7 @@ class View implements UISWTViewCoreEventListener
         ToolTipText.set(this.pasteToolItem, "i18nAZ.ToolTips.Paste");
         this.pasteToolItem.addSelectionListener(new SelectionAdapter()
         {
-            @Override
+            
             public void widgetSelected(SelectionEvent e)
             {
                 Point selection = View.this.editorStyledText.getSelection();
@@ -2099,7 +2670,7 @@ class View implements UISWTViewCoreEventListener
         ToolTipText.set(this.selectAllToolItem, "i18nAZ.ToolTips.SelectAll");
         this.selectAllToolItem.addSelectionListener(new SelectionAdapter()
         {
-            @Override
+            
             public void widgetSelected(SelectionEvent e)
             {
                 View.this.selectEditor();
@@ -2113,23 +2684,23 @@ class View implements UISWTViewCoreEventListener
         ToolTipText.set(this.upperCaseToolItem, "i18nAZ.ToolTips.Uppercase");
         this.upperCaseToolItem.addSelectionListener(new SelectionAdapter()
         {
-            @Override
+            
             public void widgetSelected(SelectionEvent e)
             {
                 // get selected column
-                int selectedColumn = (int) View.this.editorStyledText.getData(View.DATAKEY_SELECTED_COLUMN);
+                int selectedColumn = (Integer) View.this.editorStyledText.getData(View.DATAKEY_SELECTED_COLUMN);
 
                 // get selected locale
-                Locale selectedLocale = (Locale) TreeTableManager.getColumn(selectedColumn).getData(View.DATAKEY_LOCALE);
+                TargetLocale selectedTargetLocale = (TargetLocale) TreeTableManager.getColumn(selectedColumn).getData(View.DATAKEY_TARGET_LOCALE);
 
                 Point selection = View.this.editorStyledText.getSelection();
                 if (View.this.editorStyledText.getSelectionCount() == 0)
                 {
-                    View.this.editorStyledText.setText(View.this.editorStyledText.getText().toUpperCase(selectedLocale));
+                    View.this.editorStyledText.setText(View.this.editorStyledText.getText().toUpperCase(selectedTargetLocale.getLocale()));
                 }
                 else
                 {
-                    View.this.editorStyledText.insert(View.this.editorStyledText.getSelectionText().toUpperCase(selectedLocale));
+                    View.this.editorStyledText.insert(View.this.editorStyledText.getSelectionText().toUpperCase(selectedTargetLocale.getLocale()));
                 }
                 View.this.editorStyledText.setSelection(selection);
                 View.this.editorStyledText.setFocus();
@@ -2141,23 +2712,23 @@ class View implements UISWTViewCoreEventListener
         ToolTipText.set(this.lowerCaseToolItem, "i18nAZ.ToolTips.Lowercase");
         this.lowerCaseToolItem.addSelectionListener(new SelectionAdapter()
         {
-            @Override
+            
             public void widgetSelected(SelectionEvent e)
             {
                 // get selected column
-                int selectedColumn = (int) View.this.editorStyledText.getData(View.DATAKEY_SELECTED_COLUMN);
+                int selectedColumn = (Integer) View.this.editorStyledText.getData(View.DATAKEY_SELECTED_COLUMN);
 
                 // get selected locale
-                Locale selectedLocale = (Locale) TreeTableManager.getColumn(selectedColumn).getData(View.DATAKEY_LOCALE);
+                TargetLocale selectedTargetLocale = (TargetLocale) TreeTableManager.getColumn(selectedColumn).getData(View.DATAKEY_TARGET_LOCALE);
 
                 Point selection = View.this.editorStyledText.getSelection();
                 if (View.this.editorStyledText.getSelectionCount() == 0)
                 {
-                    View.this.editorStyledText.setText(View.this.editorStyledText.getText().toLowerCase(selectedLocale));
+                    View.this.editorStyledText.setText(View.this.editorStyledText.getText().toLowerCase(selectedTargetLocale.getLocale()));
                 }
                 else
                 {
-                    View.this.editorStyledText.insert(View.this.editorStyledText.getSelectionText().toLowerCase(selectedLocale));
+                    View.this.editorStyledText.insert(View.this.editorStyledText.getSelectionText().toLowerCase(selectedTargetLocale.getLocale()));
                 }
                 View.this.editorStyledText.setSelection(selection);
                 View.this.editorStyledText.setFocus();
@@ -2169,23 +2740,44 @@ class View implements UISWTViewCoreEventListener
         ToolTipText.set(this.firstCaseToolItem, "i18nAZ.ToolTips.Firstcase");
         this.firstCaseToolItem.addSelectionListener(new SelectionAdapter()
         {
-            @Override
+            
             public void widgetSelected(SelectionEvent e)
             {
                 // get selected column
-                int selectedColumn = (int) View.this.editorStyledText.getData(View.DATAKEY_SELECTED_COLUMN);
+                int selectedColumn = (Integer) View.this.editorStyledText.getData(View.DATAKEY_SELECTED_COLUMN);
 
                 // get selected locale
-                Locale selectedLocale = (Locale) TreeTableManager.getColumn(selectedColumn).getData(View.DATAKEY_LOCALE);
+                TargetLocale selectedTargetLocale = (TargetLocale) TreeTableManager.getColumn(selectedColumn).getData(View.DATAKEY_TARGET_LOCALE);
 
                 Point selection = View.this.editorStyledText.getSelection();
+
+                String text = "";
                 if (View.this.editorStyledText.getSelectionCount() == 0)
                 {
-                    View.this.editorStyledText.setText(Character.toTitleCase(View.this.editorStyledText.getText().charAt(0)) + View.this.editorStyledText.getText().substring(1).toLowerCase(selectedLocale));
+
+                    text = View.this.editorStyledText.getText();
                 }
                 else
                 {
-                    View.this.editorStyledText.insert(Character.toTitleCase(View.this.editorStyledText.getSelectionText().charAt(0)) + View.this.editorStyledText.getSelectionText().substring(1).toLowerCase(selectedLocale));
+                    text = View.this.editorStyledText.getSelectionText();
+                }
+                int index = 0;
+                while (index < text.length() && (text.charAt(index) == ' ' || text.charAt(index) == '\t' || text.charAt(index) == '\r' || text.charAt(index) == '\n' || text.charAt(index) == '\\' || text.charAt(index) == '{' || text.charAt(index) == '[' || text.charAt(index) == '(' || text.charAt(index) == '}' || text.charAt(index) == ']' || text.charAt(index) == ')' || text.charAt(index) == '.' || text.charAt(index) == ',' || text.charAt(index) == ';' || text.charAt(index) == ':' || text.charAt(index) == '?' || text.charAt(index) == '!' || text.charAt(index) == '%' || text.charAt(index) == '/' || text.charAt(index) == '*' || text.charAt(index) == '-' || text.charAt(index) == '+' || text.charAt(index) == '_' || text.charAt(index) == '\'' || text.charAt(index) == '"' || text.charAt(index) == '#' || text.charAt(index) == '~' || text.charAt(index) == '&' || text.charAt(index) == '|'))
+                {
+                    index++;
+                }
+                if (index < text.length())
+                {
+                    text = text.substring(0, index) + Character.toTitleCase(text.charAt(index)) + text.substring(index + 1).toLowerCase(selectedTargetLocale.getLocale());
+                }
+
+                if (View.this.editorStyledText.getSelectionCount() == 0)
+                {
+                    View.this.editorStyledText.setText(text);
+                }
+                else
+                {
+                    View.this.editorStyledText.insert(text);
                 }
                 View.this.editorStyledText.setSelection(selection);
                 View.this.editorStyledText.setFocus();
@@ -2198,7 +2790,7 @@ class View implements UISWTViewCoreEventListener
         ToolTipText.set(this.trademarkToolItem, "i18nAZ.ToolTips.Trademark");
         this.trademarkToolItem.addSelectionListener(new SelectionAdapter()
         {
-            @Override
+            
             public void widgetSelected(SelectionEvent e)
             {
                 Point selection = View.this.editorStyledText.getSelection();
@@ -2210,16 +2802,51 @@ class View implements UISWTViewCoreEventListener
             }
         });
         new ToolItem(this.toolBar, SWT.SEPARATOR);
+        this.translateToolItem = new ToolItem(this.toolBar, SWT.PUSH);
+        this.translateToolItem.setImage(this.imageLoader.getImage("i18nAZ.image.toolbar.translate"));
+        ToolTipText.set(this.translateToolItem, "i18nAZ.ToolTips.Translate");
+        this.translateToolItem.addSelectionListener(new SelectionAdapter()
+        {
+            
+            public void widgetSelected(SelectionEvent e)
+            {
+                // get selected column
+                int selectedColumn = (Integer) View.this.editorStyledText.getData(View.DATAKEY_SELECTED_COLUMN);
 
+                // get selected locale
+                TargetLocale selectedTargetLocale = (TargetLocale) TreeTableManager.getColumn(selectedColumn).getData(View.DATAKEY_TARGET_LOCALE);
+                
+                // get selected row
+                Item selectedRow = (Item) View.this.editorStyledText.getData(View.DATAKEY_SELECTED_ROW);
+                if (selectedRow == null || selectedRow.isDisposed() == true)
+                {
+                    return;
+                }
+                // get reference
+                String reference = TreeTableManager.getText(selectedRow, 1);
+                if (View.this.multilineEditor == true)
+                {
+                    reference = Util.escape(reference, false);
+                }
+                
+                //Translate
+                String result = View.this.translate(reference, selectedTargetLocale.getLocale());
+                if (result != null)
+                {
+                    View.this.editorStyledText.setText(result);
+                }
+            }
+        });
+        new ToolItem(this.toolBar, SWT.SEPARATOR);
         this.validateToolItem = new ToolItem(this.toolBar, SWT.PUSH);
         this.validateToolItem.setImage(this.imageLoader.getImage("i18nAZ.image.toolbar.validate"));
         ToolTipText.set(this.validateToolItem, "i18nAZ.ToolTips.Validate" + ((this.multilineEditor == true) ? "" : ".Shortcut"));
         this.validateToolItem.addSelectionListener(new SelectionAdapter()
         {
-            @Override
+            
             public void widgetSelected(SelectionEvent e)
             {
-                View.this.valid(true);
+                View.this.valid(true, true);
             }
         });
 
@@ -2228,37 +2855,71 @@ class View implements UISWTViewCoreEventListener
         ToolTipText.set(this.cancelToolItem, "i18nAZ.ToolTips.Cancel");
         this.cancelToolItem.addSelectionListener(new SelectionAdapter()
         {
-            @Override
+            
             public void widgetSelected(SelectionEvent e)
             {
                 View.this.cancel();
             }
         });
+    }
 
-        this.editorStyledText = new StyledText(infoComposite, SWT.WRAP | SWT.MULTI | SWT.BORDER | SWT.V_SCROLL);
+    private void initializeEditor()
+    {
+        this.editorStyledText = new StyledText(this.footerComposite, SWT.WRAP | SWT.MULTI | SWT.BORDER | SWT.V_SCROLL);
+        this.editorStyledText.setMargins(5, 5, 5, 5);
         this.editorStyledText.setKeyBinding(SWT.MOD1 | 'X', ST.VerifyKey);
         this.editorStyledText.setKeyBinding(SWT.MOD1 | 'C', ST.VerifyKey);
         this.editorStyledText.setKeyBinding(SWT.MOD1 | 'V', ST.VerifyKey);
-        this.addLinkManager(this.editorStyledText, false);
+        Util.addLinkManager(this.editorStyledText, false, false);
 
         this.undoRedo = new UndoRedo(this.editorStyledText);
         this.undoRedo.addListener(SWT.CHANGED, new Listener()
         {
-            @Override
+            
             public void handleEvent(Event e)
             {
                 View.this.undoToolItem.setEnabled(View.this.undoRedo.canUndo());
                 View.this.redoToolItem.setEnabled(View.this.undoRedo.canRedo());
             }
         });
-        gridData = new GridData(SWT.FILL, SWT.FILL, true, true);
         this.editorStyledText.setVisible(false);
-        this.editorStyledText.setLayoutData(gridData);
-        this.editorStyledText.addSelectionListener(new SelectionListener()
+        Util.setGridData(this.editorStyledText, SWT.FILL, SWT.FILL, true, true, 0);
+        this.editorStyledText.addTraverseListener(new TraverseListener()
         {
-            @Override
+            
+            public void keyTraversed(TraverseEvent e)
+            {
+                if (e.detail == SWT.TRAVERSE_TAB_PREVIOUS)
+                {
+                    e.doit = false;
+                }
+            }
+        });
+        this.editorStyledText.addSelectionListener(new SelectionAdapter()
+        {
+            
             public void widgetSelected(SelectionEvent e)
             {
+
+                // get selected row
+                Item selectedRow = (Item) View.this.editorStyledText.getData(View.DATAKEY_SELECTED_ROW);
+                if (selectedRow == null || selectedRow.isDisposed() == true)
+                {
+                    View.this.updateStyledTexts();
+                    return;
+                }
+
+                // get selected column
+                int selectedColumn = (Integer) View.this.editorStyledText.getData(View.DATAKEY_SELECTED_COLUMN);
+
+                // get locale properties for save
+                TargetLocale selectedTargetLocale = (TargetLocale) TreeTableManager.getColumn(selectedColumn).getData(View.DATAKEY_TARGET_LOCALE);
+
+                if (selectedTargetLocale.isReadOnly() == true)
+                {
+                    return;
+                }
+
                 if (View.this.editorStyledText.isFocusControl() == false)
                 {
                     View.this.editorStyledText.setFocus();
@@ -2267,137 +2928,262 @@ class View implements UISWTViewCoreEventListener
                 View.this.copyToolItem.setEnabled(View.this.editorStyledText.getText().length() > 0 && e.y - e.x > 0);
                 View.this.selectAllToolItem.setEnabled(View.this.editorStyledText.getText().length() > 0 && e.y - e.x != View.this.editorStyledText.getText().length());
             }
-
-            @Override
-            public void widgetDefaultSelected(SelectionEvent e)
-            {
-            }
         });
 
         final Menu menu = new Menu(this.editorStyledText);
         this.editorStyledText.setMenu(menu);
         this.editorStyledText.addMenuDetectListener(new MenuDetectListener()
         {
-            @Override
+            
             public void menuDetected(MenuDetectEvent e)
             {
-                View.this.populateMenu(menu, MenuOptions.EDITOR);
-            }
-        });
+                while (menu.getItemCount() > 0)
+                {
+                    menu.getItem(0).dispose();
+                }
 
-        this.createTopLevelMenuitem();
-
-        this.editorStyledText.addExtendedModifyListener(new ExtendedModifyListener()
-        {
-            @Override
-            public void modifyText(ExtendedModifyEvent e)
-            {
-                View.this.selectAllToolItem.setEnabled(View.this.editorStyledText.getText().length() > 0);
-                View.this.upperCaseToolItem.setEnabled(View.this.editorStyledText.getText().length() > 0);
-                View.this.lowerCaseToolItem.setEnabled(View.this.editorStyledText.getText().length() > 0);
-                View.this.firstCaseToolItem.setEnabled(View.this.editorStyledText.getText().length() > 1);
-
+                int offset = -1;
+                if (View.this.editorStyledText.getSelectionCount() == 0)
+                {
+                    Point point = View.this.editorStyledText.toControl(e.x, e.y);
+                    point = View.this.editorStyledText.toControl(e.x, e.y);
+                    try
+                    {
+                        offset = View.this.editorStyledText.getOffsetAtLocation(point);
+                        View.this.editorStyledText.setSelection(offset, offset);
+                    }
+                    catch (IllegalArgumentException ie)
+                    {
+                    }
+                }
+                else
+                {
+                    offset = View.this.editorStyledText.getSelection().x;
+                }
                 // get selected row
                 Item selectedRow = (Item) View.this.editorStyledText.getData(View.DATAKEY_SELECTED_ROW);
+                if (selectedRow == null || selectedRow.isDisposed() == true)
+                {
+                    View.this.updateStyledTexts();
+                    return;
+                }
 
                 // get selected column
-                int selectedColumn = (int) View.this.editorStyledText.getData(View.DATAKEY_SELECTED_COLUMN);
+                int selectedColumn = (Integer) View.this.editorStyledText.getData(View.DATAKEY_SELECTED_COLUMN);
+                
+                final PrebuildItem prebuildItem = (PrebuildItem) selectedRow.getData(TreeTableManager.DATAKEY_PREBUILD_ITEM);
+                final LangFileObject langFileObject = LocalizablePluginManager.getCurrentLangFile();
+                
+                // get locale properties for save
+                TargetLocale selectedTargetLocale = (TargetLocale) TreeTableManager.getColumn(selectedColumn).getData(View.DATAKEY_TARGET_LOCALE);
 
-                // get reference
-                String reference = TreeTableManager.getText(selectedRow, 1);
-                if (View.this.multilineEditor == true)
+                SpellObject[] editorSpellObjects = View.this.editorSpellObjectManager.getSpellObjects(LocalizablePluginManager.getCurrentLangFile(), prebuildItem.getKey(), selectedTargetLocale.getLocale(), View.this.editorStyledText.getText(), View.this.multilineEditor);
+
+                for (int i = 0; offset != -1 && i < editorSpellObjects.length; i++)
                 {
-                    reference = Util.unescape(reference);
-                }
-
-                // get old value
-                String oldValue = TreeTableManager.getText(selectedRow, selectedColumn);
-                if (View.this.multilineEditor == true)
-                {
-                    oldValue = Util.unescape(oldValue);
-                }
-
-                View.this.validateToolItem.setEnabled(View.this.deletableRows.size() > 0 || oldValue.equals(View.this.editorStyledText.getText()) == false);
-                View.this.cancelToolItem.setEnabled(View.this.editorStyledText.getText().equals("") == true || (oldValue.equals(View.this.editorStyledText.getText()) == false && !(oldValue.equals("") == true && View.this.editorStyledText.getText().equals(reference) == true)));
-
-                // found params & references for editor
-                View.this.editorParams = Util.getParams(0, View.this.editorStyledText.getText());
-                View.this.editorReferences = Util.getReferences(0, View.this.editorStyledText.getText());
-                View.this.editorUrls = Util.getUrls(0, View.this.editorStyledText.getText());
-
-                // apply styles for editorStyledText
-                View.this.formatStyledText(View.this.editorStyledText, View.this.editorParams, View.this.editorReferences, View.this.editorUrls, false);
-
-                // search unknown params
-                for (int i = 0; i < View.this.editorParams.size(); i++)
-                {
-                    boolean found = false;
-                    for (int j = 0; j < View.this.infoParams.size(); j++)
+                    final SpellObject editorSpellObject = editorSpellObjects[i];
+                    if (offset >= editorSpellObject.getOffset() && offset <= editorSpellObject.getOffset() + editorSpellObject.getLength())
                     {
-                        if (View.this.editorParams.get(i)[2] == View.this.infoParams.get(j)[2])
+                        MenuItem menuItem = null;
+                        switch (editorSpellObject.getType())
                         {
-                            found = true;
-                            break;
-                        }
-                    }
+                            case SpellChecker.TYPE_PARAM:
+                            case SpellChecker.TYPE_REFERENCE:
+                                for (int j = 0; j < editorSpellObjects.length; j++)
+                                {
+                                    if (editorSpellObjects[j].getType() == editorSpellObject.getType() && editorSpellObjects[j].getValue().equals(editorSpellObject.getValue()) == false)
+                                    {
+                                        menuItem = new MenuItem(menu, SWT.PUSH);
+                                        menuItem.setText(editorSpellObjects[j].getValue());
+                                        menuItem.addSelectionListener(new SelectionAdapter()
+                                        {
+                                            
+                                            public void widgetSelected(SelectionEvent e)
+                                            {
+                                                View.this.editorStyledText.setSelection(editorSpellObject.getOffset(), editorSpellObject.getOffset() + editorSpellObject.getLength());
+                                                Point selection = View.this.editorStyledText.getSelection();
+                                                String data = ((MenuItem) e.widget).getText();
+                                                View.this.editorStyledText.insert(data);
+                                                selection.x = selection.x + data.length();
+                                                selection.y = selection.x;
+                                                View.this.editorStyledText.setSelection(selection);
+                                                View.this.editorStyledText.setFocus();
+                                            }
+                                        });
+                                    }
+                                }
+                                break;
 
-                    if (found == false)
-                    {
-                        // set not found param style
-                        StyleRange styleRange = new StyleRange(View.this.editorParams.get(i)[0], View.this.editorParams.get(i)[1], new Color(Display.getCurrent(), 163, 21, 21), null);
-                        styleRange.font = new Font(null, View.this.editorStyledText.getFont().getFontData()[0].getName(), 9, SWT.BOLD);
-                        styleRange.underline = true;
-                        styleRange.underlineColor = Display.getCurrent().getSystemColor(SWT.COLOR_RED);
-                        styleRange.underlineStyle = SWT.UNDERLINE_SQUIGGLE;
-                        View.this.editorStyledText.setStyleRange(styleRange);
+                            case SpellChecker.TYPE_URL:
+                                menuItem = new MenuItem(menu, SWT.PUSH);
+                                menuItem.setText(i18nAZ.getLocalisedMessageText("i18nAZ.Menus.FollowTheLink"));
+                                menuItem.addSelectionListener(new SelectionAdapter()
+                                {
+                                    
+                                    public void widgetSelected(SelectionEvent e)
+                                    {
+                                        Utils.launch(editorSpellObject.getValue());
+                                    }
+                                });
+                                break;
+
+                            default:
+                                if (editorSpellObject.getType() != SpellChecker.TYPE_TRANSLATED_WORDS && (editorSpellObject.getSuggestions() == null || editorSpellObject.getSuggestions().length == 0))
+                                {
+                                    menuItem = new MenuItem(menu, SWT.PUSH);
+                                    menuItem.setText(i18nAZ.getLocalisedMessageText("i18nAZ.Menus.NoSuggestion"));
+                                    menuItem.setEnabled(false);
+                                }
+                                else
+                                {
+                                    if (editorSpellObject.getType() == SpellChecker.TYPE_TRANSLATED_WORDS)
+                                    {
+                                        if (editorSpellObject.getOffset() + editorSpellObject.getLength() > View.this.editorStyledText.getText().length())
+                                        {
+                                            continue;
+                                        }
+                                        if (View.this.editorStyledText.getText().substring(editorSpellObject.getOffset(), editorSpellObject.getOffset() + editorSpellObject.getLength()).equalsIgnoreCase(editorSpellObject.getValue()) == false)
+                                        {
+                                            continue;
+                                        }
+                                    }
+
+                                    for (int j = 0; j < editorSpellObject.getSuggestions().length; j++)
+                                    {
+                                        final Suggestion suggestion = editorSpellObject.getSuggestions()[j];
+                                        menuItem = new MenuItem(menu, SWT.PUSH);
+                                        menuItem.setImage(View.this.imageLoader.getImage("i18nAZ.image.toolbar." + ((editorSpellObject.getType() == SpellChecker.TYPE_TRANSLATED_WORDS) ? "translate" : "spellChecker")));
+                                        menuItem.setText(suggestion.getName());
+                                        menuItem.addSelectionListener(new SelectionAdapter()
+                                        {
+                                            
+                                            public void widgetSelected(SelectionEvent e)
+                                            {
+                                                View.this.editorStyledText.setSelection(editorSpellObject.getOffset(), editorSpellObject.getOffset() + editorSpellObject.getLength());
+                                                Point selection = View.this.editorStyledText.getSelection();
+                                                String data = suggestion.getValue();
+                                                View.this.editorStyledText.insert(data);
+                                                selection.x = selection.x + data.length();
+                                                selection.y = selection.x;
+                                                View.this.editorStyledText.setSelection(selection);
+                                                View.this.editorStyledText.setFocus();
+                                                if (editorSpellObject.getType() == SpellChecker.TYPE_TRANSLATED_WORDS)
+                                                {
+                                                    editorSpellObject.length = data.length();
+                                                    editorSpellObject.value = data;
+                                                }
+                                            }
+                                        });
+
+                                    }
+                                }
+                                if ((editorSpellObject.getType() & (SpellChecker.TYPE_MISSPELLING_ERROR | SpellChecker.TYPE_MISSPELLING_VUZE | SpellChecker.TYPE_MISSPELLING_DUPLICATE | SpellChecker.TYPE_MISSPELLING_EXTRA_SPACES)) != 0)
+                                {
+                                    new MenuItem(menu, SWT.SEPARATOR);
+                                }
+                                if ((editorSpellObject.getType() & SpellChecker.TYPE_MISSPELLING_ERROR) != 0)
+                                {   
+                                    menuItem = new MenuItem(menu, SWT.PUSH);
+                                    menuItem.setText(i18nAZ.getLocalisedMessageText("i18nAZ.Menus.AddToDictionary"));
+                                    menuItem.addSelectionListener(new SelectionAdapter()
+                                    {
+                                        
+                                        public void widgetSelected(SelectionEvent e)
+                                        {
+                                            View.this.editorStyledText.setSelection(editorSpellObject.getOffset(), editorSpellObject.getOffset() + editorSpellObject.getLength());
+                                            SpellChecker.add(editorSpellObject.getValue());
+                                            Point selection = View.this.editorStyledText.getSelection();
+                                            String data = editorSpellObject.getValue();
+                                            View.this.editorStyledText.insert(data);
+                                            View.this.editorSpellObjectManager.reset();
+                                            View.this.updateEditor();
+                                            selection.x = selection.x + data.length();
+                                            selection.y = selection.x;
+                                            View.this.editorStyledText.setSelection(selection);
+                                        }
+                                    });
+                                }
+                                if ((editorSpellObject.getType() & (SpellChecker.TYPE_MISSPELLING_ERROR | SpellChecker.TYPE_MISSPELLING_VUZE | SpellChecker.TYPE_MISSPELLING_DUPLICATE | SpellChecker.TYPE_MISSPELLING_EXTRA_SPACES)) != 0)
+                                {   
+                                    menuItem = new MenuItem(menu, SWT.PUSH);
+                                    menuItem.setText(i18nAZ.getLocalisedMessageText("i18nAZ.Menus.Ignore"));
+                                    menuItem.addSelectionListener(new SelectionAdapter()
+                                    {
+                                        
+                                        public void widgetSelected(SelectionEvent e)
+                                        {
+                                            View.this.editorStyledText.setSelection(editorSpellObject.getOffset(), editorSpellObject.getOffset() + editorSpellObject.getLength());
+
+                                            Point selection = View.this.editorStyledText.getSelection();
+                                            SpellChecker.ignore(langFileObject, prebuildItem.getKey(), editorSpellObject);                      
+                                            
+                                            View.this.editorSpellObjectManager.reset();
+                                            View.this.updateEditor();
+                                            selection.x = selection.y;
+                                            View.this.editorStyledText.setSelection(selection);
+                                        }
+                                    });
+                                }
+                                break;
+                        }
+                        break;
                     }
                 }
-
-                // Search unknown references
-                for (int i = 0; i < View.this.editorReferences.size(); i++)
+                if (menu.getItemCount() > 0)
                 {
-                    boolean found = false;
-                    for (int j = 0; j < View.this.infoReferences.size(); j++)
-                    {
-                        if (View.this.editorReferences.get(i)[2].equals(View.this.infoReferences.get(j)[2]) == true)
-                        {
-                            found = true;
-                            break;
-                        }
-                    }
-
-                    if (found == false)
-                    {
-                        // set not found references style
-                        StyleRange styleRange = new StyleRange((int) View.this.editorReferences.get(i)[0] + 1, (int) View.this.editorReferences.get(i)[1] - 2, Display.getCurrent().getSystemColor(SWT.COLOR_BLUE), null);
-                        styleRange.font = new Font(null, View.this.editorStyledText.getFont().getFontData()[0].getName(), 9, SWT.NORMAL);
-                        styleRange.underline = true;
-                        styleRange.underlineColor = Display.getCurrent().getSystemColor(SWT.COLOR_RED);
-                        styleRange.underlineStyle = SWT.UNDERLINE_SQUIGGLE;
-                        View.this.editorStyledText.setStyleRange(styleRange);
-                    }
+                    new MenuItem(menu, SWT.SEPARATOR);
                 }
-
+                View.this.populateMenu(menu, MenuOptions.EDITOR, false);
             }
         });
+        this.editorStyledText.addExtendedModifyListener(new ExtendedModifyListener()
+        {
+            
+            public void modifyText(ExtendedModifyEvent e)
+            {                
+                //update Editor
+                View.this.updateEditor();
+            }
+        });
+
         this.editorStyledText.addFocusListener(new FocusAdapter()
         {
-            @Override
+            
             public void focusGained(FocusEvent e)
             {
+                // get selected row
+                Item selectedRow = (Item) View.this.editorStyledText.getData(View.DATAKEY_SELECTED_ROW);
+                if (selectedRow == null || selectedRow.isDisposed() == true)
+                {
+                    View.this.updateStyledTexts();
+                    return;
+                }
+
+                // get selected column
+                int selectedColumn = (Integer) View.this.editorStyledText.getData(View.DATAKEY_SELECTED_COLUMN);
+
+                // get locale properties for save
+                TargetLocale selectedTargetLocale = (TargetLocale) TreeTableManager.getColumn(selectedColumn).getData(View.DATAKEY_TARGET_LOCALE);
+
+                if (selectedTargetLocale.isReadOnly() == true)
+                {
+                    return;
+                }
+
+                View.this.infoStyledText.setSelection(0, 0);
                 View.this.pasteToolItem.setEnabled(View.this.clipboard.getContents(TextTransfer.getInstance()) != null);
                 View.this.selectEditor();
             }
 
-            @Override
+            
             public void focusLost(FocusEvent e)
             {
-                View.this.valid(false);
+                View.this.valid(false, false);
             }
         });
         this.editorStyledText.addKeyListener(new KeyAdapter()
         {
-            @Override
+            
             public void keyReleased(KeyEvent e)
             {
                 if (e.character == SWT.ESC)
@@ -2412,20 +3198,14 @@ class View implements UISWTViewCoreEventListener
         });
         this.editorStyledText.addVerifyKeyListener(new VerifyKeyListener()
         {
-            @Override
+            
             public void verifyKey(VerifyEvent e)
             {
                 if ((e.stateMask & SWT.MODIFIER_MASK) == 0 && e.character == SWT.CR)
                 {
                     if (View.this.multilineEditor == false)
                     {
-                        e.doit = false;
-                        if (View.this.validateToolItem.getEnabled() == true)
-                        {
-                            View.this.valid(true);
-                        }
-                        TreeTableManager.Cursor.notifyListeners(SWT.KeyDown, Util.createKeyEvent(TreeTableManager.getCurrent(), SWT.ARROW_DOWN));
-                        View.this.selectEditor();
+                        View.this.valid(true, SWT.DOWN);
                     }
                     else
                     {
@@ -2434,99 +3214,163 @@ class View implements UISWTViewCoreEventListener
                         selection.x = selection.x + 1;
                         selection.y = selection.x;
                         View.this.editorStyledText.setSelection(selection);
-                        e.doit = false;
                     }
+                    e.doit = false;
                 }
                 if ((e.stateMask & SWT.MODIFIER_MASK) == 0 && e.keyCode == SWT.PAGE_UP)
                 {
+                    View.this.valid(false, SWT.UP);
                     e.doit = false;
-                    if (View.this.validateToolItem.getEnabled() == true)
-                    {
-                        View.this.valid(false);
-                    }
-                    Item selectedRow = null;
-                    TreeTableManager.setRedraw(false, false);
-                    do
-                    {
-                        selectedRow = TreeTableManager.Cursor.getRow();
-                        TreeTableManager.Cursor.notifyListeners(SWT.KeyDown, Util.createKeyEvent(TreeTableManager.getCurrent(), SWT.ARROW_UP));
-                    }
-                    while (selectedRow != TreeTableManager.Cursor.getRow() && (boolean) TreeTableManager.Cursor.getRow().getData(TreeTableManager.DATAKEY_EXIST) == false);
-                    TreeTableManager.setRedraw(true, false);
-                    View.this.selectEditor();
                 }
                 if ((e.stateMask & SWT.MODIFIER_MASK) == 0 && e.keyCode == SWT.PAGE_DOWN)
                 {
+                    View.this.valid(true, SWT.DOWN);
                     e.doit = false;
-                    if (View.this.validateToolItem.getEnabled() == true)
-                    {
-                        View.this.valid(false);
-                    }
-                    Item selectedRow = null;
-                    TreeTableManager.setRedraw(false, false);
-                    do
-                    {
-                        selectedRow = TreeTableManager.Cursor.getRow();
-                        TreeTableManager.Cursor.notifyListeners(SWT.KeyDown, Util.createKeyEvent(TreeTableManager.getCurrent(), SWT.ARROW_DOWN));
-                    }
-                    while (selectedRow != TreeTableManager.Cursor.getRow() && (boolean) TreeTableManager.Cursor.getRow().getData(TreeTableManager.DATAKEY_EXIST) == false);
-                    TreeTableManager.setRedraw(true, false);
-                    View.this.selectEditor();
                 }
-                if (e.character == SWT.TAB && View.this.multilineEditor == false)
+                if ((e.stateMask & SWT.MODIFIER_MASK) == 0 && e.keyCode == SWT.TAB && View.this.multilineEditor == false)
                 {
+                    View.this.valid(false, SWT.DOWN);
                     e.doit = false;
-
-                    if (View.this.validateToolItem.getEnabled() == true)
-                    {
-                        View.this.valid(false);
-                    }
-                    Item selectedRow = null;
-                    TreeTableManager.setRedraw(false, false);
-                    do
-                    {
-                        selectedRow = TreeTableManager.Cursor.getRow();
-                        TreeTableManager.Cursor.notifyListeners(SWT.KeyDown, Util.createKeyEvent(TreeTableManager.getCurrent(), SWT.ARROW_DOWN));
-                    }
-                    while (selectedRow != TreeTableManager.Cursor.getRow() && (boolean) TreeTableManager.Cursor.getRow().getData(TreeTableManager.DATAKEY_EXIST) == false);
-                    TreeTableManager.setRedraw(true, false);
-                    View.this.selectEditor();
                 }
-                if (e.stateMask == SWT.MOD1 && e.keyCode == 'z')
+                if (e.stateMask == SWT.MOD2 && e.keyCode == 9 && View.this.multilineEditor == false)
+                {
+                    View.this.valid(false, SWT.UP);
+                    e.doit = false;
+                }
+                if (e.stateMask == SWT.MOD1 && e.keyCode == 'z' && View.this.undoToolItem.getEnabled() == true)
                 {
                     View.this.undoToolItem.notifyListeners(SWT.Selection, null);
                 }
-                if (e.stateMask == SWT.MOD1 && e.keyCode == 'y')
+                if (e.stateMask == SWT.MOD1 && e.keyCode == 'y' && View.this.redoToolItem.getEnabled() == true)
                 {
                     View.this.redoToolItem.notifyListeners(SWT.Selection, null);
                 }
-                if (e.stateMask == SWT.MOD1 && e.keyCode == 'x')
+                if (e.stateMask == SWT.MOD1 && e.keyCode == 'x' && View.this.cutToolItem.getEnabled() == true)
                 {
                     View.this.cutToolItem.notifyListeners(SWT.Selection, null);
                 }
-                if (e.stateMask == SWT.MOD1 && e.keyCode == 'c')
+                if (e.stateMask == SWT.MOD1 && e.keyCode == 'c' && View.this.copyToolItem.getEnabled() == true)
                 {
                     View.this.copyToolItem.notifyListeners(SWT.Selection, null);
                 }
-                if (e.stateMask == SWT.MOD1 && e.keyCode == 'v')
+                if (e.stateMask == SWT.MOD1 && e.keyCode == 'v' && View.this.pasteToolItem.getEnabled() == true)
                 {
                     View.this.pasteToolItem.notifyListeners(SWT.Selection, null);
                 }
-                if (e.stateMask == SWT.MOD1 && e.keyCode == 'a')
+                if (e.stateMask == SWT.MOD1 && e.keyCode == 'a' && View.this.selectAllToolItem.getEnabled() == true)
                 {
                     View.this.selectAllToolItem.notifyListeners(SWT.Selection, null);
                 }
+                if ((e.stateMask & SWT.MODIFIER_MASK) == 0 && e.keyCode == SWT.F8 && View.this.spellCheckerButton.isDisabled() == false)
+                {
+                    View.this.spellCheckerButton.getSkinObject().getControl().notifyListeners(SWT.MouseDown, null);
+                    View.this.spellCheckerButton.getSkinObject().getControl().notifyListeners(SWT.MouseUp, null);
+                    e.doit = false;
+                }
             }
         });
-
-        this.updateTreeTable(true, true);
-
-        this.statusLabel = new Label(AreaContainer.getComposite(), SWT.NULL);
     }
 
+    private void initialize(Composite composite, SWTSkinObjectContainer skinObjectContainer)
+    {
+        this.clipboard = new Clipboard(Display.getCurrent());
+
+        this.display = composite.getShell().getDisplay();
+
+        this.mainChildContainer = new SWTSkinObjectContainer(SWTSkinFactory.getInstance(), SWTSkinFactory.getInstance().getSkinProperties(), "i18nAZ.main", "i18nAZ.main", skinObjectContainer);
+        this.mainChildContainer.setControl(composite);
+        GridLayout gridLayout = null;
+        gridLayout = new GridLayout();
+        gridLayout.verticalSpacing = 1;
+        gridLayout.horizontalSpacing = 0;
+        gridLayout.marginHeight = 0;
+        gridLayout.marginWidth = 0;
+        this.mainChildContainer.getComposite().setLayout(gridLayout);
+        Util.setGridData(this.mainChildContainer.getComposite(), SWT.FILL, SWT.FILL, true, true);
+
+        // initialize Main ToolBar
+        this.initializeMainToolBar();
+
+        // create area composite
+        this.areaContainer = new SWTSkinObjectContainer(SWTSkinFactory.getInstance(), SWTSkinFactory.getInstance().getSkinProperties(), "i18nAZ.main.area", "i18nAZ.main.area", this.mainChildContainer);
+        gridLayout = new GridLayout();
+        gridLayout.verticalSpacing = 1;
+        gridLayout.horizontalSpacing = 0;
+        gridLayout.marginHeight = 0;
+        gridLayout.marginWidth = 0;
+        this.areaContainer.getComposite().setLayout(gridLayout);
+        Util.setGridData(this.areaContainer.getComposite(), SWT.FILL, SWT.FILL, true, true);
+
+        // initialize TableCombos
+        this.initializeTableCombos();
+
+        // initialize treetable
+        TreeTableManager.initTreeTable(this.areaContainer);
+        Util.setGridData(TreeTableManager.getCurrent(), SWT.FILL, SWT.FILL, true, false, -100);
+        TreeTableManager.setVisible(false);
+
+        // initialize loading composite
+        this.initializeLoadingComposite();
+
+        // initialize wizard composite
+        this.initializeWizardComposite();
+
+        // Create footer composite
+        this.footerComposite = Util.getNewComposite(this.areaContainer.getComposite(), SWT.NONE, SWT.FILL, SWT.NULL, true, false, 0);
+        Util.setGridData(this.footerComposite, SWT.FILL, SWT.NONE, true, false, 0);
+        this.footerComposite.setVisible(false);
+
+        // initialize info styled text
+        this.initializeInfoLabel();
+
+        // initialize editor toolbar
+        this.initializeEditorToolBar();
+
+        // initialize editor
+        this.initializeEditor();
+
+        // create status label
+        this.statusLabel = new Label(this.areaContainer.getComposite(), SWT.NULL);
+        Util.setGridData(this.statusLabel, SWT.FILL, SWT.NONE, true, false, 0);
+        this.statusLabel.setVisible(false);
+
+        synchronized (this.viewInitialized)
+        {
+            this.viewInitialized.set(true);
+        }
+        synchronized (this.initialized)
+        {
+            synchronized (this.wizard)
+            {
+                if (this.initialized.get() == false)
+                {
+                    if (this.wizard == false)
+                    {
+                        View.this.show(View.SHOW_LOADING);
+                        return;
+                    }
+                    else
+                    {
+                        View.this.show(View.SHOW_WIZARD);
+                        return;
+                    }
+                }
+            }
+        }
+
+        this.enable();
+    }
+    boolean isCreated()
+    {
+        synchronized (View.this.viewCreated)
+        {
+            return this.viewCreated.get();
+        }
+    }   
     void itemEnterEventOccurred(Item item, int columnIndex)
     {
-        String key = (String) item.getData(TreeTableManager.DATAKEY_KEY);
+        PrebuildItem prebuildItem = (PrebuildItem) item.getData(TreeTableManager.DATAKEY_PREBUILD_ITEM);
+
         String message = "";
         if (columnIndex == 0)
         {
@@ -2534,12 +3378,13 @@ class View implements UISWTViewCoreEventListener
             {
                 return;
             }
-            int[] counts = this.getCounts(key, null, TreeTableManager.Cursor.getColumn());
-            message += this.getLocalisedMessageText("i18nAZ.ToolTips.Items.ExpandMessage", new String[] { String.valueOf(counts[0]), String.valueOf(counts[1]), String.valueOf(counts[2]), String.valueOf(counts[3]) });
+            TargetLocale selectedTargetLocale = (TargetLocale) TreeTableManager.getColumn(TreeTableManager.Cursor.getColumn()).getData(View.DATAKEY_TARGET_LOCALE);
+            CountObject counts = FilterManager.getCounts(prebuildItem.getKey(), selectedTargetLocale);
+            message += i18nAZ.getLocalisedMessageText("i18nAZ.ToolTips.Items.ExpandMessage", new String[] { String.valueOf(counts.entryCount), String.valueOf(counts.emptyCount), String.valueOf(counts.unchangedCount), String.valueOf(counts.extraCount) });
         }
         else
         {
-            if ((Boolean) item.getData(TreeTableManager.DATAKEY_EXIST) == false)
+            if (prebuildItem.isExist() == false)
             {
                 return;
             }
@@ -2548,20 +3393,37 @@ class View implements UISWTViewCoreEventListener
             {
                 message = Util.unescape(message);
             }
+            if (message.equals("") == true)
+            {
+                message = i18nAZ.getLocalisedMessageText("i18nAZ.Labels.Empty");
+            }
         }
-        ToolTipText.set(item, columnIndex, null, new String[] { key }, new String[] { message });
+        ToolTipText.set(item, columnIndex, null, new String[] { prebuildItem.getKey() }, new String[] { message });
     }
 
     void populateMenu(final Menu menu, final int visible)
     {
-        this.populateMenu(menu, visible, visible);
+        this.populateMenu(menu, visible, visible, true);
+    }
+
+    void populateMenu(final Menu menu, final int visible, boolean clear)
+    {
+        this.populateMenu(menu, visible, visible, clear);
     }
 
     void populateMenu(final Menu menu, final int visible, int enabled)
     {
-        while (menu.getItemCount() > 0)
+        this.populateMenu(menu, visible, enabled, true);
+    }
+
+    void populateMenu(final Menu menu, final int visible, int enabled, boolean clear)
+    {
+        if (clear == true)
         {
-            menu.getItem(0).dispose();
+            while (menu.getItemCount() > 0)
+            {
+                menu.getItem(0).dispose();
+            }
         }
         MenuItem menuItem = null;
 
@@ -2569,7 +3431,7 @@ class View implements UISWTViewCoreEventListener
         {
             menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.RemoveLanguage", new Listener()
             {
-                @Override
+                
                 public void handleEvent(Event e)
                 {
                     View.this.removeLanguage();
@@ -2583,7 +3445,7 @@ class View implements UISWTViewCoreEventListener
         {
             menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.Undo", new Listener()
             {
-                @Override
+                
                 public void handleEvent(Event e)
                 {
                     View.this.undoToolItem.notifyListeners(SWT.Selection, null);
@@ -2593,7 +3455,7 @@ class View implements UISWTViewCoreEventListener
 
             menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.Redo", new Listener()
             {
-                @Override
+                
                 public void handleEvent(Event e)
                 {
                     View.this.redoToolItem.notifyListeners(SWT.Selection, null);
@@ -2605,43 +3467,81 @@ class View implements UISWTViewCoreEventListener
 
             menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.Cut", new Listener()
             {
-                @Override
+                
                 public void handleEvent(Event e)
                 {
                     View.this.cutToolItem.notifyListeners(SWT.Selection, null);
                 }
             }, SWT.PUSH);
             menuItem.setEnabled(View.this.cutToolItem.getEnabled() && ((enabled & MenuOptions.EDITOR) != 0));
-
-            menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.Copy", new Listener()
+            if ((visible & MenuOptions.COPY_VALUE) == 0)
             {
-                @Override
-                public void handleEvent(Event e)
+                menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.Copy", new Listener()
                 {
-                    View.this.copyToolItem.notifyListeners(SWT.Selection, null);
-                }
-            }, SWT.PUSH);
-            menuItem.setEnabled(View.this.copyToolItem.getEnabled() && ((enabled & MenuOptions.EDITOR) != 0));
+                    
+                    public void handleEvent(Event e)
+                    {
+                        View.this.copyToolItem.notifyListeners(SWT.Selection, null);
+                    }
+                }, SWT.PUSH);
+                menuItem.setEnabled(View.this.copyToolItem.getEnabled() && ((enabled & MenuOptions.EDITOR) != 0));
+            }
         }
 
-        // ROW_COPY
-        if ((visible & MenuOptions.ROW_COPY) != 0)
+        // ROW_COPY VALUE
+        if ((visible & MenuOptions.COPY_VALUE) != 0)
         {
-            menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.CopyKey", new Listener()
+            if ((visible & MenuOptions.REMOVE_COLUMN) != 0)
             {
-                @Override
+                new MenuItem(menu, SWT.SEPARATOR);
+            }
+            menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.CopyValue", new Listener()
+            {
+                
                 public void handleEvent(Event e)
                 {
                     Item item = (Item) menu.getData(TreeTableManager.DATAKEY_ITEM);
-                    String textData = (String) item.getData(TreeTableManager.DATAKEY_KEY);
+                    String textData = TreeTableManager.getText(item, TreeTableManager.Cursor.getColumn());
+                    if (textData.equals("") == true)
+                    {
+                        View.this.clipboard.clearContents();
+                    }
+                    else
+                    {
+                        View.this.clipboard.setContents(new Object[] { textData }, new Transfer[] { TextTransfer.getInstance() });
+                    }
+                }
+            }, SWT.PUSH);
+            menuItem.setEnabled(true && ((enabled & MenuOptions.COPY_VALUE) != 0));
+        }
+
+        // COPY_KEY
+        if ((visible & MenuOptions.COPY_KEY) != 0)
+        {
+            if ((visible & MenuOptions.REMOVE_COLUMN) != 0 && (visible & MenuOptions.COPY_VALUE) == 0)
+            {
+                new MenuItem(menu, SWT.SEPARATOR);
+            }
+            menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.CopyKey", new Listener()
+            {
+                
+                public void handleEvent(Event e)
+                {
+                    Item item = (Item) menu.getData(TreeTableManager.DATAKEY_ITEM);
+                    PrebuildItem prebuildItem = (PrebuildItem) item.getData(TreeTableManager.DATAKEY_PREBUILD_ITEM);
+                    String textData = prebuildItem.getKey();
                     View.this.clipboard.setContents(new Object[] { textData }, new Transfer[] { TextTransfer.getInstance() });
                 }
             }, SWT.PUSH);
-            menuItem.setEnabled(true && ((enabled & MenuOptions.ROW_COPY) != 0));
+            menuItem.setEnabled(true && ((enabled & MenuOptions.COPY_KEY) != 0));
+        }
 
+        // COPY_REFERENCE
+        if ((visible & MenuOptions.COPY_REFERENCE) != 0)
+        {
             menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.CopyReference", new Listener()
             {
-                @Override
+                
                 public void handleEvent(Event e)
                 {
                     Item item = (Item) menu.getData(TreeTableManager.DATAKEY_ITEM);
@@ -2649,7 +3549,7 @@ class View implements UISWTViewCoreEventListener
                     View.this.clipboard.setContents(new Object[] { textData }, new Transfer[] { TextTransfer.getInstance() });
                 }
             }, SWT.PUSH);
-            menuItem.setEnabled(true && ((enabled & MenuOptions.ROW_COPY) != 0));
+            menuItem.setEnabled(true && ((enabled & MenuOptions.COPY_REFERENCE) != 0));
         }
 
         // EDITOR
@@ -2657,7 +3557,7 @@ class View implements UISWTViewCoreEventListener
         {
             menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.Paste", new Listener()
             {
-                @Override
+                
                 public void handleEvent(Event e)
                 {
                     View.this.pasteToolItem.notifyListeners(SWT.Selection, null);
@@ -2669,7 +3569,7 @@ class View implements UISWTViewCoreEventListener
 
             menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.SelectAll", new Listener()
             {
-                @Override
+                
                 public void handleEvent(Event e)
                 {
                     View.this.selectAllToolItem.notifyListeners(SWT.Selection, null);
@@ -2681,7 +3581,7 @@ class View implements UISWTViewCoreEventListener
 
             menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.Uppercase", new Listener()
             {
-                @Override
+                
                 public void handleEvent(Event e)
                 {
                     View.this.upperCaseToolItem.notifyListeners(SWT.Selection, null);
@@ -2691,7 +3591,7 @@ class View implements UISWTViewCoreEventListener
 
             menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.Lowercase", new Listener()
             {
-                @Override
+                
                 public void handleEvent(Event e)
                 {
                     View.this.lowerCaseToolItem.notifyListeners(SWT.Selection, null);
@@ -2701,7 +3601,7 @@ class View implements UISWTViewCoreEventListener
 
             menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.Firstcase", new Listener()
             {
-                @Override
+                
                 public void handleEvent(Event e)
                 {
                     View.this.firstCaseToolItem.notifyListeners(SWT.Selection, null);
@@ -2719,11 +3619,11 @@ class View implements UISWTViewCoreEventListener
             }
             menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.OpenUrl", new Listener()
             {
-                @Override
+                
                 public void handleEvent(Event e)
                 {
                     Item item = (Item) menu.getData(TreeTableManager.DATAKEY_ITEM);
-                    int columnIndex = (int) menu.getData(TreeTableManager.DATAKEY_COLUMN_INDEX);
+                    int columnIndex = (Integer) menu.getData(TreeTableManager.DATAKEY_COLUMN_INDEX);
                     Utils.launch(TreeTableManager.getText(item, columnIndex));
                 }
             }, SWT.PUSH);
@@ -2739,7 +3639,7 @@ class View implements UISWTViewCoreEventListener
             }
             menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.Find", new Listener()
             {
-                @Override
+                
                 public void handleEvent(Event e)
                 {
                     View.this.searchTextbox.getTextControl().setFocus();
@@ -2753,7 +3653,7 @@ class View implements UISWTViewCoreEventListener
         if ((visible & MenuOptions.FILTERS) != 0 || (visible & MenuOptions.TOPFILTERS) != 0)
         {
 
-            if ((visible & MenuOptions.ROW_COPY) != 0 && (visible & MenuOptions.SEARCH) == 0)
+            if ((visible & MenuOptions.COPY_KEY) != 0 && (visible & MenuOptions.SEARCH) == 0)
             {
                 new MenuItem(menu, SWT.SEPARATOR);
             }
@@ -2763,7 +3663,7 @@ class View implements UISWTViewCoreEventListener
             {
                 menuItem = MenuFactory.addMenuItem(menu, "i18nAZ.Menus.Filters", new Listener()
                 {
-                    @Override
+                    
                     public void handleEvent(Event e)
                     {
 
@@ -2778,7 +3678,7 @@ class View implements UISWTViewCoreEventListener
 
             menuItem = MenuFactory.addMenuItem(topMenu, "i18nAZ.Menus.EmptyFilter", new Listener()
             {
-                @Override
+                
                 public void handleEvent(Event e)
                 {
                     if ((visible & MenuOptions.TOPFILTERS) != 0)
@@ -2788,14 +3688,15 @@ class View implements UISWTViewCoreEventListener
                         return;
                     }
                     Item item = (Item) menu.getData(TreeTableManager.DATAKEY_ITEM);
+                    PrebuildItem prebuildItem = (PrebuildItem) item.getData(TreeTableManager.DATAKEY_PREBUILD_ITEM);
 
-                    if (((MenuItem) e.widget).getSelection() == View.this.emptyFilter)
+                    if (((MenuItem) e.widget).getSelection() == FilterManager.getCurrentFilter().empty)
                     {
-                        View.this.emptyFilterExcludedKey.remove(item.getData(TreeTableManager.DATAKEY_KEY));
+                        FilterManager.getCurrentFilter().emptyExcludedKey.remove(prebuildItem.getKey());
                     }
                     else
                     {
-                        View.this.emptyFilterExcludedKey.add((String) item.getData(TreeTableManager.DATAKEY_KEY));
+                        FilterManager.getCurrentFilter().emptyExcludedKey.add(prebuildItem.getKey());
                     }
                     View.this.updateTreeTable();
                 }
@@ -2804,7 +3705,7 @@ class View implements UISWTViewCoreEventListener
 
             menuItem = MenuFactory.addMenuItem(topMenu, "i18nAZ.Menus.UnchangedFilter", new Listener()
             {
-                @Override
+                
                 public void handleEvent(Event e)
                 {
                     if ((visible & MenuOptions.TOPFILTERS) != 0)
@@ -2814,14 +3715,15 @@ class View implements UISWTViewCoreEventListener
                         return;
                     }
                     Item item = (Item) menu.getData(TreeTableManager.DATAKEY_ITEM);
+                    PrebuildItem prebuildItem = (PrebuildItem) item.getData(TreeTableManager.DATAKEY_PREBUILD_ITEM);
 
-                    if (((MenuItem) e.widget).getSelection() == View.this.unchangedFilter)
+                    if (((MenuItem) e.widget).getSelection() == FilterManager.getCurrentFilter().unchanged)
                     {
-                        View.this.unchangedFilterExcludedKey.remove(item.getData(TreeTableManager.DATAKEY_KEY));
+                        FilterManager.getCurrentFilter().unchangedExcludedKey.remove(prebuildItem.getKey());
                     }
                     else
                     {
-                        View.this.unchangedFilterExcludedKey.add((String) item.getData(TreeTableManager.DATAKEY_KEY));
+                        FilterManager.getCurrentFilter().unchangedExcludedKey.add(prebuildItem.getKey());
                     }
                     View.this.updateTreeTable();
                 }
@@ -2830,7 +3732,7 @@ class View implements UISWTViewCoreEventListener
 
             menuItem = MenuFactory.addMenuItem(topMenu, "i18nAZ.Menus.ExtraFilter", new Listener()
             {
-                @Override
+                
                 public void handleEvent(Event e)
                 {
                     if ((visible & MenuOptions.TOPFILTERS) != 0)
@@ -2840,14 +3742,15 @@ class View implements UISWTViewCoreEventListener
                         return;
                     }
                     Item item = (Item) menu.getData(TreeTableManager.DATAKEY_ITEM);
+                    PrebuildItem prebuildItem = (PrebuildItem) item.getData(TreeTableManager.DATAKEY_PREBUILD_ITEM);
 
-                    if (((MenuItem) e.widget).getSelection() == View.this.extraFilter)
+                    if (((MenuItem) e.widget).getSelection() == FilterManager.getCurrentFilter().extra)
                     {
-                        View.this.extraFilterExcludedKey.remove(item.getData(TreeTableManager.DATAKEY_KEY));
+                        FilterManager.getCurrentFilter().extraExcludedKey.remove(prebuildItem.getKey());
                     }
                     else
                     {
-                        View.this.extraFilterExcludedKey.add((String) item.getData(TreeTableManager.DATAKEY_KEY));
+                        FilterManager.getCurrentFilter().extraExcludedKey.add(prebuildItem.getKey());
                     }
                     View.this.updateTreeTable();
                 }
@@ -2858,7 +3761,7 @@ class View implements UISWTViewCoreEventListener
 
             menuItem = MenuFactory.addMenuItem(topMenu, "i18nAZ.Menus.RedirectKeysFilter", new Listener()
             {
-                @Override
+                
                 public void handleEvent(Event e)
                 {
                     if ((visible & MenuOptions.TOPFILTERS) != 0)
@@ -2868,14 +3771,15 @@ class View implements UISWTViewCoreEventListener
                         return;
                     }
                     Item item = (Item) menu.getData(TreeTableManager.DATAKEY_ITEM);
+                    PrebuildItem prebuildItem = (PrebuildItem) item.getData(TreeTableManager.DATAKEY_PREBUILD_ITEM);
 
-                    if (((MenuItem) e.widget).getSelection() == View.this.redirectKeysFilter)
+                    if (((MenuItem) e.widget).getSelection() == FilterManager.getCurrentFilter().redirectKeys)
                     {
-                        View.this.hideRedirectKeysFilterExcludedKey.remove(item.getData(TreeTableManager.DATAKEY_KEY));
+                        FilterManager.getCurrentFilter().hideRedirectKeysExcludedKey.remove(prebuildItem.getKey());
                     }
                     else
                     {
-                        View.this.hideRedirectKeysFilterExcludedKey.add((String) item.getData(TreeTableManager.DATAKEY_KEY));
+                        FilterManager.getCurrentFilter().hideRedirectKeysExcludedKey.add(prebuildItem.getKey());
                     }
                     View.this.updateTreeTable();
                 }
@@ -2886,12 +3790,12 @@ class View implements UISWTViewCoreEventListener
 
             menuItem = MenuFactory.addMenuItem(topMenu, "i18nAZ.Menus.HideUrlsFilter", new Listener()
             {
-                @Override
+                
                 public void handleEvent(Event e)
                 {
                     if ((visible & MenuOptions.TOPFILTERS) != 0)
                     {
-                        if (View.this.urlsFilter != 1)
+                        if (FilterManager.getCurrentFilter().urls != 1)
                         {
                             View.this.setUrlsFilterState(1);
                         }
@@ -2899,18 +3803,24 @@ class View implements UISWTViewCoreEventListener
                         {
                             View.this.setUrlsFilterState(0);
                         }
+
+                        if (TreeTableManager.getCurrent() != null)
+                        {
+                            i18nAZ.viewInstance.updateTreeTable();
+                        }
                         return;
                     }
                     Item item = (Item) menu.getData(TreeTableManager.DATAKEY_ITEM);
-                    if (View.this.urlsFilter == 1)
+                    PrebuildItem prebuildItem = (PrebuildItem) item.getData(TreeTableManager.DATAKEY_PREBUILD_ITEM);
+                    if (FilterManager.getCurrentFilter().urls == 1)
                     {
                         if (((MenuItem) e.widget).getSelection() == true)
                         {
-                            View.this.urlsFilterOverriddenStates.remove(item.getData(TreeTableManager.DATAKEY_KEY));
+                            FilterManager.getCurrentFilter().urlsOverriddenStates.remove(prebuildItem.getKey());
                         }
                         else
                         {
-                            View.this.urlsFilterOverriddenStates.put((String) item.getData(TreeTableManager.DATAKEY_KEY), 0);
+                            FilterManager.getCurrentFilter().urlsOverriddenStates.put(prebuildItem.getKey(), 0);
                             TreeTableManager.setExpanded(item, true);
                         }
                     }
@@ -2918,11 +3828,11 @@ class View implements UISWTViewCoreEventListener
                     {
                         if (((MenuItem) e.widget).getSelection() == true)
                         {
-                            View.this.urlsFilterOverriddenStates.put((String) item.getData(TreeTableManager.DATAKEY_KEY), 1);
+                            FilterManager.getCurrentFilter().urlsOverriddenStates.put(prebuildItem.getKey(), 1);
                         }
                         else
                         {
-                            View.this.urlsFilterOverriddenStates.remove(item.getData(TreeTableManager.DATAKEY_KEY));
+                            FilterManager.getCurrentFilter().urlsOverriddenStates.remove(prebuildItem.getKey());
                             TreeTableManager.setExpanded(item, true);
                         }
                     }
@@ -2933,12 +3843,12 @@ class View implements UISWTViewCoreEventListener
 
             menuItem = MenuFactory.addMenuItem(topMenu, "i18nAZ.Menus.ShowUrlsFilter", new Listener()
             {
-                @Override
+                
                 public void handleEvent(Event e)
                 {
                     if ((visible & MenuOptions.TOPFILTERS) != 0)
                     {
-                        if (View.this.urlsFilter != 2)
+                        if (FilterManager.getCurrentFilter().urls != 2)
                         {
                             View.this.setUrlsFilterState(2);
                         }
@@ -2946,29 +3856,34 @@ class View implements UISWTViewCoreEventListener
                         {
                             View.this.setUrlsFilterState(0);
                         }
+                        if (TreeTableManager.getCurrent() != null)
+                        {
+                            i18nAZ.viewInstance.updateTreeTable();
+                        }
                         return;
                     }
                     Item item = (Item) menu.getData(TreeTableManager.DATAKEY_ITEM);
-                    if (View.this.urlsFilter == 2)
+                    PrebuildItem prebuildItem = (PrebuildItem) item.getData(TreeTableManager.DATAKEY_PREBUILD_ITEM);
+                    if (FilterManager.getCurrentFilter().urls == 2)
                     {
                         if (((MenuItem) e.widget).getSelection() == true)
                         {
-                            View.this.urlsFilterOverriddenStates.remove(item.getData(TreeTableManager.DATAKEY_KEY));
+                            FilterManager.getCurrentFilter().urlsOverriddenStates.remove(prebuildItem.getKey());
                         }
                         else
                         {
-                            View.this.urlsFilterOverriddenStates.put((String) item.getData(TreeTableManager.DATAKEY_KEY), 0);
+                            FilterManager.getCurrentFilter().urlsOverriddenStates.put(prebuildItem.getKey(), 0);
                         }
                     }
                     else
                     {
                         if (((MenuItem) e.widget).getSelection() == true)
                         {
-                            View.this.urlsFilterOverriddenStates.put((String) item.getData(TreeTableManager.DATAKEY_KEY), 2);
+                            FilterManager.getCurrentFilter().urlsOverriddenStates.put(prebuildItem.getKey(), 2);
                         }
                         else
                         {
-                            View.this.urlsFilterOverriddenStates.remove(item.getData(TreeTableManager.DATAKEY_KEY));
+                            FilterManager.getCurrentFilter().urlsOverriddenStates.remove(prebuildItem.getKey());
                         }
                     }
                     TreeTableManager.setExpanded(item, true);
@@ -2987,61 +3902,119 @@ class View implements UISWTViewCoreEventListener
         final int columnIndex = TreeTableManager.Cursor.getColumn();
         if (columnIndex != -1)
         {
-            // Item column = TreeTableManager.getColumn(columnIndex);
-            final Locale selectedLocale = (Locale) TreeTableManager.getColumn(columnIndex).getData(View.DATAKEY_LOCALE);
+            final TargetLocale[] targetLocales = TargetLocaleManager.toArray();
+            final TargetLocale selectedTargetLocale = (TargetLocale) TreeTableManager.getColumn(columnIndex).getData(View.DATAKEY_TARGET_LOCALE);
 
-            MessageBox messageBox = new MessageBox(SWTSkinFactory.getInstance().getShell().getShell(), SWT.ICON_WARNING | SWT.YES | SWT.NO);
-            messageBox.setMessage(View.this.getLocalisedMessageText("i18nAZ.Messages.Remove"));
-
-            int result = messageBox.open();
-            if (result == SWT.YES)
+            MessageBoxShell messageBoxShell = null;
+            if (selectedTargetLocale.isReadOnly() == false)
             {
-                File vuzeDirectory = new File(View.this.getPluginInterface().getUtilities().getAzureusProgramDir());
-                for (int j = 0; j < this.pluginInterfaces.length; j++)
+                String[] buttons = new String[] { MessageText.getString("Button.yes"), MessageText.getString("Button.no"), MessageText.getString("Button.cancel") };
+                messageBoxShell = new MessageBoxShell(i18nAZ.getLocalisedMessageText("i18nAZ.Titles.RemoveLanguage"), i18nAZ.getLocalisedMessageText("i18nAZ.Messages.Remove1"), buttons, 1);
+            }
+            else
+            {
+                String[] buttons = new String[] { MessageText.getString("Button.confirm"), MessageText.getString("Button.cancel") };
+                messageBoxShell = new MessageBoxShell(i18nAZ.getLocalisedMessageText("i18nAZ.Titles.RemoveLanguage"), i18nAZ.getLocalisedMessageText("i18nAZ.Messages.Remove2"), buttons, 1);
+            }
+            messageBoxShell.setLeftImage("image.trash");
+            messageBoxShell.setSize(500, 120);
+            messageBoxShell.open(new UserPrompterResultListener()
+            {
+
+                
+                public void prompterClosed(int result)
                 {
-                    BundleObject bundleObject = new BundleObject(this.pluginInterfaces[j]);
-                    if (bundleObject.isValid() == true)
+                    ImageLoader.getInstance().releaseImage("image.trash");
+                    if (selectedTargetLocale.isReadOnly() == false)
                     {
-                        String localizedBundleName = bundleObject.getName() + "_" + selectedLocale.toLanguageTag().replace('-', '_');
-                        File localfile = new File(View.this.getPluginInterface().getPluginDirectoryName().toString() + "\\internat\\" + bundleObject.getPluginName() + "\\" + localizedBundleName + BundleObject.EXTENSION);
-                        if ((localfile.isFile()) && (localfile.exists()))
+                        if (result == 2)
                         {
-                            localfile.delete();
+                            return;
+                        }   
+                        if (result == 0)
+                        {
+                            LocalizablePlugin[] localizablePlugins = LocalizablePluginManager.toArray();
+                            for (int i = 0; i < localizablePlugins.length; i++)
+                            {
+                                LangFileObject[] langFileObjects = localizablePlugins[i].toArray();
+                                for (int j = 0; j < langFileObjects.length; j++)
+                                {
+                                    URL internalPath = langFileObjects[j].getInternalPath(selectedTargetLocale);
+                                    Path.getFile(internalPath).delete();
+                                }
+                            }
+                            if (selectedTargetLocale.getLocale().equals(Locale.getDefault()))
+                            {
+                                Path.getFile(i18nAZ.mergedInternalFile).delete();
+                            }
+                        }
+                        for (int i = targetLocales.length - 1; i >= 0; i--)
+                        {
+                            if (targetLocales[i].getLocale().equals(selectedTargetLocale.getLocale()))
+                            {
+                                TargetLocaleManager.remove(targetLocales[i]);
+                                TreeTableManager.removeColumns(i + 1);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (result == 1)
+                        {
+                            return;
+                        }
+                        for (int i = targetLocales.length - 1; i >= 0; i--)
+                        {
+                            if (targetLocales[i].equals(selectedTargetLocale))
+                            {
+                                String langFileId = LocalizablePluginManager.getCurrentLangFile().getId();
+                                if (targetLocales[i].getExternalPaths().containsKey(langFileId) == true)
+                                {
+                                    targetLocales[i].getExternalPaths().remove(langFileId);
+                                }
+                                if (targetLocales[i].getExternalPaths().size() == 0)
+                                {
+                                    TargetLocaleManager.remove(selectedTargetLocale);
+                                    TreeTableManager.removeColumns(i + 1);
+                                }
+                                break;
+                            }
                         }
                     }
 
+                    View.saveLocales();
+                    View.this.updateTreeTable(false, true);
                 }
-                String fileName = BundleObject.DEFAULT_NAME + "_" + selectedLocale.toLanguageTag().replace('-', '_');
-                File mergedLocalfile = new File(vuzeDirectory + File.separator + fileName + BundleObject.EXTENSION);
-                if ((mergedLocalfile.isFile()) && (mergedLocalfile.exists()))
-                {
-                    mergedLocalfile.delete();
-                }
-            }
-            // remove column
-            TreeTableManager.removeColumns(columnIndex);
-            for (int i = 0; i < this.localesProperties.size(); i++)
-            {
-                if (this.localesProperties.get(i).locale == selectedLocale)
-                {
-                    this.localesProperties.remove(i);
-                    break;
-                }
-            }
-            List<String> locales = new ArrayList<String>();
-            for (int i = 0; i < this.localesProperties.size(); i++)
-            {
-                Locale locale = this.localesProperties.get(i).locale;
-                if ((locale.toLanguageTag() != null) && (!locale.toLanguageTag().equals("")) && (!locale.toLanguageTag().equals("und")))
-                {
-                    locales.add(locale.toLanguageTag());
-                }
-            }
-            COConfigurationManager.setParameter("i18nAZ.LocalesSelected", locales);
-            COConfigurationManager.save();
-            View.this.updateTreeTable(false, false);
+            });
+          
 
         }
+    }
+
+    private static void saveLocales()
+    {
+        List<String> selectedLocales = new ArrayList<String>();
+        TargetLocale[] targetLocales = TargetLocaleManager.toArray();
+        for (int i = 0; i < targetLocales.length; i++)
+        {
+            Locale locale = targetLocales[i].getLocale();
+            if (targetLocales[i].isReference() == false)
+            {
+                String selectedLocale = Util.getLanguageTag(locale);
+                if (targetLocales[i].isReadOnly() == true)
+                {
+                    for (Iterator<Entry<String, ExternalPath>> iterator = targetLocales[i].getExternalPaths().entrySet().iterator(); iterator.hasNext();)
+                    {
+                        Entry<String, ExternalPath> entry = iterator.next();
+                        selectedLocale += "|" + entry.getValue().getLangFileId() + ":" + Path.getPath(entry.getValue().getUrl());
+
+                    }
+                }
+                selectedLocales.add(selectedLocale);
+            }
+        }
+        COConfigurationManager.setParameter("i18nAZ.LocalesSelected", selectedLocales);
+        COConfigurationManager.save();
     }
 
     void selectEditor()
@@ -3058,375 +4031,285 @@ class View implements UISWTViewCoreEventListener
 
     private void setEmptyFilter(boolean checked)
     {
-        this.emptyFilterExcludedKey.clear();
-        View.this.emptyFilter = checked;
-        COConfigurationManager.setParameter("i18nAZ.emptyFilter", View.this.emptyFilter);
-        COConfigurationManager.save();
-        View.this.emptyFilterButton.getSkinObject().switchSuffix(checked ? "-selected" : "", 4, true);
+        FilterManager.getCurrentFilter().emptyExcludedKey.clear();
+        FilterManager.getCurrentFilter().empty = checked;
+        View.checkButton(this.emptyFilterButton, checked);
+    }
+
+    private void setUnchangedFilter(boolean checked)
+    {
+        FilterManager.getCurrentFilter().unchangedExcludedKey.clear();
+        FilterManager.getCurrentFilter().unchanged = checked;
+        View.checkButton(this.unchangedFilterButton, checked);
     }
 
     private void setExtraFilter(boolean checked)
     {
-        this.extraFilterExcludedKey.clear();
-        View.this.extraFilter = checked;
-        COConfigurationManager.setParameter("i18nAZ.extraFilter", View.this.extraFilter);
-        COConfigurationManager.save();
-        View.this.extraFilterButton.getSkinObject().switchSuffix(checked ? "-selected" : "", 4, true);
+        FilterManager.getCurrentFilter().extraExcludedKey.clear();
+        FilterManager.getCurrentFilter().extra = checked;
+        View.checkButton(this.extraFilterButton, checked);
     }
 
-    private void setUrlsFilterState()
+    private void setRedirectKeysFilter(boolean checked)
     {
-        this.urlsFilterOverriddenStates.clear();
-        switch (View.this.urlsFilter)
-        {
-            case 0:
-                View.this.setUrlsFilterState(1);
-                break;
-            case 1:
-                View.this.setUrlsFilterState(2);
-                break;
-            case 2:
-                View.this.setUrlsFilterState(0);
-                break;
-        }
+        FilterManager.getCurrentFilter().hideRedirectKeysExcludedKey.clear();
+        FilterManager.getCurrentFilter().redirectKeys = checked;
+        View.checkButton(this.redirectKeysFilterButton, checked);
     }
 
     private void setUrlsFilterState(int state)
     {
-        if (TreeTableManager.getCurrent() != null)
-        {
-            TreeTableManager.getCurrent().setFocus();
-        }
-        View.this.urlsFilter = state;
-        switch (state)
-        {
-            case 0:
-                View.this.urlsFilterButton.setImage("i18nAZ.image.toolbar.urlsFilter");
-                View.this.checkButton(View.this.urlsFilterButton, false);
-                ToolTipText.set(View.this.urlsFilterButton.getSkinObject().getControl(), "i18nAZ.ToolTips.UrlsFilter.State1");
-                break;
-            case 1:
-                View.this.urlsFilterButton.setImage("i18nAZ.image.toolbar.urlsFilterOff");
-                View.this.checkButton(View.this.urlsFilterButton, true);
-                ToolTipText.set(View.this.urlsFilterButton.getSkinObject().getControl(), "i18nAZ.ToolTips.UrlsFilter.State2");
-                break;
-            case 2:
-                View.this.urlsFilterButton.setImage("i18nAZ.image.toolbar.urlsFilterOn");
-                View.this.checkButton(View.this.urlsFilterButton, true);
-                ToolTipText.set(View.this.urlsFilterButton.getSkinObject().getControl(), "i18nAZ.ToolTips.UrlsFilter.State3");
-                break;
-        }
-        if (TreeTableManager.getCurrent() != null)
-        {
-            View.this.updateTreeTable();
-        }
-        COConfigurationManager.setParameter("i18nAZ.urlsFilter", View.this.urlsFilter);
-        COConfigurationManager.save();
+        FilterManager.getCurrentFilter().urlsOverriddenStates.clear();
+        FilterManager.getCurrentFilter().urls = state;
+        View.checkButton(this.urlsFilterButton, state, "i18nAZ.image.toolbar.urlsFilter", "i18nAZ.ToolTips.UrlsFilter");
     }
 
-    private void setSearch(String text)
+    private void show(int what)
     {
-        this.searchPrefixes = new HashSet<String>();
-
-        text = (text == null) ? "" : text;
-        String prefix = "";
-        while (text.indexOf(':') != -1)
+        boolean showHeader = false;
+        boolean hideFooter = true;
+        switch (what)
         {
-            prefix = text.split(":", 2)[0];
-            boolean valid = true;
-            for (int i = 0; i < prefix.length(); i++)
-            {
-                char c = prefix.charAt(i);
-                if (c != 'k' && c != 'r' && c != 'c')
-                {
-                    valid = false;
-                    break;
-                }
-            }
-            if (valid == true)
-            {
-                for (int i = 0; i < prefix.length(); i++)
-                {
-                    this.searchPrefixes.add(Character.toString(prefix.charAt(i)));
-                }
-                text = text.split(":", 2)[1];
-                continue;
-            }
-            boolean found = true;
-            Locale[] AvailableLocales = Locale.getAvailableLocales();
-            for (int i = 0; i < AvailableLocales.length; i++)
-            {
-                if (AvailableLocales[i].toLanguageTag().equals("") == false && AvailableLocales[i].toLanguageTag().equals("und") == false && AvailableLocales[i].toLanguageTag().equals(prefix) == true)
-                {
-                    found = true;
-                    break;
-                }
-            }
-            if (found == true)
-            {
-                this.searchPrefixes.add(prefix);
-                text = text.split(":", 2)[1];
-                continue;
-            }
-            break;
+            case View.SHOW_SPLASH_SCREEN:
+
+            case View.SHOW_LOADING:
+                break;
+
+            case View.SHOW_TREETABLE:
+                hideFooter = false;
+                showHeader = true;
+                break;
+
+            case View.SHOW_WIZARD:
+                hideFooter = true;
+                break;
         }
-        if (this.searchPrefixes.size() == 0)
-        {
-            this.searchPrefixes = null;
-        }
-
-        text = text.replace("\\|", Character.toString((char) 0));
-        text = text.replace("\\!", Character.toString((char) 1));
-
-        this.searchPatterns = new HashMap<Pattern, Object>();
-
-        String[] phrases = text.split("\\|");
-        for (int i = 0; i < phrases.length; i++)
-        {
-            if (phrases[i].equals("") == false)
-            {
-                boolean searchResult = true;
-                if (phrases[i].startsWith("!"))
-                {
-                    searchResult = false;
-                    phrases[i] = phrases[i].substring(1);
-                }
-                phrases[i] = phrases[i].replace(Character.toString((char) 0), "\\|");
-                phrases[i] = phrases[i].replace(Character.toString((char) 1), "!");
-
-                String search = (this.regexSearch == true) ? phrases[i] : ("\\Q" + phrases[i].replaceAll("[|;]", "\\\\E|\\\\Q") + "\\E");
-
-                this.searchPatterns.put(Pattern.compile(search, 2), searchResult);
-            }
-        }
-        if (this.searchPatterns.size() == 0)
-        {
-            this.searchPatterns = null;
-            this.searchPrefixes = null;
-        }
-        this.updateTreeTable();
+        this.show(what, showHeader, hideFooter);
     }
 
-    void setUnchangedFilter(boolean checked)
+    private void show(int what, boolean showHeader, boolean hideFooter)
     {
-        this.unchangedFilterExcludedKey.clear();
-        View.this.unchangedFilter = checked;
-        COConfigurationManager.setParameter("i18nAZ.unchangedFilter", View.this.unchangedFilter);
-        COConfigurationManager.save();
-        View.this.unchangedFilterButton.getSkinObject().switchSuffix(checked ? "-selected" : "", 4, true);
+        boolean isSplashScreen = false;
+        boolean showLoading = false;
+        boolean showTreeTable = false;
+        boolean showWizard = false;
+        boolean showPlugin = false;
+        switch (what)
+        {
+            case View.SHOW_SPLASH_SCREEN:
+                isSplashScreen = true;
+
+            case View.SHOW_LOADING:
+                showLoading = true;
+                View.this.updateLoadingMessage(null);
+                View.this.updateProgressBar(-1);
+                break;
+            case View.SHOW_TREETABLE:
+                showTreeTable = true;
+                showPlugin = View.this.pluginsCombo.getItemCount() > 0;
+                break;
+
+            case View.SHOW_WIZARD:
+                showWizard = true;
+                break;
+        }
+        // FOOTER
+        if (hideFooter == true)
+        {
+            Util.setHeightHint(this.footerComposite, 0);
+        }
+        else
+        {
+            Util.setHeightHint(this.footerComposite, SWT.DEFAULT);
+        }
+
+        // HEADER
+        this.headerContainer.getComposite().setVisible(showHeader);
+        Util.setGridData(this.headerContainer.getComposite(), SWT.FILL, SWT.TOP, true, false, SWT.DEFAULT, showHeader == true ? SWT.DEFAULT : 0);
+
+        // LOADING
+        Util.setGridData(View.this.loadingComposite, SWT.CENTER, SWT.CENTER, false, showLoading, showLoading == true ? SWT.DEFAULT : 0);
+        View.this.loadingComposite.setVisible(showLoading);
+
+        // SPLASHSCREEN
+        if (showLoading)
+        {
+            GridLayout gridLayout = new GridLayout(isSplashScreen == true ? 1 : 2, false);
+            gridLayout.verticalSpacing = 0;
+            gridLayout.horizontalSpacing = 0;
+            gridLayout.marginHeight = 0;
+            gridLayout.marginWidth = 0;
+            View.this.loadingSubComposite.setLayout(gridLayout);
+            Util.setGridData(View.this.bannerLabel, isSplashScreen == true ? SWT.CENTER : SWT.RIGHT, SWT.BOTTOM, true, true);
+            Util.setGridData(View.this.animatedCanvas, isSplashScreen == true ? SWT.CENTER : SWT.LEFT, isSplashScreen == true ? SWT.CENTER : SWT.BOTTOM, true, true, isSplashScreen == true ? 0 : 80, isSplashScreen == true ? 0 : 80);
+            View.this.animatedCanvas.setVisible(isSplashScreen == false);
+        }
+
+        // TREETABLE
+        Util.setGridData(TreeTableManager.getCurrent(), SWT.FILL, SWT.FILL, true, showTreeTable, showTreeTable == true ? SWT.DEFAULT : -100);
+        TreeTableManager.setVisible(showTreeTable);
+
+        Util.setHeightHint(View.this.pluginComposite, (showPlugin) ? SWT.DEFAULT : 0);
+        View.this.pluginComposite.setVisible(showPlugin);
+
+        // WIZARD
+        Util.setGridData(View.this.wizardComposite, SWT.FILL, SWT.FILL, true, showWizard, showWizard == true ? SWT.DEFAULT : 0);
+        View.this.wizardComposite.setVisible(showWizard);
+
+        // redraw
+        Util.redraw(View.this.areaContainer.getComposite());
+        Util.redraw(View.this.mainChildContainer.getComposite());
+
     }
 
-    void startSaveThread()
+    void startInitialization()
     {
-        this.saveThread = new Thread(new Runnable()
+        synchronized (View.this.initialized)
         {
-            public void setInfo(final String info)
+            if (View.this.initialized.get() == false)
             {
-                View.this.display.asyncExec(new Runnable()
-                {
+                i18nAZ.log("Main initializing...");
+            }
+        }
 
-                    @Override
-                    public void run()
+        LocalePropertiesLoader.start();
+
+        if (TargetLocaleManager.isInitialized() == false)
+        {
+            i18nAZ.log("TargetLocaleManager init...");
+            TargetLocaleManager.init();
+            i18nAZ.log("TargetLocaleManager OK!");
+        }
+
+        LocalizablePluginManager.addListener(new LocalizablePluginListener()
+        {
+            
+            public void changed(LocalizablePluginEvent e)
+            {
+                Utils.execSWTThread(new AERunnable()
+                {
+                    
+                    public void runSupport()
                     {
-                        View.this.statusLabel.setText(info);
-                        View.this.statusLabel.getParent().layout();
+                        LangFileObject langFileObject = View.this.fillPluginsCombo();
+                        if (LocalizablePluginManager.setCurrentLangFile(langFileObject) == true)
+                        {
+                            synchronized (View.this.initialized)
+                            {
+                                if (View.this.initialized.get() == true)
+                                {
+                                    View.this.updateTreeTable(false, false);
+                                }
+                            }
+                        }
+                        synchronized (View.this.initialized)
+                        {
+                            if (View.this.initialized.get() == false)
+                            {
+                                View.this.initialized.set(true);
+                                i18nAZ.log("Main initialized !");
+                                View.this.enable();
+                            }
+                        }
                     }
                 });
             }
+        });
 
-            @Override
+        LocalizablePluginManager.start();
+
+        // init thread
+        AEThread2 initThread = new AEThread2("i18nAZ.initThread")
+        {
+            
             public void run()
             {
-                try
+                boolean initialized = false;
+                synchronized (View.this.initialized)
                 {
-                    while (View.this.isCreated == true)
+                    initialized = View.this.initialized.get();
+                }
+                if (initialized == false)
+                {
+                    if (View.this.sideBarEntry != null && View.this.sideBarEntry.getVitalityImages().length == 0)
                     {
-                        this.setInfo(View.this.getLocalisedMessageText("i18nAZ.Messages.Status.Ready"));
-
-                        Thread.sleep(1000);
-
-                        SaveObject saveObject = null;
-                        synchronized (View.this.saveObjects)
+                        View.this.sideBarEntry.addVitalityImage("image.sidebar.vitality.dots");
+                    }
+                    while (true)
+                    {
+                        synchronized (View.this.initialized)
                         {
-                            if (View.this.saveObjects.size() == 0)
+                            if (View.this.initialized.get() == true)
                             {
-                                continue;
-                            }
-                            saveObject = View.this.saveObjects.get(0);
-                            View.this.saveObjects.remove(0);
-                        }
-
-                        String currentSaveName = saveObject.getFile().getParentFile().getName() + File.pathSeparator + saveObject.getFile().getName();
-                        this.setInfo(View.this.getLocalisedMessageText("i18nAZ.Messages.Status.Saving"));
-
-                        // clean empty reference
-                        while (true)
-                        {
-                            boolean loop = false;
-                            for (Iterator<String> iterator = saveObject.getCommentedProperties().stringPropertyNames().iterator(); iterator.hasNext();)
-                            {
-                                String key = iterator.next();
-                                if (saveObject.getCommentedProperties().getProperty(key).equals("") == true)
+                                if (View.this.sideBarEntry != null && View.this.sideBarEntry.getVitalityImages().length > 0)
                                 {
-                                    saveObject.getCommentedProperties().remove(key);
-                                    loop = true;
-                                    break;
+                                    View.this.sideBarEntry.getVitalityImages()[0].setVisible(false);
                                 }
-
-                            }
-                            if (loop == false)
-                            {
+                                TargetLocaleManager.notifyCountListeners(null);
                                 break;
                             }
                         }
-
-                        String result = Util.saveLocaleProperties(saveObject.getCommentedProperties(), saveObject.getFile());
-
-                        // dispose
-                        saveObject.dispose();
-                        saveObject = null;
-
-                        if (result != null)
-                        {
-                            this.setInfo(View.this.getLocalisedMessageText("i18nAZ.Messages.Status.ErrorSave", new String[] { currentSaveName, result }));
-                            Thread.sleep(10000);
-                            continue;
-                        }
-
-                        // merge and store all bundle files for viewing in Vuze
-                        synchronized (View.this.saveObjects)
-                        {
-                            if (View.this.saveObjects.size() > 0)
-                            {
-                                continue;
-                            }
-                        }
-
-                        // get Buze directory
-                        File vuzeDirectory = new File(i18nAZ.viewInstance.getPluginInterface().getUtilities().getAzureusProgramDir());
-                        for (int i = 0; i < View.this.localesProperties.size(); i++)
-                        {
-                            // merge plugins properties
-                            CommentedProperties mergedlocaleProperties = new CommentedProperties();
-                            for (int j = 0; j < i18nAZ.viewInstance.pluginInterfaces.length; j++)
-                            {
-                                BundleObject bundleObject = new BundleObject(i18nAZ.viewInstance.pluginInterfaces[j]);
-                                if (bundleObject.isValid() == true)
-                                {
-                                    String localizedBundleName = bundleObject.getName();
-                                    if (i > 0)
-                                    {
-                                        localizedBundleName = localizedBundleName + "_" + View.this.localesProperties.get(i).locale.toLanguageTag().replace('-', '_');
-                                    }
-                                    File localfile = new File(i18nAZ.viewInstance.getPluginInterface().getPluginDirectoryName().toString() + "\\internat\\" + bundleObject.getPluginName() + "\\" + localizedBundleName + BundleObject.EXTENSION);
-                                    if ((localfile.isFile()) && (localfile.exists()))
-                                    {
-                                        CommentedProperties localeProperties = Util.getLocaleProperties(localfile);
-                                        if (localeProperties != null && localeProperties.IsLoaded() == true)
-                                        {
-                                            for (Iterator<String> iterator = localeProperties.stringPropertyNames().iterator(); iterator.hasNext();)
-                                            {
-                                                String key = iterator.next();
-                                                mergedlocaleProperties.put(key, localeProperties.getProperty(key));
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            // set merge file
-                            String fileName = BundleObject.DEFAULT_NAME;
-                            if (i > 0)
-                            {
-                                fileName = fileName + "_" + View.this.localesProperties.get(i).locale.toLanguageTag().replace('-', '_');
-                            }
-
-                            File localFile = new File(vuzeDirectory + File.separator + fileName + BundleObject.EXTENSION);
-
-                            // save
-                            result = Util.saveLocaleProperties(mergedlocaleProperties, localFile);
-                            if (result != null)
-                            {
-                                this.setInfo(View.this.getLocalisedMessageText("i18nAZ.Messages.Status.ErrorGlobalSave", new String[] { fileName, result }));
-                                Thread.sleep(10000);
-                                break;
-                            }
-                        }
+                        Util.sleep(1000);
                     }
                 }
-                catch (InterruptedException e)
+                LocaleProperties localeProperties = Util.loadLocaleProperties(Locale.getDefault(), i18nAZ.mergedInternalFile);
+                if (localeProperties == null)
                 {
-                    Thread.currentThread().interrupt();
+                    i18nAZ.mergeBundleFile();
+                    localeProperties = Util.loadLocaleProperties(Locale.getDefault(), i18nAZ.mergedInternalFile);
                 }
-
+                if (localeProperties != null && localeProperties.IsLoaded() == true)
+                {
+                    localeProperties.clear();
+                }
             }
-        }, "i18nAZ.saveThread");
-        this.saveThread.setDaemon(true);
-        this.saveThread.start();
+        };
+        initThread.start();
     }
 
-    private void updateInfoText()
+    void updateInfoText()
     {
-
         String localisedMessageText = "";
         if (TreeTableManager.getItemCount() == 0)
         {
-            if (View.this.searchPatterns == null)
+            if (FilterManager.getCurrentFilter().isTextEnabled() == false)
             {
-                localisedMessageText = View.this.getLocalisedMessageText("i18nAZ.Labels.Noentry");
+                localisedMessageText = i18nAZ.getLocalisedMessageText("i18nAZ.Labels.Noentry");
             }
             else
             {
-                localisedMessageText = View.this.getLocalisedMessageText("i18nAZ.Labels.UnsuccessfulSearch");
+                localisedMessageText = i18nAZ.getLocalisedMessageText("i18nAZ.Labels.UnsuccessfulSearch");
             }
         }
         else
-        {            
-            final int columnIndex = TreeTableManager.Cursor.getColumn();
-            if (columnIndex >= 2)
+        {
+            if (TreeTableManager.Cursor.getColumn() >= 2)
             {
-                
-                Thread infoThread = new Thread(new Runnable()
+                TargetLocale selectedTargetLocale = ((TargetLocale) TreeTableManager.getColumn(TreeTableManager.Cursor.getColumn()).getData(View.DATAKEY_TARGET_LOCALE));
+                CountObject counts = LocalizablePluginManager.getCurrentLangFile().getCounts(selectedTargetLocale);
+                if (FilterManager.getCurrentFilter().isTextEnabled() == false)
                 {
-                    @Override
-                    synchronized public void run()
-                    {
-                        String localisedMessageText = "";
-                        int[] counts = View.this.getCounts("", null, columnIndex);
-                        if (View.this.searchPatterns == null)
-                        {
-                            localisedMessageText = View.this.getLocalisedMessageText("i18nAZ.Labels.Informations.Prefix");
-                        }
-                        else
-                        {
-                            localisedMessageText = View.this.getLocalisedMessageText("i18nAZ.Labels.SearchResult.Prefix");
-                        }
-                        localisedMessageText += View.this.getLocalisedMessageText("i18nAZ.Labels.Informations", new String[] { String.valueOf(counts[0]), String.valueOf(counts[1]), String.valueOf(counts[2]), String.valueOf(counts[3]) });
+                    localisedMessageText = i18nAZ.getLocalisedMessageText("i18nAZ.Labels.Informations.Prefix");
+                }
+                else
+                {
+                    localisedMessageText = i18nAZ.getLocalisedMessageText("i18nAZ.Labels.SearchResult.Prefix");
+                }
+                localisedMessageText += " " + i18nAZ.getLocalisedMessageText("i18nAZ.Labels.Informations", new String[] { String.valueOf(counts.entryCount), String.valueOf(counts.emptyCount), String.valueOf(counts.unchangedCount), String.valueOf(counts.extraCount) });
 
-                        
-                        final String finalLocalisedMessageText = localisedMessageText;
-                        View.this.display.asyncExec(new Runnable()
-                        {
-                            @Override
-                            public void run()
-                            {
-                                View.this.updateToolTipColumnHeader(TreeTableManager.getColumn(columnIndex));
-                                View.this.infoText.setText(finalLocalisedMessageText);
-                            }
-                        });
-                        
-                    }
-                }, "i18nAZ.infoText");
-                infoThread.setDaemon(true);
-                infoThread.start();
-                return;
             }
             else
             {
-                localisedMessageText = View.this.getLocalisedMessageText("i18nAZ.Labels.Nolanguage");
+                localisedMessageText = i18nAZ.getLocalisedMessageText("i18nAZ.Labels.Nolanguage");
             }
         }
-        View.this.infoText.setText(localisedMessageText);      
+        this.infoText.setText(localisedMessageText);
+        this.updatePluginsCombo();
+        this.updateFilesCombo();
+        if (TreeTableManager.Cursor.getColumn() < TreeTableManager.getColumnCount())
+        {
+            this.updateToolTipColumnHeader(TreeTableManager.getColumn(TreeTableManager.Cursor.getColumn()));
+        }
     }
 
     void updateStyledTexts()
@@ -3443,39 +4326,10 @@ class View implements UISWTViewCoreEventListener
         this.cancelToolItem.setEnabled(false);
 
         // get layout datas
-        GridData parentgridData = (GridData) this.editorStyledText.getParent().getLayoutData();
-        GridData infogridData = (GridData) this.infoStyledText.getParent().getLayoutData();
-        GridData toolBargridData = (GridData) this.toolBar.getParent().getLayoutData();
-        GridData valuegridData = (GridData) this.editorStyledText.getLayoutData();
-
-        // show/hide label & editor
-        if (TreeTableManager.getSelection().length == 0 || TreeTableManager.getColumnCount() == 0)
-        {
-            // set datas
-            this.editorStyledText.setData(View.DATAKEY_SELECTED_ROW, null);
-            this.editorStyledText.setData(View.DATAKEY_SELECTED_COLUMN, 0);
-
-            // set heights
-            parentgridData.heightHint = 0;
-            infogridData.heightHint = 0;
-            toolBargridData.heightHint = 0;
-            valuegridData.heightHint = 0;
-
-            // set visible
-            this.editorStyledText.getParent().setVisible(false);
-
-            // layout all
-            this.editorStyledText.getParent().layout();
-            this.editorStyledText.getParent().getParent().layout();
-            return;
-        }
-
-        // set heights
-        parentgridData.heightHint = SWT.DEFAULT;
-        infogridData.heightHint = SWT.DEFAULT;
-
-        // set visible
-        this.editorStyledText.getParent().setVisible(true);
+        GridData footerGridData = (GridData) this.footerComposite.getLayoutData();
+        GridData infoGridData = (GridData) this.infoStyledText.getLayoutData();
+        GridData toolBarGridData = (GridData) this.toolBar.getLayoutData();
+        GridData editorGridData = (GridData) this.editorStyledText.getLayoutData();
 
         // get selected row
         Item selectedRow = TreeTableManager.Cursor.getRow();
@@ -3483,15 +4337,40 @@ class View implements UISWTViewCoreEventListener
         // get selected column
         int selectedColumn = TreeTableManager.Cursor.getColumn();
 
-        // get locales
-        Locale DefaultLocale = (Locale) TreeTableManager.getColumn(1).getData(View.DATAKEY_LOCALE);
-        Locale selectedLocale = (Locale) TreeTableManager.getColumn(selectedColumn).getData(View.DATAKEY_LOCALE);
+        // show/hide label & editor
+        if (TreeTableManager.getSelection().length == 0 || TreeTableManager.getColumnCount() < 2 || selectedRow == null)
+        {
+            // set datas
+            this.editorStyledText.setData(View.DATAKEY_SELECTED_ROW, null);
+            this.editorStyledText.setData(View.DATAKEY_SELECTED_COLUMN, 0);
 
-        // get exist
-        boolean exist = (boolean) selectedRow.getData(TreeTableManager.DATAKEY_EXIST);
+            // set heights
+            footerGridData.heightHint = 0;
+            infoGridData.heightHint = 0;
+            toolBarGridData.heightHint = 0;
+            footerGridData.heightHint = 0;
 
-        // get key
-        String key = (String) selectedRow.getData(TreeTableManager.DATAKEY_KEY);
+            // set visible
+            this.footerComposite.setVisible(false);
+
+            // layout all
+            Util.redraw(this.mainChildContainer.getComposite());
+            return;
+        }
+
+        // set heights
+        footerGridData.heightHint = SWT.DEFAULT;
+        infoGridData.heightHint = SWT.DEFAULT;
+
+        // set visible
+        this.footerComposite.setVisible(true);
+
+        // get default locales
+        TargetLocale defaultTargetLocale = (TargetLocale) TreeTableManager.getColumn(1).getData(View.DATAKEY_TARGET_LOCALE);
+        TargetLocale selectedTargetLocale = (TargetLocale) TreeTableManager.getColumn(selectedColumn).getData(View.DATAKEY_TARGET_LOCALE);
+
+        // get prebuild
+        PrebuildItem prebuildItem = (PrebuildItem) selectedRow.getData(TreeTableManager.DATAKEY_PREBUILD_ITEM);
 
         // get referenve
         String reference = TreeTableManager.getText(selectedRow, 1);
@@ -3508,25 +4387,29 @@ class View implements UISWTViewCoreEventListener
         }
 
         // get key info
-        String keyInfo = key;
+        String keyInfo = prebuildItem.getKey();
         if (selectedRow != null && TreeTableManager.getChildItemCount(selectedRow) > 0 && selectedColumn >= 2)
         {
-            int[] counts = this.getCounts(key, null, TreeTableManager.Cursor.getColumn());
-            keyInfo += " - " + this.getLocalisedMessageText("i18nAZ.Labels.Comments", new String[] { String.valueOf(counts[0]), String.valueOf(counts[1]), String.valueOf(counts[2]), String.valueOf(counts[3]) });;
+            CountObject counts = FilterManager.getCounts(prebuildItem.getKey(), selectedTargetLocale);
+            keyInfo += " - " + i18nAZ.getLocalisedMessageText("i18nAZ.Labels.Comments", new String[] { String.valueOf(counts.entryCount), String.valueOf(counts.emptyCount), String.valueOf(counts.unchangedCount), String.valueOf(counts.extraCount) });
         }
+        if (selectedTargetLocale != null && selectedTargetLocale.isReadOnly() == true && selectedTargetLocale.isVisible() == true)
+        {
+            keyInfo += " [read-only]";
+        }
+
         keyInfo += "\n";
 
         // get reference info
         String currentReferenceInfo = (reference == "") ? "" : "\n" + reference;
 
         // get comments info
-        String[] commentsLines = (String[]) selectedRow.getData(TreeTableManager.DATAKEY_COMMENTS);
         String commentsInfo = "";
-        if (commentsLines != null)
+        if (prebuildItem.getCommentsLines() != null)
         {
-            for (int i = 0; i < commentsLines.length; i++)
+            for (int i = 0; i < prebuildItem.getCommentsLines().length; i++)
             {
-                commentsInfo += commentsLines[i].replaceAll("\\n", "\\\\n") + "\n";
+                commentsInfo += prebuildItem.getCommentsLines()[i].replaceAll("\\n", "\\\\n") + "\n";
             }
             commentsInfo = Util.trimNewLine(commentsInfo);
             commentsInfo = (commentsInfo == "") ? "" : "\n\n" + commentsInfo;
@@ -3536,7 +4419,7 @@ class View implements UISWTViewCoreEventListener
         String referencesInfo = "";
         if (selectedColumn >= 2)
         {
-            String[] refs = Util.getReferences((String) this.getLocalesProperties(DefaultLocale).commentedProperties.get(key));
+            String[] refs = Util.getReferences((String) defaultTargetLocale.getProperties().get(prebuildItem.getKey()));
             while (true)
             {
                 if (refs.length > 0)
@@ -3545,19 +4428,19 @@ class View implements UISWTViewCoreEventListener
                     for (int i = 0; i < refs.length; i++)
                     {
                         referencesInfo += refs[i] + " => ";
-                        String ref = refs[i].substring(1, refs[i].length() - 1);;
+                        String ref = refs[i].substring(1, refs[i].length() - 1);
                         String value = "";
-                        if (this.getLocalesProperties(selectedLocale).commentedProperties.containsKey(ref))
+                        if (selectedTargetLocale.getProperties().containsKey(ref))
                         {
-                            value = (String) this.getLocalesProperties(selectedLocale).commentedProperties.get(ref);
+                            value = (String) selectedTargetLocale.getProperties().get(ref);
                         }
-                        else if (this.getLocalesProperties(DefaultLocale).commentedProperties.containsKey(ref))
+                        else if (defaultTargetLocale.getProperties().containsKey(ref))
                         {
-                            value = (String) this.getLocalesProperties(DefaultLocale).commentedProperties.get(ref);
+                            value = (String) defaultTargetLocale.getProperties().get(ref);
                         }
-                        else if (this.getPluginInterface().getUtilities().getLocaleUtilities().hasLocalisedMessageText(ref))
+                        else if (i18nAZ.getPluginInterface().getUtilities().getLocaleUtilities().hasLocalisedMessageText(ref))
                         {
-                            value = this.getPluginInterface().getUtilities().getLocaleUtilities().getLocalisedMessageText(ref);
+                            value = i18nAZ.getPluginInterface().getUtilities().getLocaleUtilities().getLocalisedMessageText(ref);
                         }
                         else
                         {
@@ -3588,12 +4471,12 @@ class View implements UISWTViewCoreEventListener
         this.infoStyledText.setStyleRange(styleRange);
 
         // set styles for key
-        styleRange = new StyleRange(0, key.length(), this.infoStyledText.getForeground(), null);
+        styleRange = new StyleRange(0, prebuildItem.getKey().length(), this.infoStyledText.getForeground(), null);
         styleRange.font = new Font(null, this.infoStyledText.getFont().getFontData()[0].getName(), 9, SWT.BOLD);
         this.infoStyledText.setStyleRange(styleRange);
 
         // set styles for info key
-        styleRange = new StyleRange(key.length(), keyInfo.length() - key.length(), this.infoStyledText.getForeground(), null);
+        styleRange = new StyleRange(prebuildItem.getKey().length(), keyInfo.length() - prebuildItem.getKey().length(), this.infoStyledText.getForeground(), null);
         styleRange.font = new Font(null, this.infoStyledText.getFont().getFontData()[0].getName(), 9, SWT.ITALIC);
         this.infoStyledText.setStyleRange(styleRange);
 
@@ -3612,13 +4495,13 @@ class View implements UISWTViewCoreEventListener
         styleRange.font = new Font(null, this.infoStyledText.getFont().getFontData()[0].getName(), 8, SWT.ITALIC);
         this.infoStyledText.setStyleRange(styleRange);
 
-        if (this.searchPatterns != null && (this.searchPrefixes == null || this.searchPrefixes.contains("r") == true))
+        if (FilterManager.getCurrentFilter().isTextEnabled("r") == true)
         {
-            for (Iterator<Entry<Pattern, Object>> iterator = this.searchPatterns.entrySet().iterator(); iterator.hasNext();)
+            for (Iterator<Entry<Pattern, Object>> iterator = FilterManager.getCurrentFilter().getPatterns(); iterator.hasNext();)
             {
                 Entry<Pattern, Object> entry = iterator.next();
                 Pattern searchPattern = entry.getKey();
-                boolean searchResult = (boolean) entry.getValue();
+                boolean searchResult = (Boolean) entry.getValue();
                 Matcher matcher = searchPattern.matcher(currentReferenceInfo);
                 matcher.reset();
                 while (matcher.find() == searchResult)
@@ -3628,19 +4511,34 @@ class View implements UISWTViewCoreEventListener
                 }
             }
         }
-        if (this.searchPatterns != null && (this.searchPrefixes == null || this.searchPrefixes.contains("c") == true))
+        if (FilterManager.getCurrentFilter().isTextEnabled("c") == true)
         {
-            for (Iterator<Entry<Pattern, Object>> iterator = this.searchPatterns.entrySet().iterator(); iterator.hasNext();)
+            for (Iterator<Entry<Pattern, Object>> iterator = FilterManager.getCurrentFilter().getPatterns(); iterator.hasNext();)
             {
                 Entry<Pattern, Object> entry = iterator.next();
                 Pattern searchPattern = entry.getKey();
-                boolean searchResult = (boolean) entry.getValue();
+                boolean searchResult = (Boolean) entry.getValue();
                 Matcher matcher = searchPattern.matcher(commentsInfo);
                 matcher.reset();
                 while (matcher.find() == searchResult)
                 {
-                    styleRange = new StyleRange(keyInfo.length() + currentReferenceInfo.length() + matcher.start(), matcher.end() - matcher.start(), this.infoStyledText.getForeground(), Display.getCurrent().getSystemColor(SWT.COLOR_YELLOW));
-                    this.infoStyledText.setStyleRange(styleRange);
+                    int offset = keyInfo.length() + currentReferenceInfo.length() + matcher.start();
+                    int length = matcher.end() - matcher.start();
+                    StyleRange[] styleRanges = this.infoStyledText.getStyleRanges(offset, length);
+                    if (styleRanges == null || styleRanges.length == 0)
+                    {
+                        styleRanges = new StyleRange[1];
+                        styleRanges[0] = new StyleRange(offset, length, this.infoStyledText.getForeground(), Display.getCurrent().getSystemColor(SWT.COLOR_YELLOW));
+                    }
+                    for (int j = 0; j < styleRanges.length; j++)
+                    {
+                        if (styleRanges[j].background.getRGB().equals(Display.getCurrent().getSystemColor(SWT.COLOR_YELLOW).getRGB()))
+                        {
+                            continue;
+                        }
+                        styleRanges[j].background = Display.getCurrent().getSystemColor(SWT.COLOR_YELLOW);
+                        this.infoStyledText.setStyleRange(styleRanges[j]);
+                    }
                 }
             }
         }
@@ -3648,139 +4546,143 @@ class View implements UISWTViewCoreEventListener
         this.infoStyledText.setData(View.DATAKEY_DEFAULT_STYLES, this.infoStyledText.getStyleRanges(true));
 
         // found params & references for info
-        this.infoParams = Util.getParams(keyInfo.length(), currentReferenceInfo);
-        this.infoReferences = Util.getReferences(keyInfo.length(), currentReferenceInfo);
-        this.infoUrls = Util.getUrls(keyInfo.length(), currentReferenceInfo);
+        this.infoSpellObjects = SpellChecker.get(LocalizablePluginManager.getCurrentLangFile(),  prebuildItem.getKey(), keyInfo.length(), currentReferenceInfo, null);
 
         // apply styles for infoStyledText
-        this.formatStyledText(this.infoStyledText, this.infoParams, this.infoReferences, this.infoUrls, true);
+        View.formatStyledText(this.infoStyledText, this.infoSpellObjects, true);
 
         // set data for editor
         this.editorStyledText.setData(View.DATAKEY_SELECTED_ROW, selectedRow);
         this.editorStyledText.setData(View.DATAKEY_SELECTED_COLUMN, selectedColumn);
 
+        this.editorSpellObjectManager = prebuildItem.getSpellObjectManager(selectedColumn);
+
         // set editor value
-        this.editorStyledText.setText(currentValue.equals("") == true ? reference : currentValue);
+        String text = currentValue;
+        if (currentValue.equals("") == true && selectedTargetLocale.isReadOnly() == false)
+        {
+            text = reference;
+            String result = View.this.translate(text, selectedTargetLocale.getLocale());
+            if (result != null)
+            {
+                text = result;
+            }
+        }
+        this.editorStyledText.setText(text);
 
         // show/hide editor
-        if (exist == true && selectedColumn >= 2 && !(reference.equals("") == true && currentValue.equals("") == true))
+        if (prebuildItem.isExist() == true && selectedColumn >= 2 && !(reference.equals("") == true && currentValue.equals("") == true))
         {
             // set heights
-            toolBargridData.heightHint = SWT.DEFAULT;
-            valuegridData.heightHint = SWT.DEFAULT;
-            valuegridData.minimumHeight = 100;
+            toolBarGridData.heightHint = SWT.DEFAULT;
+            editorGridData.heightHint = SWT.DEFAULT;
+            editorGridData.minimumHeight = 100;
 
             // set undo redo
-            PluginInterface pluginInterface = View.this.pluginInterfaces[View.this.pluginsCombo.getSelectionIndex()];
-            String pluginKey = "(core)";
-            if (pluginInterface != null)
-            {
-                Properties pluginProperties = pluginInterface.getPluginProperties();
-                pluginKey = pluginProperties.getProperty("plugin.id") + "_" + pluginProperties.getProperty("plugin.version");
-            }
-            this.undoRedo.set(pluginKey, key);
+            this.undoRedo.set(LocalizablePluginManager.getCurrentLangFile().getId(), prebuildItem.getKey());
 
             // set visibles
-            this.toolBar.getParent().setVisible(true);
+            this.toolBar.setVisible(true);
             this.editorStyledText.setVisible(true);
-
+            if (selectedTargetLocale.isReadOnly() == true)
+            {
+                this.undoToolItem.setEnabled(false);
+                this.redoToolItem.setEnabled(false);
+                this.cutToolItem.setEnabled(false);
+                this.copyToolItem.setEnabled(false);
+                this.pasteToolItem.setEnabled(false);
+                this.selectAllToolItem.setEnabled(false);
+                this.upperCaseToolItem.setEnabled(false);
+                this.lowerCaseToolItem.setEnabled(false);
+                this.firstCaseToolItem.setEnabled(false);
+                this.trademarkToolItem.setEnabled(false);
+                this.translateToolItem.setEnabled(false);
+                this.validateToolItem.setEnabled(false);
+                this.cancelToolItem.setEnabled(false);
+                this.editorStyledText.setEditable(false);
+                this.editorStyledText.update();
+            }
+            else
+            {
+                this.trademarkToolItem.setEnabled(true);
+                this.translateToolItem.setEnabled(true);
+                this.editorStyledText.setEditable(true);
+                this.editorStyledText.update();
+            }
         }
         else
         {
             // set heights
-            toolBargridData.heightHint = 0;
-            valuegridData.heightHint = 0;
-            valuegridData.minimumHeight = 0;
+            toolBarGridData.heightHint = 0;
+            editorGridData.heightHint = 0;
+            editorGridData.minimumHeight = 0;
 
             // set visibles
-            this.toolBar.getParent().setVisible(false);
+            this.toolBar.setVisible(false);
             this.editorStyledText.setVisible(false);
         }
 
         // layout all
-        this.editorStyledText.getParent().layout();
-        this.editorStyledText.getParent().getParent().layout();
+        if (this.loadingComposite.isVisible() == false)
+        {
+            Util.redraw(this.mainChildContainer.getComposite());
+        }
     }
 
     private void updateToolTipColumnHeader(Item column)
     {
-        CommentedProperties localeProperties = null;
-        int emptyCount = 0;
-        int entryCount = 0;
-        for (int i = 0; i < this.keys.size(); i++)
+        TargetLocale selectedTargetLocale = (TargetLocale) column.getData(View.DATAKEY_TARGET_LOCALE);
+        if (selectedTargetLocale != null && selectedTargetLocale.isReference() == false)
         {
-            int state = State.NONE;
-            String key = this.keys.get(i);
-
-            localeProperties = this.getLocalesProperties((Locale) TreeTableManager.getColumn(1).getData(View.DATAKEY_LOCALE)).commentedProperties;
-            String reference = localeProperties.getProperty(key);
-
-            state = Util.getStateOfReference(reference);
-            if ((state & State.URL) != 0 || (state & State.REDIRECT_KEY) != 0)
+            CountObject counts = LocalizablePluginManager.getCurrentLangFile().getCounts(selectedTargetLocale);
+            double percent = (1 - ((double) counts.emptyCount) / ((double) counts.entryCount));
+            if (percent > 1)
             {
-                continue;
+                percent = 1;
             }
-            entryCount++;
+            DecimalFormat decimalFormat = new DecimalFormat("0.00 %");
+            //decimalFormat.setRoundingMode(RoundingMode.DOWN);
+            decimalFormat.setMaximumFractionDigits(2);
+            decimalFormat.setMinimumFractionDigits(2);
 
-            localeProperties = this.getLocalesProperties((Locale) column.getData(View.DATAKEY_LOCALE)).commentedProperties;
-            String value = localeProperties.getProperty(key);
+            String headerTooltTipText = i18nAZ.getLocalisedMessageText("i18nAZ.ToolTips.Columns.Header.Title") + "\n\n";
+            headerTooltTipText += i18nAZ.getLocalisedMessageText("i18nAZ.ToolTips.Columns.Header.TranslationProgress", new String[] { decimalFormat.format(percent) }) + "\n";
 
-            state = Util.getStateOfValue(reference, value);
-            if ((state & State.EMPTY) != 0)
+            if (selectedTargetLocale.getLocale().getDisplayLanguage() != null && selectedTargetLocale.getLocale().getDisplayLanguage().equals("") == false)
             {
-                emptyCount++;
+                String DisplayLanguage = selectedTargetLocale.getLocale().getDisplayLanguage();
+                DisplayLanguage = Character.toTitleCase(DisplayLanguage.charAt(0)) + DisplayLanguage.substring(1).toLowerCase(selectedTargetLocale.getLocale());
+                String LocalizedDisplayLanguage = selectedTargetLocale.getLocale().getDisplayLanguage(selectedTargetLocale.getLocale());
+                LocalizedDisplayLanguage = Character.toTitleCase(LocalizedDisplayLanguage.charAt(0)) + LocalizedDisplayLanguage.substring(1).toLowerCase(selectedTargetLocale.getLocale());
+                headerTooltTipText += i18nAZ.getLocalisedMessageText("i18nAZ.ToolTips.Columns.Header.Language", new String[] { DisplayLanguage, LocalizedDisplayLanguage }) + "\n";
             }
+            if (selectedTargetLocale.getLocale().getDisplayCountry() != null && selectedTargetLocale.getLocale().getDisplayCountry().equals("") == false)
+            {
+                String DisplayCountry = selectedTargetLocale.getLocale().getDisplayCountry();
+                DisplayCountry = Character.toTitleCase(DisplayCountry.charAt(0)) + DisplayCountry.substring(1).toLowerCase(selectedTargetLocale.getLocale());
+                String LocalizedDisplayCountry = selectedTargetLocale.getLocale().getDisplayCountry(selectedTargetLocale.getLocale());
+                LocalizedDisplayCountry = Character.toTitleCase(LocalizedDisplayCountry.charAt(0)) + LocalizedDisplayCountry.substring(1).toLowerCase(selectedTargetLocale.getLocale());
+                headerTooltTipText += i18nAZ.getLocalisedMessageText("i18nAZ.ToolTips.Columns.Header.Country", new String[] { DisplayCountry, LocalizedDisplayCountry }) + "\n";
+            }
+            if (selectedTargetLocale.getLocale().getDisplayVariant() != null && selectedTargetLocale.getLocale().getDisplayVariant().equals("") == false)
+            {
+                String DisplayVariant = selectedTargetLocale.getLocale().getDisplayVariant();
+                DisplayVariant = Character.toTitleCase(DisplayVariant.charAt(0)) + DisplayVariant.substring(1).toLowerCase(selectedTargetLocale.getLocale());
+                String LocalizedDisplayVariant = selectedTargetLocale.getLocale().getDisplayVariant(selectedTargetLocale.getLocale());
+                LocalizedDisplayVariant = Character.toTitleCase(LocalizedDisplayVariant.charAt(0)) + LocalizedDisplayVariant.substring(1).toLowerCase(selectedTargetLocale.getLocale());
+                headerTooltTipText += i18nAZ.getLocalisedMessageText("i18nAZ.ToolTips.Columns.Header.Variant", new String[] { DisplayVariant, LocalizedDisplayVariant }) + "\n";
+            }
+            headerTooltTipText += i18nAZ.getLocalisedMessageText("i18nAZ.ToolTips.Columns.Header.LanguageTag", new String[] { Util.getLanguageTag(selectedTargetLocale.getLocale()).replace("-", "") }) + "\n";
+            if (selectedTargetLocale.isReadOnly() == true && selectedTargetLocale.isVisible() == true)
+            {
+                headerTooltTipText += i18nAZ.getLocalisedMessageText("i18nAZ.ToolTips.Columns.Header.Path", new String[] { Path.getPath(selectedTargetLocale.getExternalPath()) });
+            }
+            else if (selectedTargetLocale.getInternalPath() != null)
+            {
+                headerTooltTipText += i18nAZ.getLocalisedMessageText("i18nAZ.ToolTips.Columns.Header.Path", new String[] { selectedTargetLocale.getInternalPath().toString() });
+            }
+            TreeTableManager.setToolTipColumnHeader(column, headerTooltTipText);
         }
-
-        double percent = (1 - ((double) emptyCount) / ((double) entryCount));
-        if (percent > 1)
-        {
-            percent = 1;
-        }
-        DecimalFormat decimalFormat = new DecimalFormat("00.00 %");
-        decimalFormat.setRoundingMode(RoundingMode.DOWN);
-
-        Locale locale = (Locale) column.getData(View.DATAKEY_LOCALE);
-        String headerTooltTipText = this.getLocalisedMessageText("i18nAZ.ToolTips.Columns.Header.Title") + "\n\n";
-        NumberFormat.getPercentInstance(locale).setMaximumFractionDigits(2);
-        NumberFormat.getPercentInstance(locale).setMinimumFractionDigits(2);
-
-        headerTooltTipText += this.getLocalisedMessageText("i18nAZ.ToolTips.Columns.Header.TranslationProgress", new String[] { decimalFormat.format(percent) }) + "\n";
-
-        if (locale.getDisplayLanguage() != null && locale.getDisplayLanguage().equals("") == false)
-        {
-            String DisplayLanguage = locale.getDisplayLanguage();
-            DisplayLanguage = Character.toTitleCase(DisplayLanguage.charAt(0)) + DisplayLanguage.substring(1).toLowerCase(locale);
-            String LocalizedDisplayLanguage = locale.getDisplayLanguage(locale);
-            LocalizedDisplayLanguage = Character.toTitleCase(LocalizedDisplayLanguage.charAt(0)) + LocalizedDisplayLanguage.substring(1).toLowerCase(locale);
-            headerTooltTipText += this.getLocalisedMessageText("i18nAZ.ToolTips.Columns.Header.Language", new String[] { DisplayLanguage, LocalizedDisplayLanguage }) + "\n";
-        }
-        if (locale.getDisplayCountry() != null && locale.getDisplayCountry().equals("") == false)
-        {
-            String DisplayCountry = locale.getDisplayCountry();
-            DisplayCountry = Character.toTitleCase(DisplayCountry.charAt(0)) + DisplayCountry.substring(1).toLowerCase(locale);
-            String LocalizedDisplayCountry = locale.getDisplayCountry(locale);
-            LocalizedDisplayCountry = Character.toTitleCase(LocalizedDisplayCountry.charAt(0)) + LocalizedDisplayCountry.substring(1).toLowerCase(locale);
-            headerTooltTipText += this.getLocalisedMessageText("i18nAZ.ToolTips.Columns.Header.Country", new String[] { DisplayCountry, LocalizedDisplayCountry }) + "\n";
-        }
-        if (locale.getDisplayScript() != null && locale.getDisplayScript().equals("") == false)
-        {
-            String DisplayScript = locale.getDisplayScript();
-            DisplayScript = Character.toTitleCase(DisplayScript.charAt(0)) + DisplayScript.substring(1).toLowerCase(locale);
-            String LocalizedDisplayScript = locale.getDisplayScript(locale);
-            LocalizedDisplayScript = Character.toTitleCase(LocalizedDisplayScript.charAt(0)) + LocalizedDisplayScript.substring(1).toLowerCase(locale);
-            headerTooltTipText += this.getLocalisedMessageText("i18nAZ.ToolTips.Columns.Header.Script", new String[] { DisplayScript, LocalizedDisplayScript }) + "\n";
-        }
-        if (locale.getDisplayVariant() != null && locale.getDisplayVariant().equals("") == false)
-        {
-            String DisplayVariant = locale.getDisplayVariant();
-            DisplayVariant = Character.toTitleCase(DisplayVariant.charAt(0)) + DisplayVariant.substring(1).toLowerCase(locale);
-            String LocalizedDisplayVariant = locale.getDisplayVariant(locale);
-            LocalizedDisplayVariant = Character.toTitleCase(LocalizedDisplayVariant.charAt(0)) + LocalizedDisplayVariant.substring(1).toLowerCase(locale);
-            headerTooltTipText += this.getLocalisedMessageText("i18nAZ.ToolTips.Columns.Header.Variant", new String[] { DisplayVariant, LocalizedDisplayVariant }) + "\n";
-        }
-        headerTooltTipText += this.getLocalisedMessageText("i18nAZ.ToolTips.Columns.Header.LanguageTag", new String[] { locale.toLanguageTag().replace("-", "") });
-        TreeTableManager.setToolTipColumnHeader(column, headerTooltTipText);
     }
 
     private void updateTreeTable()
@@ -3793,71 +4695,101 @@ class View implements UISWTViewCoreEventListener
         this.updateTreeTable(true, savePosition);
     }
 
-    private void updateTreeTable(boolean refreshColumn, boolean savePosition)
+    private void updateTreeTable(boolean refreshColumns, boolean savePosition)
     {
+        synchronized (this.viewInitialized)
+        {
+            if (this.viewInitialized.get() == false)
+            {
+                return;
+            }
+        }
         this.addLanguageButton.setDisabled(true);
         this.exportLanguageButton.setDisabled(true);
+        this.importLanguageButton.setDisabled(true);
         this.removeLanguageButton.setDisabled(true);
         this.emptyFilterButton.setDisabled(true);
         this.unchangedFilterButton.setDisabled(true);
         this.extraFilterButton.setDisabled(true);
+        this.spellCheckerButton.setDisabled(true);
         this.treeModeButton.setDisabled(true);
         this.redirectKeysFilterButton.setDisabled(true);
         this.urlsFilterButton.setDisabled(true);
-
+        this.searchTextbox.getControl().setEnabled(false);
         this.deletableRows.clear();
+
         TreeTableManager.removeAll(savePosition);
 
-        if (refreshColumn == true)
+        TargetLocale[] targetLocales = TargetLocaleManager.toArray();
+        if (refreshColumns == true || TreeTableManager.getColumnCount() == 0 || LocalizablePluginManager.getCurrentLangFile() == null)
         {
-            this.emptyFilterExcludedKey.clear();
-            this.unchangedFilterExcludedKey.clear();
-            this.extraFilterExcludedKey.clear();
-            this.hideRedirectKeysFilterExcludedKey.clear();
-            this.urlsFilterOverriddenStates.clear();
             TreeTableManager.removeAllColumns();
-            if ((this.currentBundleObject == null || this.currentBundleObject.getPluginInterface() != this.selectedPluginInterface))
-            {
-                this.keys.clear();
-                this.currentBundleObject = new BundleObject(this.selectedPluginInterface);
-            }
 
-            if (this.currentBundleObject.isValid() == true)
+            if (LocalizablePluginManager.getCurrentLangFile() != null)
             {
                 int width = COConfigurationManager.getIntParameter("i18nAZ.columnWidth.0", 200);
-                TreeTableManager.addColumn(this.getLocalisedMessageText("i18nAZ.Columns.Key"), width);
-                for (int i = 0; i < this.localesProperties.size(); i++)
+                Item column = TreeTableManager.addColumn(i18nAZ.getLocalisedMessageText("i18nAZ.Columns.Key"), width);
+                if (column instanceof TableColumn)
                 {
-                    try
-                    {
-                        this.addLocaleColumn(this.localesProperties.get(i).locale, this.currentBundleObject);
-                    }
-                    catch (Exception e)
-                    {
-                        e.printStackTrace();
-                    }
+                    Util.addSortManager((TableColumn) column, Util.KEY_COMPARATOR);
+                }
+
+                for (int i = 0; i < targetLocales.length; i++)
+                {
+                    this.addLocaleColumn(targetLocales[i]);
                 }
             }
         }
-
+        for (int i = 1; LocalizablePluginManager.getCurrentLangFile() != null && i < targetLocales.length; i++)
+        {
+            TreeTableManager.setEnableColumn(TreeTableManager.getColumn(i + 1), targetLocales[i].isVisible());
+        }
+        if (TreeTableManager.getColumnCount() <= 1)
+        {
+            this.setRedirectKeysFilter(false);
+            this.setUrlsFilterState(0);
+        }
+        else
+        {
+            if (FilterManager.getCurrentFilter().redirectKeys != COConfigurationManager.getBooleanParameter("i18nAZ.redirectKeysFilter"))
+            {
+                this.setRedirectKeysFilter(COConfigurationManager.getBooleanParameter("i18nAZ.redirectKeysFilter"));
+            }
+            if (FilterManager.getCurrentFilter().urls != COConfigurationManager.getIntParameter("i18nAZ.urlsFilter"))
+            {
+                this.setUrlsFilterState(COConfigurationManager.getIntParameter("i18nAZ.urlsFilter", 0));
+            }
+        }
         if (TreeTableManager.getColumnCount() <= 2)
         {
             this.setEmptyFilter(false);
             this.setUnchangedFilter(false);
             this.setExtraFilter(false);
         }
-
-        TreeTableManager.buildItems(this.getPrebuildItems(null, true));
-
-        this.updateInfoText();
-
+        else
+        {
+            if (FilterManager.getCurrentFilter().empty != COConfigurationManager.getBooleanParameter("i18nAZ.emptyFilter"))
+            {
+                this.setEmptyFilter(COConfigurationManager.getBooleanParameter("i18nAZ.emptyFilter"));
+            }
+            if (FilterManager.getCurrentFilter().unchanged != COConfigurationManager.getBooleanParameter("i18nAZ.unchangedFilter"))
+            {
+                this.setUnchangedFilter(COConfigurationManager.getBooleanParameter("i18nAZ.unchangedFilter"));
+            }
+            if (FilterManager.getCurrentFilter().extra != COConfigurationManager.getBooleanParameter("i18nAZ.extraFilter"))
+            {
+                this.setExtraFilter(COConfigurationManager.getBooleanParameter("i18nAZ.extraFilter"));
+            }
+        }
         if (TreeTableManager.getColumnCount() > 0)
         {
             this.addLanguageButton.setDisabled(false);
             this.exportLanguageButton.setDisabled(false);
+            this.importLanguageButton.setDisabled(false);
             this.treeModeButton.setDisabled(false);
             this.redirectKeysFilterButton.setDisabled(false);
             this.urlsFilterButton.setDisabled(false);
+            this.searchTextbox.getControl().setEnabled(true);
         }
         if (TreeTableManager.getColumnCount() > 2)
         {
@@ -3865,14 +4797,77 @@ class View implements UISWTViewCoreEventListener
             this.unchangedFilterButton.setDisabled(false);
             this.extraFilterButton.setDisabled(false);
         }
+
+        TreeTableManager.buildItems();
+
+        TargetLocaleManager.notifyCountListeners(null);
     }
 
-    private void valid(boolean force)
+    private void valid(boolean force, int direction)
     {
+        int columnIndex = TreeTableManager.Cursor.getColumn();
+        Item selectedRow = TreeTableManager.Cursor.getRow();
+        PrebuildItem prebuildItem = null;
+
+        if (View.this.validateToolItem.getEnabled() == true)
+        {
+            if (View.this.valid(force, false) == false)
+            {
+                return;
+            }
+        }
+
+        TreeTableManager.setRedraw(false);
+        while (true)
+        {
+            TreeTableManager.Cursor.notifyListeners(SWT.KeyDown, Util.createKeyEvent(TreeTableManager.getCurrent(), direction == SWT.UP ? SWT.ARROW_UP : SWT.ARROW_DOWN));
+            selectedRow = TreeTableManager.Cursor.getRow();
+            if (TreeTableManager.Cursor.getRow() == null || selectedRow == null)
+            {
+                break;
+            }
+            if (selectedRow.equals(TreeTableManager.Cursor.getRow()) == true)
+            {
+                break;
+            }
+            selectedRow = TreeTableManager.Cursor.getRow();
+            prebuildItem = (PrebuildItem) selectedRow.getData(TreeTableManager.DATAKEY_PREBUILD_ITEM);
+            if ((force == false || View.this.deletableRows.containsValue(selectedRow) == false) && prebuildItem.isExist() == true)
+            {
+                break;
+            }
+        }
+        if (force == true)
+        {
+            View.this.clearDeletableRows();
+        }
+        if (selectedRow != null)
+        {
+            TreeTableManager.Cursor.setSelection(selectedRow, columnIndex);
+        }
+        TreeTableManager.setRedraw(true);
+        View.this.selectEditor();
+    }
+
+    private boolean valid(boolean force, boolean deleteRows)
+    {
+        synchronized (this.onValid)
+        {
+            if (this.onValid.get() == true)
+            {
+                return false;
+            }
+            this.onValid.set(true);
+        }
+
         // show/hide value editor
         if (this.editorStyledText.getVisible() == false)
         {
-            return;
+            synchronized (this.onValid)
+            {
+                this.onValid.set(false);
+            }
+            return false;
         }
 
         // init
@@ -3882,12 +4877,36 @@ class View implements UISWTViewCoreEventListener
         Item selectedRow = (Item) this.editorStyledText.getData(View.DATAKEY_SELECTED_ROW);
         if (selectedRow == null || selectedRow.isDisposed() == true)
         {
-            updateStyledTexts();
-            return;
+            this.updateStyledTexts();
+            synchronized (this.onValid)
+            {
+                this.onValid.set(false);
+            }
+            return false;
         }
 
         // get selected column
-        int selectedColumn = (int) this.editorStyledText.getData(View.DATAKEY_SELECTED_COLUMN);
+        int selectedColumn = (Integer) this.editorStyledText.getData(View.DATAKEY_SELECTED_COLUMN);
+
+        // get locale properties for save
+        TargetLocale selectedTargetLocale = (TargetLocale) TreeTableManager.getColumn(selectedColumn).getData(View.DATAKEY_TARGET_LOCALE);
+
+        // check readOnly
+        if (selectedTargetLocale.isReadOnly() == true)
+        {
+            this.updateStyledTexts();
+            synchronized (this.onValid)
+            {
+                this.onValid.set(false);
+            }
+            return false;
+        }
+        
+        // get prebuild
+        PrebuildItem prebuildItem = (PrebuildItem) selectedRow.getData(TreeTableManager.DATAKEY_PREBUILD_ITEM);
+        
+        // find spellObject
+        final SpellObject[] editorSpellObjects = View.this.editorSpellObjectManager.getSpellObjects(LocalizablePluginManager.getCurrentLangFile(), prebuildItem.getKey(), selectedTargetLocale.getLocale(), View.this.editorStyledText.getText(), View.this.multilineEditor);
 
         // get reference (the search process is in for)
         String reference = TreeTableManager.getText(selectedRow, 1);
@@ -3903,40 +4922,28 @@ class View implements UISWTViewCoreEventListener
         }
 
         // restaure styles for infoStyledText
-        this.formatStyledText(this.infoStyledText, this.infoParams, this.infoReferences, this.infoUrls, true);
+        View.formatStyledText(this.infoStyledText, this.infoSpellObjects, true);
 
         // search missing params
         if (errorMessage == null)
         {
-            for (int i = 0; i < this.infoParams.size(); i++)
+            SpellObject missingParam = SpellChecker.foundMissing(View.this.infoSpellObjects, editorSpellObjects, SpellChecker.TYPE_PARAM);
+            if (missingParam != null)
             {
-                boolean found = false;
-                for (int j = 0; j < this.editorParams.size(); j++)
-                {
-                    if (this.infoParams.get(i)[2] == this.editorParams.get(j)[2])
-                    {
-                        found = true;
-                        break;
-                    }
-                }
+                // set not found param style
+                StyleRange styleRange = new StyleRange(missingParam.getOffset(), missingParam.getLength(), new Color(Display.getCurrent(), 163, 21, 21), null);
+                styleRange.font = new Font(null, this.infoStyledText.getFont().getFontData()[0].getName(), 9, SWT.BOLD);
+                styleRange.underline = true;
+                styleRange.underlineColor = Display.getCurrent().getSystemColor(SWT.COLOR_RED);
+                styleRange.underlineStyle = SWT.UNDERLINE_SQUIGGLE;
+                this.infoStyledText.setStyleRange(styleRange);
 
-                if (found == false)
+                // show error message box
+                errorMessage = "";
+                if (TreeTableManager.Cursor.isSetFocusedRow() == false || force == true)
                 {
-                    // set not found param style
-                    StyleRange styleRange = new StyleRange(this.infoParams.get(i)[0], this.infoParams.get(i)[1], new Color(Display.getCurrent(), 163, 21, 21), null);
-                    styleRange.font = new Font(null, this.infoStyledText.getFont().getFontData()[0].getName(), 9, SWT.BOLD);
-                    styleRange.underline = true;
-                    styleRange.underlineColor = Display.getCurrent().getSystemColor(SWT.COLOR_RED);
-                    styleRange.underlineStyle = SWT.UNDERLINE_SQUIGGLE;
-                    this.infoStyledText.setStyleRange(styleRange);
-
-                    // show error message box
-                    errorMessage = "";
-                    if (TreeTableManager.Cursor.isSetFocusedRow() == false || force == true)
-                    {
-                        errorMessage = this.getLocalisedMessageText("i18nAZ.Messages.MissingParam", new String[] { "%" + String.valueOf(this.infoParams.get(i)[2]) });
-                    }
-                    break;
+                    errorMessage = i18nAZ.getLocalisedMessageText("i18nAZ.Messages.MissingParam", new String[] { missingParam.getValue() });
+                    i18nAZ.logWarning(errorMessage);
                 }
             }
         }
@@ -3944,27 +4951,15 @@ class View implements UISWTViewCoreEventListener
         // search unknown params
         if (errorMessage == null)
         {
-            for (int i = 0; i < this.editorParams.size(); i++)
+            SpellObject unknownParam = SpellChecker.foundMissing(editorSpellObjects, View.this.infoSpellObjects, SpellChecker.TYPE_PARAM);
+            if (unknownParam != null)
             {
-                boolean found = false;
-                for (int j = 0; j < this.infoParams.size(); j++)
+                // show error message box
+                errorMessage = "";
+                if (TreeTableManager.Cursor.isSetFocusedRow() == false || force == true)
                 {
-                    if (this.editorParams.get(i)[2] == this.infoParams.get(j)[2])
-                    {
-                        found = true;
-                        break;
-                    }
-                }
-
-                if (found == false)
-                {
-                    // show error message box
-                    errorMessage = "";
-                    if (TreeTableManager.Cursor.isSetFocusedRow() == false || force == true)
-                    {
-                        errorMessage = this.getLocalisedMessageText("i18nAZ.Messages.UnknownParam", new String[] { "%" + String.valueOf(this.editorParams.get(i)[2]) });
-                    }
-                    break;
+                    errorMessage = i18nAZ.getLocalisedMessageText("i18nAZ.Messages.UnknownParam", new String[] { unknownParam.getValue() });
+                    i18nAZ.logWarning(errorMessage);
                 }
             }
         }
@@ -3972,45 +4967,34 @@ class View implements UISWTViewCoreEventListener
         // search missing references
         if (errorMessage == null)
         {
-            for (int i = 0; i < this.infoReferences.size(); i++)
+            SpellObject missingReference = SpellChecker.foundMissing(View.this.infoSpellObjects, editorSpellObjects, SpellChecker.TYPE_REFERENCE);
+            if (missingReference != null && reference.equals(missingReference.getValue()) == false)
             {
-                boolean found = false;
-                for (int j = 0; j < this.editorReferences.size(); j++)
-                {
-                    if (this.infoReferences.get(i)[2].equals(this.editorReferences.get(j)[2]) == true)
-                    {
-                        found = true;
-                        break;
-                    }
-                }
+                // set not found references style
+                StyleRange styleRange = new StyleRange(missingReference.getOffset() + 1, missingReference.getLength() - 2, Display.getCurrent().getSystemColor(SWT.COLOR_BLUE), null);
+                styleRange.font = new Font(null, this.infoStyledText.getFont().getFontData()[0].getName(), 9, SWT.NORMAL);
+                styleRange.underline = true;
+                styleRange.underlineColor = Display.getCurrent().getSystemColor(SWT.COLOR_RED);
+                styleRange.underlineStyle = SWT.UNDERLINE_SQUIGGLE;
+                this.infoStyledText.setStyleRange(styleRange);
 
-                if (found == false)
+                // show error message box
+                errorMessage = "";
+                if (TreeTableManager.Cursor.isSetFocusedRow() == false || force == true)
                 {
-                    // set not found references style
-                    StyleRange styleRange = new StyleRange((int) this.infoReferences.get(i)[0] + 1, (int) this.infoReferences.get(i)[1] - 2, Display.getCurrent().getSystemColor(SWT.COLOR_BLUE), null);
-                    styleRange.font = new Font(null, this.infoStyledText.getFont().getFontData()[0].getName(), 9, SWT.NORMAL);
-                    styleRange.underline = true;
-                    styleRange.underlineColor = Display.getCurrent().getSystemColor(SWT.COLOR_RED);
-                    styleRange.underlineStyle = SWT.UNDERLINE_SQUIGGLE;
-                    this.infoStyledText.setStyleRange(styleRange);
-
-                    // show error message box
-                    errorMessage = "";
-                    if (TreeTableManager.Cursor.isSetFocusedRow() == false || force == true)
+                    if (Util.isRedirectKeys(oldValue) == true)
                     {
-                        if (Util.isRedirectKeys(oldValue) == true)
+                        if (this.editorStyledText.getText().equals("") == false)
                         {
-                            if (this.editorStyledText.getText().equals("") == false)
-                            {
-                                errorMessage = this.getLocalisedMessageText("i18nAZ.Messages.InvalidValue", new String[] { reference });
-                            }
-                        }
-                        else
-                        {
-                            errorMessage = this.getLocalisedMessageText("i18nAZ.Messages.MissingReference", new String[] { (String) this.infoReferences.get(i)[2] });
+                            errorMessage = i18nAZ.getLocalisedMessageText("i18nAZ.Messages.InvalidValue", new String[] { reference });
+                            i18nAZ.logWarning(errorMessage);
                         }
                     }
-                    break;
+                    else
+                    {
+                        errorMessage = i18nAZ.getLocalisedMessageText("i18nAZ.Messages.MissingReference", new String[] { missingReference.getValue() });
+                        i18nAZ.logWarning(errorMessage);
+                    }
                 }
             }
         }
@@ -4018,36 +5002,23 @@ class View implements UISWTViewCoreEventListener
         // Search unknown references
         if (errorMessage == null)
         {
-            for (int i = 0; i < this.editorReferences.size(); i++)
+            SpellObject unknownReference = SpellChecker.foundMissing(editorSpellObjects, View.this.infoSpellObjects, SpellChecker.TYPE_REFERENCE);
+            if (unknownReference != null)
             {
-                boolean found = false;
-                for (int j = 0; j < this.infoReferences.size(); j++)
+                // show error message box
+                errorMessage = "";
+                if (TreeTableManager.Cursor.isSetFocusedRow() == false || force == true)
                 {
-                    if (this.editorReferences.get(i)[2].equals(this.infoReferences.get(j)[2]) == true)
-                    {
-                        found = true;
-                        break;
-                    }
-                }
-
-                if (found == false)
-                {
-                    // show error message box
-                    errorMessage = "";
-                    if (TreeTableManager.Cursor.isSetFocusedRow() == false || force == true)
-                    {
-                        errorMessage = this.getLocalisedMessageText("i18nAZ.Messages.UnknownReference", new String[] { (String) this.editorReferences.get(i)[2] });
-                    }
-                    break;
+                    errorMessage = i18nAZ.getLocalisedMessageText("i18nAZ.Messages.UnknownReference", new String[] { unknownReference.getValue() });
+                    i18nAZ.logWarning(errorMessage);
                 }
             }
         }
-
+    
         // search url error
         if (errorMessage == null)
         {
-            int referenceState = ((int[]) selectedRow.getData(TreeTableManager.DATAKEY_STATES))[1];
-            if ((referenceState & State.URL) != 0)
+            if ((prebuildItem.getStates()[1] & State.URL) != 0)
             {
                 try
                 {
@@ -4059,7 +5030,8 @@ class View implements UISWTViewCoreEventListener
                     errorMessage = "";
                     if (TreeTableManager.Cursor.isSetFocusedRow() == false || force == true)
                     {
-                        errorMessage = this.getLocalisedMessageText("i18nAZ.Messages.MalformedURL", new String[] { newValue });
+                        errorMessage = i18nAZ.getLocalisedMessageText("i18nAZ.Messages.MalformedURL", new String[] { newValue });
+                        i18nAZ.logWarning(errorMessage);
                     }
                 }
 
@@ -4075,216 +5047,215 @@ class View implements UISWTViewCoreEventListener
                 messageBox.setMessage(errorMessage);
                 messageBox.open();
             }
-
-            return;
+            synchronized (this.onValid)
+            {
+                this.onValid.set(false);
+            }
+            return false;
         }
         else
         {
             TreeTableManager.Cursor.cancelfocusedRow();
         }
 
-        // get key
-        String currentKey = (String) selectedRow.getData(TreeTableManager.DATAKEY_KEY);
-
-        // get old state
-        int oldState = ((int[]) selectedRow.getData(TreeTableManager.DATAKEY_STATES))[selectedColumn];
-
         // get new state
         int newState = Util.getStateOfValue(reference, newValue);
 
         // check opportunity
-        if ((!(oldValue.equals(newValue) == true && oldState == newState) && (!(oldState == 1 && newState == 2) || force == true)) || (force == true && this.deletableRows.size() > 0))
+        if ((!(oldValue.equals(newValue) == true && prebuildItem.getStates()[selectedColumn] == newState) && (!(prebuildItem.getStates()[selectedColumn] == 1 && newState == 2) || force == true)) || (force == true && this.deletableRows.size() > 0))
         {
             // update cell
-            TreeTableManager.setText(selectedRow, selectedColumn, newValue);
+            prebuildItem.setValue(selectedColumn, newValue, newState);
+            TreeTableManager.refreshItem(selectedRow);
             TreeTableManager.setRedraw(true);
 
-            // get locale properties for save
-            CommentedProperties localeProperties = this.getLocalesProperties((Locale) TreeTableManager.getColumn(selectedColumn).getData(View.DATAKEY_LOCALE)).commentedProperties;
-
             // update resource bundle
-            localeProperties.put(currentKey, Util.unescape(newValue));
-
-            // get local file
-            File Localfile = (File) TreeTableManager.getColumn(selectedColumn).getData(View.DATAKEY_FILE);
+            selectedTargetLocale.getProperties().put(prebuildItem.getKey(), Util.unescape(newValue));
 
             // add to save objects
-            synchronized (this.saveObjects)
-            {
-                this.saveObjects.add(new SaveObject(localeProperties, Localfile, currentKey));
-            }
+            this.saveObjects.add(new SaveObject(selectedTargetLocale));
 
             // init values for check
-            boolean showable = true;
-            boolean matchesSearch = this.searchPatterns == null;
-
-            // search in key
-            if (matchesSearch == false)
-            {
-                matchesSearch = this.find(0, currentKey);
-            }
-
-            // define show row values
-            boolean showRowEmpty = this.emptyFilter;
-            boolean showRowUnchanged = this.unchangedFilter;
-            boolean showRowExtra = this.extraFilter;
-
-            for (Iterator<String> iterator = this.emptyFilterExcludedKey.iterator(); iterator.hasNext();)
-            {
-                if (currentKey.startsWith(iterator.next() + "."))
-                {
-                    showRowEmpty = !showRowEmpty;
-                    break;
-                }
-            }
-            for (Iterator<String> iterator = this.unchangedFilterExcludedKey.iterator(); iterator.hasNext();)
-            {
-                if (currentKey.startsWith(iterator.next() + "."))
-                {
-                    showRowUnchanged = !showRowUnchanged;
-                    break;
-                }
-            }
-            for (Iterator<String> iterator = this.extraFilterExcludedKey.iterator(); iterator.hasNext();)
-            {
-                if (currentKey.startsWith(iterator.next() + "."))
-                {
-                    showRowExtra = !showRowExtra;
-                    break;
-                }
-            }
-
-            // reference
-            if (matchesSearch == false && reference != null)
-            {
-                matchesSearch = this.find(1, reference);
-            }
-
-            // search in comments
-            if (matchesSearch == false)
-            {
-                String[] CommentsLines = (String[]) selectedRow.getData(TreeTableManager.DATAKEY_COMMENTS);
-                if (CommentsLines != null)
-                {
-                    String comments = "";
-                    for (int k = 0; k < CommentsLines.length; k++)
-                    {
-                        comments += CommentsLines[k].replaceAll("\\n", "\\\\n") + "\n";
-                    }
-                    matchesSearch = this.find(-1, comments);
-                }
-            }
-
-            // values
-            String rowText = reference;
-            boolean rowContainEmpty = false;
-            boolean rowContainUnchanged = false;
-            boolean rowContainExtra = false;
-
-            for (int j = 2; j < TreeTableManager.getColumnCount(); j++)
-            {
-                localeProperties = this.getLocalesProperties((Locale) TreeTableManager.getColumn(j).getData(View.DATAKEY_LOCALE)).commentedProperties;
-                if (localeProperties == null)
-                {
-                    continue;
-                }
-                String value = localeProperties.getProperty(currentKey);
-                value = (value == null) ? "" : value;
-                if (matchesSearch == false)
-                {
-                    matchesSearch = this.find(j, value);
-                }
-                int state = Util.getStateOfValue(reference, value);
-                switch (state)
-                {
-                    case State.EMPTY:
-                        rowContainEmpty = true;
-                        break;
-
-                    case State.UNCHANGED:
-                        rowContainUnchanged = true;
-                        break;
-
-                    case State.EXTRA:
-                        rowContainExtra = true;
-                        break;
-                }
-                if (j == selectedColumn)
-                {
-                    TreeTableManager.setState(selectedRow, selectedColumn, state);
-                }
-                rowText += value;
-            }
-
-            if (matchesSearch == false)
-            {
-                showable = false;
-            }
-
-            if (showable == true && (showRowEmpty || showRowUnchanged || showRowExtra))
-            {
-                showable = (rowContainEmpty && showRowEmpty) || (rowContainUnchanged && showRowUnchanged) || (rowContainExtra && showRowExtra);
-            }
-            if (rowText.equals("") == true)
-            {
-                showable = false;
-            }
+            boolean showable = FilterManager.getPrebuildItem(prebuildItem.getKey(), prebuildItem.getLangFileObject()) != null;
 
             if (showable == false && TreeTableManager.getChildItemCount(selectedRow) == 0)
             {
-                this.deletableRows.put(currentKey, selectedRow);
+                this.deletableRows.put(prebuildItem.getKey(), selectedRow);
             }
-            else if (this.deletableRows.containsKey(currentKey))
+            else if (this.deletableRows.containsKey(prebuildItem.getKey()))
             {
-                this.deletableRows.remove(currentKey);
+                this.deletableRows.remove(prebuildItem.getKey());
             }
-            if (force == true)
+            if (deleteRows == true)
             {
-                for (Iterator<Entry<String, Item>> iterator = this.deletableRows.entrySet().iterator(); iterator.hasNext();)
-                {
-                    HashSet<Item> removableItems = new HashSet<Item>();
-                    Entry<String, Item> entry = iterator.next();
-                    Item Parent = entry.getValue();
-                    removableItems.add(Parent);
-                    while (true)
-                    {
-                        Parent = TreeTableManager.getParentItem(Parent);
-                        if (Parent == null)
-                        {
-                            break;
-                        }
-                        if (TreeTableManager.getChildItemCount(Parent) == 1)
-                        {
-                            removableItems.add(Parent);
-                        }
-                        else
-                        {
-                            break;
-                        }
-                    }
-                    for (Iterator<Item> iterator2 = removableItems.iterator(); iterator2.hasNext();)
-                    {
-                        Item RemovableItem = iterator2.next();
-                        RemovableItem.dispose();
-                        RemovableItem = null;
-                    }
-                }
-
-                this.deletableRows.clear();
+                this.clearDeletableRows();
             }
-
-            // update info text
-            this.updateInfoText();
         }
 
         // set focus
-        if(TreeTableManager.getItemCount() > 0)
+        if (TreeTableManager.getItemCount() > 0)
         {
+            if (force)
+            {
+                this.updateStyledTexts();
+            }
+            View.this.validateToolItem.setEnabled(false);
+            View.this.cancelToolItem.setEnabled(false);
             TreeTableManager.Cursor.setFocus();
         }
         else
         {
-            updateStyledTexts();
+            this.updateStyledTexts();
         }
+        synchronized (this.onValid)
+        {
+            this.onValid.set(false);
+        }
+        return true;
+    }
+
+    private void clearDeletableRows()
+    {
+        for (Iterator<Entry<String, Item>> iterator = this.deletableRows.entrySet().iterator(); iterator.hasNext();)
+        {
+            HashSet<Item> removableItems = new HashSet<Item>();
+            Entry<String, Item> entry = iterator.next();
+            Item Parent = entry.getValue();
+            removableItems.add(Parent);
+            while (true)
+            {
+                Parent = TreeTableManager.getParentItem(Parent);
+                if (Parent == null)
+                {
+                    break;
+                }
+                if (TreeTableManager.getChildItemCount(Parent) == 1)
+                {
+                    removableItems.add(Parent);
+                }
+                else
+                {
+                    break;
+                }
+            }
+            for (Iterator<Item> iterator2 = removableItems.iterator(); iterator2.hasNext();)
+            {
+                Item RemovableItem = iterator2.next();
+                RemovableItem.dispose();
+                RemovableItem = null;
+            }
+        }
+        this.deletableRows.clear();
+    }
+
+    public void updateSpellCheckerButton()
+    {
+        TargetLocale targetLocale = (TargetLocale) TreeTableManager.getColumn(TreeTableManager.Cursor.getColumn()).getData(View.DATAKEY_TARGET_LOCALE);
+        Dictionary dictionary = null;
+        if (targetLocale != null)
+        {
+            dictionary = SpellChecker.getDictionary(targetLocale.getLocale());
+        }
+        this.spellCheckerButton.setDisabled(TreeTableManager.Cursor.getColumn() < 2 || dictionary == null || targetLocale.isReadOnly() == true);
+    }
+
+    public void spellCheck()
+    {
+     // View.this.show(View.SHOW_LOADING, true, false);
+        int columnIndex = TreeTableManager.Cursor.getColumn();
+        Item selectedRow = TreeTableManager.Cursor.getRow();
+
+        TargetLocale selectedTargetLocale = (TargetLocale) TreeTableManager.getColumn(columnIndex).getData(View.DATAKEY_TARGET_LOCALE);
+
+        TreeTableManager.setRedraw(false);
+        View.this.editorStyledText.setRedraw(false);
+        View.this.infoStyledText.setRedraw(false);
+        View.this.toolBar.setRedraw(false);
+        boolean isFirst = true;
+        boolean foundSelected = false;
+        SpellObject spellObject = null;
+
+        List<Item> items = Util.getAllItems(TreeTableManager.getCurrent(), null);
+
+        for (int i = 0; i < items.size(); i++)
+        {
+            Item item = items.get(i);
+            if (item.equals(selectedRow) == false && foundSelected == false)
+            {
+                continue;
+            }
+            foundSelected = true;
+            PrebuildItem prebuildItem = (PrebuildItem) item.getData(TreeTableManager.DATAKEY_PREBUILD_ITEM);
+            if (prebuildItem.isExist() == false)
+            {
+                continue;
+            }
+            String value = prebuildItem.getValues()[columnIndex];
+            if (View.this.multilineEditor == true)
+            {
+                value = Util.unescape(value);
+            }
+
+            SpellObject[] spellObjects = prebuildItem.getSpellObjectManager(columnIndex).getSpellObjects(LocalizablePluginManager.getCurrentLangFile(), prebuildItem.getKey(),selectedTargetLocale.getLocale(), value, View.this.multilineEditor);
+            int offset = 0;
+            if (isFirst == true)
+            {
+                offset = View.this.editorStyledText.getSelection().y;
+            }
+            for (int j = 0; j < spellObjects.length; j++)
+            {
+                if ((spellObjects[j].getType() & SpellChecker.TYPE_MISSPELLING) != 0)
+                {
+                    if (offset <= spellObjects[j].getOffset())
+                    {
+                        spellObject = spellObjects[j];
+                        break;
+                    }
+                }
+            }
+            if (spellObject != null)
+            {
+                if (TreeTableManager.Cursor.getRow() == null || TreeTableManager.Cursor.getRow().equals(item) == false)
+                {
+                    TreeTableManager.Cursor.setSelection(item, columnIndex);
+                }
+                break;
+            }                   
+            isFirst = false;
+        }
+        TreeTableManager.setRedraw(true);
+        View.this.editorStyledText.setRedraw(true);
+        View.this.infoStyledText.setRedraw(true);
+        View.this.toolBar.setRedraw(true);
+        // View.this.show(View.SHOW_TREETABLE); 
+        if (View.this.editorStyledText.isFocusControl() == false)
+        {
+            View.this.editorStyledText.setFocus();
+        }
+        if (spellObject != null)
+        {                   
+            View.this.editorStyledText.setSelection(spellObject.getOffset(), spellObject.getOffset() + spellObject.getLength());
+        }
+        else
+        {
+            String[] buttons = new String[] { MessageText.getString("Button.ok")}; 
+            MessageBoxShell messageBoxShell = new MessageBoxShell(i18nAZ.getLocalisedMessageText("i18nAZ.Titles.EndCheckSpelling"), i18nAZ.getLocalisedMessageText("i18nAZ.Messages.EndCheckSpelling"), buttons, 1);
+            
+            messageBoxShell.setLeftImage("i18nAZ.image.toolbar.spellChecker");
+            messageBoxShell.setSize(500, 80);
+            messageBoxShell.open(new UserPrompterResultListener()
+            {
+                
+                public void prompterClosed(int result)
+                {
+                    
+                }
+            });
+            if (TreeTableManager.getItemCount() > 0)
+            {
+                TreeTableManager.Cursor.setSelection(TreeTableManager.getItem(0), columnIndex);
+            }
+        }
+        
     }
 }

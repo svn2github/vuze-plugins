@@ -53,7 +53,10 @@ public class ToolTipText
                     {
                         fields[i].set(e, fields[i].get(event));
                     }
-                    catch (IllegalArgumentException | IllegalAccessException e1)
+                    catch (IllegalArgumentException e1)
+                    {
+                    }  
+                    catch (IllegalAccessException e1)
                     {
                     }
                 }
@@ -76,7 +79,7 @@ public class ToolTipText
                 }                                        
             }
 
-            @Override
+            
             public void handleEvent(Event e)
             {
                 if (e.type == SWT.MouseEnter || e.type == SWT.MouseExit)
@@ -129,14 +132,14 @@ public class ToolTipText
                     boolean hotted = false;
                     for(int i = this.hottedItems.size() - 1; i >= 0 ; i--)
                     {
-                        if(this.hottedItems.get(i)[0].equals(item) && (int)this.hottedItems.get(i)[1] == columnIndex)
+                        if(this.hottedItems.get(i)[0].equals(item) && (Integer)this.hottedItems.get(i)[1] == columnIndex)
                         {
                             hotted = true;
                             continue;
                         }
                         if(((Item)this.hottedItems.get(i)[0]).isDisposed() == false) 
                         {
-                            handleItemEvent((Item)this.hottedItems.get(i)[0], (int)this.hottedItems.get(i)[1], e, SWT.MouseExit);
+                            handleItemEvent((Item)this.hottedItems.get(i)[0], (Integer)this.hottedItems.get(i)[1], e, SWT.MouseExit);
                         }
                         this.hottedItems.remove(i);
                     }                    
@@ -290,19 +293,19 @@ class ToolTipTrackListener implements MouseTrackListener
         {
             if (titleParams == null)
             {
-                this.title = i18nAZ.viewInstance.getLocalisedMessageText(this.textID + ".Title");
+                this.title = i18nAZ.getLocalisedMessageText(this.textID + ".Title");
             }
             else
             {
-                this.title = i18nAZ.viewInstance.getLocalisedMessageText(this.textID + ".Title", titleParams);
+                this.title = i18nAZ.getLocalisedMessageText(this.textID + ".Title", titleParams);
             }
             if (messageParams == null)
             {
-                this.message = i18nAZ.viewInstance.getLocalisedMessageText(this.textID + ".Message");
+                this.message = i18nAZ.getLocalisedMessageText(this.textID + ".Message");
             }
             else
             {
-                this.message = i18nAZ.viewInstance.getLocalisedMessageText(this.textID + ".Message", messageParams);
+                this.message = i18nAZ.getLocalisedMessageText(this.textID + ".Message", messageParams);
             }
         }
     }
@@ -312,16 +315,16 @@ class ToolTipTrackListener implements MouseTrackListener
         return this.index;
     }
 
-    @Override
+    
     public void mouseEnter(MouseEvent e)
     {
     }
 
-    @Override
+    
     public void mouseExit(MouseEvent e)
     {
         e.data = (e.data == null) ? 0 : e.data;
-        if((int) e.data != this.getIndex())
+        if((Integer) e.data != this.getIndex())
         {
             return;
         }
@@ -333,20 +336,28 @@ class ToolTipTrackListener implements MouseTrackListener
         }
     }
 
-    @Override
+    
     public void mouseHover(MouseEvent e)
     {
         e.data = (e.data == null) ? 0 : e.data;
         Point point = null;
         if (e.widget instanceof Control)
-        {
+        {            
             Control control = ((Control) e.widget);
+            if (control.getEnabled() == false)
+            {
+                return;
+            }
             point = control.toDisplay(0, 0);
             point = new Point(point.x, point.y + control.getSize().y - control.getBorderWidth());
         }
         else if (e.widget instanceof Item)
         {          
             Control parent = (Control) Util.invoke(e.widget, "getParent");
+            if (parent.getEnabled() == false)
+            {
+                return;
+            }
             Rectangle bounds = null;
             if (e.widget instanceof ToolItem)
             {
@@ -354,7 +365,7 @@ class ToolTipTrackListener implements MouseTrackListener
             }
             else
             {
-                bounds = (Rectangle) Util.invoke(e.widget, "getBounds", new Object[] { (int) e.data });
+                bounds = (Rectangle) Util.invoke(e.widget, "getBounds", new Object[] { (Integer) e.data });
             }
             point = parent.getLocation();
             point = parent.getParent().toControl(parent.toDisplay(0,0));
@@ -367,7 +378,7 @@ class ToolTipTrackListener implements MouseTrackListener
             this.toolTip = null;
             this.toolTip = new ToolTip(this.shell, SWT.NULL);
         }
-        if((int) e.data != this.getIndex())
+        if((Integer) e.data != this.getIndex())
         {
             return;
         }   

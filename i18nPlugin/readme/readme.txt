@@ -1,4 +1,4 @@
-﻿Release 20140408 v1.3
+﻿Release 20140513 v1.4
 
 About
 =====
@@ -50,10 +50,11 @@ Usage
    If your new language is country specific, you exit close the plugin window
    and rename the file to the following format:
    MessageBundles_xx_ZZ.properties, where
-     xx = and 2 letter language code.  This will already be set for you (see 
-          http://www.ics.uci.edu/pub/ietf/http/related/iso639.txt )
-     ZZ = 2 letter country code ( see 
-          http://www.chemie.fu-berlin.de/diverse/doc/ISO_3166.html )
+     xx = 2 letter language code. 
+            This will already be set for you 
+            (see 'http://en.wikipedia.org/wiki/List_of_ISO_639-1_codes')
+     ZZ = 2 letter country code
+            (see 'http://en.wikipedia.org/wiki/ISO_3166')
 
 8) Send your language file to the  Vuze™ people
 
@@ -69,7 +70,24 @@ To see the changes made ​​to the language files in Vuze ™, restart the app
 
 changelog
 =========
-
+20140513: aka v1.4
+          New: Ability to translate all not installed plugins
+          New: Adding of spellchecker (Hunspell with JNA)
+          New: Adding of translator (powered by google)
+          New: Possibility of importing language files in read-only mode to compare
+          New: Adding a tab in the help dialog box that lists non-localizable plugins
+          New: Adding combo that lists the different language files present in each plugin
+          New: Adding a configuration view for disable download not installed plugins and reset personal dictionarie
+          New: Display the number of untranslated entries in the side bar
+          New: Displays the progress of the translation for each file and each plugin
+          Fix: Detect all the messages bundles even those not defined in the property 'plugin.langfile'
+          Fix: The export feature create a zip file with different language files saved in a separate folder
+          Fix: Changing the dialog box to delete language column
+          Fix: Changing the urls button filter for also display urls only
+          
+20140408: aka v1.3.1
+          Fix: one minor bug
+           
 20140408: aka v1.3
           Fix: Restructuring of code (with SWTSkin)
           Fix: Integration into Vuze™ toolbar

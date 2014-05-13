@@ -1,12 +1,12 @@
-﻿Version 20140408 v1.3
+﻿Version 20140513 v1.4
 
-Avant-Propos
-============
-i18nAZ est un plugin de l'application cliente Vuze™ permettant de modifier les fichier de langue de l'application (appelé 'MessagesBundle').  
+<b>Avant-Propos</b>
+
+Internationalize Vuze est un plugin de l'application cliente Vuze™ permettant de modifier les fichier de langue de l'application (appelé 'MessagesBundle').  
 
 
-Installation
-============
+<b>Installation</b>
+
 Il est recommandé d'installer le plugin en le téléchargeant depuis le site web 'http://www.vuze.com/plugins/?lang=fr_FR'
 
 Vous pouvez aussi l'installer manuellement en suivant ces instructions :
@@ -19,8 +19,8 @@ Vous pouvez aussi l'installer manuellement en suivant ces instructions :
 Dans le cas contraire, redémarrez Vuze™.
 
 
-Utilisation
-===========
+<b>Utilisation</b>
+
 1) (Recommandé) Mettre à jour Vuze™. Ce qui vous permettra de travailler avec les fichiers de langue les plus récents.
 
 2) Démarrez Vuze™.
@@ -45,18 +45,20 @@ Utilisation
 
 7) Lorsque vous avez terminé, cliquez sur "Exporter". Vous serez invité à choisir un dossier de destination. Sélectionnez-en un, et vos fichiers de langue seront enregistrés. 
    
-    Remarque pour les nouvelles langues 
-    ------------------- 
+    <u>Remarque pour les nouvelles langues</u>
+
     Si votre nouvelle langue est spécifique au pays, vous devez renommez le fichier au format suivant: 
-    MessageBundles_xx_ZZ.properties, où 
-      xx = les 2 lettres du code de langue. (En savoir plus sur 'http://www.ics.uci.edu/pub/ietf/http/related/iso639.txt') 
-      Code pays ZZ = 2 lettres (En savoir plus sur 'http://www.chemie.fu-berlin.de/diverse/doc/ISO_3166.html')
+    MessageBundles_xx_ZZ.properties, où :
+      xx = les 2 lettres du code de langue 
+           (En savoir plus sur 'http://fr.wikipedia.org/wiki/Liste_des_codes_ISO_639-1') 
+      ZZ = les 2 lettres du code pays
+           (En savoir plus sur 'http://fr.wikipedia.org/wiki/ISO_3166')
 
 8) Envoyer votre fichier de langue à la communauté Vuze™.
 
 
-Affichage de votre langue 
-========================= 
+<b>Affichage de votre langue</b>
+
 Pour voir les modifications apportés aux fichiers de langue dans Vuze™, redémarrez l'application.
 
 
@@ -64,9 +66,25 @@ Pour voir les modifications apportés aux fichiers de langue dans Vuze™, redé
 
 
 
-Journal des modifications 
-=========
-
+<b>Journal des modifications</b>
+20140513: aka v1.4
+          Nouveau: Possibilité de traduire les plugins qui ne sont pas installés
+          Nouveau: Ajout d'un correcteur orthographique (Hunspell avec JNA)
+          Nouveau: Ajout d'un traducteur (fourni par Google)
+          Nouveau: Possibilité d'importer des fichiers de langue en lecture seule pour comparer
+          Nouveau: Ajout d'un onglet dans la boîte de dialogue d'aide qui répertorie les plugins non localisables
+          Nouveau: Ajout d'un combo qui liste les différents fichiers de langue présents dans chaque plugin
+          Nouveau: Ajout d'une vue de configuration pour désactiver le téléchargement des plugins qui ne sont pas installés et pour réinitialiser le dictionaire personnel
+          Nouveau: Affichage du nombre d'entrées non traduites dans la barre latérale
+          Nouveau: Affichage de la progression de la traduction pour chaque fichier et chaque plugin
+          Correction: Détection de tous les fichiers de langue même ceux qui n'ont pas été défini dans la propriété 'plugin.langfile'
+          Correction: La fonction d'exportation crée maintenant un fichier zip avec les différents fichiers de langue enregistrés dans un dossier séparé
+          Correction: Modification de la boîte de dialogue permettant de supprimer une colonne de langue
+          Correction: Changement du bouton de filtre URL pour n'afficher aussi que les URLs
+          
+20140408: aka v1.3.1
+          Correction: un bug mineur
+          
 20140408: aka v1.3
           Correction: Restructuration du code (avec SWTSkin)
           Correction: Intégration dans la barre d’outils de Vuze™

@@ -790,7 +790,7 @@ public class View implements UISWTViewEventListener {
     	keysSorted, 
     	new Comparator<String>()
     	{
-    		@Override
+    		//@Override
     		public int 
     		compare(
     			String s1, String s2) 

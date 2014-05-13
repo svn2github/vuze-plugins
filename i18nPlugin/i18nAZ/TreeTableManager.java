@@ -6,14 +6,16 @@
 
 package i18nAZ;
 
+import i18nAZ.FilterManager.PrebuildItem;
+import i18nAZ.FilterManager.PrebuildItemCollection;
+import i18nAZ.FilterManager.State;
+import i18nAZ.TargetLocaleManager.TargetLocale;
 import i18nAZ.View.MenuOptions;
-import i18nAZ.View.State;
 
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 
 import org.eclipse.swt.SWT;
@@ -21,10 +23,8 @@ import org.eclipse.swt.custom.TableCursor;
 import org.eclipse.swt.custom.TreeCursor;
 import org.eclipse.swt.events.ControlAdapter;
 import org.eclipse.swt.events.ControlEvent;
-import org.eclipse.swt.events.DisposeEvent;
-import org.eclipse.swt.events.DisposeListener;
-import org.eclipse.swt.events.KeyAdapter;
 import org.eclipse.swt.events.KeyEvent;
+import org.eclipse.swt.events.KeyListener;
 import org.eclipse.swt.events.MenuDetectEvent;
 import org.eclipse.swt.events.MenuDetectListener;
 import org.eclipse.swt.events.MouseAdapter;
@@ -32,15 +32,15 @@ import org.eclipse.swt.events.MouseEvent;
 import org.eclipse.swt.events.MouseTrackAdapter;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.TreeEvent;
+import org.eclipse.swt.events.TreeListener;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
-import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.widgets.Canvas;
 import org.eclipse.swt.widgets.Composite;
-import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Item;
@@ -53,10 +53,10 @@ import org.eclipse.swt.widgets.Tree;
 import org.eclipse.swt.widgets.TreeColumn;
 import org.eclipse.swt.widgets.TreeItem;
 import org.eclipse.swt.widgets.TypedListener;
-import org.eclipse.swt.widgets.Widget;
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 
 import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectContainer;
+
 
 /**
  * TreeTableManager.java
@@ -65,12 +65,7 @@ import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectContainer;
  */
 class TreeTableManager
 {
-    static final String DATAKEY_KEY = "key";
-    static final String DATAKEY_COMMENTS = "comments";
-    static final String DATAKEY_VALUES = "values";
-    static final String DATAKEY_EXIST = "exist";
-    static final String DATAKEY_CHILDS = "childs";
-    static final String DATAKEY_STATES = "states";
+    static final String DATAKEY_PREBUILD_ITEM = "prebuildItem";
     static final String DATAKEY_ITEM = "item";
     static final String DATAKEY_COLUMN_INDEX = "columnIndex";
 
@@ -83,7 +78,7 @@ class TreeTableManager
     static Color COLOR_ROW_HOT_RECTANGLE_FOREGROUND = null;
     static Color COLOR_ROW_SELECTED_BACKGROUND = null;
     static Color COLOR_ROW_HOT_SELECTED_BACKGROUND = null;
-     static Color COLOR_ROW_HOT_BACKGROUND = null;
+    static Color COLOR_ROW_HOT_BACKGROUND = null;
     static final Color COLOR_CELL_BACKGROUND = new Color(Display.getCurrent(), 174, 178, 181);
 
     static final Color COLOR_ROW_SELECTED_FOREGROUND = Display.getCurrent().getSystemColor(SWT.COLOR_WHITE);
@@ -100,9 +95,9 @@ class TreeTableManager
 
     private static Composite areaComposite = null;
 
-    private static HashSet<String> expandedkeys = new HashSet<String>();
-    private static String selectedKey = "";
-    private static int relativeTopIndex = -1;
+    private static Map<String, HashSet<String>> expandedkeys = new HashMap<String, HashSet<String>>();
+    private static Map<String, String> selectedKeys = new HashMap<String, String>();
+    private static Map<String, Integer> relativeTopIndexes = new HashMap<String, Integer>();
 
     private static Image EmptyImage = null;
     private static Image UnchangedImage = null;
@@ -110,6 +105,177 @@ class TreeTableManager
 
     private static Item focusedRow = null;
     private static int focusedColumn = 0;
+
+    private static int oldColumn = -1;
+    private static String oldLangFileId = "";
+    private static ItemListener itemListener = new ItemListener();
+    private static int selectedColumnsIndex = -1;
+
+    private static class ItemListener implements Listener
+    {
+        private Item itemHot = null;
+
+        private int getTotalWidth()
+        {
+            int width = 0;
+            for (int i = 0; i < TreeTableManager.getColumnCount(); i++)
+            {
+                switch (TreeTableManager.CurrentMode)
+                {
+                    case TreeTableManager.MODE_TABLE:
+                        width += ((TableColumn) TreeTableManager.getColumn(i)).getWidth();
+                        break;
+                    default:
+                        width += ((TreeColumn) TreeTableManager.getColumn(i)).getWidth();
+                        break;
+                }
+
+            }
+            return width;
+        }
+
+        private String getText(GC gc, Item item, int column)
+        {
+            int width = ((TableColumn) TreeTableManager.getColumn(column)).getWidth() - 12;
+            String text = TreeTableManager.getText(item, column);
+            text = (text == null) ? "" : text;
+            if (gc.textExtent(text).x > width)
+            {
+                int ellipseWidth = gc.textExtent("...").x;
+                int length = text.length();
+                while (length > 0)
+                {
+                    length--;
+                    text = text.substring(0, length);
+                    if (gc.textExtent(text).x + ellipseWidth <= width)
+                    {
+                        text = text + "...";
+                        break;
+                    }
+                }
+            }
+            return text;
+        }
+
+        
+        public void handleEvent(Event e)
+        {
+            if (((Composite) e.widget).getVisible() == false)
+            {
+                e.doit = false;
+                return;
+            }
+            switch (e.type)
+            {
+                case SWT.EraseItem:
+
+                    // INIT
+                    Rectangle originalClipping = e.gc.getClipping();
+                    e.detail &= ~SWT.FOCUSED;
+                    
+                    // FOREGROUND
+                    if (e.index == 0 && TreeTableManager.CurrentMode == TreeTableManager.MODE_TABLE)
+                    {
+                        e.detail &= ~SWT.FOREGROUND;
+                    }
+
+                    // NO HOT NO SELECTED
+                    if (this.itemHot != null && this.itemHot.equals(e.item) == true && (e.detail & SWT.HOT) == 0 && e.index > 0)
+                    {
+                        e.detail |= SWT.HOT;
+                    }
+                    if ((e.detail & SWT.HOT) == 0 && e.index == 0)
+                    {
+                        this.itemHot = null;
+                    }
+                    if ((e.detail & SWT.HOT) == 0 && (e.detail & SWT.SELECTED) == 0 && TreeTableManager.CurrentMode == TreeTableManager.MODE_TABLE)
+                    {
+                        e.gc.fillRectangle(e.x, e.y, e.width, e.height);
+                    }
+
+                    // HOT
+                    if ((e.detail & SWT.HOT) != 0)
+                    {
+                        e.detail &= ~SWT.BACKGROUND;
+                        if (e.index == 0)
+                        {
+                            this.itemHot = (Item) e.item;
+                        }
+                        e.gc.setBackground(TreeTableManager.COLOR_ROW_HOT_BACKGROUND);
+                        Rectangle rowClipping = e.gc.getClipping();
+                        rowClipping.width = this.getTotalWidth() - e.x;
+                        e.gc.setClipping(rowClipping);
+                        e.gc.fillRectangle(e.x, e.y, rowClipping.width, e.height);
+                        Color foreground = e.gc.getForeground();
+                        e.gc.setForeground(TreeTableManager.COLOR_ROW_HOT_RECTANGLE_FOREGROUND);
+                        e.gc.drawRectangle(0, e.y, this.getTotalWidth() - 1, e.height - 1);
+                        e.gc.setForeground(foreground);
+                    }
+
+                    // SELECTED
+                    if ((e.detail & SWT.SELECTED) != 0)
+                    {
+                        e.detail &= ~SWT.SELECTED;
+                        e.detail &= ~SWT.BACKGROUND;
+                        Rectangle rowClipping = e.gc.getClipping();
+                        rowClipping.width = this.getTotalWidth() - e.x;
+                        e.gc.setClipping(rowClipping);
+                        if ((e.detail & SWT.HOT) != 0)
+                        {
+                            e.gc.setBackground(TreeTableManager.COLOR_ROW_HOT_SELECTED_BACKGROUND);
+                            e.gc.setForeground(TreeTableManager.COLOR_ROW_HOT_RECTANGLE_FOREGROUND);
+                        }
+                        else
+                        {
+                            e.gc.setBackground(TreeTableManager.COLOR_ROW_SELECTED_BACKGROUND);
+                            e.gc.setForeground(TreeTableManager.COLOR_ROW_SELECTED_RECTANGLE_FOREGROUND);
+                        }
+                        e.gc.fillRectangle(e.x, e.y, rowClipping.width, e.height);
+                        e.gc.drawRectangle(0, e.y, this.getTotalWidth() - 1, e.height - 1);
+
+                        e.gc.setForeground(TreeTableManager.COLOR_ROW_SELECTED_FOREGROUND);
+                    }
+
+                    e.gc.setClipping(originalClipping);
+                    e.detail &= ~SWT.HOT;
+
+                    break;
+                case SWT.MeasureItem:
+                    if (e.index == 0 && TreeTableManager.CurrentMode == TreeTableManager.MODE_TABLE)
+                    {
+                        String text = this.getText(e.gc, (Item) e.item, e.index);
+                        Point size = e.gc.textExtent(text);
+                        e.width = size.x;
+                        e.height = Math.max(e.height, size.y);
+                    }
+
+                    break;
+
+                case SWT.PaintItem:
+
+                    if (e.index == 0 && TreeTableManager.CurrentMode == TreeTableManager.MODE_TABLE)
+                    {
+                        TableItem item = (TableItem) e.item;
+                        String text = this.getText(e.gc, item, e.index);
+                        Point size = e.gc.textExtent(text);
+                        int offset2 = e.index == 0 ? Math.max(0, (e.height - size.y) / 2) : 0;
+                        if ((e.detail & SWT.SELECTED) != 0)
+                        {
+                            e.gc.setForeground(Display.getCurrent().getSystemColor(SWT.COLOR_WHITE));
+                        }
+                        e.gc.drawText(text, e.x + 6, e.y + offset2, true);
+                    }
+                    break;
+            }
+        }
+    };
+
+    private static class SearchResult
+    {
+        int index = -1;
+        Item item = null;
+        boolean success = false;
+    }
 
     static class Cursor
     {
@@ -126,6 +292,7 @@ class TreeTableManager
                     break;
             }
         }
+
         private static void addSelectionListener(SelectionAdapter listener)
         {
             switch (TreeTableManager.CurrentMode)
@@ -147,7 +314,7 @@ class TreeTableManager
         }
 
         static int getColumn()
-        {        
+        {
             switch (TreeTableManager.CurrentMode)
             {
                 case TreeTableManager.MODE_TABLE:
@@ -169,10 +336,12 @@ class TreeTableManager
                     return ((TreeCursor) TreeTableManager.cursor).getRow();
             }
         }
+
         static boolean isFocusControl()
         {
             return TreeTableManager.cursor.isFocusControl();
         }
+
         static boolean isSetFocusedRow()
         {
             return TreeTableManager.focusedRow != null;
@@ -181,11 +350,10 @@ class TreeTableManager
         private static void onSelect()
         {
             // set undo redo
-            if(i18nAZ.viewInstance.undoRedo != null)
+            if (i18nAZ.viewInstance.undoRedo != null)
             {
                 i18nAZ.viewInstance.undoRedo.unset();
             }
-            
             if (TreeTableManager.focusedRow != null)
             {
                 TreeTableManager.Cursor.setSelection(TreeTableManager.focusedRow, TreeTableManager.focusedColumn);
@@ -195,84 +363,115 @@ class TreeTableManager
             }
             if (TreeTableManager.getCurrent().getVisible() == true && ((TreeTableManager.isTreeMode() == false && TreeTableManager.treeTable instanceof Table) || (TreeTableManager.isTreeMode() == true && TreeTableManager.treeTable instanceof Tree)))
             {
-                try
+                if (TreeTableManager.getItemCount() > 0)
                 {
-                    if (TreeTableManager.getItemCount() > 0)
+                    if (TreeTableManager.getColumnCount() > 2)
                     {
-                        if (TreeTableManager.getColumnCount() >= 2)
+                        int targetIndex = TreeTableManager.Cursor.getColumn();
+
+                        while (targetIndex > 2 && ((TargetLocale) TreeTableManager.getColumn(targetIndex).getData(View.DATAKEY_TARGET_LOCALE)).isVisible() == false)
                         {
-                            if (TreeTableManager.Cursor.getColumn() < 2)
+                            if(TreeTableManager.Cursor.getColumn() < TreeTableManager.oldColumn)
                             {
-                                TreeTableManager.Cursor.setSelection(TreeTableManager.Cursor.getRow(), 2);
-                                return;
+                                targetIndex--;
+                                if (targetIndex < 2)
+                                {
+                                    targetIndex = 0;
+                                    break;
+                                }
                             }
+                            if(TreeTableManager.Cursor.getColumn() > TreeTableManager.oldColumn)
+                            {
+                                targetIndex++;
+                                if (targetIndex >= TreeTableManager.getColumnCount())
+                                {
+                                    targetIndex = 0;
+                                    break;
+                                }
+                            }                          
                         }
-                        Item row = TreeTableManager.Cursor.getRow();
-                        boolean exist = false;
-                        if (row != null)
+                        if (targetIndex < 2)
                         {
-                            TreeTableManager.setSelection(TreeTableManager.Cursor.getRow());
-                            exist = (boolean) TreeTableManager.Cursor.getRow().getData(TreeTableManager.DATAKEY_EXIST);
+                            targetIndex = 2;
                         }
-                        TreeTableManager.setBackgroundColumn();
-                        TreeTableManager.Cursor.setVisible(exist);
+                        if(TreeTableManager.Cursor.getColumn() != targetIndex)
+                        {
+                            TreeTableManager.Cursor.setSelection(TreeTableManager.Cursor.getRow(), targetIndex);
+                            return;
+                        }                        
                     }
-                    i18nAZ.viewInstance.updateStyledTexts();
-                    TreeTableManager.Cursor.setFocus();
+                    Item row = TreeTableManager.Cursor.getRow();
+                    boolean exist = false;
+                    if (row != null)
+                    {
+                        TreeTableManager.setSelection(TreeTableManager.Cursor.getRow());
+                        PrebuildItem prebuildItem = (PrebuildItem) TreeTableManager.Cursor.getRow().getData(TreeTableManager.DATAKEY_PREBUILD_ITEM);
+                        exist = prebuildItem.isExist();
+                    }
+                    TreeTableManager.setBackgroundColumn();
+                    TreeTableManager.Cursor.setVisible(exist && TreeTableManager.getColumnCount() > 2);
                 }
-                catch (Exception e)
+                i18nAZ.viewInstance.updateStyledTexts();
+                if (oldColumn != TreeTableManager.Cursor.getColumn())
                 {
-                    e.printStackTrace();
+                    oldColumn = TreeTableManager.Cursor.getColumn();
+                    i18nAZ.viewInstance.updateInfoText();
                 }
+                TreeTableManager.Cursor.setFocus();
             }
         }
 
         static void setDefaultSelection()
         {
-            int selectedRowIndex = -1;
-            Item selectedItem = null;
-            if (TreeTableManager.selectedKey.equals("") == false)
+            if(TreeTableManager.getItemCount() == 0 || TreeTableManager.getColumnCount() == 0)
             {
-                Object[] datas = TreeTableManager.getSelectedRowIndex(TreeTableManager.treeTable, TreeTableManager.selectedKey, -1);
-                selectedItem = (Item) datas[2];
-                selectedRowIndex = (selectedItem == null) ? -1 : (int) datas[0];
-
+                TreeTableManager.Cursor.onSelect();
+                return;
             }
+            int selectedRowIndex = -1;
+            Item selectedItem = TreeTableManager.getItem(0);
+            if (LocalizablePluginManager.getCurrentLangFile() != null && TreeTableManager.selectedKeys.containsKey(LocalizablePluginManager.getCurrentLangFile().getId()) == true && TreeTableManager.selectedKeys.get(LocalizablePluginManager.getCurrentLangFile().getId()).equals("") == false)
+            {
+                SearchResult searchResult = TreeTableManager.getSelectedRowIndex(TreeTableManager.treeTable, TreeTableManager.selectedKeys.get(LocalizablePluginManager.getCurrentLangFile().getId()));
+                if (searchResult.success == true)
+                {
+                    selectedItem = searchResult.item;
+                    selectedRowIndex = searchResult.index;
+                }
+            }
+            int columnIndex = TreeTableManager.selectedColumnsIndex;
+            if(columnIndex >= TreeTableManager.getColumnCount())
+            {
+                columnIndex = TreeTableManager.getColumnCount() - 1;
+            }
+            if(columnIndex < 2)
+            {
+                columnIndex = 2;
+            }
+            TreeTableManager.Cursor.setSelection(selectedItem,  columnIndex);            
             if (selectedRowIndex != -1)
             {
-                TreeTableManager.Cursor.setSelection(selectedItem, 0);
-
-                Object[] datas = TreeTableManager.getSelectedRowIndex(TreeTableManager.treeTable, selectedItem, -1);
-                selectedRowIndex = (int) datas[0];
-
-                if (TreeTableManager.relativeTopIndex != -1)
+                SearchResult searchResult = TreeTableManager.getSelectedRowIndex(TreeTableManager.treeTable, selectedItem);
+                selectedRowIndex = searchResult.index;
+                if (TreeTableManager.relativeTopIndexes.containsKey(LocalizablePluginManager.getCurrentLangFile().getId()) == true && TreeTableManager.relativeTopIndexes.get(LocalizablePluginManager.getCurrentLangFile().getId()) != -1)
                 {
                     switch (TreeTableManager.CurrentMode)
                     {
                         case TreeTableManager.MODE_TABLE:
-                            int topIndex = selectedRowIndex - TreeTableManager.relativeTopIndex;
+                            int topIndex = selectedRowIndex - TreeTableManager.relativeTopIndexes.get(LocalizablePluginManager.getCurrentLangFile().getId());
                             ((Table) TreeTableManager.treeTable).setTopIndex(topIndex);
                             break;
 
                         default:
-                            Item topItem = (Item) TreeTableManager.getSelectedRowIndex(TreeTableManager.treeTable, selectedRowIndex - TreeTableManager.relativeTopIndex, -1)[2];
+                            Item topItem = TreeTableManager.getSelectedRowIndex(TreeTableManager.treeTable, selectedRowIndex - TreeTableManager.relativeTopIndexes.get(LocalizablePluginManager.getCurrentLangFile().getId())).item;
                             if (topItem != null)
                             {
-                                ((Tree) TreeTableManager.treeTable).setTopItem((TreeItem) topItem);
+                               ((Tree) TreeTableManager.treeTable).setTopItem((TreeItem) topItem);
                             }
                             break;
                     }
                 }
-                TreeTableManager.Cursor.setSelection(selectedItem, 2);
-            }
-            else if (TreeTableManager.getItemCount() > 0)
-            {
-                TreeTableManager.Cursor.setSelection(TreeTableManager.getItem(0), 2);
-            }
-            else
-            {
-                TreeTableManager.Cursor.onSelect();
-            }
+            }            
         }
 
         static boolean setFocus()
@@ -295,8 +494,36 @@ class TreeTableManager
             TreeTableManager.focusedRow = row;
             TreeTableManager.focusedColumn = column;
         }
+        static void setColumn(Item column)
+        {
+            TreeTableManager.Cursor.setColumn(TreeTableManager.indexOf(column));
+        }
+        private static void setColumn(int columnIndex)
+        {
+            try
+            {
+                if (TreeTableManager.Cursor.getRow() != null && TreeTableManager.Cursor.getRow().isDisposed() == false &&columnIndex >= 0 && columnIndex < TreeTableManager.getColumnCount())
+                {
+                    switch (TreeTableManager.CurrentMode)
+                    {
+                        case TreeTableManager.MODE_TABLE:
+                            ((TableCursor) TreeTableManager.cursor).setSelection(((TableCursor) TreeTableManager.cursor).getRow(), columnIndex);
+                            break;
 
-        private static void setSelection(Item row, int columnIndex)
+                        default:
+                            ((TreeCursor) TreeTableManager.cursor).setSelection(((TreeCursor) TreeTableManager.cursor).getRow(), columnIndex);
+                            break;
+                    }
+                }
+            }
+            catch (IllegalArgumentException e)
+            {
+                e.printStackTrace();
+                return;
+            }
+        }
+
+        static void setSelection(Item row, int columnIndex)
         {
             try
             {
@@ -305,7 +532,7 @@ class TreeTableManager
                     switch (TreeTableManager.CurrentMode)
                     {
                         case TreeTableManager.MODE_TABLE:
-                            if (row != null && row.equals(((TableCursor) TreeTableManager.cursor).getRow()) && columnIndex == ((TableCursor) TreeTableManager.cursor).getColumn())
+                            if (row != null && (row.isDisposed() == true || (row.equals(((TableCursor) TreeTableManager.cursor).getRow()) && columnIndex == ((TableCursor) TreeTableManager.cursor).getColumn())))
                             {
                                 return;
                             }
@@ -313,15 +540,15 @@ class TreeTableManager
                             break;
 
                         default:
-                            if (row != null && row.equals(((TreeCursor) TreeTableManager.cursor).getRow()) && columnIndex == ((TreeCursor) TreeTableManager.cursor).getColumn())
+                            if (row != null && (row.isDisposed() == true || (row.equals(((TreeCursor) TreeTableManager.cursor).getRow()) && columnIndex == ((TreeCursor) TreeTableManager.cursor).getColumn())))
                             {
                                 return;
                             }
                             ((TreeCursor) TreeTableManager.cursor).setSelection((TreeItem) row, columnIndex);
                             break;
                     }
-                    TreeTableManager.Cursor.onSelect();
                 }
+                TreeTableManager.Cursor.onSelect();
             }
             catch (IllegalArgumentException e)
             {
@@ -347,84 +574,29 @@ class TreeTableManager
 
     static Item addColumn(String text, int width)
     {
-        ControlAdapter controlAdapter = new ControlAdapter () 
+        ControlAdapter controlAdapter = new ControlAdapter()
         {
+            
             public void controlResized(ControlEvent e)
             {
-                int columnIndex = (int) e.widget.getData(TreeTableManager.DATAKEY_COLUMN_INDEX); 
-                int width = (int) Util.invoke(e.widget, "getWidth");
-                COConfigurationManager.setParameter("i18nAZ.columnWidth." + columnIndex, width);                          
-            }            
+                TargetLocale targetLocale  =  (TargetLocale) e.widget.getData(View.DATAKEY_TARGET_LOCALE);
+                if(targetLocale.isVisible() == false)
+                {
+                    return;
+                }
+                int columnIndex = TreeTableManager.indexOf((Item) e.widget);
+                int columnWidth = (Integer) Util.invoke(e.widget, "getWidth");
+                COConfigurationManager.setParameter("i18nAZ.columnWidth." + columnIndex, columnWidth);
+            }
         };
-                
+
         switch (TreeTableManager.CurrentMode)
         {
             case TreeTableManager.MODE_TABLE:
-                final Table table = (Table) TreeTableManager.treeTable;
                 TableColumn tableColumn = new TableColumn((Table) TreeTableManager.treeTable, 16384);
                 tableColumn.setText(text);
                 tableColumn.setWidth(width);
-                Listener sortListener = new Listener()
-                {
-                    @Override
-                    public void handleEvent(Event e)
-                    {
-                        TableColumn column = (TableColumn) e.widget;
-                        TableItem[] items = table.getItems();
-                        int index = -1;
-                        TableColumn[] columns = table.getColumns();
-                        for (int i = 0; i < columns.length; i++)
-                        {
-                            if (column.equals(columns[i]) == true)
-                            {
-                                index = i;
-                                break;
-                            }
-                        }
-                        if (index == -1)
-                        {
-                            return;
-                        }
-                        TreeTableManager.setRedraw(false);
-                        for (int i = 1; i < items.length; i++)
-                        {
-                            String value1 = items[i].getText(index);
-                            for (int j = 0; j < i; j++)
-                            {
-                                String value2 = items[j].getText(index);
-                                if ((value1.compareTo(value2) < 0 && table.getSortDirection() != SWT.UP) || (value2.compareTo(value1) < 0 && table.getSortDirection() == SWT.UP))
-                                {
-                                    String[] values = new String[table.getColumnCount()];
-                                    for (int k = 0; k < values.length; k++)
-                                    {
-                                        values[k] = items[i].getText(k);
-                                    }
-
-                                    Map<String, Object> prebuildItem = new HashMap<String, Object>();
-                                    prebuildItem.put(TreeTableManager.DATAKEY_KEY, items[i].getData(TreeTableManager.DATAKEY_KEY));
-                                    prebuildItem.put(TreeTableManager.DATAKEY_COMMENTS, items[i].getData(TreeTableManager.DATAKEY_COMMENTS));
-                                    prebuildItem.put(TreeTableManager.DATAKEY_VALUES, values);
-                                    prebuildItem.put(TreeTableManager.DATAKEY_STATES, items[i].getData(TreeTableManager.DATAKEY_STATES));
-                                    prebuildItem.put(TreeTableManager.DATAKEY_EXIST, items[i].getData(TreeTableManager.DATAKEY_EXIST));
-
-                                    items[i].dispose();
-
-                                    TableItem item = new TableItem(table, SWT.NONE, j);
-                                    TreeTableManager.addItem(item, prebuildItem);
-
-                                    items = table.getItems();
-                                    break;
-                                }
-                            }
-                        }
-                        table.setSortColumn(column);
-                        table.setSortDirection(table.getSortDirection() != SWT.UP ? SWT.UP : SWT.DOWN);
-                        TreeTableManager.setRedraw(true);
-                    }
-                };
-                tableColumn.addListener(SWT.Selection, sortListener);
-                tableColumn.addControlListener(controlAdapter);  
-                tableColumn.setData(TreeTableManager.DATAKEY_COLUMN_INDEX, TreeTableManager.getColumnCount() - 1);   
+                tableColumn.addControlListener(controlAdapter);
                 return tableColumn;
 
             default:
@@ -432,74 +604,69 @@ class TreeTableManager
                 treeColumn.setText(text);
                 treeColumn.setWidth(width);
                 treeColumn.addControlListener(controlAdapter);
-                treeColumn.setData(TreeTableManager.DATAKEY_COLUMN_INDEX, TreeTableManager.getColumnCount() - 1);                
                 return treeColumn;
         }
     }
-
-    private static void addItem(final Item item, Map<String, Object> prebuildItem)
-    {        
-        Util.addTypedListenerAndChildren((Widget)item, SWT.MouseEnter, new TypedListener(new MouseTrackAdapter()
+    static void refreshItem(Item item)
+    {
+        PrebuildItem prebuildItem = (PrebuildItem) item.getData(TreeTableManager.DATAKEY_PREBUILD_ITEM);
+        for (int i = 0; i < prebuildItem.getValues().length; i++)
         {
-            @Override
-            public void mouseEnter(MouseEvent e)
-            {
-                i18nAZ.viewInstance.itemEnterEventOccurred(item, (int) e.data);
-            }
-        }));
-        
-        item.addDisposeListener(new DisposeListener()
-        {
-            @Override
-            public void widgetDisposed(DisposeEvent e)
-            {
-                Util.removeTypedListenerAndChildren((Widget)item, SWT.MouseExit);
-                Control parent = (Control) Util.invoke(item, "getParent");
-                int columnCount = (int) Util.invoke(parent, "getColumnCount");                
-                for(int i = 0; i < columnCount; i++)
-                {
-                    ToolTipTrackListener.removeToolTipAndListeners(item, SWT.MouseExit, i);
-                    ToolTipTrackListener.removeToolTipAndListeners(item, SWT.MouseHover, i);    
-                }
-            }            
-        });
-        
-        String key = (String) prebuildItem.get(TreeTableManager.DATAKEY_KEY);
-        String[] commentsLines = (String[]) prebuildItem.get(TreeTableManager.DATAKEY_COMMENTS);
-        String[] values = (String[]) prebuildItem.get(TreeTableManager.DATAKEY_VALUES);
-        int[] states = (int[]) prebuildItem.get(TreeTableManager.DATAKEY_STATES);
-        boolean Exist = (boolean) prebuildItem.get(TreeTableManager.DATAKEY_EXIST);
-
-        item.setData(TreeTableManager.DATAKEY_KEY, key);
-        item.setData(TreeTableManager.DATAKEY_COMMENTS, commentsLines);
-        item.setData(TreeTableManager.DATAKEY_STATES, new int[values.length]);
-
-        for (int i = 0; i < values.length; i++)
-        {
-            TreeTableManager.setText(item, i, values[i]);
-            TreeTableManager.setState(item, i, states[i]);
+            TreeTableManager.setText(item, i, prebuildItem.getValues()[i]);
+            TreeTableManager.setState(item, i, prebuildItem.getStates()[i]);
         }
-        item.setData(TreeTableManager.DATAKEY_EXIST, Exist);
         switch (TreeTableManager.CurrentMode)
         {
             case TreeTableManager.MODE_TABLE:
                 break;
 
             default:
-                if (prebuildItem.containsKey(TreeTableManager.DATAKEY_CHILDS) == true)
+                if (prebuildItem.getChilds() != null)
                 {
                     ((TreeItem) item).setBackground(TreeTableManager.COLOR_ROW_NODE_BACKGROUND);
-                   
-                    @SuppressWarnings("unchecked")
-                    List<Map<String, Object>> childPrebuildItems = (List<Map<String, Object>>) prebuildItem.get(TreeTableManager.DATAKEY_CHILDS);
-                    TreeItem[] childItems = ((TreeItem) item).getItems();
-                    TreeTableManager.buildNotVirtualItems(item, childItems, childPrebuildItems);
                 }
                 else
                 {
                     ((TreeItem) item).setBackground(TreeTableManager.COLOR_ROW_DEFAULT_BACKGROUND);
                 }
-                if (TreeTableManager.expandedkeys.contains(key) == true)
+                break;
+        }
+    }
+    private static void addItem(Item item, PrebuildItem prebuildItem)
+    {
+        Util.addTypedListenerAndChildren(item, SWT.MouseEnter, new TypedListener(new MouseTrackAdapter()
+        {
+            
+            public void mouseEnter(MouseEvent e)
+            {
+                if (e.widget instanceof TableCursor)
+                {
+                    i18nAZ.viewInstance.itemEnterEventOccurred(((TableCursor) e.widget).getRow(), (Integer) e.data);
+                }
+                else if (e.widget instanceof TreeCursor)
+                {
+                    i18nAZ.viewInstance.itemEnterEventOccurred(((TreeCursor) e.widget).getRow(), (Integer) e.data);
+                }
+                else
+                {
+                    i18nAZ.viewInstance.itemEnterEventOccurred((Item) e.widget, (Integer) e.data);
+                }
+            }
+        }));
+
+        item.setData(TreeTableManager.DATAKEY_PREBUILD_ITEM, prebuildItem);
+        TreeTableManager.refreshItem(item);
+        switch (TreeTableManager.CurrentMode)
+        {
+            case TreeTableManager.MODE_TABLE:
+                break;
+
+            default:
+                if (prebuildItem.getChilds() != null)
+                {
+                    TreeTableManager.buildNotVirtualItems(item, prebuildItem.getChilds());
+                }
+                if (TreeTableManager.expandedkeys.containsKey(LocalizablePluginManager.getCurrentLangFile().getId()) == true && TreeTableManager.expandedkeys.get(LocalizablePluginManager.getCurrentLangFile().getId()).contains(prebuildItem.getKey()) == true)
                 {
                     ((TreeItem) item).setExpanded(true);
                 }
@@ -521,23 +688,54 @@ class TreeTableManager
         }
     }
 
-    static void buildItems(List<Map<String, Object>> prebuildItems)
+    static void buildItems()
     {
-        Item[] items = TreeTableManager.getItems();
-        TreeTableManager.buildNotVirtualItems(TreeTableManager.treeTable, items, prebuildItems);
+        if(LocalizablePluginManager.getCurrentLangFile() != null && TreeTableManager.oldLangFileId.equals(LocalizablePluginManager.getCurrentLangFile().getId()) == false)
+        {
+            TreeTableManager.oldLangFileId = LocalizablePluginManager.getCurrentLangFile().getId();
+            TreeTableManager.oldColumn = -1;
+        }
+        
+        PrebuildItemCollection prebuildItems = FilterManager.getPrebuildItems(LocalizablePluginManager.getCurrentLangFile());  
+        
+        TreeTableManager.buildNotVirtualItems(TreeTableManager.treeTable, prebuildItems);
 
-        TreeTableManager.expandedkeys.clear();
+        if (LocalizablePluginManager.getCurrentLangFile() != null && TreeTableManager.expandedkeys.containsKey(LocalizablePluginManager.getCurrentLangFile().getId()) == true)
+        {
+            TreeTableManager.expandedkeys.clear();
+        }
+
+        if (TreeTableManager.getCurrent().getLayoutData() == null)
+        {
+            Util.setGridData(TreeTableManager.getCurrent(), SWT.FILL, SWT.FILL, true, true);
+        }
 
         TreeTableManager.setRedraw(true, true);
 
+      
+        if (TreeTableManager.getColumnCount() > 0)
+        {
+            switch (TreeTableManager.CurrentMode)
+            {
+                case TreeTableManager.MODE_TABLE:
+                    ((Table) TreeTableManager.treeTable).setSortColumn((TableColumn) TreeTableManager.getColumn(0));
+                    ((Table) TreeTableManager.treeTable).setSortDirection(SWT.UP);
+                    break;
+
+                default:
+                    ((Tree) TreeTableManager.treeTable).setSortColumn((TreeColumn) TreeTableManager.getColumn(0));
+                    ((Tree) TreeTableManager.treeTable).setSortDirection(SWT.UP);
+                    break;
+            }
+        }        
         TreeTableManager.Cursor.setDefaultSelection();
     }
 
-    private static void buildNotVirtualItems(Object parent, Item[] items, List<Map<String, Object>> prebuildItems)
+    private static void buildNotVirtualItems(Object parent, PrebuildItemCollection prebuildItemCollection)
     {
-        for (int i = 0; i < prebuildItems.size(); i++)
+        for (int i = 0; i < prebuildItemCollection.size(); i++)
         {
-            Map<String, Object> prebuildItem = prebuildItems.get(i);
+            PrebuildItem prebuildItem = prebuildItemCollection.get(i);
             Item item = null;
             switch (TreeTableManager.CurrentMode)
             {
@@ -572,100 +770,82 @@ class TreeTableManager
     private static Canvas buildTree(int style)
     {
         final Tree tree = new Tree(TreeTableManager.areaComposite, style);
-      
+
         tree.setHeaderVisible(true);
         tree.addMouseListener(new MouseAdapter()
         {
-            @Override
+            
             public void mouseDoubleClick(MouseEvent e)
             {
                 Item item = TreeTableManager.Cursor.getRow();
                 if (item != null)
                 {
-                    TreeTableManager.setSelection(TreeTableManager.Cursor.getRow());
-                    if(((TreeItem) item).getExpanded() == false)
+                    if (((TreeItem) item).getExpanded() == false)
                     {
-                        TreeTableManager.setExpanded((TreeItem) item, true);
+                        TreeTableManager.setExpanded(item, true);
                     }
                     else
                     {
-                        TreeTableManager.setExpanded((TreeItem) item, false);
+                        TreeTableManager.setExpanded(item, false);
                     }
-                }               
+                }
             }
         });
-        
-        
-        final TreeCursor treeCursor = new TreeCursor(tree, SWT.NULL);
-     
-        treeCursor.addKeyListener(new KeyAdapter()
+        tree.addTreeListener(new TreeListener()
         {
-            @Override
-            public void keyReleased(KeyEvent e)
+            
+            public void treeCollapsed(TreeEvent e)
             {
-                if (e.character == '+')
-                {
-                    tree.getSelection()[0].setExpanded(true);
-                }
-                else if (e.character == '*')
-                {
-                    TreeTableManager.setExpanded(tree.getSelection()[0], true);
-                }
-                else if (e.character == '-')
-                {
-                    tree.getSelection()[0].setExpanded(false);
-                }
-                else if (e.keyCode == SWT.ARROW_UP || e.keyCode == SWT.ARROW_DOWN)
-                {
-                    Item item = TreeTableManager.Cursor.getRow();
-                    if (item != null)
-                    {
-                        TreeTableManager.setSelection(TreeTableManager.Cursor.getRow());
-                    }
-                    i18nAZ.viewInstance.updateStyledTexts();
-                }
+                TreeTableManager.Cursor.setSelection((Item) e.item, TreeTableManager.Cursor.getColumn());
+            }
+
+            
+            public void treeExpanded(TreeEvent e)
+            {
             }
         });
+
+        final TreeCursor treeCursor = new TreeCursor(tree, SWT.NULL);
+
         return treeCursor;
     }
 
     private static void collectExpandedKeys(TreeItem[] items)
     {
+
+        if (TreeTableManager.expandedkeys.containsKey(LocalizablePluginManager.getCurrentLangFile().getId()) == false)
+        {
+            TreeTableManager.expandedkeys.put(LocalizablePluginManager.getCurrentLangFile().getId(), new HashSet<String>());
+        }
+
         for (int i = 0; i < items.length; i++)
         {
             if (items[i].getExpanded() == true)
             {
-                expandedkeys.add((String) items[i].getData(TreeTableManager.DATAKEY_KEY));
+                PrebuildItem prebuildItem = (PrebuildItem) items[i].getData(TreeTableManager.DATAKEY_PREBUILD_ITEM);
+                TreeTableManager.expandedkeys.get(LocalizablePluginManager.getCurrentLangFile().getId()).add(prebuildItem.getKey());
             }
             TreeTableManager.collectExpandedKeys(items[i].getItems());
         }
-    }  
+    }
+
     static void dispose()
-    {        
-        TreeTableManager.areaComposite = null;        
+    {
+        TreeTableManager.areaComposite = null;
+
         if (TreeTableManager.treeTable != null)
         {
             ToolTipText.unconfig(TreeTableManager.treeTable);
-            TreeTableManager.setRedraw(false, true);            
-            TreeTableManager.removeAll(false);
-            if (!TreeTableManager.treeTable.isDisposed())
-            {
-                TreeTableManager.treeTable.dispose();
-            }
-            TreeTableManager.treeTable = null;
         }
-        if (TreeTableManager.cursor != null)
-        {
-            if (!TreeTableManager.cursor.isDisposed())
-            {
-                TreeTableManager.cursor.dispose();
-            }
-            TreeTableManager.cursor = null;
-        }        
-        TreeTableManager.EmptyImage = null;  
+
+        TreeTableManager.treeTable = null;
+        TreeTableManager.cursor = null;
+
+        TreeTableManager.EmptyImage = null;
         TreeTableManager.UnchangedImage = null;
         TreeTableManager.ExtraImage = null;
     }
+
     static Rectangle getBounds(Item item, int column)
     {
         switch (TreeTableManager.CurrentMode)
@@ -715,7 +895,7 @@ class TreeTableManager
     }
 
     static int getColumnCount()
-    { 
+    {
         switch (TreeTableManager.CurrentMode)
         {
             case TreeTableManager.MODE_TABLE:
@@ -725,12 +905,12 @@ class TreeTableManager
                 return ((Tree) TreeTableManager.treeTable).getColumnCount();
         }
     }
-
     static Composite getCurrent()
     {
         return TreeTableManager.treeTable;
     }
-    private static Item getItem(int index)
+
+    static Item getItem(int index)
     {
         switch (TreeTableManager.CurrentMode)
         {
@@ -778,14 +958,14 @@ class TreeTableManager
         }
     }
 
-    private static Object[] getSelectedRowIndex(Object parent, Object search, int parentRowIndex)
+    private static SearchResult getSelectedRowIndex(Object parent, Object search)
     {
-        int found = 1;
-        int rowIndex = parentRowIndex;
-        Item foundedItem = null;
+        return TreeTableManager.getSelectedRowIndex(parent, search, -1);
+    }
 
+    private static SearchResult getSelectedRowIndex(Object parent, Object search, Integer parentRowIndex)
+    {
         Item[] items = null;
-
         switch (TreeTableManager.CurrentMode)
         {
             case TreeTableManager.MODE_TABLE:
@@ -806,43 +986,72 @@ class TreeTableManager
                 }
                 break;
         }
+
+        SearchResult searchResult = new SearchResult();
+        Integer rowIndex = parentRowIndex;
+
         if (items != null)
         {
             for (int i = 0; i < items.length; i++)
             {
                 rowIndex++;
-                if (search instanceof Item && items[i].equals(search) == true)
+                if (search instanceof Item)
                 {
-                    found = 0;
-                    foundedItem = items[i];
-                    break;
+                    if (items[i].equals(search) == true)
+                    {
+                        searchResult.success = true;
+                        searchResult.item = items[i];
+                        searchResult.index = rowIndex;
+                        break;
+                    }
                 }
-                else if (search instanceof String && ((String) items[i].getData(TreeTableManager.DATAKEY_KEY)).equals(search) == true)
+                else if (search instanceof String)
                 {
-                    found = 0;
-                    foundedItem = items[i];
-                    break;
+                    if (((PrebuildItem) items[i].getData(TreeTableManager.DATAKEY_PREBUILD_ITEM)).getKey().equals(search) == true)
+                    {
+                        searchResult.success = true;
+                        searchResult.item = items[i];
+                        searchResult.index = rowIndex;
+                        break;
+                    }
                 }
-                else if ((search instanceof Item) == false && (search instanceof String) == false && rowIndex == (int) search)
+                else if (search instanceof Integer)
                 {
-                    found = 0;
-                    foundedItem = items[i];
-                    break;
+                    if (searchResult.index == (Integer) search)
+                    {
+                        searchResult.success = true;
+                        searchResult.item = items[i];
+                        searchResult.index = rowIndex;
+                        break;
+                    }
                 }
                 if (items[i] instanceof TreeItem && (((TreeItem) items[i]).getExpanded() == true || (search instanceof String) == true))
                 {
-                    Object[] datas = TreeTableManager.getSelectedRowIndex(items[i], search, rowIndex);
-                    rowIndex = (int) datas[0];
-                    found = (int) datas[1];
-                    foundedItem = (Item) datas[2];
-                    if (found == 0)
+                    SearchResult childSearchResult = TreeTableManager.getSelectedRowIndex(items[i], search, rowIndex);
+                    rowIndex = childSearchResult.index;
+                    if (childSearchResult.success == true)
                     {
+                        searchResult.success = childSearchResult.success;
+                        searchResult.item = childSearchResult.item;
+                        searchResult.index = childSearchResult.index;
+
                         break;
                     }
                 }
             }
         }
-        return new Object[] { rowIndex, found, foundedItem };
+        if (searchResult.success == false)
+        {
+            if (parentRowIndex == -1)
+            {
+                searchResult.index = -1;
+            }
+            else
+            {
+                searchResult.index = rowIndex;
+            }
+        }
+        return searchResult;
     }
 
     static Item[] getSelection()
@@ -869,6 +1078,18 @@ class TreeTableManager
         }
     }
 
+    static int indexOf(Item column)
+    {
+        switch (TreeTableManager.CurrentMode)
+        {
+            case TreeTableManager.MODE_TABLE:
+                return ((TableColumn) column).getParent().indexOf((TableColumn) column);
+
+            default:
+                return ((TreeColumn) column).getParent().indexOf((TreeColumn) column);
+        }
+    }
+
     static void initTreeTable(SWTSkinObjectContainer AreaContainer)
     {
         int R = TreeTableManager.COLOR_CELL_BACKGROUND.getRed();
@@ -879,12 +1100,12 @@ class TreeTableManager
         TreeTableManager.COLOR_ROW_NODE_BACKGROUND = new Color(Display.getCurrent(), R + 50, G + 50, B + 50);
         TreeTableManager.COLOR_COLUMN_DEFAULT_BACKGROUND = new Color(Display.getCurrent(), R + 40, G + 40, B + 40);
         TreeTableManager.COLOR_COLUMN_NODE_BACKGROUND = new Color(Display.getCurrent(), R + 30, G + 30, B + 30);
-        TreeTableManager.COLOR_ROW_SELECTED_BACKGROUND = new Color(Display.getCurrent(), R + 20, G + 20, B + 20);        
+        TreeTableManager.COLOR_ROW_SELECTED_BACKGROUND = new Color(Display.getCurrent(), R + 20, G + 20, B + 20);
         TreeTableManager.COLOR_ROW_HOT_SELECTED_BACKGROUND = new Color(Display.getCurrent(), R + 10, G + 10, B + 10);
-        
+
         TreeTableManager.COLOR_ROW_HOT_RECTANGLE_FOREGROUND = new Color(Display.getCurrent(), R - 40, G - 40, B - 40);
         TreeTableManager.COLOR_ROW_SELECTED_RECTANGLE_FOREGROUND = new Color(Display.getCurrent(), R - 60, G - 60, B - 60);
-     
+
         TreeTableManager.EmptyImage = i18nAZ.viewInstance.getImageLoader().getImage("i18nAZ.image.empty");
         TreeTableManager.UnchangedImage = i18nAZ.viewInstance.getImageLoader().getImage("i18nAZ.image.unchanged");
         TreeTableManager.ExtraImage = i18nAZ.viewInstance.getImageLoader().getImage("i18nAZ.image.extra");
@@ -892,7 +1113,6 @@ class TreeTableManager
         TreeTableManager.areaComposite = AreaContainer.getComposite();
         TreeTableManager.rebuild();
     }
-
     static boolean isTreeMode()
     {
         return TreeTableManager.CurrentMode == TreeTableManager.MODE_TREE;
@@ -904,7 +1124,7 @@ class TreeTableManager
         {
             Composite newTreeTable = null;
             Canvas newCursor = null;
-            int style = SWT.FLAT | SWT.FULL_SELECTION | SWT.BORDER | SWT.FULL_SELECTION | SWT.SINGLE;
+            int style = SWT.FULL_SELECTION | SWT.BORDER | SWT.FULL_SELECTION | SWT.SINGLE;
             switch (TreeTableManager.CurrentMode)
             {
                 case TreeTableManager.MODE_TABLE:
@@ -917,248 +1137,133 @@ class TreeTableManager
                     break;
             }
 
-            newTreeTable.setLayoutData(new GridData(4, 4, true, true));
+            Util.setGridData(newTreeTable, SWT.FILL, SWT.FILL, true, true);
 
             if (TreeTableManager.treeTable != null)
             {
                 Composite oldTreeTable = TreeTableManager.getCurrent();
                 newTreeTable.moveAbove(oldTreeTable);
-                ToolTipText.unconfig(oldTreeTable);              
+                ToolTipText.unconfig(oldTreeTable);
                 oldTreeTable.dispose();
                 TreeTableManager.areaComposite.layout();
             }
 
             TreeTableManager.cursor = newCursor;
             TreeTableManager.treeTable = newTreeTable;
-                          
+
             TreeTableManager.addSelectionListener(new SelectionAdapter()
             {
-                @Override
+                
                 public void widgetSelected(SelectionEvent e)
                 {
                     TreeTableManager.Cursor.setSelection(TreeTableManager.getSelection()[0], TreeTableManager.Cursor.getColumn());
                 }
-            });            
+            });
             TreeTableManager.Cursor.addSelectionListener(new SelectionAdapter()
             {
-                @Override
+                
                 public void widgetSelected(SelectionEvent e)
                 {
                     TreeTableManager.Cursor.onSelect();
                 }
 
-                @Override
+                
                 public void widgetDefaultSelected(SelectionEvent e)
                 {
                     i18nAZ.viewInstance.selectEditor();
                 }
             });
-     
+
             Listener mouseTrackListener = new Listener()
             {
-                @Override
+                
                 public void handleEvent(Event e)
                 {
-                    e.data =  TreeTableManager.Cursor.getColumn();
-                    Listener[] listeners = TreeTableManager.Cursor.getRow().getListeners(e.type);
-                    for (int k = 0; k < listeners.length; k++)
+                    e.data = TreeTableManager.Cursor.getColumn();
+                    if(TreeTableManager.Cursor.getRow() != null)
                     {
-                        TypedListener typedListener = (TypedListener) listeners[k];
-                        typedListener.handleEvent(e);
+                        Listener[] listeners = TreeTableManager.Cursor.getRow().getListeners(e.type);
+                        for (int k = 0; k < listeners.length; k++)
+                        {
+                            TypedListener typedListener = (TypedListener) listeners[k];
+                            typedListener.handleEvent(e);
+                        }
                     }                    
-                }                
+                }
             };
             cursor.addListener(SWT.MouseExit, mouseTrackListener);
             cursor.addListener(SWT.MouseEnter, mouseTrackListener);
             cursor.addListener(SWT.MouseHover, mouseTrackListener);
-            
-            Listener listener = new Listener()
-            { 
-                int getTotalWidth()
-                {
-                    int width = 0;
-                    for(int i = 0; i < TreeTableManager.getColumnCount(); i++)
-                    {  
-                        switch (TreeTableManager.CurrentMode)
-                        {
-                            case TreeTableManager.MODE_TABLE:
-                                width +=((TableColumn) TreeTableManager.getColumn(i)).getWidth();
-                                break;
-                            default:
-                                width +=((TreeColumn) TreeTableManager.getColumn(i)).getWidth();
-                                break;
-                        }
-                        
-                    }
-                    return width;
-                }
-                String getText(GC gc, Item item, int column)
-                {
-                    int width = ((TableColumn) TreeTableManager.getColumn(column)).getWidth() - 12;
-                    String text = TreeTableManager.getText(item, column);
-                    text = (text == null) ? "" : text;
-                    if (gc.textExtent(text).x > width)
-                    {
-                        int ellipseWidth = gc.textExtent("...").x;
-                        int length = text.length();
-                        while (length > 0)
-                        {
-                            length--;
-                            text = text.substring(0, length);
-                            if (gc.textExtent(text).x + ellipseWidth <= width)
-                            {
-                                text = text + "...";
-                                break;
-                            }
-                        }
-                    }
-                    return text;
-                }
+
+            TreeTableManager.treeTable.addListener(SWT.Show, new Listener()
+            {
                 
-                Item itemHot = null;
-                   
-                @Override
-                public void handleEvent(Event e)
+                public void handleEvent(Event event)
                 {
-                    switch (e.type)
-                    {
-                        case SWT.Selection:
-                            
-                            
-                        case SWT.EraseItem:
-                            
-                            // INIT
-                            Rectangle originalClipping = e.gc.getClipping();                            
-                           
-                            // FOREGROUND
-                            if (e.index == 0 && TreeTableManager.CurrentMode == TreeTableManager.MODE_TABLE)
-                            {                                
-                                e.detail &= ~SWT.FOREGROUND;
-                            }                            
-                          
-                            // NO HOT NO SELECTED
-                            if(this.itemHot != null && this.itemHot.equals(e.item) == true && (e.detail & SWT.HOT) == 0 && e.index > 0)
-                            {
-                                //e.detail &= ~SWT.BACKGROUND;
-                                //e.detail &= ~SWT.SELECTED;                                
-                                e.detail |= SWT.HOT;
-                                
-                            }
-                            if ((e.detail & SWT.HOT) == 0  && e.index == 0)
-                            {
-                                this.itemHot = null;
-                            }
-                            if ((e.detail & SWT.HOT) == 0 && (e.detail & SWT.SELECTED) == 0 && TreeTableManager.CurrentMode == TreeTableManager.MODE_TABLE)
-                            {
-                                e.gc.fillRectangle(e.x, e.y, e.width, e.height);
-                            } 
-                            
-                            // HOT
-                            if ((e.detail & SWT.HOT) != 0)
-                            {
-                               e.detail &= ~SWT.BACKGROUND;
-                                //e.detail &= ~SWT.SELECTED;
-                                if(e.index == 0)
-                                {
-                                    this.itemHot = (Item) e.item;                                
-                                }                                
-                                e.gc.setBackground(TreeTableManager.COLOR_ROW_HOT_BACKGROUND);
-                                Rectangle rowClipping = e.gc.getClipping();
-                                rowClipping.width = this.getTotalWidth() - e.x;
-                                e.gc.setClipping(rowClipping); 
-                                e.gc.fillRectangle(e.x, e.y, rowClipping.width, e.height);
-                                Color foreground = e.gc.getForeground();                                 
-                                e.gc.setForeground(TreeTableManager.COLOR_ROW_HOT_RECTANGLE_FOREGROUND);  
-                                e.gc.drawRectangle(0, e.y, this.getTotalWidth() - 1, e.height - 1);
-                                e.gc.setForeground(foreground);                                
-                            }
-                                                        
-                            // SELECTED
-                            if ((e.detail & SWT.SELECTED) != 0)
-                            {
-                                e.detail &= ~SWT.SELECTED;                                
-                                e.detail &= ~SWT.BACKGROUND;
-                                Rectangle rowClipping = e.gc.getClipping();
-                                rowClipping.width = this.getTotalWidth() - e.x;
-                                e.gc.setClipping(rowClipping); 
-                                if ((e.detail & SWT.HOT) != 0)
-                                {
-                                    e.gc.setBackground(TreeTableManager.COLOR_ROW_HOT_SELECTED_BACKGROUND);
-                                    e.gc.setForeground(TreeTableManager.COLOR_ROW_HOT_RECTANGLE_FOREGROUND);                              
-                                }
-                                else
-                                {
-                                    e.gc.setBackground(TreeTableManager.COLOR_ROW_SELECTED_BACKGROUND);
-                                    e.gc.setForeground(TreeTableManager.COLOR_ROW_SELECTED_RECTANGLE_FOREGROUND); 
-                                }
-                                e.gc.fillRectangle(e.x, e.y, rowClipping.width, e.height);
-                               // e.gc.drawRectangle(e.x, e.y, rowClipping.width, e.height);                                   
-                                e.gc.drawRectangle(0, e.y, this.getTotalWidth() - 1, e.height - 1);
-                                
-                                e.gc.setForeground(TreeTableManager.COLOR_ROW_SELECTED_FOREGROUND);             
-                            }                                
-                            
-                            e.gc.setClipping(originalClipping);                                
-                            e.detail &= ~SWT.HOT;                            
-
-                            break;
-                        case SWT.MeasureItem:
-                            if (e.index == 0 && TreeTableManager.CurrentMode == TreeTableManager.MODE_TABLE)
-                            {
-                                String text = this.getText(e.gc, (Item) e.item, e.index);
-                                Point size = e.gc.textExtent(text);
-                                e.width = size.x;
-                                e.height = Math.max(e.height, size.y);
-                            }
-                            
-                            break;
-
-                        case SWT.PaintItem:                            
-                                                     
-                            if (e.index == 0 && TreeTableManager.CurrentMode == TreeTableManager.MODE_TABLE)
-                            {
-                                TableItem item = (TableItem) e.item;
-                                String text = this.getText(e.gc, item, e.index);
-                                Point size = e.gc.textExtent(text);
-                                int offset2 = e.index == 0 ? Math.max(0, (e.height - size.y) / 2) : 0;
-                                if ((e.detail & SWT.SELECTED) != 0)
-                                {
-                                    e.gc.setForeground(Display.getCurrent().getSystemColor(SWT.COLOR_WHITE));
-                                }
-                                e.gc.drawText(text, e.x + 6, e.y + offset2, true);
-                            }
-                            break;
-                    }
+                    Util.addListener(TreeTableManager.treeTable, SWT.PaintItem, TreeTableManager.itemListener);
+                    Util.addListener(TreeTableManager.treeTable, SWT.MeasureItem, TreeTableManager.itemListener);
+                    Util.addListener(TreeTableManager.treeTable, SWT.EraseItem, TreeTableManager.itemListener);
                 }
-            };
-            TreeTableManager.treeTable.addListener(SWT.EraseItem, listener);
-            TreeTableManager.treeTable.addListener(SWT.MeasureItem, listener);
-            TreeTableManager.treeTable.addListener(SWT.PaintItem, listener);            
-            
+            });
+            TreeTableManager.treeTable.addListener(SWT.Hide, new Listener()
+            {
+
+                
+                public void handleEvent(Event event)
+                {
+                    TreeTableManager.treeTable.removeListener(SWT.PaintItem, TreeTableManager.itemListener);
+                    TreeTableManager.treeTable.removeListener(SWT.MeasureItem, TreeTableManager.itemListener);
+                    TreeTableManager.treeTable.removeListener(SWT.EraseItem, TreeTableManager.itemListener);
+                }
+
+            });
+            TreeTableManager.cursor.addKeyListener(new KeyListener()
+            {
+                
+                public void keyPressed(KeyEvent e)
+                {                 
+                }
+
+                
+                public void keyReleased(KeyEvent e)
+                {
+                    if ((e.stateMask & SWT.MODIFIER_MASK) == 0 && e.keyCode == SWT.DEL &&  i18nAZ.viewInstance.removeLanguageButton.isDisabled() == false)
+                    {
+                        i18nAZ.viewInstance.removeLanguage();
+                        e.doit = false;
+                    }   
+                    if ((e.stateMask & SWT.MODIFIER_MASK) == 0 && e.keyCode == SWT.F8 && i18nAZ.viewInstance.spellCheckerButton.isDisabled() == false)
+                    {
+                        i18nAZ.viewInstance.spellCheck();
+                        e.doit = false;
+                    }                    
+                }
+
+            });
             ToolTipText.config(TreeTableManager.treeTable);
-              
+
             MenuDetectListener menuDetectListener = new MenuDetectListener()
             {
-                @Override
+                
                 public void menuDetected(MenuDetectEvent e)
                 {
 
-                    if (TreeTableManager.getSelection().length == 0)
+                    if (TreeTableManager.getSelection().length == 0 && TreeTableManager.getColumnCount() < 2)
                     {
                         e.doit = false;
                         return;
                     }
                     Item item = TreeTableManager.getSelection()[0];
                     int columnIndex = -1;
-                    for(int i = 0; i < TreeTableManager.getColumnCount(); i++)
+                    for (int i = 0; i < TreeTableManager.getColumnCount(); i++)
                     {
-                        if(TreeTableManager.getBounds(item, i).contains(TreeTableManager.getCurrent().toControl(e.x, e.y)) == true)
+                        if (TreeTableManager.getBounds(item, i).contains(TreeTableManager.getCurrent().toControl(e.x, e.y)) == true)
                         {
                             columnIndex = i;
-                            break;                            
+                            break;
                         }
                     }
-                    if(columnIndex == -1)
+                    if (columnIndex == -1)
                     {
                         e.doit = false;
                         return;
@@ -1166,33 +1271,36 @@ class TreeTableManager
                     Menu menu = ((Composite) e.widget).getMenu();
                     menu.setData(TreeTableManager.DATAKEY_ITEM, item);
                     menu.setData(TreeTableManager.DATAKEY_COLUMN_INDEX, columnIndex);
-               
-                    int visible = MenuOptions.NONE;
+
+                    int visible = MenuOptions.COPY_KEY | MenuOptions.COPY_REFERENCE | MenuOptions.COPY_VALUE;
                     int enabled = MenuOptions.NONE;
-                    
-                    if (columnIndex >= 2 && TreeTableManager.getBounds(item, TreeTableManager.Cursor.getColumn()).contains(TreeTableManager.getCurrent().toControl(e.x, e.y)) == true)
+
+                    String textData = TreeTableManager.getText(item, 0);
+                    if (textData.equals("") == false)
+                    {
+                        enabled |= MenuOptions.COPY_KEY;
+                    }
+                    textData = TreeTableManager.getText(item, 1);
+                    if (textData.equals("") == false)
+                    {
+                        enabled |= MenuOptions.COPY_REFERENCE;
+                    }
+                    PrebuildItem prebuildItem = (PrebuildItem) item.getData(TreeTableManager.DATAKEY_PREBUILD_ITEM);
+                    if (columnIndex >= 2)
                     {
                         visible |= MenuOptions.REMOVE_COLUMN;
                         enabled |= MenuOptions.REMOVE_COLUMN;
+                        enabled |= MenuOptions.COPY_VALUE;
                     }
-                    if (columnIndex == 0 || columnIndex == 1)
-                    {
-                        visible |= MenuOptions.ROW_COPY;
-                        if (((boolean) item.getData(TreeTableManager.DATAKEY_EXIST)) == true)
-                        { 
-                            enabled |= MenuOptions.ROW_COPY;
-                        }
-                    }                     
-                    if (columnIndex == 0  && TreeTableManager.getChildItemCount(item) > 0)
+                    if (columnIndex == 0 && TreeTableManager.getChildItemCount(item) > 0)
                     {
                         visible |= MenuOptions.FILTERS;
                         enabled |= MenuOptions.FILTERS;
                     }
-                    
+
                     if (columnIndex > 0)
                     {
-                        int[] states = (int[]) item.getData(TreeTableManager.DATAKEY_STATES);
-                        if ((states[1] & State.URL) != 0)
+                        if ((prebuildItem.getStates()[1] & State.URL) != 0)
                         {
                             visible |= MenuOptions.OPEN_URL;
                             try
@@ -1203,42 +1311,42 @@ class TreeTableManager
                             catch (MalformedURLException me)
                             {
                             }
-                        }                        
-                    }                    
-                    
+                        }
+                    }
+
                     i18nAZ.viewInstance.populateMenu(menu, visible, enabled);
-                    
-                    if((visible & MenuOptions.FILTERS) != 0)
+
+                    if ((visible & MenuOptions.FILTERS) != 0)
                     {
-                        String key = (String) item.getData(TreeTableManager.DATAKEY_KEY);
+                        CountObject counts = FilterManager.getCounts(prebuildItem.getKey());
+                        menu.getItems()[4].setEnabled(counts.emptyCount > 0);
+                        menu.getItems()[5].setEnabled(counts.unchangedCount > 0);
+                        menu.getItems()[6].setEnabled(counts.extraCount > 0);
+                        menu.getItems()[8].setEnabled(counts.redirectKeyCount > 0);
+                        menu.getItems()[10].setEnabled(counts.urlsCount > 0);
 
-                        int[] counts = i18nAZ.viewInstance.getCounts(key, null, -1);
-                        menu.getItems()[3].setEnabled(counts[1] > 0);
-                        menu.getItems()[4].setEnabled(counts[2] > 0);
-                        menu.getItems()[5].setEnabled(counts[3] > 0);
-                        menu.getItems()[7].setEnabled(counts[4] > 0);
-                        menu.getItems()[8].setEnabled(counts[5] > 0);
+                        menu.getItems()[4].setText(i18nAZ.getLocalisedMessageText("i18nAZ.Menus.EmptyFilter") + (counts.emptyCount == 0 ? "" : " (" + counts.emptyCount + ")"));
+                        menu.getItems()[5].setText(i18nAZ.getLocalisedMessageText("i18nAZ.Menus.UnchangedFilter") + (counts.unchangedCount == 0 ? "" : " (" + counts.unchangedCount + ")"));
+                        menu.getItems()[6].setText(i18nAZ.getLocalisedMessageText("i18nAZ.Menus.ExtraFilter") + (counts.extraCount == 0 ? "" : " (" + counts.extraCount + ")"));
+                        menu.getItems()[8].setText(i18nAZ.getLocalisedMessageText("i18nAZ.Menus.RedirectKeysFilter") + (counts.redirectKeyCount == 0 ? "" : " (" + counts.redirectKeyCount + ")"));
+                        menu.getItems()[10].setText(i18nAZ.getLocalisedMessageText("i18nAZ.Menus.HideUrlsFilter") + (counts.urlsCount == 0 ? "" : " (" + counts.urlsCount + ")"));
+                        menu.getItems()[11].setText(i18nAZ.getLocalisedMessageText("i18nAZ.Menus.ShowUrlsFilter") + (counts.urlsCount == 0 ? "" : " (" + counts.urlsCount + ")"));
 
-                        menu.getItems()[3].setText(i18nAZ.viewInstance.getLocalisedMessageText("i18nAZ.Menus.EmptyFilter") + (counts[1] == 0 ? "" : " (" + counts[1] + ")"));
-                        menu.getItems()[4].setText(i18nAZ.viewInstance.getLocalisedMessageText("i18nAZ.Menus.UnchangedFilter") + (counts[2] == 0 ? "" : " (" + counts[2] + ")"));
-                        menu.getItems()[5].setText(i18nAZ.viewInstance.getLocalisedMessageText("i18nAZ.Menus.ExtraFilter") + (counts[3] == 0 ? "" : " (" + counts[3] + ")"));
-                        menu.getItems()[7].setText(i18nAZ.viewInstance.getLocalisedMessageText("i18nAZ.Menus.RedirectKeysFilter") + (counts[4] == 0 ? "" : " (" + counts[4] + ")"));
-                        menu.getItems()[8].setText(i18nAZ.viewInstance.getLocalisedMessageText("i18nAZ.Menus.UrlsFilter") + (counts[5] == 0 ? "" : " (" + counts[5] + ")"));
-                         
-                        menu.getItems()[3].setSelection(i18nAZ.viewInstance.emptyFilter && i18nAZ.viewInstance.emptyFilterExcludedKey.contains(key) == false);
-                        menu.getItems()[4].setSelection(i18nAZ.viewInstance.unchangedFilter && i18nAZ.viewInstance.unchangedFilterExcludedKey.contains(key) == false);
-                        menu.getItems()[5].setSelection(i18nAZ.viewInstance.extraFilter && i18nAZ.viewInstance.extraFilterExcludedKey.contains(key) == false);
-                        menu.getItems()[7].setSelection(i18nAZ.viewInstance.redirectKeysFilter && i18nAZ.viewInstance.hideRedirectKeysFilterExcludedKey.contains(key) == false);
-                       int overriddenState = i18nAZ.viewInstance.urlsFilter;
-                       if(i18nAZ.viewInstance.urlsFilterOverriddenStates.containsKey(key))
-                       {
-                           overriddenState = i18nAZ.viewInstance.urlsFilterOverriddenStates.get(key);
-                       }                               
-                        menu.getItems()[9].setSelection(overriddenState == 1);
-                        menu.getItems()[10].setSelection(overriddenState == 2);
-                     }
-                    
-                    e.doit = visible != MenuOptions.NONE;                    
+                        menu.getItems()[4].setSelection(FilterManager.getCurrentFilter().empty == FilterManager.getCurrentFilter().emptyExcludedKey.contains(prebuildItem.getKey()) == false);
+                        menu.getItems()[5].setSelection(FilterManager.getCurrentFilter().unchanged == FilterManager.getCurrentFilter().unchangedExcludedKey.contains(prebuildItem.getKey()) == false);
+                        menu.getItems()[6].setSelection(FilterManager.getCurrentFilter().extra == FilterManager.getCurrentFilter().extraExcludedKey.contains(prebuildItem.getKey()) == false);
+                        menu.getItems()[8].setSelection(FilterManager.getCurrentFilter().redirectKeys == FilterManager.getCurrentFilter().hideRedirectKeysExcludedKey.contains(prebuildItem.getKey()) == false);
+                        int overriddenState = FilterManager.getCurrentFilter().urls;
+
+                        if (FilterManager.getCurrentFilter().urlsOverriddenStates.containsKey(prebuildItem.getKey()))
+                        {
+                            overriddenState = FilterManager.getCurrentFilter().urlsOverriddenStates.get(prebuildItem.getKey());
+                        }
+                        menu.getItems()[10].setSelection(overriddenState == 1);
+                        menu.getItems()[11].setSelection(overriddenState == 2);
+                    }
+
+                    e.doit = visible != MenuOptions.NONE;
                 }
             };
             Menu menu = null;
@@ -1261,10 +1369,12 @@ class TreeTableManager
         TreeTableManager.setRedraw(false, true);
 
         TreeTableManager.Cursor.cancelfocusedRow();
+
         if (savePosition == true)
         {
             savePosition();
         }
+
         switch (TreeTableManager.CurrentMode)
         {
             case TreeTableManager.MODE_TABLE:
@@ -1280,6 +1390,10 @@ class TreeTableManager
 
     static void removeColumns(int columnIndex)
     {
+        if (columnIndex > 0 && TreeTableManager.Cursor.getColumn() == columnIndex)
+        {
+            TreeTableManager.Cursor.setColumn(columnIndex - 1);
+        }
         switch (TreeTableManager.CurrentMode)
         {
             case TreeTableManager.MODE_TABLE:
@@ -1294,54 +1408,60 @@ class TreeTableManager
 
     static void removeAllColumns()
     {
-        switch (TreeTableManager.CurrentMode)
+        while (TreeTableManager.getColumnCount() > 0)
         {
-            case TreeTableManager.MODE_TABLE:
-                while (((Table) TreeTableManager.treeTable).getColumnCount() > 0)
-                {
-                    ((Table) TreeTableManager.treeTable).getColumn(0).dispose();
-                }
-                break;
-
-            default:
-                while (((Tree) TreeTableManager.treeTable).getColumnCount() > 0)
-                {
-                    ((Tree) TreeTableManager.treeTable).getColumn(0).dispose();
-                }
-                break;
+            TreeTableManager.removeColumns(0);
         }
     }
 
-    private static void savePosition()
+    static void savePosition()
     {
-        if (TreeTableManager.treeTable == null)
+        if (TreeTableManager.treeTable == null || LocalizablePluginManager.getCurrentLangFile() == null)
         {
             return;
         }
-
+        String selectedKey = "";
+        int relativeTopIndex = -1;
         if (TreeTableManager.getSelection().length > 0)
         {
-            TreeTableManager.relativeTopIndex = -1;
-            int selectedRowIndex = (int) TreeTableManager.getSelectedRowIndex(TreeTableManager.treeTable, TreeTableManager.getSelection()[0], -1)[0];
+            Item selectedRow = TreeTableManager.getSelection()[0];
+            int selectedRowIndex = TreeTableManager.getSelectedRowIndex(TreeTableManager.treeTable, selectedRow).index;
             switch (TreeTableManager.CurrentMode)
             {
                 case TreeTableManager.MODE_TABLE:
-                    TreeTableManager.relativeTopIndex = selectedRowIndex - ((Table) TreeTableManager.treeTable).getTopIndex();
+                    relativeTopIndex = selectedRowIndex - ((Table) TreeTableManager.treeTable).getTopIndex();
                     break;
 
                 default:
-                    int topIndex = (int) TreeTableManager.getSelectedRowIndex(TreeTableManager.treeTable, ((Tree) TreeTableManager.treeTable).getTopItem(), -1)[0];
+                    int topIndex = TreeTableManager.getSelectedRowIndex(TreeTableManager.treeTable, ((Tree) TreeTableManager.treeTable).getTopItem()).index;
 
-                    TreeTableManager.relativeTopIndex = selectedRowIndex - topIndex;
+                    relativeTopIndex = selectedRowIndex - topIndex;
                     break;
             }
-            TreeTableManager.selectedKey = (String) TreeTableManager.getSelection()[0].getData(TreeTableManager.DATAKEY_KEY);
+            while (true)
+            {
+                PrebuildItem prebuildItem = (PrebuildItem) selectedRow.getData(TreeTableManager.DATAKEY_PREBUILD_ITEM);
+                if (PrebuildItem.isShowable(prebuildItem))
+                {
+                    selectedKey = prebuildItem.getKey();
+                    break;
+                }
+                TreeTableManager.Cursor.notifyListeners(SWT.KeyDown, Util.createKeyEvent(TreeTableManager.getCurrent(), SWT.ARROW_DOWN));
+                if (TreeTableManager.Cursor.getRow() == null || selectedRow == null)
+                {
+                    break;
+                }
+                if (selectedRow.equals(TreeTableManager.Cursor.getRow()) == true)
+                {
+                    break;
+                }
+                selectedRow = TreeTableManager.Cursor.getRow();
+            }
         }
-        else
-        {
-            TreeTableManager.relativeTopIndex = -1;
-            TreeTableManager.selectedKey = "";
-        }
+
+        TreeTableManager.selectedKeys.put(LocalizablePluginManager.getCurrentLangFile().getId(), selectedKey);
+        TreeTableManager.relativeTopIndexes.put(LocalizablePluginManager.getCurrentLangFile().getId(), relativeTopIndex);
+        TreeTableManager.selectedColumnsIndex = TreeTableManager.Cursor.getColumn();
     }
 
     private static void setBackgroundColumn()
@@ -1366,34 +1486,79 @@ class TreeTableManager
                 TreeTableManager.setBackgroundItem(item, i, defaultColor, nodeColor);
             }
         }
-        String columnText = TreeTableManager.getColumn(TreeTableManager.Cursor.getColumn()).getText();
-        if(columnText.equals("") == false)
-        {
-            columnText = "'" + columnText + "'";
-        }
         i18nAZ.viewInstance.removeLanguageButton.setDisabled(TreeTableManager.Cursor.getColumn() < 2);
-        ToolTipText.set(i18nAZ.viewInstance.removeLanguageButton.getSkinObject().getControl(), "i18nAZ.ToolTips.RemoveLanguage", new String[]{columnText});
-
+        if (TreeTableManager.Cursor.getColumn() >= 2)
+        {
+            String columnText = TreeTableManager.getColumn(TreeTableManager.Cursor.getColumn()).getText();
+            if (columnText.equals("") == false)
+            {
+                columnText = "'" + columnText + "'";
+            }
+            ToolTipText.set(i18nAZ.viewInstance.removeLanguageButton.getSkinObject().getControl(), "i18nAZ.ToolTips.RemoveLanguage", new String[] { columnText });
+        }
+        else
+        {
+            ToolTipText.set(i18nAZ.viewInstance.removeLanguageButton.getSkinObject().getControl(), "i18nAZ.ToolTips.RemoveLanguage");
+        }
+        i18nAZ.viewInstance.updateSpellCheckerButton();               
     }
 
     static void setExpanded(Item item, boolean expanded)
-    {        
+    {
         if (item.isDisposed() == true || TreeTableManager.treeTable.isDisposed() == true)
         {
             return;
         }
-        if( item instanceof TreeItem)
+        if (item instanceof TreeItem)
         {
             return;
         }
-        TreeItem[] items = ((TreeItem)item).getItems();
-        ((TreeItem)item).setExpanded(expanded);
+        TreeItem[] items = ((TreeItem) item).getItems();
+        ((TreeItem) item).setExpanded(expanded);
         for (int i = 0; i < items.length; i++)
         {
             TreeTableManager.setExpanded(items[i], expanded);
         }
     }
-
+    static void setEnableColumn(Item column, boolean enable)
+    {   
+        if (column.isDisposed() == true)
+        {
+            return;
+        }
+        if(enable == true)
+        {
+            int width =  COConfigurationManager.getIntParameter("i18nAZ.columnWidth." + TreeTableManager.indexOf(column), 200);
+            switch (TreeTableManager.CurrentMode)
+            {
+                case TreeTableManager.MODE_TABLE:
+                    ((TableColumn)column).setResizable(true);
+                    ((TableColumn)column).setWidth(width);
+                     break;
+    
+                default:
+                    ((TreeColumn)column).setResizable(true);
+                    ((TreeColumn)column).setWidth(width);
+                    break;
+            }
+        }
+        else
+        {
+            switch (TreeTableManager.CurrentMode)
+            {
+                case TreeTableManager.MODE_TABLE:
+                    ((TableColumn)column).setResizable(false);
+                    ((TableColumn)column).setWidth(0);
+                     break;
+    
+                default:
+                    ((TreeColumn)column).setResizable(false);  
+                    ((TreeColumn)column).setWidth(0); 
+                    break;
+            }
+        }
+    }
+    
     private static void setBackgroundItem(Item item, int column, Color defaultColor, Color nodeColor)
     {
         if (item.isDisposed() == true || TreeTableManager.treeTable.isDisposed() == true)
@@ -1430,6 +1595,11 @@ class TreeTableManager
 
     static void setMode(boolean treeMode)
     {
+        if (TreeTableManager.treeTable != null)
+        {
+            TreeTableManager.setRedraw(false, true);
+        }
+
         savePosition();
         if (treeMode == false)
         {
@@ -1441,27 +1611,25 @@ class TreeTableManager
         }
         TreeTableManager.rebuild();
     }
+
     static void setRedraw(boolean redraw)
     {
         setRedraw(redraw, false);
     }
-    static void setRedraw(boolean redraw, boolean setVisible)
+
+    private static void setRedraw(boolean redraw, boolean setVisible)
     {
+        if (setVisible == true)
+        {
+            TreeTableManager.setVisible(redraw);
+        }
         switch (TreeTableManager.CurrentMode)
         {
             case TreeTableManager.MODE_TABLE:
-                if(setVisible == true)
-                {
-                    ((Table) TreeTableManager.treeTable).setVisible(redraw);                    
-                }
                 ((Table) TreeTableManager.treeTable).setRedraw(redraw);
                 break;
 
             default:
-                if(setVisible == true)
-                {
-                    ((Tree) TreeTableManager.treeTable).setVisible(redraw);                    
-                }
                 ((Tree) TreeTableManager.treeTable).setRedraw(redraw);
                 break;
         }
@@ -1485,15 +1653,14 @@ class TreeTableManager
         }
     }
 
-    static void setState(Item item, int column, int state)
+    private static void setState(Item item, int column, int state)
     {
         if (item.isDisposed() == true || TreeTableManager.treeTable.isDisposed() == true)
         {
             return;
         }
-        int[] states = (int[]) item.getData(TreeTableManager.DATAKEY_STATES);
-        states[column] = state;
-        item.setData(TreeTableManager.DATAKEY_STATES, states);
+        PrebuildItem prebuildItem = (PrebuildItem) item.getData(TreeTableManager.DATAKEY_PREBUILD_ITEM);
+        prebuildItem.getStates()[column] = state;
         Image image = null;
         switch (state)
         {
@@ -1521,7 +1688,7 @@ class TreeTableManager
         }
     }
 
-    static void setText(Item item, int column, String value)
+    private static void setText(Item item, int column, String value)
     {
         if (item.isDisposed() == true || TreeTableManager.treeTable.isDisposed() == true)
         {
@@ -1556,6 +1723,24 @@ class TreeTableManager
 
             default:
                 ((TreeColumn) column).setToolTipText(toolTipText);
+                break;
+        }
+    }
+
+    static void setVisible(boolean visible)
+    {
+        if (TreeTableManager.treeTable.isDisposed() == true)
+        {
+            return;
+        }
+        switch (TreeTableManager.CurrentMode)
+        {
+            case TreeTableManager.MODE_TABLE:
+                ((Table) TreeTableManager.treeTable).setVisible(visible);
+                break;
+
+            default:
+                ((Tree) TreeTableManager.treeTable).setVisible(visible);
                 break;
         }
     }
