@@ -61,7 +61,6 @@ import net.i2p.data.Base64;
 import net.i2p.data.Destination;
 
 import org.gudy.azureus2.core3.config.COConfigurationManager;
-import org.gudy.azureus2.core3.config.impl.TransferSpeedValidator;
 import org.gudy.azureus2.core3.torrent.TOTorrent;
 import org.gudy.azureus2.core3.torrent.TOTorrentFactory;
 import org.gudy.azureus2.core3.util.AESemaphore;
@@ -102,7 +101,6 @@ import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 import org.parg.azureus.plugins.networks.i2p.swt.I2PHelperView;
 
-import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
 import com.aelitis.azureus.core.networkmanager.NetworkManager;
 import com.aelitis.azureus.core.proxy.AEProxyAddressMapper;
 import com.aelitis.azureus.core.proxy.AEProxyFactory;
@@ -363,7 +361,9 @@ I2PHelperPlugin
 					parameterChanged(
 						Parameter 	param ) 
 					{
-						if ( link_rates_param.getValue()){
+						boolean	is_linked = link_rates_param.getValue();
+						
+						if ( is_linked ){
 							
 							if ( event == null ){
 								
@@ -579,9 +579,11 @@ I2PHelperPlugin
 							
 							boolean	enabled_not_ext = plugin_enabled && !use_ext_i2p;
 							
+							boolean	is_linked = link_rates_param.getValue();
+
 							link_rates_param.setEnabled( enabled_not_ext );
-							up_limit_param.setEnabled( enabled_not_ext );
-							down_limit_param.setEnabled( enabled_not_ext );
+							up_limit_param.setEnabled( enabled_not_ext && !is_linked );
+							down_limit_param.setEnabled( enabled_not_ext  && !is_linked );
 							share_percent_param.setEnabled( enabled_not_ext );
 							
 							int_port_param.setEnabled( enabled_not_ext );
@@ -600,6 +602,7 @@ I2PHelperPlugin
 			
 			enable_param.addListener( enabler_listener );
 			ext_i2p_param.addListener( enabler_listener );
+			link_rates_param.addListener( enabler_listener );
 			
 			enabler_listener.parameterChanged( null );
 					
