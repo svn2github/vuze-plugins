@@ -58,7 +58,6 @@ import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.DisplayFormatters;
 import org.gudy.azureus2.core3.util.RandomUtils;
-import org.gudy.azureus2.plugins.PluginInterface;
 import org.parg.azureus.plugins.networks.i2p.dht.*;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTI2P;
 
@@ -78,6 +77,9 @@ I2PHelperRouter
 	public static final int		PARAM_SHARE_PERCENT_DEFAULT	= 25;
 	
 	private Map<String,Object>		properties;
+	
+	private boolean					is_external_router;
+	
 	private boolean					is_bootstrap_node;
 	private boolean					is_vuze_dht;
 	private I2PHelperAdapter		adapter;
@@ -326,6 +328,8 @@ I2PHelperRouter
 		throws Exception
 	{	
 		try{
+			is_external_router = false;
+			
 			init( config_dir );
 			
 			new File( config_dir, "router.ping" ).delete();
@@ -439,6 +443,13 @@ I2PHelperRouter
 		throws Exception
 	{	
 		try{
+			is_external_router = true;
+			
+				// we need this so that the NameService picks up the hosts file in the plugin dir when using
+				// an external router (dunno how/if to delegate lookups to the external router's hosts...)
+						
+			System.setProperty( "i2p.dir.config", config_dir.getAbsolutePath());
+			
 			init( config_dir );
 		
 			adapter.log( "Waiting for router startup" );;
@@ -455,7 +466,7 @@ I2PHelperRouter
 				}catch( Throwable e ){
 					
 					try{
-						Thread.sleep(250);
+						Thread.sleep(1000);
 						
 					}catch( Throwable f ){
 						
@@ -881,8 +892,10 @@ I2PHelperRouter
 		
 		if ( router == null ){
 			
-			adapter.log( "Router is inactive" );
+			if ( !is_external_router ){
 			
+				adapter.log( "Router is inactive" );
+			}
 		}else{
 			
 			RouterContext router_ctx = router.getContext();
@@ -928,6 +941,14 @@ I2PHelperRouter
 		Router 			router 	= this.router;
 		
 		if ( router == null || dht == null ){
+			
+			if ( is_external_router ){
+				
+				if ( dht != null ){
+					
+					return( dht.getStatusString() + "\nExternal Router" );
+				}
+			}
 			
 			return( adapter.getMessageText( "azi2phelper.status.initialising" ));
 		}

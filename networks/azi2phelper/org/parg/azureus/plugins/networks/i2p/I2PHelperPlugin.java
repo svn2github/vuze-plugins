@@ -867,6 +867,11 @@ I2PHelperPlugin
 			
 			if ( socks_proxy == null ){
 			
+				if ( router == null ){
+					
+					throw( new IPCException( "Router unavailable" ));
+				}
+				
 				try{
 					socks_proxy = new I2PHelperSocksProxy( router, socks_port_param.getValue(), I2PHelperPlugin.this );
 				
