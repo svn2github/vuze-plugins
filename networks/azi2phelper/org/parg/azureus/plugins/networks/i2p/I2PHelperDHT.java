@@ -113,4 +113,7 @@ I2PHelperDHT
 	
 	public String
 	getStats();
+	
+	public String
+	getStatusString();
 }

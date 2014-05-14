@@ -994,6 +994,21 @@ DHTI2P
 		return( transport.getStats().getString());
 	}
 	
+	public String 
+	getStatusString() 
+	{
+		long size = dht.getControl().getStats().getEstimatedDHTSize();
+		
+		if ( size < 50 ){
+			
+			return( adapter.getMessageText( "azi2phelper.status.bootstrapping" ));
+					
+		}else{
+		
+			return( adapter.getMessageText( "azi2phelper.status.node.est", String.valueOf( size )));
+		}
+	}
+	
 	private static class
 	GetCacheEntry
 		extends DHTOperationAdapter

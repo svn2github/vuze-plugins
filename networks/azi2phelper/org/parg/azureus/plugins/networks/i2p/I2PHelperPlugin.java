@@ -315,6 +315,7 @@ I2PHelperPlugin
 			config_model.addLabelParameter2( "azi2phelper.info2" );
 			
 			config_model.addHyperlinkParameter2( "azi2phelper.i2p.link", loc_utils.getLocalisedMessageText( "azi2phelper.i2p.link.url" ));
+			config_model.addHyperlinkParameter2( "azi2phelper.plugin.link", loc_utils.getLocalisedMessageText( "azi2phelper.plugin.link.url" ));
 
 			final BooleanParameter enable_param = config_model.addBooleanParameter2( "enable", "azi2phelper.enable", true );
 
@@ -783,11 +784,47 @@ I2PHelperPlugin
 		return( plugin_interface );
 	}
 	
+	public boolean
+	isEnabled()
+	{
+		return( plugin_enabled );
+	}
+	
+	public String
+	getStatusText()
+	{
+		if ( plugin_enabled ){
+			
+			I2PHelperRouter	r = router;
+			
+			if ( r == null ){
+				
+				return(  getMessageText( "azi2phelper.status.initialising" ));
+				
+			}else{
+				
+				return( r.getStatusText());
+			}
+			
+		}else{
+			
+			return( getMessageText( "azi2phelper.status.disabled" ));
+		}
+	}
+	
 	public String
 	getMessageText(
 		String		key )
 	{
 		return( loc_utils.getLocalisedMessageText(key));
+	}
+	
+	public String
+	getMessageText(
+		String		key,
+		String...	args )
+	{
+		return( loc_utils.getLocalisedMessageText(key, args));
 	}
 	
 	private void
@@ -2192,6 +2229,21 @@ I2PHelperPlugin
 					String str ) 
 				{
 					System.out.println( str );
+				}
+				
+				public String
+				getMessageText(
+					String		key )
+				{
+					return( "!" + key + "!" );
+				}
+				
+				public String
+				getMessageText(
+					String		key,
+					String...	args )
+				{
+					return( "!" + key + "!: " + args );
 				}
 				
 				public void

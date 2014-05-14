@@ -828,6 +828,10 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
         return buf.toString();
     }
 
+    @Override
+    public String getStatusString() {
+    	return( renderStatusHTML());
+    }
     ////////// All private below here /////////////////////////////////////
 
     ///// Sending.....

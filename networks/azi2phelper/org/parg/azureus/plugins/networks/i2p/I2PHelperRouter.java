@@ -58,6 +58,7 @@ import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.DisplayFormatters;
 import org.gudy.azureus2.core3.util.RandomUtils;
+import org.gudy.azureus2.plugins.PluginInterface;
 import org.parg.azureus.plugins.networks.i2p.dht.*;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTI2P;
 
@@ -79,7 +80,7 @@ I2PHelperRouter
 	private Map<String,Object>		properties;
 	private boolean					is_bootstrap_node;
 	private boolean					is_vuze_dht;
-	private I2PHelperAdapter		logger;
+	private I2PHelperAdapter		adapter;
 	
 	
 	private static final boolean	FULL_STATS = false;
@@ -97,14 +98,14 @@ I2PHelperRouter
 	protected
 	I2PHelperRouter(
 		Map<String,Object>		_properties,
-		boolean					bootstrap_node,
-		boolean					use_vuze_dht,
-		I2PHelperAdapter		_logger )
+		boolean					_is_bootstrap_node,
+		boolean					_is_vuze_dht,
+		I2PHelperAdapter		_adapter )
 	{
 		properties			= _properties;
-		is_bootstrap_node	= bootstrap_node;		// could be props one day
-		is_vuze_dht			= use_vuze_dht;
-		logger				= _logger;
+		is_bootstrap_node	= _is_bootstrap_node;		// could be props one day
+		is_vuze_dht			= _is_vuze_dht;
+		adapter				= _adapter;
 	}
 	
 	private int
@@ -382,7 +383,7 @@ I2PHelperRouter
 
 			RouterContext router_ctx = router.getContext();
 			
-			logger.log( "Waiting for router startup" );;
+			adapter.log( "Waiting for router startup" );;
 						
 			while( true ){
 				
@@ -404,7 +405,7 @@ I2PHelperRouter
 				}
 			}
 			
-			logger.log( "Router startup complete: version=" + CoreVersion.VERSION );
+			adapter.log( "Router startup complete: version=" + CoreVersion.VERSION );
 			
             Properties opts = new Properties();
             
@@ -440,7 +441,7 @@ I2PHelperRouter
 		try{
 			init( config_dir );
 		
-			logger.log( "Waiting for router startup" );;
+			adapter.log( "Waiting for router startup" );;
 						
 			while( true ){
 				
@@ -462,7 +463,7 @@ I2PHelperRouter
 				}
 			}
 			
-			logger.log( "Router startup complete" );
+			adapter.log( "Router startup complete" );
 			
             Properties opts = new Properties();
                         
@@ -495,7 +496,7 @@ I2PHelperRouter
 		
 		throws Exception
 	{
-		logger.log( "Initializing DHT..." );
+		adapter.log( "Initializing DHT..." );
 		
 		File dht_config 	= new File( config_dir,  "dht.config" );
 		File dest_key_file 	= new File( config_dir,  "dest_key.dat" );
@@ -579,7 +580,7 @@ I2PHelperRouter
 			throw( new Exception ( "Failed to create socket manager" ));
 		}
 		
-		logger.log( "Waiting for socket manager startup" );
+		adapter.log( "Waiting for socket manager startup" );
 		
 		while( true ){
 			
@@ -600,7 +601,7 @@ I2PHelperRouter
 			Thread.sleep(250);
 		}
 		
-		logger.log( "Socket manager startup complete" );
+		adapter.log( "Socket manager startup complete" );
 		
 		Destination my_dest = session.getMyDestination();
 		
@@ -673,7 +674,7 @@ I2PHelperRouter
 						}else{
 							try{
 							
-								logger.incomingConnection( socket );
+								adapter.incomingConnection( socket );
 							
 							}catch( Throwable e ){
 								
@@ -737,11 +738,11 @@ I2PHelperRouter
 				int	dht_port = Integer.parseInt( dht_port_str );
 				NID	dht_nid	= new NID( Base32.decode( dht_NID_str ));
 		
-				dht = snark_dht = new KRPC( ctx, "i2pvuze", session, dht_port, dht_nid, logger );
+				dht = snark_dht = new KRPC( ctx, "i2pvuze", session, dht_port, dht_nid, adapter );
 				
 			}else{	
 				
-	    		dht = snark_dht = new KRPC( ctx, "i2pvuze", session, logger );
+	    		dht = snark_dht = new KRPC( ctx, "i2pvuze", session, adapter );
 	    	}
 						
 			if ( !use_existing_nid ){
@@ -758,9 +759,9 @@ I2PHelperRouter
 				snark_dht.setBootstrapNode( boot_ninf );
 			}
 			
-			logger.log( "MyDest: " + full_dest);
-			logger.log( "        " + b32_dest  + ", existing=" + use_existing_key );
-			logger.log( "MyNID:  " + Base32.encode( snark_dht.getNID().getData()) + ", existing=" + use_existing_nid );
+			adapter.log( "MyDest: " + full_dest);
+			adapter.log( "        " + b32_dest  + ", existing=" + use_existing_key );
+			adapter.log( "MyNID:  " + Base32.encode( snark_dht.getNID().getData()) + ", existing=" + use_existing_nid );
 			
 		}else{
 			
@@ -786,11 +787,11 @@ I2PHelperRouter
 			
 			NodeInfo my_node_info = new NodeInfo( dht_nid, my_dest, dht_port );
 
-			logger.log( "MyDest: " + full_dest );
-			logger.log( "        " + b32_dest  + ", existing=" + use_existing_key );
-			logger.log( "MyNID:  " + Base32.encode( dht_nid.getData()) + ", existing=" + use_existing_nid );
+			adapter.log( "MyDest: " + full_dest );
+			adapter.log( "        " + b32_dest  + ", existing=" + use_existing_key );
+			adapter.log( "MyNID:  " + Base32.encode( dht_nid.getData()) + ", existing=" + use_existing_nid );
 
-			dht = new DHTI2P( config_dir, session, my_node_info, is_bootstrap_node?null:boot_ninf, logger );						
+			dht = new DHTI2P( config_dir, session, my_node_info, is_bootstrap_node?null:boot_ninf, adapter );						
 		}
 	}
 	
@@ -865,28 +866,28 @@ I2PHelperRouter
 		
 		if ( dht == null ){
 			
-			logger.log( "DHT is inactive" );
+			adapter.log( "DHT is inactive" );
 			
 		}else{
 			
 			String html = dht.renderStatusHTML();
 			
 			if ( html.length() > 0 ){
-				logger.log( html );
+				adapter.log( html );
 			}
 			
-			logger.log( dht.getStats());
+			adapter.log( dht.getStats());
 		}
 		
 		if ( router == null ){
 			
-			logger.log( "Router is inactive" );
+			adapter.log( "Router is inactive" );
 			
 		}else{
 			
 			RouterContext router_ctx = router.getContext();
 			
-			logger.log( "Known routers=" + router_ctx.netDb().getKnownRouters() + ", lease-sets=" + router_ctx.netDb().getKnownLeaseSets());
+			adapter.log( "Known routers=" + router_ctx.netDb().getKnownRouters() + ", lease-sets=" + router_ctx.netDb().getKnownLeaseSets());
 			
 			TunnelManagerFacade tunnel_manager = router_ctx.tunnelManager();
 			
@@ -894,9 +895,9 @@ I2PHelperRouter
 			int	client_tunnels			= tunnel_manager.getInboundClientTunnelCount()  + tunnel_manager.getOutboundClientTunnelCount();
 			int participating_tunnels	= tunnel_manager.getParticipatingCount();
 			
-			logger.log( "Tunnels: exploratory=" + exploratory_tunnels + ", client=" + client_tunnels + ", participating=" + participating_tunnels ); 
+			adapter.log( "Tunnels: exploratory=" + exploratory_tunnels + ", client=" + client_tunnels + ", participating=" + participating_tunnels ); 
 	
-			logger.log( "Throttle: msg_delay=" + router_ctx.throttle().getMessageDelay() + ", tunnel_lag=" + router_ctx.throttle().getTunnelLag() + ", tunnel_stat=" +  router_ctx.throttle().getTunnelStatus());
+			adapter.log( "Throttle: msg_delay=" + router_ctx.throttle().getMessageDelay() + ", tunnel_lag=" + router_ctx.throttle().getTunnelLag() + ", tunnel_stat=" +  router_ctx.throttle().getTunnelStatus());
 			
 			FIFOBandwidthLimiter bwl = router_ctx.bandwidthLimiter();
 			
@@ -909,14 +910,47 @@ I2PHelperRouter
 		    
 			if ( FULL_STATS ){
 			
-				logger.log( "Lease repubs=" + router_ctx.statManager().getRate("netDb.republishLeaseSetCount" ).getLifetimeEventCount());
+				adapter.log( "Lease repubs=" + router_ctx.statManager().getRate("netDb.republishLeaseSetCount" ).getLifetimeEventCount());
 			}
 			
-			logger.log( 
+			adapter.log( 
 				"Rates: send=" + DisplayFormatters.formatByteCountToKiBEtcPerSec(send_rate) +
 				", recv=" + DisplayFormatters.formatByteCountToKiBEtcPerSec(recv_rate) +
 				"; Limits: send=" + DisplayFormatters.formatByteCountToKiBEtcPerSec(bwl.getOutboundKBytesPerSecond()*1024) + 
 				", recv=" + DisplayFormatters.formatByteCountToKiBEtcPerSec(bwl.getInboundKBytesPerSecond()*1024));
 		}
+	}
+	
+	public String
+	getStatusText()
+	{	
+		I2PHelperDHT	dht		= this.dht;
+		Router 			router 	= this.router;
+		
+		if ( router == null || dht == null ){
+			
+			return( adapter.getMessageText( "azi2phelper.status.initialising" ));
+		}
+
+		RouterContext router_ctx = router.getContext();
+		
+		FIFOBandwidthLimiter bwl = router_ctx.bandwidthLimiter();
+		
+		long recv_rate = (long)bwl.getReceiveBps();
+		long send_rate = (long)bwl.getSendBps();
+		
+		long send_limit = bwl.getOutboundKBytesPerSecond()*1024;
+		long recv_limit = bwl.getInboundKBytesPerSecond()*1024;
+		
+		String recv_limit_str = recv_limit > 50*1024*1024?"": (	"[" + DisplayFormatters.formatByteCountToKiBEtcPerSec(recv_limit) + "] " );
+		String send_limit_str = send_limit > 50*1024*1024?"": (	"[" + DisplayFormatters.formatByteCountToKiBEtcPerSec(send_limit) + "] " );
+		
+		String router_str = 
+			adapter.getMessageText( "azi2phelper.status.router",
+					router_ctx.throttle().getTunnelStatus(),
+					recv_limit_str + DisplayFormatters.formatByteCountToKiBEtcPerSec(recv_rate),
+					send_limit_str + DisplayFormatters.formatByteCountToKiBEtcPerSec(send_rate));
+
+		return( dht.getStatusString() + "\n" + router_str );
 	}
 }

@@ -26,6 +26,7 @@ package org.parg.azureus.plugins.networks.i2p.swt;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.CTabFolder;
 import org.eclipse.swt.custom.CTabItem;
+import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
@@ -37,9 +38,14 @@ import org.gudy.azureus2.core3.util.SimpleTimer;
 import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.gudy.azureus2.core3.util.TimerEventPeriodic;
+import org.gudy.azureus2.plugins.ui.Graphic;
 import org.gudy.azureus2.plugins.ui.UIInstance;
+import org.gudy.azureus2.plugins.ui.menus.MenuItem;
+import org.gudy.azureus2.plugins.ui.menus.MenuItemListener;
 import org.gudy.azureus2.ui.swt.Utils;
 import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
+import org.gudy.azureus2.ui.swt.plugins.UISWTStatusEntry;
+import org.gudy.azureus2.ui.swt.plugins.UISWTStatusEntryListener;
 import org.gudy.azureus2.ui.swt.plugins.UISWTView;
 import org.gudy.azureus2.ui.swt.plugins.UISWTViewEvent;
 import org.gudy.azureus2.ui.swt.plugins.UISWTViewEventListener;
@@ -52,11 +58,15 @@ import org.parg.azureus.plugins.networks.i2p.I2PHelperRouter;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTI2P;
 
 import com.aelitis.azureus.core.dht.DHT;
+import com.aelitis.azureus.ui.UIFunctions;
+import com.aelitis.azureus.ui.UIFunctionsManager;
 
 public class 
 I2PHelperView 
 	implements UISWTViewEventListener
 {
+	private static final String	resource_path = "org/parg/azureus/plugins/networks/i2p/swt/";
+
 	private I2PHelperPlugin		plugin;
 	private UISWTInstance		ui;
 	private String				view_id;
@@ -69,7 +79,16 @@ I2PHelperView
 	private DHTView 		dht_view;
 	private DHTOpsView		ops_view;
 	
-	private TimerEventPeriodic	timer;
+	private TimerEventPeriodic	view_timer;
+	private TimerEventPeriodic	status_timer;
+	
+	private UISWTStatusEntry	status_icon;
+
+	private Image				img_sb_enabled;
+	private Image				img_sb_disabled;
+	
+	
+	private boolean		unloaded;
 	
 	public
 	I2PHelperView(
@@ -82,6 +101,122 @@ I2PHelperView
 		view_id	= _view_id;
 		
 		ui.addView( UISWTInstance.VIEW_MAIN, view_id, this );
+		
+		Utils.execSWTThread(
+			new Runnable()
+			{
+				public void
+				run()
+				{
+					synchronized( I2PHelperView.this ){
+						
+						if ( unloaded ){
+							
+							return;
+						}
+						
+						status_icon	= ui.createStatusEntry();
+						
+						status_icon.setImageEnabled( true );
+						
+						status_icon.setVisible( true );
+																	
+						UISWTStatusEntryListener status_listener = 
+							new UISWTStatusEntryListener()
+							{
+								public void 
+								entryClicked(
+									UISWTStatusEntry entry )
+								{
+									ui.openView( UISWTInstance.VIEW_MAIN, view_id, null );
+								}
+							};
+							
+						status_icon.setListener( status_listener );
+							
+						img_sb_disabled	 	= loadImage( ui, "sb_i2p_disabled.png" );
+						img_sb_enabled	 	= loadImage( ui, "sb_i2p_running.png" );
+						
+						boolean	enabled = plugin.isEnabled();
+						
+						status_icon.setImage( enabled?img_sb_enabled:img_sb_disabled);
+						
+						MenuItem mi_options =
+								plugin.getPluginInterface().getUIManager().getMenuManager().addMenuItem(
+										status_icon.getMenuContext(),
+										"MainWindow.menu.view.configuration" );
+
+						mi_options.addListener(
+							new MenuItemListener()
+							{
+								public void
+								selected(
+									MenuItem			menu,
+									Object 				target )
+								{
+									UIFunctions uif = UIFunctionsManager.getUIFunctions();
+
+									if ( uif != null ){
+
+										uif.openView( UIFunctions.VIEW_CONFIG, "azi2phelper.name" );
+									}
+								}
+							});
+
+						status_icon.setTooltipText( plugin.getStatusText());
+
+						if ( enabled ){
+							
+							status_timer = SimpleTimer.addPeriodicEvent(
+									"I2PView:status",
+									10*1000,
+									new TimerEventPerformer() 
+									{
+										public void 
+										perform(
+											TimerEvent event ) 
+										{
+											if ( unloaded ){
+												
+												TimerEventPeriodic timer = status_timer;
+												
+												if ( timer != null ){
+													
+													timer.cancel();
+												}
+												
+												return;
+											}
+											
+											status_icon.setTooltipText( plugin.getStatusText());
+										}
+									});
+						}
+					}
+				}
+			});
+	}
+	
+	protected Image
+	loadImage(
+		UISWTInstance	swt,
+		String			name )
+	{
+		Image	image = swt.loadImage( resource_path + name );
+
+		return( image );
+	}
+	
+	protected Graphic
+	loadGraphic(
+		UISWTInstance	swt,
+		String			name )
+	{
+		Image	image = swt.loadImage( resource_path + name );
+
+		Graphic graphic = swt.createGraphic(image );
+				
+		return( graphic );
 	}
 	
 	protected void
@@ -194,7 +329,7 @@ I2PHelperView
 				
 				current_view = event.getView();
 				
-				timer = SimpleTimer.addPeriodicEvent(
+				view_timer = SimpleTimer.addPeriodicEvent(
 					"I2PView:stats",
 					1000,
 					new TimerEventPerformer() 
@@ -270,11 +405,11 @@ I2PHelperView
 				try{
 					composite = null;
 					
-					if ( timer != null ){
+					if ( view_timer != null ){
 						
-						timer.cancel();
+						view_timer.cancel();
 						
-						timer = null;
+						view_timer = null;
 					}
 					
 				}finally{
@@ -299,6 +434,48 @@ I2PHelperView
 	public void
 	unload()
 	{
+		synchronized( this ){
+			
+			unloaded = true;
+		}
+		
 		ui.removeViews( UISWTInstance.VIEW_MAIN, view_id );
+		
+		if ( status_timer != null ){
+			
+			status_timer.cancel();
+			
+			status_timer = null;
+		}
+		
+		if ( status_icon != null ){
+			
+			status_icon.destroy();
+			
+			status_icon = null;
+		}
+		
+		Utils.execSWTThread(
+			new Runnable()
+			{
+				public void
+				run()
+				{
+					if ( img_sb_disabled != null ){
+						
+						img_sb_disabled.dispose();
+						
+						img_sb_disabled = null;
+					}
+					
+					if ( img_sb_enabled != null ){
+						
+						img_sb_enabled.dispose();
+						
+						img_sb_enabled = null;
+					}
+				}
+			});
+		
 	}
 }

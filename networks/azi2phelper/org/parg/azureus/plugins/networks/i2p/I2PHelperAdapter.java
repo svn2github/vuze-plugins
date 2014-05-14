@@ -35,6 +35,15 @@ I2PHelperAdapter
 	public PluginInterface
 	getPluginInterface();
 	
+	public String
+	getMessageText(
+		String			key );
+	
+	public String
+	getMessageText(
+		String			key,
+		String...		args );
+	
 	public void
 	tryExternalBootstrap(
 		boolean		force );
