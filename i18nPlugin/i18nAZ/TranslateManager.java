@@ -314,7 +314,7 @@ public class TranslateManager
                             }
                         }
                         String oldword = value.substring(offsetBegin, offsetEnd);
-                        if (value.length() > 1 && sentence.length() > 1 && word.equals("\n") == false)
+                        if (value.length() > 1 && word.length() > 1 && sentence.length() > 1 && word.equals("\n") == false)
                         {
                             String[] originalLines = value.split("\\n");
                             String[] lines = sentence.split("\\n");

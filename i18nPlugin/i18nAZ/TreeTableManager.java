@@ -1248,7 +1248,7 @@ class TreeTableManager
                 public void menuDetected(MenuDetectEvent e)
                 {
 
-                    if (TreeTableManager.getSelection().length == 0 && TreeTableManager.getColumnCount() < 2)
+                    if (TreeTableManager.getSelection().length == 0 || TreeTableManager.getColumnCount() < 2)
                     {
                         e.doit = false;
                         return;
@@ -1498,7 +1498,7 @@ class TreeTableManager
         }
         else
         {
-            ToolTipText.set(i18nAZ.viewInstance.removeLanguageButton.getSkinObject().getControl(), "i18nAZ.ToolTips.RemoveLanguage");
+            ToolTipText.set(i18nAZ.viewInstance.removeLanguageButton.getSkinObject().getControl(), "i18nAZ.ToolTips.RemoveLanguage", new String[] {""});
         }
         i18nAZ.viewInstance.updateSpellCheckerButton();               
     }

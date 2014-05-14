@@ -777,7 +777,10 @@ public class NotInstalledPluginManager implements iTask
                             }
                         }
                     }
-                    NotInstalledPluginManager.add(notInstalledPluginInterfaces[j]);
+                    if(NotInstalledPluginManager.contains(notInstalledPluginInterfaces[j]) == false)
+                    {
+                        NotInstalledPluginManager.add(notInstalledPluginInterfaces[j]);
+                    }
                 }              
             }
             else

@@ -549,7 +549,10 @@ class View implements UISWTViewCoreEventListener
                 
                 public void pressed(SWTSkinButtonUtility buttonUtility, SWTSkinObject skinObject, int stateMask)
                 {
-                    View.checkButton(button);
+                    if(buttonUtility.equals(View.this.urlsFilterButton) == false)
+                    {
+                        View.checkButton(button);
+                    }
                 }
             });
         }
@@ -680,24 +683,25 @@ class View implements UISWTViewCoreEventListener
 
     private static void checkButton(SWTSkinButtonUtility button, int state, String imageId, String tooltipId)
     {
+        boolean checked = true;
         switch (state)
         {
             case 0:
                 button.setImage(imageId);
-                View.checkButton(button, false);
+                checked = false;
                 ToolTipText.set(button.getSkinObject().getControl(), tooltipId + "State1");
                 break;
             case 1:
                 button.setImage(imageId + "Off");
-                View.checkButton(button, true);
                 ToolTipText.set(button.getSkinObject().getControl(), tooltipId + "State2");
                 break;
             case 2:
                 button.setImage(imageId + "On");
-                View.checkButton(button, true);
                 ToolTipText.set(button.getSkinObject().getControl(), tooltipId + "State3");
                 break;
         }
+        button.getSkinObject().switchSuffix(checked ? "-selected" : "", 4, false);
+        button.getSkinObject().setData("checked", checked);
     }
 
     private void createTopLevelMenuitem()

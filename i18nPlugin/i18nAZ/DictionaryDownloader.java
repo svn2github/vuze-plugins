@@ -11,8 +11,12 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Vector;
 import java.util.jar.JarEntry;
@@ -151,10 +155,11 @@ public class DictionaryDownloader implements iTask
             {
                 Dictionary dictionary = null;
                 String availablelanguageTag = null;
+                String targetLanguageTag = Util.getLanguageTag(locale).replace('-', '_');
                 if (available != null)
                 {
                     availablelanguageTag = available[0] + ((available[1].equals("") == true) ? "" : "_" + available[1]);;
-                    dictionary = getDictionaries(Util.getLanguageTag(locale).replace('-', '_'));
+                    dictionary = getDictionaries(targetLanguageTag);
                 }
                 if (dictionary != null || processed == true || availablelanguageTag == null)
                 {
@@ -168,7 +173,7 @@ public class DictionaryDownloader implements iTask
                     }
                     break;
                 }
-                final File destFile = new File(dictionaryFolder + File.separator + Util.getLanguageTag(locale).replace('-', '_') + ".zip");
+                final File destFile = new File(dictionaryFolder + File.separator + targetLanguageTag + ".zip");
                 synchronized (DictionaryDownloader.resourceDownloaderAlternateMutex)
                 {
                     DictionaryDownloader.semaphore = new AESemaphore("DictionaryDownloader");
@@ -273,27 +278,62 @@ public class DictionaryDownloader implements iTask
                     }
                     if (archiveFile != null)
                     {
+                        Map<String, Map<String, JarEntry>> mapFiles = new HashMap<String, Map<String, JarEntry>>();
                         for (Enumeration<JarEntry> entries = archiveFile.entries(); entries.hasMoreElements();)
                         {
                             JarEntry entry = entries.nextElement();
                             if (entry.isDirectory() == true)
                             {
                                 continue;
-                            }
+                            }   
                             String fileName = Path.getFilenameWithoutExtension(entry.getName());
-                            if (fileName.startsWith(availablelanguageTag) == false)
-                            {
-                                continue;
-                            }
                             String extension = Path.getExtension(entry.getName());
                             if (extension.equalsIgnoreCase(".dic") == false && extension.equalsIgnoreCase(".aff") == false)
                             {
                                 continue;
                             }
+                            if (mapFiles.containsKey(fileName) == false)
+                            {
+                                mapFiles.put(fileName, new HashMap<String, JarEntry>());                                
+                            }                            
+                            mapFiles.get(fileName).put(extension, entry);
+                        }
+                        
+                        begin:
+                        while(true)
+                        {
+                            for (Iterator<Entry<String, Map<String, JarEntry>>> iterator = mapFiles.entrySet().iterator(); iterator.hasNext();)
+                            {
+                                Entry<String, Map<String, JarEntry>> entry = iterator.next();
+                                if(entry.getValue().size() != 2)
+                                {
+                                    mapFiles.remove(entry.getKey());
+                                    continue begin;
+                                }
+                            }
+                            break;
+                        }
+                        Map<String, JarEntry> mapFile = null;
+                        if(mapFiles.containsKey(availablelanguageTag) == true)
+                        {
+                            mapFile = mapFiles.get(availablelanguageTag);
+                        }
+                        if(mapFile == null)
+                        {
+                            for (Iterator<Entry<String, Map<String, JarEntry>>> iterator = mapFiles.entrySet().iterator(); iterator.hasNext();)
+                            {
+                                mapFile = iterator.next().getValue();
+                                break;
+                            }
+                        }
+                        for (Iterator<Entry<String, JarEntry>> iterator = mapFile.entrySet().iterator(); iterator.hasNext();)
+                        {
+                            Entry<String, JarEntry> entry = iterator.next();                            
+                       
                             InputStream data = null;
                             try
                             {
-                                data = archiveFile.getInputStream(entry);
+                                data = archiveFile.getInputStream(entry.getValue());
                             }
                             catch (IOException e)
                             {
@@ -303,7 +343,7 @@ public class DictionaryDownloader implements iTask
                                 continue;
                             }
                             OutputStream output = null;
-                            File file = new File(dictionaryFolder + File.separator + Util.getLanguageTag(locale).replace('-', '_') + extension);
+                            File file = new File(dictionaryFolder + File.separator + targetLanguageTag + entry.getKey());
                             file.getParentFile().mkdirs();
                             try
                             {
