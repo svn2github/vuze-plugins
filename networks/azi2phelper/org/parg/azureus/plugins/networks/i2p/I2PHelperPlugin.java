@@ -74,6 +74,7 @@ import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.gudy.azureus2.core3.util.TimerEventPeriodic;
+import org.gudy.azureus2.core3.util.TorrentUtils;
 import org.gudy.azureus2.core3.util.UrlUtils;
 import org.gudy.azureus2.plugins.PluginAdapter;
 import org.gudy.azureus2.plugins.PluginConfig;
@@ -98,6 +99,7 @@ import org.gudy.azureus2.plugins.ui.config.StringParameter;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
+import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 import org.parg.azureus.plugins.networks.i2p.swt.I2PHelperView;
 
@@ -156,8 +158,8 @@ I2PHelperPlugin
 	
 	private boolean					plugin_enabled;
 	
-	private I2PHelperRouter			router;
-	private I2PHelperTracker		tracker;
+	private volatile I2PHelperRouter		router;
+	private volatile I2PHelperTracker		tracker;
 	
 	private File			lock_file;
 	private InputStream		lock_stream;
@@ -166,6 +168,8 @@ I2PHelperPlugin
 	private Map<Proxy,ProxyMapEntry>			proxy_map 				= new IdentityHashMap<Proxy, ProxyMapEntry>();
 
 	private I2PHelperMessageHandler		message_handler;
+	
+	private I2PHelperNetworkMixer		network_mixer;
 	
 	private MagnetURIHandlerListener	magnet_handler =
 		new MagnetURIHandlerListener()
@@ -319,6 +323,9 @@ I2PHelperPlugin
 
 			final BooleanParameter enable_param = config_model.addBooleanParameter2( "enable", "azi2phelper.enable", true );
 
+			
+				// Bandwidth
+			
 			final BooleanParameter link_rates_param = config_model.addBooleanParameter2( "azi2phelper.link.rates", "azi2phelper.link.rates", false );
 			
 			final IntParameter up_limit_param 		= config_model.addIntParameter2( I2PHelperRouter.PARAM_SEND_KBS, I2PHelperRouter.PARAM_SEND_KBS, I2PHelperRouter.PARAM_SEND_KBS_DEFAULT, 0, Integer.MAX_VALUE );
@@ -430,6 +437,31 @@ I2PHelperPlugin
 			link_listener.parameterChanged( null );
 				
 			link_rates_param.addListener( link_listener );
+			
+			config_model.createGroup( 
+					"azi2phelper.bandwidth.group",
+					new Parameter[]{ 
+						link_rates_param, up_limit_param, down_limit_param, share_percent_param 	
+					});
+			
+				// Network Mixing
+			
+			final BooleanParameter net_mix_enable		= config_model.addBooleanParameter2( "azi2phelper.netmix.enable", "azi2phelper.netmix.enable", true );
+
+			final IntParameter net_mix_incomp_num 		= config_model.addIntParameter2( "azi2phelper.netmix.incomp.num", "azi2phelper.netmix.incomp.num", 5 );
+			
+			final IntParameter net_mix_comp_num 		= config_model.addIntParameter2( "azi2phelper.netmix.comp.num", "azi2phelper.netmix.comp.num", 5 );
+
+			network_mixer = new I2PHelperNetworkMixer( this, net_mix_enable, net_mix_incomp_num, net_mix_comp_num );
+			
+			config_model.createGroup( 
+					"azi2phelper.netmix.group",
+					new Parameter[]{ 
+							net_mix_enable, net_mix_incomp_num, net_mix_comp_num	
+					});
+			
+			
+				// I2P Internals
 			
 			int_port_param 		= config_model.addIntParameter2( "azi2phelper.internal.port", "azi2phelper.internal.port", 0 );
 			ext_port_param	 	= config_model.addIntParameter2( "azi2phelper.external.port", "azi2phelper.external.port", 0 );
@@ -567,6 +599,7 @@ I2PHelperPlugin
 				
 				log( "Plugin is disabled" );
 			}
+			
 			ParameterListener enabler_listener =
 					new ParameterListener()
 					{
@@ -587,6 +620,10 @@ I2PHelperPlugin
 							down_limit_param.setEnabled( enabled_not_ext  && !is_linked );
 							share_percent_param.setEnabled( enabled_not_ext );
 							
+							net_mix_enable.setEnabled( plugin_enabled );
+							net_mix_incomp_num.setEnabled( plugin_enabled );
+							net_mix_comp_num.setEnabled( plugin_enabled );
+							
 							int_port_param.setEnabled( enabled_not_ext );
 							ext_port_param.setEnabled( enabled_not_ext);
 							socks_port_param.setEnabled( plugin_enabled );
@@ -594,7 +631,7 @@ I2PHelperPlugin
 							use_upnp.setEnabled( enabled_not_ext );
 							always_socks.setEnabled( plugin_enabled);
 							ext_i2p_param.setEnabled( plugin_enabled );
-							ext_i2p_port_param.setEnabled( enabled_not_ext );
+							ext_i2p_port_param.setEnabled( !enabled_not_ext );
 							
 							command_text_param.setEnabled( plugin_enabled );
 							command_exec_param.setEnabled( plugin_enabled );
@@ -1308,6 +1345,41 @@ I2PHelperPlugin
 		}
 	}
 	
+	private I2PHelperTracker
+	getTracker(
+		long		timeout )
+	{
+		long start = SystemTime.getMonotonousTime();
+		
+		while( true ){
+			
+			if ( unloaded ){
+				
+				break;
+			}
+			
+			if ( tracker != null ){
+				
+				return( tracker );
+			}
+			
+			if ( SystemTime.getMonotonousTime() - start >= timeout ){
+				
+				break;
+			}
+			
+			try{
+				Thread.sleep(500);
+				
+			}catch( Throwable e ){
+				
+				break;
+			}
+		}
+		
+		return( null );
+	}
+	
 	private byte[] 
 	handleMaggotRequest(
 		final MagnetURIHandlerProgressListener	progress,
@@ -1351,11 +1423,22 @@ I2PHelperPlugin
 			run()
 			{
 				try{
-					tracker.get( 
+					long	start = SystemTime.getMonotonousTime();
+					
+					I2PHelperTracker t = getTracker( timeout );
+					
+					long	remaining = timeout - ( SystemTime.getMonotonousTime() - start );
+
+					if ( t == null || remaining < 5*1000 ){
+						
+						throw( new Exception( "Timeout waiting for tracker" ));
+					}
+										
+					t.get( 
 						hash,
 						"Maggot lookup",
 						16,
-						timeout,
+						remaining,
 						new I2PHelperDHTListener()
 						{
 							public void 
@@ -1544,6 +1627,7 @@ I2PHelperPlugin
 					
 				}catch( Throwable e ){
 					
+					wait_sem.release();
 				}
 			}
 		}.start();
@@ -1674,7 +1758,7 @@ I2PHelperPlugin
 									
 									Torrent torrent = download.getTorrent();
 									
-									if ( torrent != null && !torrent.isPrivate()){
+									if ( torrent != null && !TorrentUtils.isReallyPrivate( PluginCoreUtils.unwrap( torrent ))){
 										
 										String torrent_name = torrent.getName() + ".torrent";
 										
@@ -2053,6 +2137,13 @@ I2PHelperPlugin
 					message_handler.destroy();
 					
 					message_handler = null;
+				}
+				
+				if ( network_mixer != null ){
+					
+					network_mixer.destroy();
+					
+					network_mixer = null;
 				}
 			}
 		}finally{

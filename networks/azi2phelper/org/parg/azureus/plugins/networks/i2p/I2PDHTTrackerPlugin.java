@@ -293,7 +293,7 @@ I2PDHTTrackerPlugin
 					}
 				}
 				
-				if ( i2p_net && !torrent.isPrivate()){
+				if ( i2p_net && !TorrentUtils.isReallyPrivate( PluginCoreUtils.unwrap( torrent ))){
 	
 					boolean	our_download =  torrent.wasCreatedByUs();
 	
@@ -458,7 +458,7 @@ I2PDHTTrackerPlugin
 					}
 				}
 				
-				if ( i2p_net && !torrent.isPrivate()){
+				if ( i2p_net && !TorrentUtils.isReallyPrivate( PluginCoreUtils.unwrap( torrent ))){
 					
 					if ( torrent.isDecentralised()){
 						
