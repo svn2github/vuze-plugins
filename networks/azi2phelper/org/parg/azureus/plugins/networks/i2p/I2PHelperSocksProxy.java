@@ -960,7 +960,9 @@ I2PHelperSocksProxy
 																	
 																}else if ( kw.equals( "HOST" )){
 																	
-																	Destination peer_dest = socket.getPeerDestination();
+																	I2PSocket s = socket;
+																	
+																	Destination peer_dest = s==null?null:s.getPeerDestination();
 																	
 																	if ( peer_dest == null ){
 																		

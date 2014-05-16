@@ -21,6 +21,11 @@
 
 package org.parg.azureus.plugins.networks.i2p;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.core3.util.AsyncDispatcher;
@@ -35,6 +40,7 @@ import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.download.DownloadAttributeListener;
 import org.gudy.azureus2.plugins.download.DownloadManager;
 import org.gudy.azureus2.plugins.download.DownloadManagerListener;
+import org.gudy.azureus2.plugins.download.DownloadScrapeResult;
 import org.gudy.azureus2.plugins.torrent.Torrent;
 import org.gudy.azureus2.plugins.torrent.TorrentAttribute;
 import org.gudy.azureus2.plugins.torrent.TorrentManager;
@@ -53,6 +59,7 @@ I2PHelperNetworkMixer
 	private static final int MS_ACTIVE				= 2;
 	private static final int MS_MANUAL				= 3;
 	
+	private I2PHelperPlugin		plugin;
 	private PluginInterface		plugin_interface;
 	private TorrentAttribute 	ta_networks;
 	private TorrentAttribute 	ta_mixstate;
@@ -63,6 +70,8 @@ I2PHelperNetworkMixer
 	
 	private static final int MIN_CHECK_PERIOD 	= 60*1000;
 	private static final int RECHECK_PERIOD 	= 5*60*1000;
+	
+	private static final int MIN_ACTIVE_PERIOD 	= 20*60*1000;
 	
 	private TimerEventPeriodic	recheck_timer;
 	
@@ -76,11 +85,12 @@ I2PHelperNetworkMixer
 	
 	protected
 	I2PHelperNetworkMixer(
-		I2PHelperPlugin			plugin,
+		I2PHelperPlugin			_plugin,
 		final BooleanParameter	enable_param,
 		final IntParameter		incomp_param,
 		final IntParameter		comp_param )
 	{
+		plugin				= _plugin;
 		plugin_interface	= plugin.getPluginInterface();
 		
 		ta_networks 	= plugin_interface.getTorrentManager().getAttribute( TorrentAttribute.TA_NETWORKS );
@@ -256,12 +266,47 @@ I2PHelperNetworkMixer
 			});
 	}
 	
+	private Comparator<Download> download_comparator =
+			new Comparator<Download>() 
+			{
+				public int 
+				compare(
+					Download 	d1, 
+					Download 	d2 ) 
+				{
+					DownloadScrapeResult s1 = d1.getAggregatedScrapeResult();
+					DownloadScrapeResult s2 = d2.getAggregatedScrapeResult();
+					
+					if ( s1 == s2 ){
+						
+						return( 0 );
+						
+					}else if ( s1 == null ){
+						
+						return( 1 );
+	
+					}else if ( s2 == null ){
+						
+						return( -1 );
+						
+					}else{
+						
+						return( s2.getSeedCount() - s1.getSeedCount());
+					}
+				}
+			};
+			
 	private void
 	checkStuffSupport()
 	{
 		DownloadManager dm = plugin_interface.getDownloadManager();
 		
-		for ( Download download: dm.getDownloads()){
+		Download[]	downloads = dm.getDownloads();
+		
+		List<Download>	complete_downloads		= new ArrayList<Download>( downloads.length );
+		List<Download>	incomplete_downloads 	= new ArrayList<Download>( downloads.length );
+		
+		for ( Download download: downloads ){
 			
 			if ( 	download.getFlag( Download.FLAG_LOW_NOISE ) || 
 					download.getFlag( Download.FLAG_METADATA_DOWNLOAD )){
@@ -281,11 +326,16 @@ I2PHelperNetworkMixer
 				continue;
 			}
 			
+			if ( !PluginCoreUtils.unwrap( download ).getDownloadState().isNetworkEnabled( AENetworkClassifier.AT_PUBLIC )){
+				
+				continue;
+			}
+			
 			int	existing_state = download.getIntAttribute( ta_mixstate );
 			
 			if ( existing_state == MS_CHANGING || existing_state == MS_MANUAL ){
 				
-				return;
+				continue;
 			}
 			
 			int download_state = download.getState();
@@ -297,7 +347,89 @@ I2PHelperNetworkMixer
 				continue;
 			}
 			
-			System.out.println( "Checking: " + download.getName() + ", comp=" + download.isComplete());
+			boolean	complete = download.isComplete();
+			
+			if ( complete ){
+				
+				complete_downloads.add( download );
+				
+			}else{
+				
+				incomplete_downloads.add( download );
+			}
+		}
+		
+		applyRules( complete_downloads, complete_limit );
+		applyRules( incomplete_downloads, incomplete_limit );
+	}
+	
+	private void
+	applyRules(
+		List<Download>		downloads,
+		int					active_limit )
+	{	
+		if ( active_limit <= 0 ){
+			
+			active_limit = Integer.MAX_VALUE;
+		}
+		
+		Collections.sort( downloads, download_comparator );
+				
+			// downloads are sorted highest priority first
+		
+		ArrayList<Download>		to_activate 	= new ArrayList<Download>( downloads.size());
+
+		int	failed_to_deactivate = 0;
+		
+		for ( int i=0;i<downloads.size();i++){
+			
+			Download download = downloads.get( i );
+			
+			int	existing_state = download.getIntAttribute( ta_mixstate );
+
+			if ( existing_state == MS_ACTIVE ){
+				
+				if ( i < active_limit ){
+					
+					// already good
+					
+				}else{
+					
+					Long	activate_time = (Long)download.getUserData( I2PHelperNetworkMixer.class );
+					
+					if ( 	activate_time == null ||	// shouldn't happen but just in case
+							SystemTime.getMonotonousTime() - activate_time >= MIN_ACTIVE_PERIOD ){
+						
+						plugin.log( "Netmix: deactivating " + download.getName());
+						
+						setNetworkState( download, false );
+						
+					}else{
+						
+						failed_to_deactivate++;
+					}
+				}
+			}else{
+				
+				if ( i < active_limit ){
+					
+					to_activate.add( download );
+				}
+			}
+		}
+		
+			// if we failed to deactivate N downloads then that means we can't yet activate N
+			// new ones
+		
+		int	num_to_activate = to_activate.size() - failed_to_deactivate;
+		
+		for ( int i=0;i<num_to_activate;i++){
+			
+			Download download = to_activate.get(i);
+			
+			plugin.log( "Netmix: activating " + download.getName());
+			
+			setNetworkState( download, true );
 		}
 	}
 	
@@ -341,6 +473,14 @@ I2PHelperNetworkMixer
 			
 			PluginCoreUtils.unwrap( download ).getDownloadState().setNetworkEnabled( AENetworkClassifier.AT_I2P, enabled );
 			
+			if ( enabled ){
+				
+				download.setUserData( I2PHelperNetworkMixer.class, SystemTime.getMonotonousTime());
+				
+			}else{
+				
+				download.setUserData( I2PHelperNetworkMixer.class, null );
+			}
 		}finally{
 			
 			download.setIntAttribute( ta_mixstate, enabled?MS_ACTIVE:MS_NONE );
