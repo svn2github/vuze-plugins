@@ -82,8 +82,9 @@ public class RPCServer implements Runnable, RPCServerBase {
 	
 	private boolean createSocket() 
 	{
-		if(sock != null)
+		if(sock != null){
 			sock.close();
+		}
 		
 		synchronized (interfacesInUse)
 		{
@@ -98,9 +99,15 @@ public class RPCServer implements Runnable, RPCServerBase {
 				
 				timeoutFilter.reset();
 				
-				if(addr == null)
-					throw new NullPointerException("valid address expected");
-
+				if (addr == null){
+				
+					if ( sock != null ){
+						sock.close();
+					}
+					destroy();
+					return( false );
+				}
+				
 				sock = new DatagramSocket(null);
 				sock.setReuseAddress(true);
 				sock.bind(new InetSocketAddress(addr, port));
