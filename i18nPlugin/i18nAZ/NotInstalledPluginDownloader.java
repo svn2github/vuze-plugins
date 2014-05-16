@@ -213,7 +213,7 @@ public class NotInstalledPluginDownloader implements iTask
                         }
                         if(NotInstalledPluginDownloader.semaphore != null)
                         {
-                            NotInstalledPluginDownloader.semaphore.release();
+                            NotInstalledPluginDownloader.semaphore.releaseForever();
                         }
                         return true;
                     }
@@ -223,7 +223,7 @@ public class NotInstalledPluginDownloader implements iTask
                     {
                         if(NotInstalledPluginDownloader.semaphore != null)
                         {
-                            NotInstalledPluginDownloader.semaphore.release();
+                            NotInstalledPluginDownloader.semaphore.releaseForever();
                         }
                     }
                 });
@@ -264,15 +264,19 @@ public class NotInstalledPluginDownloader implements iTask
     
     public void onStop(StopEvent e)
     {
+        AESemaphore semaphore = null;
         synchronized (NotInstalledPluginDownloader.resourceDownloaderAlternateMutex)
         {
             if (NotInstalledPluginDownloader.resourceDownloaderAlternate != null)
             {
                 NotInstalledPluginDownloader.resourceDownloaderAlternate.cancel();
-                NotInstalledPluginDownloader.semaphore.reserve();
+                semaphore = NotInstalledPluginDownloader.semaphore;
             }
         }
-
+        if (semaphore != null)
+        {
+            semaphore.reserve();
+        }        
         NotInstalledPluginDownloader.deleteListeners();
         NotInstalledPluginManager.stop();
     }

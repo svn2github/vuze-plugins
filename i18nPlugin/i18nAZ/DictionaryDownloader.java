@@ -249,7 +249,7 @@ public class DictionaryDownloader implements iTask
                             }
                             if(DictionaryDownloader.semaphore != null)
                             {
-                                DictionaryDownloader.semaphore.release();
+                                DictionaryDownloader.semaphore.releaseForever();
                             }
                             return true;
                         }
@@ -259,7 +259,7 @@ public class DictionaryDownloader implements iTask
                         {
                             if(DictionaryDownloader.semaphore != null)
                             {
-                                DictionaryDownloader.semaphore.release();
+                                DictionaryDownloader.semaphore.releaseForever();
                             }
                         }
                     });
@@ -493,15 +493,20 @@ public class DictionaryDownloader implements iTask
     
     public void onStop(StopEvent e)
     {
+        AESemaphore semaphore = null;
         synchronized (DictionaryDownloader.resourceDownloaderAlternateMutex)
         {
             if (DictionaryDownloader.resourceDownloader != null)
             {
                 DictionaryDownloader.resourceDownloader.cancel();
-                DictionaryDownloader.semaphore.reserve();
+                semaphore = DictionaryDownloader.semaphore;
             }
         }
-        DictionaryDownloader.deleteListeners();
+        if (semaphore != null)
+        {
+            semaphore.reserve();
+        }
+         DictionaryDownloader.deleteListeners();
     }
 
     public static void signal()

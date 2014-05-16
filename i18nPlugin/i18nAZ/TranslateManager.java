@@ -101,7 +101,7 @@ public class TranslateManager
                     }
                     if (TranslateManager.semaphore != null)
                     {
-                        TranslateManager.semaphore.release();
+                        TranslateManager.semaphore.releaseForever();
                     }
                     return true;
                 }
@@ -111,7 +111,7 @@ public class TranslateManager
                 {
                     if (TranslateManager.semaphore != null)
                     {
-                        TranslateManager.semaphore.release();
+                        TranslateManager.semaphore.releaseForever();
                     }
                 }
             });
