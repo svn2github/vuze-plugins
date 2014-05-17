@@ -62,7 +62,7 @@ public class LocalizablePluginInterface implements iTask
                 continue;
             }
             File[] messageBundlesFiles = langFileDirs[j].listFiles();
-            for (int k = 0; messageBundlesFiles != null && k < messageBundlesFiles.length; j++)
+            for (int k = 0; messageBundlesFiles != null && k < messageBundlesFiles.length; k++)
             {
                 if (messageBundlesFiles[k].isDirectory() == false && Path.getExtension(messageBundlesFiles[k]).equalsIgnoreCase(LocalizablePluginManager.EXTENSION) == true)
                 {
