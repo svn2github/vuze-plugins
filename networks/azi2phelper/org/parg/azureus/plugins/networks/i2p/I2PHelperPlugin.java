@@ -451,8 +451,6 @@ I2PHelperPlugin
 			final IntParameter net_mix_incomp_num 		= config_model.addIntParameter2( "azi2phelper.netmix.incomp.num", "azi2phelper.netmix.incomp.num", 5 );
 			
 			final IntParameter net_mix_comp_num 		= config_model.addIntParameter2( "azi2phelper.netmix.comp.num", "azi2phelper.netmix.comp.num", 5 );
-
-			network_mixer = new I2PHelperNetworkMixer( this, net_mix_enable, net_mix_incomp_num, net_mix_comp_num );
 			
 			config_model.createGroup( 
 					"azi2phelper.netmix.group",
@@ -537,13 +535,14 @@ I2PHelperPlugin
 		
 			final BooleanParameter ext_i2p_param 		= config_model.addBooleanParameter2( "azi2phelper.use.ext", "azi2phelper.use.ext", false );
 			
-			final IntParameter ext_i2p_port_param 		= config_model.addIntParameter2( "azi2phelper.use.ext.port", "azi2phelper.use.ext.port", 7654 ); 
+			final StringParameter 	ext_i2p_host_param 		= config_model.addStringParameter2( "azi2phelper.use.ext.host", "azi2phelper.use.ext.host", "127.0.0.1" ); 
+			final IntParameter 		ext_i2p_port_param 		= config_model.addIntParameter2( "azi2phelper.use.ext.port", "azi2phelper.use.ext.port", 7654 ); 
 			
 			config_model.createGroup( 
 				"azi2phelper.internals.group",
 				new Parameter[]{ 
 						int_port_param, ext_port_param, socks_port_param,
-						port_info_param, use_upnp, always_socks, ext_i2p_param,ext_i2p_port_param });
+						port_info_param, use_upnp, always_socks, ext_i2p_param, ext_i2p_host_param, ext_i2p_port_param });
 			
 			
 			final StringParameter 	command_text_param = config_model.addStringParameter2( "azi2phelper.cmd.text", "azi2phelper.cmd.text", "" );
@@ -591,15 +590,6 @@ I2PHelperPlugin
 			final int f_int_port = int_port;
 			final int f_ext_port = ext_port;
 			
-			if ( plugin_enabled ){
-			
-				log( "Internal port=" + int_port +", external=" + ext_port + ", socks=" + sock_port );
-				
-			}else{
-				
-				log( "Plugin is disabled" );
-			}
-			
 			ParameterListener enabler_listener =
 					new ParameterListener()
 					{
@@ -630,7 +620,9 @@ I2PHelperPlugin
 							port_info_param.setEnabled( plugin_enabled );
 							use_upnp.setEnabled( enabled_not_ext );
 							always_socks.setEnabled( plugin_enabled);
+							
 							ext_i2p_param.setEnabled( plugin_enabled );
+							ext_i2p_host_param.setEnabled( !enabled_not_ext );
 							ext_i2p_port_param.setEnabled( !enabled_not_ext );
 							
 							command_text_param.setEnabled( plugin_enabled );
@@ -643,9 +635,11 @@ I2PHelperPlugin
 			link_rates_param.addListener( enabler_listener );
 			
 			enabler_listener.parameterChanged( null );
-					
+							
 			if ( plugin_enabled ){
 				
+				log( "Internal port=" + int_port +", external=" + ext_port + ", socks=" + sock_port );
+
 				message_handler = new I2PHelperMessageHandler( I2PHelperPlugin.this );
 				
 				plugin_interface.addListener(
@@ -705,7 +699,7 @@ I2PHelperPlugin
 									
 									if ( ext_i2p_param.getValue()){
 											
-										my_router.initialise( plugin_dir, ext_i2p_port_param.getValue());
+										my_router.initialise( plugin_dir, ext_i2p_host_param.getValue(), ext_i2p_port_param.getValue());
 													
 									}else{
 										
@@ -718,6 +712,8 @@ I2PHelperPlugin
 
 										tracker = new I2PHelperTracker( I2PHelperPlugin.this, my_router.getDHT());
 										
+										network_mixer = new I2PHelperNetworkMixer( I2PHelperPlugin.this, net_mix_enable, net_mix_incomp_num, net_mix_comp_num );
+
 										while( !unloaded ){
 											
 											if ( first_run ){
@@ -798,6 +794,10 @@ I2PHelperPlugin
 				MagnetURIHandler uri_handler = MagnetURIHandler.getSingleton();
 
 				uri_handler.addListener( magnet_handler );
+				
+			}else{
+								
+				log( "Plugin is disabled" );
 			}
 		}catch( Throwable e ){
 			

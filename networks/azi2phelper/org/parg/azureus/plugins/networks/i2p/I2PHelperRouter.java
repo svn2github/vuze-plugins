@@ -65,7 +65,7 @@ import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTI2P;
 public class 
 I2PHelperRouter 
 {
-	private static final String 	i2p_host 	= "127.0.0.1";
+	private static final String 	i2p_internal_host 	= "127.0.0.1";
 
 	public static final String	PARAM_SEND_KBS				= "azi2phelper.rate.send.max";
 	public static final int		PARAM_SEND_KBS_DEFAULT		= 50;
@@ -95,7 +95,7 @@ I2PHelperRouter
 	
 	private I2PHelperDHT	dht;
 	
-	private boolean		destroyed;
+	private volatile boolean	destroyed;
 	
 	protected
 	I2PHelperRouter(
@@ -391,8 +391,13 @@ I2PHelperRouter
 						
 			while( true ){
 				
+				if ( destroyed ){
+					
+					throw( new Exception( "Router has been shutdown" ));
+				}
+				
 				try{
-					Socket s = new Socket( i2p_host, i2p_internal_port );
+					Socket s = new Socket( i2p_internal_host, i2p_internal_port );
 				
 					s.close();
 				
@@ -415,7 +420,7 @@ I2PHelperRouter
             
             opts.putAll( router_ctx.getProperties());
             
-            initialiseDHT( config_dir, i2p_host, i2p_internal_port, opts );
+            initialiseDHT( config_dir, i2p_internal_host, i2p_internal_port, opts );
             
 		}catch( Throwable e ){
 			
@@ -438,6 +443,7 @@ I2PHelperRouter
 	protected void
 	initialise(
 		File		config_dir,
+		String		i2p_separate_host,
 		int			i2p_separate_port )
 	
 		throws Exception
@@ -456,8 +462,13 @@ I2PHelperRouter
 						
 			while( true ){
 				
+				if ( destroyed ){
+					
+					throw( new Exception( "Router has been shutdown" ));
+				}
+				
 				try{
-					Socket s = new Socket( i2p_host, i2p_separate_port );
+					Socket s = new Socket( i2p_separate_host, i2p_separate_port );
 				
 					s.close();
 				
@@ -478,7 +489,7 @@ I2PHelperRouter
 			
             Properties opts = new Properties();
                         
-            initialiseDHT( config_dir, i2p_host, i2p_separate_port, opts );
+            initialiseDHT( config_dir, i2p_separate_host, i2p_separate_port, opts );
             
 		}catch( Throwable e ){
 			
