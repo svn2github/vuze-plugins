@@ -106,13 +106,16 @@ TorPlugin
 	private boolean	prompt_on_use;
 	private boolean	prompt_skip_vuze;
 	private int		internal_control_port;
+	private String	internal_socks_host	= "127.0.0.1";
 	private int		internal_socks_port;
 	
+	private String	external_socks_host	= internal_socks_host;
 	private int		external_socks_port;
 	
 	private boolean	debug_server;
 	
-	private int		active_socks_port;
+	private String		active_socks_host;
+	private int			active_socks_port;
 	
 	private long	MIN_RECONNECT_TIME		= 60*1000;
 	private long	MAX_CONNECT_WAIT_TIME	= 2*60*1000;
@@ -264,8 +267,20 @@ TorPlugin
 			
 			final BooleanParameter ext_tor_param 		= config_model.addBooleanParameter2( "ext_tor", "aztorplugin.use_external", false );
 			
-			final IntParameter ext_socks_port_param = config_model.addIntParameter2( "ext_socks_port", "aztorplugin.ext_socks_port", 9050 ); 
+			final StringParameter 	ext_socks_host_param = config_model.addStringParameter2( "ext_socks_host", "aztorplugin.ext_socks_host", "127.0.0.1" ); 
+			final IntParameter 		ext_socks_port_param = config_model.addIntParameter2( "ext_socks_port", "aztorplugin.ext_socks_port", 9050 ); 
 
+			ext_socks_host_param.addListener(
+					new ParameterListener()
+					{	
+						public void 
+						parameterChanged(
+							Parameter param) 
+						{
+							active_socks_host = external_socks_host = ext_socks_host_param.getValue();
+						}
+					});
+			
 			ext_socks_port_param.addListener(
 				new ParameterListener()
 				{	
@@ -599,15 +614,18 @@ TorPlugin
 							
 							if ( external_tor ){
 								
-								active_socks_port = ext_socks_port_param.getValue();
+								active_socks_host	= ext_socks_host_param.getValue();
+								active_socks_port 	= ext_socks_port_param.getValue();
 								
 							}else{
 								
-								active_socks_port = internal_socks_port;
+								active_socks_host	= internal_socks_host;
+								active_socks_port 	= internal_socks_port;
 							}
 						}else{
 							
-							active_socks_port = 0;
+							active_socks_host	= "127.0.0.1";
+							active_socks_port 	= 0;
 						}
 						
 						start_on_demand_param.setEnabled( plugin_enabled && !external_tor );
@@ -663,6 +681,7 @@ TorPlugin
 						debug_server_param.setEnabled( plugin_enabled && !external_tor );
 						
 						ext_tor_param.setEnabled( plugin_enabled );
+						ext_socks_host_param.setEnabled( plugin_enabled && external_tor );
 						ext_socks_port_param.setEnabled( plugin_enabled && external_tor );
 						
 						test_url_param.setEnabled( plugin_enabled );
@@ -1909,6 +1928,13 @@ TorPlugin
 		String		reason,
 		String		host )
 	{
+			// filter out any ridiculous domain names (e.g. an i2p destination missing the .i2p for some reason...)
+		
+		if ( host.indexOf( '.' ) == -1 ){
+			
+			return( false );
+		}
+		
 		if ( host.equals( "127.0.0.1" )){
 
 			return( false );
@@ -2003,6 +2029,17 @@ TorPlugin
 		return( host );
 	}
 	
+	private String
+	getActiveSocksHost()
+	{
+		if ( !external_tor ){
+			
+			getConnection( 30*1000, false );
+		}
+		
+		return( active_socks_host );
+	}
+	
 	private int
 	getActiveSocksPort()
 	{
@@ -2033,12 +2070,14 @@ TorPlugin
 				return( null );
 			}
 		}
-				
-		int	socks_port;
+			
+		String	socks_host;
+		int		socks_port;
 		
 		if ( external_tor ){
 
-			socks_port = active_socks_port;
+			socks_host	= external_socks_host;
+			socks_port 	= active_socks_port;
 			
 		}else{
 			
@@ -2049,7 +2088,8 @@ TorPlugin
 				return( null );
 			}
 			
-			socks_port = con.getSOCKSPort();
+			socks_host	= internal_socks_host;
+			socks_port 	= con.getSOCKSPort();
 		}
 		
 		if ( requires_intermediate ){
@@ -2085,7 +2125,7 @@ TorPlugin
 					
 					if ( !intermediate_host_map.containsKey( intermediate_host )){
 						
-						intermediate_host_map.put( intermediate_host, new Object[]{ host, socks_port });
+						intermediate_host_map.put( intermediate_host, new Object[]{ host, socks_host, socks_port });
 						
 						break;
 					}
@@ -2107,7 +2147,7 @@ TorPlugin
 			
 		}else{
 			
-			Proxy proxy = new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( "127.0.0.1", socks_port ));	
+			Proxy proxy = new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( socks_host, socks_port ));	
 			
 			synchronized( this ){
 						
@@ -2168,6 +2208,7 @@ TorPlugin
 	{
 		Map<String,Object>	config = new HashMap<String,Object>();
 		
+		config.put( "socks_host", external_tor?external_socks_host:internal_socks_host );
 		config.put( "socks_port", external_tor?external_socks_port:internal_socks_port );
 		
 		return( config );
@@ -2422,7 +2463,8 @@ TorPlugin
 		
 		boolean				is_new = false;
 		
-		int	socks_port = getActiveSocksPort();
+		int		socks_port = getActiveSocksPort();
+		String	socks_host = getActiveSocksHost();
 		
 		synchronized( this ){
 			
@@ -2432,7 +2474,7 @@ TorPlugin
 				
 				is_new = true;
 				
-				proxy = new TorPluginHTTPProxy( url, new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( "127.0.0.1", socks_port )));
+				proxy = new TorPluginHTTPProxy( url, new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( socks_host, socks_port )));
 				
 				http_proxy_map.put( key, proxy );
 				
@@ -3137,7 +3179,7 @@ TorPlugin
 					throw( new IOException( "Intermediate address not found" ));
 				}
 								
-				final Proxy proxy = new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( "127.0.0.1", (Integer)entry[1] ));
+				final Proxy proxy = new Proxy( Proxy.Type.SOCKS, new InetSocketAddress((String)entry[1], (Integer)entry[2] ));
 
 				int final_port = address.getPort();
 								
