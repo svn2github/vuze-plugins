@@ -33,7 +33,8 @@ I2PHelperDHTAdapter
 	
 	public void
 	valueRead(
-		String		host )
+		String		host,
+		boolean		is_seed )
 	{
 	}
 	

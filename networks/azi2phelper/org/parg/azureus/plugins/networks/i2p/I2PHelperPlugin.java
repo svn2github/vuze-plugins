@@ -1451,7 +1451,8 @@ I2PHelperPlugin
 							
 							public void 
 							valueRead(
-								String 	host ) 
+								String 		host ,
+								boolean		is_seed )
 							{
 								if ( progress.cancelled()){
 									

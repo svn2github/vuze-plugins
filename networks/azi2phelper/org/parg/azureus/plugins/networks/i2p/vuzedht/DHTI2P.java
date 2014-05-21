@@ -1022,7 +1022,8 @@ DHTI2P
 	{
 		private long						create_time = SystemTime.getMonotonousTime();
 		
-		private Set<String>					hosts 		= new HashSet<String>();
+		private Set<String>					leecher_hosts 		= new HashSet<String>();
+		private Set<String>					seed_hosts 			= new HashSet<String>();
 		
 		private CopyOnWriteList<I2PHelperDHTListener>	listeners 	= new CopyOnWriteList<I2PHelperDHTListener>();
 
@@ -1072,10 +1073,21 @@ DHTI2P
 					// deal with the fact that a 'complete' event might sneak in before we've informed
 					// the listener of the pending 'valueRead' events...
 				
-				for ( String host: hosts ){
+				for ( String host: leecher_hosts ){
 					
 					try{
-						listener.valueRead( host );
+						listener.valueRead( host, false );
+						
+					}catch( Throwable e ){
+						
+						Debug.out( e );
+					}
+				}
+				
+				for ( String host: seed_hosts ){
+					
+					try{
+						listener.valueRead( host, true );
 						
 					}catch( Throwable e ){
 						
@@ -1112,16 +1124,27 @@ DHTI2P
 			String host =  Base32.encode( value.getValue()) + ".b32.i2p";
 			
 			synchronized( this ){
-				
-				if ( !hosts.add( host )){
+			
+				if ( seed_hosts.contains( host ) || leecher_hosts.contains( host )){
 					
 					return;
 				}
-			
+				
+				boolean	is_seed = ( value.getFlags() & DHT.FLAG_SEEDING ) != 0;
+
+				if ( is_seed ){
+				
+					seed_hosts.add( host );
+					
+				}else{
+					
+					leecher_hosts.add( host );
+				}
+							
 				for ( I2PHelperDHTListener listener: listeners ){
 			
 					try{
-						listener.valueRead( host );
+						listener.valueRead( host, is_seed );
 						
 					}catch( Throwable e ){
 						

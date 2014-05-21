@@ -26,6 +26,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -896,11 +897,21 @@ DHTTransportI2P
 	        				
 	        				DHTTransportValue[] values = new DHTTransportValue[peers.size()];
 	        				
+	        				byte[]	flags = (byte[])reply.get( "flags" );
+	        				
 	        				for ( int i=0;i<values.length;i++){
 	        					
-	        					short flags = (short)0;
+	        					short flag = DHT.FLAG_DOWNLOADING;
 	        					
-	        					values[i] = new DHTTransportValueImpl( contact, flags, peers.get(i));
+	        					if ( flags != null ){
+	        						
+	        						if ((flags[i/8] & (1<<(7-(i%8)))) != 0 ){
+	        							
+	        							flag = DHT.FLAG_SEEDING;
+	        						}
+	        					}
+	        					
+	        					values[i] = new DHTTransportValueImpl( contact, flag, peers.get(i));
 	        				}
 	        				
 	        				handler.findValueReply( contact, values, DHT.DT_NONE, false );
@@ -973,22 +984,59 @@ DHTTransportI2P
 			
 			List<byte[]>	peers = new ArrayList<byte[]>( values.length );
 			
-				// Snark removes the peer itself from the list returned so a peer can't read its own
-				// values stored at a node. This in itself isn't so bad, but what is worse is that
-				// Snark will end up returning "nodes" if there was only the one value stored which
-				// results in an exhaustive search by the caller in the case where there is only
-				// one announcer.... I'm not going to do this
-			
 			byte[]	caller_hash = originator.getNode().getHash().getData();
-			
-			for ( DHTTransportValue value: values ){
+
+			boolean	caller_non_vuze = originator.getVersion() == DHTI2P.DHT_VERSION_NON_VUZE;
+
+			if ( caller_non_vuze ){
 				
-				byte[]	peer_hash = value.getValue();
-				
-				if ( !Arrays.equals( caller_hash, peer_hash )){
+
+					// Snark removes the peer itself from the list returned so a peer can't read its own
+					// values stored at a node. This in itself isn't so bad, but what is worse is that
+					// Snark will end up returning "nodes" if there was only the one value stored which
+					// results in an exhaustive search by the caller in the case where there is only
+					// one announcer.... I'm not going to do this
+								
+				for ( DHTTransportValue value: values ){
 					
-					peers.add( value.getValue());
+					if ( no_seed && ( value.getFlags() & DHT.FLAG_SEEDING ) != 0 ){
+						
+						continue;
+					}
+					
+					byte[]	peer_hash = value.getValue();
+					
+					if ( !Arrays.equals( caller_hash, peer_hash )){
+						
+						peers.add( value.getValue());
+					}
 				}
+			}else{
+				
+				byte[]	flags = new byte[(values.length+7)/8];
+				
+				int	pos = 0;
+				
+				for ( DHTTransportValue value: values ){
+					
+					boolean is_seed = ( value.getFlags() & DHT.FLAG_SEEDING ) != 0;
+			
+					byte[]	peer_hash = value.getValue();
+					
+					if ( !Arrays.equals( caller_hash, peer_hash )){
+						
+						peers.add( value.getValue());
+						
+						if ( is_seed ){
+							
+							flags[pos/8] |= 1<<(7-(pos%8));
+						}
+						
+						pos++;
+					}
+				}
+				
+				resps.put( "flags", flags );
 			}
 			
 			resps.put( "values", peers );
@@ -1061,9 +1109,7 @@ DHTTransportI2P
 					boolean	seed =  ( values[0].getFlags() & DHT.FLAG_SEEDING ) != 0;
 						
 					args.put( "seed", new Long(seed?1:0));
-					
-					System.out.println( args );
-					
+										
 					sendQuery( 
 							new ReplyHandler()
 							{
@@ -1943,7 +1989,7 @@ DHTTransportI2P
 		public int
 		getVersion()
 		{
-			return( 1 );
+			return( DHTI2P.DHT_VERSION );
 		}
 		
 		public DHTTransportContact

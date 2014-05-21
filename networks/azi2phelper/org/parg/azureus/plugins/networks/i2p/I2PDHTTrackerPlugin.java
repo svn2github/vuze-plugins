@@ -1241,7 +1241,8 @@ I2PDHTTrackerPlugin
 						
 						public void
 						valueRead(
-							String		host )
+							String		host,
+							boolean		is_seed )
 						{
 							synchronized( this ){
 								
@@ -1255,17 +1256,16 @@ I2PDHTTrackerPlugin
 									
 									addresses.add( host ); 
 									
-									if ( true ){
+									if ( is_seed ){
+											
+										is_seeds.add( new Boolean( true ));
+										
+										seed_count++;
+									}else{
 										
 										leecher_count++;
 										
 										is_seeds.add( new Boolean( false ));
-	
-									}else{
-										
-										is_seeds.add( new Boolean( true ));
-										
-										seed_count++;
 									}
 								
 								
@@ -1900,15 +1900,16 @@ I2PDHTTrackerPlugin
 								
 								public void
 								valueRead(
-									String		host )
+									String		host,
+									boolean		is_seed )
 								{
-									if ( true ){
+									if ( is_seed ){
 
-										leechers++;
+										seeds++;
 										
 									}else{
 										
-										seeds++;
+										leechers++;
 									}
 								}
 								

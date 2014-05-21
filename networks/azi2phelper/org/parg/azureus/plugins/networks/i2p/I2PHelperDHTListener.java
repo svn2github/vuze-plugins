@@ -30,7 +30,8 @@ I2PHelperDHTListener
 	
 	public void
 	valueRead(
-		String		host );
+		String		host,
+		boolean		is_seed );
 	
 	public void
 	complete(
