@@ -44,11 +44,12 @@ public class
 DHTTransportContactI2P 
 	implements DHTTransportContact
 {
-	protected static byte[]	DEFAULT_TOKEN = {};
+	protected static final byte[]	DEFAULT_TOKEN = {};
 	
 	private DHTTransportI2P		transport;
-	
 	private NodeInfo			node;
+	private int					version;
+	
 	private InetSocketAddress	address;
 	
 	private byte[]				id;
@@ -59,10 +60,12 @@ DHTTransportContactI2P
 	protected
 	DHTTransportContactI2P(
 		DHTTransportI2P		_transport,
-		NodeInfo			_node )
+		NodeInfo			_node,
+		int					_version )
 	{
 		transport 	= _transport;
 		node		= _node;
+		version		= _version;
 		
 		String 	host = Base32.encode( node.getHash().getData())  + ".b32.i2p";
 		
@@ -75,6 +78,19 @@ DHTTransportContactI2P
 	getNode()
 	{
 		return( node );
+	}
+	
+	protected void
+	setVersion(
+		int		_version )
+	{
+		version	= _version;
+	}
+	
+	protected int
+	getVersion()
+	{
+		return( version );
 	}
 	
 	public int
@@ -268,7 +284,7 @@ DHTTransportContactI2P
 		int							max_values,
 		short						flags )
 	{
-		transport.sendFindValue( handler, this, key );
+		transport.sendFindValue( handler, this, key, flags );
 	}
 		
 	public void
@@ -294,7 +310,7 @@ DHTTransportContactI2P
 	
 		throws IOException, DHTTransportException
 	{
-		transport.exportContact( os, node );
+		transport.exportContact( os, this );
 	}
 	
 	public void

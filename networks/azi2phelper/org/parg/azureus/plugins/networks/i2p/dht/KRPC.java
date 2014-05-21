@@ -429,6 +429,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
 	get(
 		byte[] 						ih,
 		String						reason,
+		byte						flag,
 		int 						max, 
 		long						maxWait,
 		final I2PHelperDHTListener	listener )
@@ -440,6 +441,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
 	put(
 		byte[] 						ih,
 		String						reason,
+		byte						flag,
 		final I2PHelperDHTListener	listener )
 	{
 		throw( new RuntimeException( "no imp" ));

@@ -1437,6 +1437,7 @@ I2PHelperPlugin
 					t.get( 
 						hash,
 						"Maggot lookup",
+						(byte)0,
 						16,
 						remaining,
 						new I2PHelperDHTListener()

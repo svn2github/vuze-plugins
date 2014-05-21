@@ -62,6 +62,11 @@ public class
 DHTI2P
 	implements DHTLogger, I2PHelperDHT
 {
+	public static final int		DHT_VERSION_NON_VUZE		= 0;
+	public static final int		DHT_VERSION_INITIAL			= 1;	// testing adding version to messages
+	
+	public static final int		DHT_VERSION		= DHT_VERSION_INITIAL;
+	
 	public static final int		DHT_NETWORK		= 10;
 	
 	private static final int	REQUEST_TIMEOUT	= 45*1000;
@@ -368,6 +373,7 @@ DHTI2P
 	get(
 		byte[] 					ih,
 		String					reason,
+		byte					flags,
 		int 					max, 
 		long					maxWait,
 		I2PHelperDHTListener	listener )
@@ -404,7 +410,7 @@ DHTI2P
 		
 		dht.get(	ih,
 					reason + " for " + ByteFormatter.encodeString( ih ),
-					DHT.FLAG_NONE,
+					flags,
 					max,
 					maxWait,
 					false,
@@ -416,12 +422,13 @@ DHTI2P
 	put(
 		byte[] 						ih,
 		String						reason,
+		byte						flags,
 		final I2PHelperDHTListener	listener )
 	{
 		dht.put(	ih,
 					reason + " for " + ByteFormatter.encodeString( ih ),
 					new byte[1],
-					DHT.FLAG_NONE,
+					flags,
 					new DHTOperationAdapter() 
 					{	
 						public void 

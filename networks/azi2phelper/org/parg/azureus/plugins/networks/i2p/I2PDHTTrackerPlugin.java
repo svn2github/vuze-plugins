@@ -879,7 +879,7 @@ I2PDHTTrackerPlugin
 	  			continue;
 	  		}
 	  		
-			byte	flags = DHTPlugin.FLAG_DOWNLOADING;
+			byte	flags = isComplete( dl )?DHTPlugin.FLAG_SEEDING:DHTPlugin.FLAG_DOWNLOADING;
 			
 			RegistrationDetails	registration = (RegistrationDetails)registered_downloads.get( dl );
 			
@@ -1167,7 +1167,7 @@ I2PDHTTrackerPlugin
 					target.getHash(),
 					"Tracker reg of '" + download.getName() + "'" + target.getDesc() + " -> " + encoded,
 					//encoded_bytes,
-					//flags,
+					flags,
 					//false,
 					new I2PHelperDHTAdapter()
 					{
@@ -1224,7 +1224,7 @@ I2PDHTTrackerPlugin
 			
 			dht.get(target.getHash(), 
 					"Tracker announce for '" + download.getName() + "'" + target.getDesc(),
-					//isComplete( download )?DHTPlugin.FLAG_SEEDING:DHTPlugin.FLAG_DOWNLOADING,
+					(byte)( isComplete( download )?DHTPlugin.FLAG_SEEDING:DHTPlugin.FLAG_DOWNLOADING),
 					NUM_WANT, 
 					target_type==REG_TYPE_FULL?ANNOUNCE_TIMEOUT:ANNOUNCE_DERIVED_TIMEOUT,
 					//false, false,
@@ -1888,7 +1888,7 @@ I2PDHTTrackerPlugin
 				
 				dht.get(	torrent.getHash(), 
 							"Presence query for '" + ready_download.getName() + "'",
-							//(byte)0,
+							(byte)0,
 							INTERESTING_AVAIL_MAX, 
 							ANNOUNCE_TIMEOUT,
 							//false, false,
@@ -1959,7 +1959,7 @@ I2PDHTTrackerPlugin
 											torrent.getHash(),
 											"Presence store '" + f_ready_download.getName() + "'",
 											//"0".getBytes(),	// port 0, no connections
-											//(byte)0,
+											(byte)0,
 											new I2PHelperDHTAdapter()
 											{
 											});

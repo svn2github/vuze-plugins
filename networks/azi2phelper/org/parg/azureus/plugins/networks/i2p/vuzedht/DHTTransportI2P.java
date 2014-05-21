@@ -137,7 +137,7 @@ DHTTransportI2P
 		
 		stats = new DHTTransportStatsI2P();
 				
-		local_contact = new DHTTransportContactI2P( this, my_node );
+		local_contact = new DHTTransportContactI2P( this, my_node, DHTI2P.DHT_VERSION );
 		
         session.addMuxedSessionListener( this, I2PSession.PROTO_DATAGRAM_RAW, reply_port );
         session.addMuxedSessionListener( this, I2PSession.PROTO_DATAGRAM, query_port );
@@ -170,7 +170,7 @@ DHTTransportI2P
 		NodeInfo		node,
 		boolean			is_bootstrap )
 	{
-		DHTTransportContactI2P	contact = new DHTTransportContactI2P( this, node );
+		DHTTransportContactI2P	contact = new DHTTransportContactI2P( this, node, 0 );
 		
 		request_handler.contactImported( contact, is_bootstrap );
 		
@@ -310,12 +310,15 @@ DHTTransportI2P
 	
 	protected void
 	exportContact(
-		DataOutputStream		os,
-		NodeInfo				node )
+		DataOutputStream			os,
+		DHTTransportContactI2P		contact )
 		
 		throws IOException, DHTTransportException
 	{
-		os.writeByte( 0 );	// version
+		NodeInfo		node = contact.getNode();
+		
+		os.writeByte( 1 );	// serialisation version
+							// version 1: added contact version
 		
 		DHTUtilsI2P.serialiseByteArray( os, node.getNID().getData(), 255 );
 		
@@ -337,6 +340,8 @@ DHTTransportI2P
 		}
 		
 		DHTUtilsI2P.serialiseByteArray( os, b_dest, 512 );
+		
+		os.writeInt( contact.getVersion());
 	}
 	
 	public DHTTransportContact
@@ -346,7 +351,7 @@ DHTTransportI2P
 	
 		throws IOException, DHTTransportException
 	{
-		is.readByte();
+		byte serial_version = is.readByte();
 		
 		byte[]	b_nid = DHTUtilsI2P.deserialiseByteArray( is, 255 );
 		
@@ -377,7 +382,18 @@ DHTTransportI2P
 			node = new NodeInfo( new NID(b_nid), dest, port );
 		}
 		
-		DHTTransportContact contact = new DHTTransportContactI2P( this, node );
+		int	contact_version;
+		
+		if ( serial_version > 0 ){
+			
+			contact_version = is.readInt();
+			
+		}else{
+			
+			contact_version = 0;
+		}
+		
+		DHTTransportContact contact = new DHTTransportContactI2P( this, node, contact_version );
 		
 		request_handler.contactImported( contact, is_bootstrap );
 
@@ -453,7 +469,8 @@ DHTTransportI2P
 	        		@Override
 	        		public void 
 	        		handleReply(
-	        			Map reply ) 
+	        			int		originator_version,
+	        			Map 	reply ) 
 	        		{	        			
 	        			stats.pingOK();
 	        			
@@ -509,9 +526,12 @@ DHTTransportI2P
 	        		@Override
 	        		public void 
 	        		handleReply(
-	        			Map reply ) 
+	        			int		originator_version,
+	        			Map 	reply ) 
 	        		{
 	        			if ( TRACE ) trace( "good pingReply" );
+	        			
+	        			contact.setVersion( originator_version );
 	        			
 	        			handler.pingReply( contact, -1 );
 	        			
@@ -593,7 +613,8 @@ DHTTransportI2P
 	        		@Override
 	        		public void 
 	        		handleReply(
-	        			Map reply ) 
+	        			int		originator_version,
+	        			Map 	reply )
 	        		{
 	        			byte[]	nodes = (byte[])reply.get( "nodes" );
 	        				        				        			
@@ -601,7 +622,7 @@ DHTTransportI2P
 	        				
 	        				NodeInfo node = new NodeInfo( nodes, off );
 	        				
-	        				request_handler.contactImported( new DHTTransportContactI2P( DHTTransportI2P.this, node ), false );
+	        				request_handler.contactImported( new DHTTransportContactI2P( DHTTransportI2P.this, node, 0 ), false );
 	        			}
 	        			
 	        			stats.findNodeOK();
@@ -683,7 +704,8 @@ DHTTransportI2P
 					}
 				},
 				contact,
-				new_target );
+				new_target,
+				flags );
 			
 		}else{
 			try{
@@ -705,8 +727,11 @@ DHTTransportI2P
 		        		@Override
 		        		public void 
 		        		handleReply(
-		        			Map reply ) 
+		        			int		originator_version,
+		        			Map 	reply ) 
 		        		{
+		        			contact.setVersion( originator_version );
+		        			
 		        			if ( TRACE ) trace( "good findNodeReply: " + reply );
 		        				        			
 		        			/* no token on findNode
@@ -725,7 +750,7 @@ DHTTransportI2P
 		        				
 		        				NodeInfo node = new NodeInfo( nodes, off );
 		        				
-		        				contacts[pos++] = new DHTTransportContactI2P( DHTTransportI2P.this, node );
+		        				contacts[pos++] = new DHTTransportContactI2P( DHTTransportI2P.this, node, 0 );
 		        			}
 		        			
 		        			handler.findNodeReply( contact, contacts );
@@ -800,7 +825,8 @@ DHTTransportI2P
 	sendFindValue(
 		final DHTTransportReplyHandler		handler,
 		final DHTTransportContactI2P		contact,
-		byte[]								target )
+		byte[]								target,
+		short								flags )
 	{
 		if ( TRACE ) trace( "sendFindValue: contact=" + contact.getString() + ", target=" + ByteFormatter.encodeString( target ));
 		
@@ -817,15 +843,23 @@ DHTTransportI2P
 	        
 	        args.put( "info_hash", target );
 	        
+	        if ( ( flags & DHT.FLAG_SEEDING ) != 0 ){
+	        	
+	        	args.put( "noseed", new Long(1));
+	        }
+	        
 	        sendQuery( 
 	        	new ReplyHandler()
 	        	{
 	        		@Override
 	        		public void 
 	        		handleReply(
-	        			Map reply ) 
+	        			int		originator_version,
+	        			Map 	reply ) 
 	        		{
 	        			if ( TRACE ) trace( "good sendFindValue: " + reply );
+	        			
+	        			contact.setVersion( originator_version );
 	        			
 	        			byte[]	token = (byte[])reply.get( "token" );
 	        			
@@ -846,7 +880,7 @@ DHTTransportI2P
 		        				
 		        				NodeInfo node = new NodeInfo( nodes, off );
 		        				
-		        				contacts[pos++] = new DHTTransportContactI2P( DHTTransportI2P.this, node );
+		        				contacts[pos++] = new DHTTransportContactI2P( DHTTransportI2P.this, node, 0 );
 		        			}
 		        			
 		        			handler.findValueReply( contact, contacts );
@@ -864,7 +898,9 @@ DHTTransportI2P
 	        				
 	        				for ( int i=0;i<values.length;i++){
 	        					
-	        					values[i] = new DHTTransportValueImpl( contact, peers.get(i));
+	        					short flags = (short)0;
+	        					
+	        					values[i] = new DHTTransportValueImpl( contact, flags, peers.get(i));
 	        				}
 	        				
 	        				handler.findValueReply( contact, values, DHT.DT_NONE, false );
@@ -905,7 +941,8 @@ DHTTransportI2P
 	receiveFindValue(
 		DHTTransportContactI2P		originator,
 		byte[]						message_id,
-		byte[]						hash )
+		byte[]						hash,
+		boolean						no_seed )
 		
 		throws Exception
 	{
@@ -996,8 +1033,14 @@ DHTTransportI2P
 
 			for ( int i=0;i<keys.length;i++){
 
+				byte[]					key		= keys[i];
+				DHTTransportValue[]		values 	= value_sets[i];
+			
 				final boolean	report_result = (i==keys.length-1);
 
+					// we're not republishing cached values (yet) so there should only be a single
+					// (originator) value
+				
 				try{
 					Map<String, Object> map = new HashMap<String, Object>();
 
@@ -1007,24 +1050,33 @@ DHTTransportI2P
 
 					map.put( "a", args );
 
-					if ( TRACE ) trace( "   storeKey: " + ByteFormatter.encodeString( keys[i] ));
+					if ( TRACE ) trace( "   storeKey: " + ByteFormatter.encodeString( key ));
 					
-					args.put( "info_hash", keys[i] );
+					args.put( "info_hash", key );
 
 					args.put( "port", 6881 );		// not used but for completeness
 
 					args.put( "token", token );
 
+					boolean	seed =  ( values[0].getFlags() & DHT.FLAG_SEEDING ) != 0;
+						
+					args.put( "seed", new Long(seed?1:0));
+					
+					System.out.println( args );
+					
 					sendQuery( 
 							new ReplyHandler()
 							{
 								@Override
 								public void 
 								handleReply(
+									int		originator_version,
 									Map 	reply ) 
 								{
 									if ( TRACE ) trace( "good sendStoreReply" );
 
+									contact.setVersion( originator_version );
+									
 									if ( report_result ){
 
 										handler.storeReply( contact, new byte[]{ DHT.DT_NONE });
@@ -1075,7 +1127,8 @@ DHTTransportI2P
 	receiveStore(
 		DHTTransportContactI2P		originator,
 		byte[]						message_id,
-		byte[]						hash )
+		byte[]						hash,
+		boolean						is_seed )
 		
 		throws Exception
 	{
@@ -1083,7 +1136,9 @@ DHTTransportI2P
 		
 		byte[][]				keys 	= new byte[][]{ hash };
 		
-		DHTTransportValue value = new DHTTransportValueImpl( originator, originator.getNode().getHash().getData());
+		DHTTransportValue value = 
+				new DHTTransportValueImpl( originator, is_seed?DHT.FLAG_SEEDING:DHT.FLAG_DOWNLOADING, originator.getNode().getHash().getData());
+		
 		
 		DHTTransportValue[][]	values 	= new DHTTransportValue[][]{{ value }};
 		
@@ -1223,7 +1278,9 @@ DHTTransportI2P
 	    Map<String, Object> args = (Map<String, Object>) map.get("a");
 	
 	    args.put("id", my_nid.getData());
-	    	    
+	    	 
+	    encodeVersion( args );
+	    
 	    if ( !repliable ){
 	    	
 	    	port++;
@@ -1284,6 +1341,8 @@ DHTTransportI2P
         Map<String, Object> resps = (Map<String, Object>) map.get("r");
         
         resps.put( "id", my_nid.getData());
+        
+        encodeVersion( resps );
         
         sendMessage( dest, node.getPort() + 1, map, false );
     }
@@ -1395,6 +1454,27 @@ DHTTransportI2P
     	}
     }
 
+    private void
+    encodeVersion(
+    	Map		map )
+    {
+    	map.put( "_v", "AZ" + DHTI2P.DHT_VERSION );
+    }
+    
+    private int
+    decodeVersion(
+    	Map		map )
+    {
+        String ver_str = MapUtils.getMapString( map, "_v", null );
+
+        if ( ver_str == null || !ver_str.startsWith( "AZ" )){
+        	
+        	return(  0 );
+        }
+        
+        return( Integer.parseInt( ver_str.substring(2)));
+    }
+    
     private void 
     receiveMessage(
     	Destination 	from_dest, 
@@ -1439,8 +1519,10 @@ DHTTransportI2P
 		                if ( type.equals("r")){
 		                	
 		                    Map reply = (Map)map.get( "r" );
+		                    		                    
+		                    int	contact_version = decodeVersion( reply );
 		                    
-		                    reply_handler.handleReply( reply );
+		                    reply_handler.handleReply( contact_version, reply );
 		                    
 		                }else{
 		                	
@@ -1513,7 +1595,9 @@ DHTTransportI2P
         	}
         }
        
-        DHTTransportContactI2P originator = new DHTTransportContactI2P( this, node );
+        int originator_version = decodeVersion( args );
+        
+        DHTTransportContactI2P originator = new DHTTransportContactI2P( this, node, originator_version );
         
         if ( method.equals("ping")){
         	
@@ -1529,7 +1613,11 @@ DHTTransportI2P
         	
             byte[] hash = (byte[])args.get("info_hash");
            
-            receiveFindValue( originator, msg_id, hash );
+            Number n_no_seed = (Number)args.get( "noseed" );
+            
+            boolean no_seed = n_no_seed!=null&&n_no_seed.intValue()!=0;
+            
+            receiveFindValue( originator, msg_id, hash, no_seed );
             
         }else if ( method.equals("announce_peer")) {
         	
@@ -1540,7 +1628,11 @@ DHTTransportI2P
             // this is the "TCP" port, we don't care
             //int port = args.get("port").getInt();
              
-            receiveStore( originator, msg_id, hash );   
+            Number n_is_seed = (Number)args.get( "seed" );
+            
+            boolean is_seed = n_is_seed!=null&&n_is_seed.intValue()!=0;
+            
+            receiveStore( originator, msg_id, hash, is_seed );   
         }
     }
     
@@ -1715,6 +1807,7 @@ DHTTransportI2P
 	{
 		public void
 		handleReply(
+			int		originator_version,
 			Map		reply );
 		
 		public void
@@ -1816,11 +1909,13 @@ DHTTransportI2P
 		implements DHTTransportValue
 	{
 		private DHTTransportContact		originator;
+		private short					flags;
 		private byte[]					value_bytes;
 		
 		private
 		DHTTransportValueImpl(
 			DHTTransportContact		_originator,
+			short					_flags,
 			byte[]					_value_bytes )
 		{
 			originator		= _originator;
@@ -1860,7 +1955,7 @@ DHTTransportI2P
 		public int
 		getFlags()
 		{
-			return( 0 );
+			return( flags&0xffff );
 		}
 		
 		public int

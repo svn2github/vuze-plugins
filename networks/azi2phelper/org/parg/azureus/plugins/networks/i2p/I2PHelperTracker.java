@@ -58,20 +58,22 @@ I2PHelperTracker
 	get(
 		byte[]						hash,
 		String						reason,
+		byte						flags,
 		int							num_want,
 		long						timeout,
 		I2PHelperDHTListener		listener )
 	{
-		dht.get( hash, reason, num_want, timeout, listener );
+		dht.get( hash, reason, flags, num_want, timeout, listener );
 	}
 	
 	protected void
 	put(
 		byte[]						hash,
 		String						reason,
+		byte						flags,
 		I2PHelperDHTListener		listener )
 	{
-		dht.put( hash, reason, listener );
+		dht.put( hash, reason, flags, listener );
 	}
 	
 	
