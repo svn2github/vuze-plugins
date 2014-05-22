@@ -425,6 +425,10 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
 		return( Base32.encode( _myNodeInfo.getHash().getData()) + ".b32.i2p" );
 	}
 	
+	@Override
+	public boolean hasLocalKey(byte[] hash) {
+		throw( new RuntimeException( "no imp" ));
+	}
 	public void
 	get(
 		byte[] 						ih,
@@ -442,6 +446,15 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
 		byte[] 						ih,
 		String						reason,
 		byte						flag,
+		final I2PHelperDHTListener	listener )
+	{
+		throw( new RuntimeException( "no imp" ));
+	}
+	
+	public void
+	remove(
+		byte[] 						ih,
+		String						reason,
 		final I2PHelperDHTListener	listener )
 	{
 		throw( new RuntimeException( "no imp" ));

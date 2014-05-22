@@ -695,17 +695,19 @@ I2PHelperPlugin
 
 								try{																
 									my_router = router = 
-											new I2PHelperRouter( router_properties, is_bootstrap_node, is_vuze_dht, I2PHelperPlugin.this );
+											new I2PHelperRouter( plugin_dir, router_properties, is_bootstrap_node, is_vuze_dht, I2PHelperPlugin.this );
 									
 									if ( ext_i2p_param.getValue()){
 											
-										my_router.initialise( plugin_dir, ext_i2p_host_param.getValue(), ext_i2p_port_param.getValue());
+										my_router.initialiseRouter( ext_i2p_host_param.getValue(), ext_i2p_port_param.getValue());
 													
 									}else{
 										
-										my_router.initialise( plugin_dir, f_int_port, f_ext_port );
+										my_router.initialiseRouter( f_int_port, f_ext_port );
 									}
 										
+									my_router.initialiseDHT();
+									
 									if ( !unloaded ){
 										
 										boolean	first_run = true;
@@ -1505,7 +1507,7 @@ I2PHelperPlugin
 													try{
 								        				Destination dest = I2PAppContext.getGlobalContext().namingService().lookup( host );
 
-								        				I2PSocketManager socket_manager = router.getSocketManager();
+								        				I2PSocketManager socket_manager = router.getDHTSocketManager();
 								        						
 								        				I2PSocketOptions opts = socket_manager.buildOptions();
 								        				
@@ -2071,6 +2073,21 @@ I2PHelperPlugin
 		}
 	}
 	
+	public Map<String,Object>
+	getProxyServer(
+		String				reason,
+		Map<String,Object>	server_options )
+		
+		throws IPCException
+	{
+		if ( !plugin_enabled ){
+			
+			return( null );
+		}
+		
+		return( null );
+	}
+	
 	public void
 	unload()
 	{
@@ -2405,19 +2422,20 @@ I2PHelperPlugin
 			};
 			
 		try{
-			I2PHelperRouter router = f_router[0] = new I2PHelperRouter( new HashMap<String, Object>(), bootstrap, vuze_dht, adapter );
+			I2PHelperRouter router = f_router[0] = new I2PHelperRouter( config_dir, new HashMap<String, Object>(), bootstrap, vuze_dht, adapter );
 			
 				// 19817 must be used for bootstrap node
 			
-			router.initialise( config_dir, 17654, bootstrap?19817:28513 );
-			//router.initialise( config_dir, 29903 ); // 7654 );
-			//router.initialise( config_dir, 7654 );
+			//router.initialiseRouter( 17654, bootstrap?19817:28513 );
+			router.initialiseRouter( "192.168.1.5", 7654 );
 
+			router.initialiseDHT();
+			
 			I2PHelperTracker tracker = new I2PHelperTracker( adapter, router.getDHT());
 			
 			I2PHelperConsole console = new I2PHelperConsole();
 			
-			I2PHelperSocksProxy	socks_proxy = new I2PHelperSocksProxy( router, 8964, adapter );
+			//I2PHelperSocksProxy	socks_proxy = new I2PHelperSocksProxy( router, 8964, adapter );
 			
 			I2PHelperBootstrapServer bootstrap_server = null;
 			
@@ -2448,6 +2466,37 @@ I2PHelperPlugin
 						
 						adapter.tryExternalBootstrap( true );
 						
+					}else if ( line.equals( "createserver" )){
+						
+						try{
+							router.createServer( 
+								"test", 
+								new I2PHelperRouter.ServerAdapter() 
+								{
+								
+								@Override
+								public void 
+								incomingConnection(
+									I2PSocket socket ) 
+											
+									throws Exception 
+								{
+									try{
+										System.out.println( "got test server connection" );
+										
+										socket.close();
+										
+									}catch( Throwable e ){
+										
+									}
+								}
+							});
+							
+						}catch( Throwable e ){
+							
+							e.printStackTrace();
+						}
+
 					}else{
 						
 						executeCommand(line, router, tracker, adapter);

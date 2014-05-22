@@ -369,6 +369,13 @@ DHTI2P
 		}
 	}
 	
+	public boolean 
+	hasLocalKey(
+		byte[] hash) 
+	{
+		return( dht.getLocalValue( hash ) != null );
+	}
+	
 	public void
 	get(
 		byte[] 					ih,
@@ -429,6 +436,35 @@ DHTI2P
 					reason + " for " + ByteFormatter.encodeString( ih ),
 					new byte[1],
 					flags,
+					new DHTOperationAdapter() 
+					{	
+						public void 
+						searching(
+							DHTTransportContact 	contact, 
+							int 					level,
+							int 					active_searches )
+						{
+							
+							listener.searching( contact.getName());
+						}
+						
+						public void 
+						complete(
+							boolean timeout ) 
+						{
+							listener.complete( timeout );
+						}
+					});
+	}
+	
+	public void
+	remove(
+		byte[] 						ih,
+		String						reason,
+		final I2PHelperDHTListener	listener )
+	{
+		dht.remove(	ih,
+					reason + " for " + ByteFormatter.encodeString( ih ),
 					new DHTOperationAdapter() 
 					{	
 						public void 

@@ -59,6 +59,10 @@ I2PHelperDHT
 	ping(
 		NodeInfo		node );
 	
+	public boolean
+	hasLocalKey(
+		byte[]			hash );
+			
 	public void
 	get(
 		byte[] 						ih, 
@@ -73,6 +77,12 @@ I2PHelperDHT
 		byte[] 						ih, 
 		String						reason,
 		byte						flags,
+		I2PHelperDHTListener		listener );
+	
+	public void
+	remove(
+		byte[] 						ih, 
+		String						reason,
 		I2PHelperDHTListener		listener );
 	
 	public Collection<Hash> 

@@ -54,7 +54,7 @@ import org.gudy.azureus2.plugins.utils.UTTimerEvent;
 import org.gudy.azureus2.plugins.utils.UTTimerEventPerformer;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 
-import com.aelitis.azureus.plugins.dht.DHTPlugin;
+import com.aelitis.azureus.core.dht.DHT;
 
 
 /**
@@ -879,7 +879,7 @@ I2PDHTTrackerPlugin
 	  			continue;
 	  		}
 	  		
-			byte	flags = isComplete( dl )?DHTPlugin.FLAG_SEEDING:DHTPlugin.FLAG_DOWNLOADING;
+			byte	flags = (byte)( isComplete( dl )?DHT.FLAG_SEEDING:DHT.FLAG_DOWNLOADING );
 			
 			RegistrationDetails	registration = (RegistrationDetails)registered_downloads.get( dl );
 			
@@ -887,7 +887,7 @@ I2PDHTTrackerPlugin
 			
 			if ( registration == null ){
 				
-				log( dl, "Registering download as " + (flags == DHTPlugin.FLAG_SEEDING?"Seeding":"Downloading"));
+				log( dl, "Registering download as " + (flags == DHT.FLAG_SEEDING?"Seeding":"Downloading"));
 
 				registration = new RegistrationDetails( dl, reg_type, put_details, flags );
 				
@@ -908,7 +908,7 @@ I2PDHTTrackerPlugin
 						registration.getFlags() != flags ||
 						!registration.getPutDetails().sameAs( put_details )){
 				
-					log( dl,(registration==null?"Registering":"Re-registering") + " download as " + (flags == DHTPlugin.FLAG_SEEDING?"Seeding":"Downloading"));
+					log( dl,(registration==null?"Registering":"Re-registering") + " download as " + (flags == DHT.FLAG_SEEDING?"Seeding":"Downloading"));
 					
 					registration.update( put_details, flags );
 					
@@ -1224,7 +1224,7 @@ I2PDHTTrackerPlugin
 			
 			dht.get(target.getHash(), 
 					"Tracker announce for '" + download.getName() + "'" + target.getDesc(),
-					(byte)( isComplete( download )?DHTPlugin.FLAG_SEEDING:DHTPlugin.FLAG_DOWNLOADING),
+					(byte)( isComplete( download )?DHT.FLAG_SEEDING:DHT.FLAG_DOWNLOADING),
 					NUM_WANT, 
 					target_type==REG_TYPE_FULL?ANNOUNCE_TIMEOUT:ANNOUNCE_DERIVED_TIMEOUT,
 					//false, false,
@@ -1733,6 +1733,44 @@ I2PDHTTrackerPlugin
 		final Download			download,
 		RegistrationDetails		details )
 	{
+		if ( download.getFlag( Download.FLAG_METADATA_DOWNLOAD )){
+			
+			return;
+		}
+		
+		final 	long	start = SystemTime.getCurrentTime();
+		
+		trackerTarget[] targets = details.getTargets( true );
+		
+		for (int i=0;i<targets.length;i++){
+			
+			final trackerTarget target = targets[i];
+			
+			if ( dht.hasLocalKey( target.getHash())){
+				
+				increaseActive( download );
+				
+				dht.remove( 
+						target.getHash(),
+						"Tracker dereg of '" + download.getName() + "'" + target.getDesc(),
+						new I2PHelperDHTAdapter()
+						{
+							public void
+							complete(
+								boolean	timeout_occurred )
+							{
+								if ( target.getType() == REG_TYPE_FULL ){
+	
+									log( 	download,
+											"Unregistration of '" + target.getDesc() + "' completed (elapsed="
+												+ TimeFormatter.formatColonMillis(SystemTime.getCurrentTime() - start) + ")");
+								}
+								
+								decreaseActive( download );
+							}
+						});
+			}
+		}
 	}
 
 	protected void
@@ -1740,6 +1778,37 @@ I2PDHTTrackerPlugin
 		final Download			download,
 		final trackerTarget 	target )
 	{
+		if ( download.getFlag( Download.FLAG_METADATA_DOWNLOAD )){
+			
+			return;
+		}
+		
+		final 	long	start = SystemTime.getCurrentTime();
+		
+		if ( dht.hasLocalKey( target.getHash())){
+			
+			increaseActive( download );
+			
+			dht.remove( 
+					target.getHash(),
+					"Tracker dereg of '" + download.getName() + "'" + target.getDesc(),
+					new I2PHelperDHTAdapter()
+					{
+						public void
+						complete(
+							boolean	timeout_occurred )
+						{
+							if ( target.getType() == REG_TYPE_FULL ){
+
+								log( 	download,
+										"Unregistration of '" + target.getDesc() + "' completed (elapsed="
+										+ TimeFormatter.formatColonMillis(SystemTime.getCurrentTime() - start) + ")");
+							}
+							
+							decreaseActive( download );
+						}
+					});
+		}
 	}
 	
 	protected void

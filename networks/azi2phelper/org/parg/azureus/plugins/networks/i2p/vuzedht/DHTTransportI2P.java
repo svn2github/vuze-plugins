@@ -26,7 +26,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -1020,22 +1019,19 @@ DHTTransportI2P
 				for ( DHTTransportValue value: values ){
 					
 					boolean is_seed = ( value.getFlags() & DHT.FLAG_SEEDING ) != 0;
-			
-					byte[]	peer_hash = value.getValue();
-					
-					if ( !Arrays.equals( caller_hash, peer_hash )){
+
+						// for Vuze callers we don't remove the caller from the reply set
+											
+					peers.add( value.getValue());
 						
-						peers.add( value.getValue());
-						
-						if ( is_seed ){
+					if ( is_seed ){
 							
-							flags[pos/8] |= 1<<(7-(pos%8));
-						}
-						
-						pos++;
+						flags[pos/8] |= 1<<(7-(pos%8));
 					}
+						
+					pos++;
 				}
-				
+								
 				resps.put( "flags", flags );
 			}
 			
@@ -1089,70 +1085,86 @@ DHTTransportI2P
 					// we're not republishing cached values (yet) so there should only be a single
 					// (originator) value
 				
-				try{
-					Map<String, Object> map = new HashMap<String, Object>();
-
-					map.put( "q", "announce_peer" );
-
-					Map<String, Object> args = new HashMap<String, Object>();
-
-					map.put( "a", args );
-
-					if ( TRACE ) trace( "   storeKey: " + ByteFormatter.encodeString( key ));
+				if ( values[0].getValue().length == 0 ){
 					
-					args.put( "info_hash", key );
-
-					args.put( "port", 6881 );		// not used but for completeness
-
-					args.put( "token", token );
-
-					boolean	seed =  ( values[0].getFlags() & DHT.FLAG_SEEDING ) != 0;
-						
-					args.put( "seed", new Long(seed?1:0));
-										
-					sendQuery( 
-							new ReplyHandler()
-							{
-								@Override
-								public void 
-								handleReply(
-									int		originator_version,
-									Map 	reply ) 
-								{
-									if ( TRACE ) trace( "good sendStoreReply" );
-
-									contact.setVersion( originator_version );
-									
-									if ( report_result ){
-
-										handler.storeReply( contact, new byte[]{ DHT.DT_NONE });
-
-										stats.storeOK();
-									}
-								}
-
-								@Override
-								public void 
-								handleError(
-										DHTTransportException error) 
-								{
-									if ( TRACE ) trace( "error sendStoreReply: " + Debug.getNestedExceptionMessage( error ));
-
-									if ( report_result ){
-
-										handler.failed( contact, error );
-
-										stats.storeFailed();
-									}
-								}
-							}, 
-							contact, map, false );		// NOT repliable. Note however that we still get a reply as the target has (or should have) our dest cached against the token...
-
-				}catch( Throwable e ){
-
+						// this is actually un-announce (entries are removed by sending zero length values )
+					
+						// if/when in the future we want to support more generic DHT storage then obviously
+						// we'll need to revisit this whole area
+					
 					if ( report_result ){
+						
+						handler.storeReply( contact, new byte[]{ DHT.DT_NONE });
 
-						throw( e );
+						stats.storeOK();
+					}
+				}else{
+					
+					try{
+						Map<String, Object> map = new HashMap<String, Object>();
+	
+						map.put( "q", "announce_peer" );
+	
+						Map<String, Object> args = new HashMap<String, Object>();
+	
+						map.put( "a", args );
+	
+						if ( TRACE ) trace( "   storeKey: " + ByteFormatter.encodeString( key ));
+						
+						args.put( "info_hash", key );
+	
+						args.put( "port", 6881 );		// not used but for completeness
+	
+						args.put( "token", token );
+	
+						boolean	seed =  ( values[0].getFlags() & DHT.FLAG_SEEDING ) != 0;
+							
+						args.put( "seed", new Long(seed?1:0));
+											
+						sendQuery( 
+								new ReplyHandler()
+								{
+									@Override
+									public void 
+									handleReply(
+										int		originator_version,
+										Map 	reply ) 
+									{
+										if ( TRACE ) trace( "good sendStoreReply" );
+	
+										contact.setVersion( originator_version );
+										
+										if ( report_result ){
+	
+											handler.storeReply( contact, new byte[]{ DHT.DT_NONE });
+	
+											stats.storeOK();
+										}
+									}
+	
+									@Override
+									public void 
+									handleError(
+											DHTTransportException error) 
+									{
+										if ( TRACE ) trace( "error sendStoreReply: " + Debug.getNestedExceptionMessage( error ));
+	
+										if ( report_result ){
+	
+											handler.failed( contact, error );
+	
+											stats.storeFailed();
+										}
+									}
+								}, 
+								contact, map, false );		// NOT repliable. Note however that we still get a reply as the target has (or should have) our dest cached against the token...
+	
+					}catch( Throwable e ){
+	
+						if ( report_result ){
+	
+							throw( e );
+						}
 					}
 				}
 			}     
@@ -1517,7 +1529,7 @@ DHTTransportI2P
         	
         	return(  0 );
         }
-        
+                
         return( Integer.parseInt( ver_str.substring(2)));
     }
     
@@ -1965,6 +1977,7 @@ DHTTransportI2P
 			byte[]					_value_bytes )
 		{
 			originator		= _originator;
+			flags			= _flags;
 			value_bytes		= _value_bytes;
 		}
 		

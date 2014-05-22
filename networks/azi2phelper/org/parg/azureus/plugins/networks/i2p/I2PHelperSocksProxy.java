@@ -219,7 +219,7 @@ I2PHelperSocksProxy
 				throw( new Exception( "SOCKS proxy destroyed" ));
 			}
 			
-			I2PSocketManager sm = router.getSocketManager();
+			I2PSocketManager sm = router.getDHTSocketManager();
 			
 			if ( sm != null ){
 				
@@ -912,7 +912,7 @@ I2PHelperSocksProxy
 																		sb.append( "info_hash=" + arg_map.get( "info_hash" ));
 																		sb.append( "&peer_id=" + arg_map.get( "peer_id" ));
 																		sb.append( "&port=6881" );
-																		sb.append( "&ip=" + router.getSocketManager().getSession().getMyDestination().toBase64() + ".i2p" );
+																		sb.append( "&ip=" + router.getDHTSocketManager().getSession().getMyDestination().toBase64() + ".i2p" );
 																		sb.append( "&uploaded=" + arg_map.get( "uploaded" ));
 																		sb.append( "&downloaded=" + arg_map.get( "downloaded" ));
 																		sb.append( "&left=" + arg_map.get( "left" ));
