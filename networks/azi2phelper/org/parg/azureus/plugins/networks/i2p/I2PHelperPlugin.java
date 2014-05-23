@@ -1246,6 +1246,17 @@ I2PHelperPlugin
 		
 		throws Exception 
 	{
+		forwardSocket( i2p_socket, true, COConfigurationManager.getIntParameter( "TCP.Listen.Port" ));
+	}
+	
+	private void
+	forwardSocket(
+		I2PSocket 	i2p_socket,
+		boolean		handle_maggots,
+		int			target_port )
+			
+		throws Exception
+	{
 		Socket vuze_socket = new Socket( Proxy.NO_PROXY );
 		
 		try{
@@ -1264,7 +1275,7 @@ I2PHelperPlugin
 			
 			// System.out.println( "Incoming from " + peer_ip + ", port=" + i2p_socket.getLocalPort());
 			
-			if ( i2p_socket.getLocalPort() == 80 ){
+			if ( handle_maggots && i2p_socket.getLocalPort() == 80 ){
 				
 				handleMaggotRequest( i2p_socket, peer_hash );
 				
@@ -1288,8 +1299,10 @@ I2PHelperPlugin
 				boolean	ok = false;
 				
 				try{
-					vuze_socket.connect( new InetSocketAddress( "127.0.0.1", COConfigurationManager.getIntParameter( "TCP.Listen.Port" )));
+					vuze_socket.connect( new InetSocketAddress( "127.0.0.1", target_port));
 				
+					vuze_socket.setTcpNoDelay( true );
+					
 					Runnable	on_complete = 
 						new Runnable()
 						{
@@ -2085,7 +2098,68 @@ I2PHelperPlugin
 			return( null );
 		}
 		
-		return( null );
+		try{
+			String	server_id = (String)server_options.get( "id" );
+			
+			int	target_port = (Integer)server_options.get( "port" );
+			
+			while( true ){
+				
+				if ( unloaded ){
+					
+					return( null );
+				}
+				
+				I2PHelperRouter current_router = router;
+				
+				if ( current_router == null ){
+					
+					try{
+						Thread.sleep(1000);
+						
+						
+					}catch( Throwable e ){
+					
+						Debug.out( e );
+						
+						return( null );
+					}
+				}else{
+					
+					I2PHelperRouter.ServerInstance server = 
+						current_router.createServer(
+							server_id, 
+							new I2PHelperRouter.ServerAdapter() 
+							{			
+								@Override
+								public void 
+								incomingConnection(
+									I2PHelperRouter.ServerInstance		server,
+									I2PSocket 							i2p_socket )
+											
+									throws Exception 
+								{	
+									int port = (Integer)server.getUserProperty( "port" );
+									
+									forwardSocket( i2p_socket, false, port );
+								}
+							});
+					
+						// update the port if we've alreready got a server and this is just an update
+					
+					server.setUserProperty( "port", target_port );
+					
+					Map<String,Object>	reply = new HashMap<String, Object>();
+					
+					reply.put( "host", server.getB32Dest());
+					
+					return( reply );
+				}
+			}
+		}catch( Throwable e ){
+			
+			throw( new IPCException( e ));
+		}
 	}
 	
 	public void
@@ -2477,7 +2551,8 @@ I2PHelperPlugin
 								@Override
 								public void 
 								incomingConnection(
-									I2PSocket socket ) 
+									I2PHelperRouter.ServerInstance		server,
+									I2PSocket 							socket ) 
 											
 									throws Exception 
 								{

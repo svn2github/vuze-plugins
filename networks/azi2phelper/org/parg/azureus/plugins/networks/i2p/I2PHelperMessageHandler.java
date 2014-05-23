@@ -26,7 +26,6 @@ import java.util.*;
 
 import net.i2p.data.Base32;
 
-import org.gudy.azureus2.core3.peer.PEPeerSource;
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.BEncoder;
@@ -39,7 +38,9 @@ import com.aelitis.azureus.core.peermanager.messaging.Message;
 import com.aelitis.azureus.core.peermanager.messaging.MessageException;
 import com.aelitis.azureus.core.peermanager.messaging.MessageManager;
 import com.aelitis.azureus.core.peermanager.messaging.MessagingUtil;
+import com.aelitis.azureus.core.peermanager.messaging.azureus.AZHandshake;
 import com.aelitis.azureus.core.peermanager.messaging.azureus.AZStylePeerExchange;
+import com.aelitis.azureus.core.peermanager.messaging.bittorrent.BTHandshake;
 import com.aelitis.azureus.core.peermanager.messaging.bittorrent.BTMessageFactory;
 import com.aelitis.azureus.core.peermanager.messaging.bittorrent.ltep.LTHandshake;
 import com.aelitis.azureus.core.peermanager.messaging.bittorrent.ltep.LTMessage;
@@ -154,7 +155,16 @@ I2PHelperMessageHandler
 						@Override
 						public boolean messageAdded(Message message) {
 							
-							if ( message instanceof LTHandshake ){
+							if ( message instanceof BTHandshake ){
+							
+								BTHandshake	bt_handshake = (BTHandshake)message;
+								
+									// disable az messaging so we don't need to implements parallel az message support
+									// for i2p_dht and i2p_pex
+								
+								bt_handshake.getReserved()[5] &= ~3;
+
+							}else if ( message instanceof LTHandshake ){
 								
 								LTHandshake lt_handshake = (LTHandshake)message;
 								
@@ -189,30 +199,40 @@ I2PHelperMessageHandler
 						{
 							//System.out.println( "Received: " + connection + " - " + message );
 							
-							if ( message instanceof LTHandshake ){
+							if ( message instanceof BTHandshake ){
+								
+								BTHandshake	bt_handshake = (BTHandshake)message;
+								
+									// disable az messaging so we don't need to implements parallel az message support
+									// for i2p_dht and i2p_pex
+								
+								bt_handshake.getReserved()[5] &= ~3;
+								
+							}else if ( message instanceof LTHandshake ){
 								
 								LTMessageEncoder encoder = (LTMessageEncoder)connection.getOutgoingMessageQueue().getEncoder();
 								
-								Map extensions = ((LTHandshake)message).getExtensionMapping();
+								Map my_extensions	 = new HashMap();
+								Map their_extensions = ((LTHandshake)message).getExtensionMapping();
 								
-								Iterator<Object> it = extensions.keySet().iterator();
-								
-								Map my_extensions = new HashMap();
+								Iterator<Object> it = their_extensions.keySet().iterator();
+										
+									// work out which extensions we should enable based on their declared set
 								
 								while( it.hasNext()){
 									
 									Object o = it.next();
 									
-									String key;
+									String their_key;
 									
 									if ( o instanceof String ){
 										
-										key = (String)o;
+										their_key = (String)o;
 										
 									}else if ( o instanceof byte[] ){
 										
 										try{
-											key = new String((byte[])o, Constants.DEFAULT_ENCODING );
+											their_key = new String((byte[])o, Constants.DEFAULT_ENCODING );
 											
 										}catch( Throwable e ){
 											
@@ -224,13 +244,13 @@ I2PHelperMessageHandler
 										continue;
 									}
 									
-									if ( lt_message_ids.contains( key )){
+									if ( lt_message_ids.contains( their_key )){
 										
-										Object value = extensions.get( key );
+										Object value = their_extensions.get( their_key );
 										
 										it.remove();
 										
-										my_extensions.put( key, value );
+										my_extensions.put( their_key, value );
 									}
 								}
 								
@@ -239,65 +259,91 @@ I2PHelperMessageHandler
 									encoder.updateSupportedExtensions( my_extensions );
 								}
 								
-								encoder.addCustomExtensionHandler( 
-									LTMessageEncoder.CET_PEX,
-									new LTMessageEncoder.CustomExtensionHandler() {
-										
-										public Object 
-										handleExtension(
-											Object[] args ) 
-										{
-											PeerExchangerItem	pxi = (PeerExchangerItem)args[0];
+								if ( encoder.supportsExtension( LTI2PPEX.MSG_ID )){
+									
+									encoder.addCustomExtensionHandler( 
+										LTMessageEncoder.CET_PEX,
+										new LTMessageEncoder.CustomExtensionHandler() {
 											
-											PeerItem[] adds 	= pxi.getNewlyAddedPeerConnections();
-											PeerItem[] drops 	= pxi.getNewlyDroppedPeerConnections();  
-											
-											if ( adds != null && adds.length > 0 ){
+											public Object 
+											handleExtension(
+												Object[] args ) 
+											{
+												PeerExchangerItem	pxi = (PeerExchangerItem)args[0];
 												
-												List<PeerItem>	my_adds = new ArrayList<PeerItem>( adds.length );
+												PeerItem[] adds 	= pxi.getNewlyAddedPeerConnections();
+												PeerItem[] drops 	= pxi.getNewlyDroppedPeerConnections();  
 												
-												for ( PeerItem pi: adds ){
+												List<PeerItem>	my_adds;
+												List<PeerItem>	my_drops;
+												
+												if ( adds != null && adds.length > 0 ){
 													
-													if ( pi.getNetwork() == AENetworkClassifier.AT_I2P ){
+													my_adds = new ArrayList<PeerItem>( adds.length );
+													
+													for ( PeerItem pi: adds ){
 														
-														my_adds.add( pi );
+														if ( pi.getNetwork() == AENetworkClassifier.AT_I2P ){
+															
+															my_adds.add( pi );
+														}
 													}
+												}else{
+													
+													my_adds = new ArrayList<PeerItem>(0);
 												}
 												
-												if ( my_adds.size() > 0 ){
-												
-													connection.getOutgoingMessageQueue().addMessage( 
-															new LTI2PPEX( my_adds ),
-															false );
+												if ( drops != null && drops.length > 0 ){
+														
+													my_drops = new ArrayList<PeerItem>( drops.length );
+													
+													for ( PeerItem pi: drops ){
+														
+														if ( pi.getNetwork() == AENetworkClassifier.AT_I2P ){
+															
+															my_drops.add( pi );
+														}
+													}
+												}else{
+													
+													my_drops = new ArrayList<PeerItem>(0);
 												}
+												
+												if ( my_adds.size() > 0 || my_drops.size() > 0 ){
+													
+													connection.getOutgoingMessageQueue().addMessage( new LTI2PPEX( my_adds, my_drops ),	false );
+												}
+	
+												return( null );
 											}
-
-											return( null );
-										}
-									});	
-								
-								if ( q_port == 0 ){
-									
-										// can take a bit of time for the DHT to become available - could queue
-										// missed connections for later message send I guess?
-									
-									I2PHelperRouter router = plugin.getRouter();
-									
-									if ( router != null ){
-										
-										I2PHelperDHT dht = router.getDHT();
-										
-										if ( dht != null ){
-											
-											q_port 	= dht.getQueryPort();
-											r_port	= dht.getReplyPort();
-										}
-									}
+										});	
 								}
 								
-								if ( q_port != 0 ){
-								
-									out_queue.addMessage( new LTI2PDHT( q_port, r_port ), false );
+								if ( encoder.supportsExtension( LTI2PDHT.MSG_ID )){
+									
+									if ( q_port == 0 ){
+										
+											// can take a bit of time for the DHT to become available - could queue
+											// missed connections for later message send I guess?
+										
+										I2PHelperRouter router = plugin.getRouter();
+										
+										if ( router != null ){
+											
+											I2PHelperDHT dht = router.getDHT();
+											
+											if ( dht != null ){
+												
+												q_port 	= dht.getQueryPort();
+												r_port	= dht.getReplyPort();
+											}
+										}
+									}
+									
+									if ( q_port != 0 ){
+									
+										out_queue.addMessage( new LTI2PDHT( q_port, r_port ), false );
+									}
 								}
 							}else if ( message instanceof LTI2PDHT ){
 									
@@ -482,9 +528,11 @@ I2PHelperMessageHandler
 		
 		public
 		LTI2PPEX(
-			List<PeerItem>		_adds )
+			List<PeerItem>		_adds,
+			List<PeerItem>		_drops )
 		{
-			added = _adds.toArray( new PeerItem[ _adds.size()]);
+			added 	= _adds.toArray( new PeerItem[ _adds.size()]);
+			dropped = _drops.toArray( new PeerItem[ _drops.size()]);
 		}
 		
 		public 

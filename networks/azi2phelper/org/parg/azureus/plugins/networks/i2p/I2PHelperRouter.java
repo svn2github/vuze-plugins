@@ -62,6 +62,7 @@ import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.DisplayFormatters;
 import org.gudy.azureus2.core3.util.RandomUtils;
+import org.gudy.azureus2.core3.util.SystemTime;
 import org.parg.azureus.plugins.networks.i2p.dht.*;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTI2P;
 
@@ -859,14 +860,14 @@ I2PHelperRouter
 		}
 	}
 	
-	protected void 
+	protected ServerInstance 
 	createServer(
-		String				server_id,
-		ServerAdapter		server_adapter )
+		final String			server_id,
+		ServerAdapter			server_adapter )
 		
 		throws Exception
 	{
-		ServerInstance server;
+		final ServerInstance server;
 		
 		synchronized( this ){
 			
@@ -874,11 +875,12 @@ I2PHelperRouter
 				
 				throw( new Exception( "Router destroyed" ));
 			}
-			
-			
-			if ( servers.containsKey( server_id )){
+					
+			ServerInstance existing_server = servers.get( server_id );
 				
-				return;
+			if ( existing_server != null ){
+				
+				return( existing_server );
 			}
 			
 			server = new ServerInstance( server_id, server_adapter );
@@ -886,7 +888,27 @@ I2PHelperRouter
 			servers.put( server_id, server );
 		}
 		
-		server.initialise();
+		new AEThread2( "I2PServer:asyncinit" )
+		{
+			public void
+			run()
+			{
+				try{
+					server.initialise();
+					
+				}catch( Throwable e ){
+					
+					Debug.out( e );
+					
+					synchronized( I2PHelperRouter.this ){
+						
+						servers.remove( server_id );
+					}
+				}
+			}
+		}.start();
+		
+		return( server );
 	}
 	
 	
@@ -1077,12 +1099,13 @@ I2PHelperRouter
 	{
 		public void
 		incomingConnection(
+			ServerInstance	server,
 			I2PSocket		socket )
 			
 			throws Exception;
 	}
 	
-	private class
+	protected class
 	ServerInstance
 	{
 		private final String			server_id;
@@ -1095,6 +1118,8 @@ I2PHelperRouter
 		private String				b32_dest;
 		
 		private volatile boolean	server_destroyed;
+		
+		private Map<String,Object>		user_properties = new HashMap<String, Object>();
 		
 		private
 		ServerInstance(
@@ -1161,32 +1186,53 @@ I2PHelperRouter
 					        
 				File dest_key_file 	= new File( config_dir,  server_id + "_dest_key.dat" );
          	
-		    	InputStream is = new FileInputStream( dest_key_file );
-		    
 		        I2PSocketManager	sm = null;
 
-		    	try{
-		    		sm = I2PSocketManagerFactory.createManager( is, i2p_host, i2p_port, sm_properties );
-		    	
-		    	}finally{
-		    		
-		    		is.close();
-		    	}
-				
-				if ( sm == null ){
+		        long start = SystemTime.getMonotonousTime();
+		        
+		        while( true ){
+			
+		        	InputStream is = new FileInputStream( dest_key_file );
+		        	
+			    	try{
+			    		sm = I2PSocketManagerFactory.createManager( is, i2p_host, i2p_port, sm_properties );
+			    	
+			    	}finally{
+			    		
+			    		is.close();
+			    	}
+			    	
+					if ( sm != null ){
+						
+						break;
 					
-					throw( new Exception( "Failed to create socket manager" ));
-				}
-				
+					}else{
+						
+						if ( SystemTime.getMonotonousTime() - start > 3*60*1000 ){
+							
+							throw( new Exception( "Timeout creating socket manager" ));
+						}
+						
+						Thread.sleep( 250 );
+									
+						if ( server_destroyed ){
+							
+							throw( new Exception( "Server destroyed" ));
+						}
+					}
+		        }
+		        		
 				log( "Waiting for socket manager startup" );
 				
+		        start = SystemTime.getMonotonousTime();
+
 				while( true ){
 					
 					if ( server_destroyed ){
 						
 						sm.destroySocketManager();
 						
-						throw( new Exception( "Router destroyed" ));
+						throw( new Exception( "Server destroyed" ));
 					}
 					
 					session = sm.getSession();
@@ -1195,6 +1241,12 @@ I2PHelperRouter
 						
 						break;
 					}
+					
+					if ( SystemTime.getMonotonousTime() - start > 3*60*1000 ){
+						
+						throw( new Exception( "Timeout waiting for socket manager startup" ));
+					}
+
 					
 					Thread.sleep(250);
 				}
@@ -1232,7 +1284,7 @@ I2PHelperRouter
 								}else{
 									try{
 									
-										server_adapter.incomingConnection( socket );
+										server_adapter.incomingConnection( ServerInstance.this, socket );
 									
 									}catch( Throwable e ){
 										
@@ -1283,6 +1335,27 @@ I2PHelperRouter
 		}
 		
 		protected void
+		setUserProperty(
+			String	key,
+			Object	value )
+		{	
+			synchronized( user_properties ){
+				
+				user_properties.put( key, value );
+			}
+		}
+			
+		protected Object
+		getUserProperty(
+			String	key )
+		{	
+			synchronized( user_properties ){
+				
+				return( user_properties.get( key ));
+			}
+		}
+		
+		private void
 		destroy()
 		{
 			synchronized( this ){
