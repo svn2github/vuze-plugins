@@ -146,6 +146,7 @@ I2PHelperPlugin
 	private BasicPluginViewModel	view_model;
 	private LocaleUtilities			loc_utils;
 
+	private InfoParameter			i2p_address_param;
 	private IntParameter 			int_port_param;
 	private IntParameter 			ext_port_param;
 	private IntParameter 			socks_port_param;
@@ -461,6 +462,7 @@ I2PHelperPlugin
 			
 				// I2P Internals
 			
+			i2p_address_param 	= config_model.addInfoParameter2( "azi2phelper.i2p.address", getMessageText( "azi2phelper.i2p.address.pending" ));
 			int_port_param 		= config_model.addIntParameter2( "azi2phelper.internal.port", "azi2phelper.internal.port", 0 );
 			ext_port_param	 	= config_model.addIntParameter2( "azi2phelper.external.port", "azi2phelper.external.port", 0 );
 			socks_port_param 	= config_model.addIntParameter2( "azi2phelper.socks.port", "azi2phelper.socks.port", 0 );
@@ -541,7 +543,7 @@ I2PHelperPlugin
 			config_model.createGroup( 
 				"azi2phelper.internals.group",
 				new Parameter[]{ 
-						int_port_param, ext_port_param, socks_port_param,
+						i2p_address_param, int_port_param, ext_port_param, socks_port_param,
 						port_info_param, use_upnp, always_socks, ext_i2p_param, ext_i2p_host_param, ext_i2p_port_param });
 			
 			
@@ -614,6 +616,7 @@ I2PHelperPlugin
 							net_mix_incomp_num.setEnabled( plugin_enabled );
 							net_mix_comp_num.setEnabled( plugin_enabled );
 							
+							i2p_address_param.setEnabled( plugin_enabled );
 							int_port_param.setEnabled( enabled_not_ext );
 							ext_port_param.setEnabled( enabled_not_ext);
 							socks_port_param.setEnabled( plugin_enabled );
@@ -622,8 +625,8 @@ I2PHelperPlugin
 							always_socks.setEnabled( plugin_enabled);
 							
 							ext_i2p_param.setEnabled( plugin_enabled );
-							ext_i2p_host_param.setEnabled( !enabled_not_ext );
-							ext_i2p_port_param.setEnabled( !enabled_not_ext );
+							ext_i2p_host_param.setEnabled( plugin_enabled && !enabled_not_ext );
+							ext_i2p_port_param.setEnabled( plugin_enabled && !enabled_not_ext );
 							
 							command_text_param.setEnabled( plugin_enabled );
 							command_exec_param.setEnabled( plugin_enabled );
@@ -864,6 +867,18 @@ I2PHelperPlugin
 		String...	args )
 	{
 		return( loc_utils.getLocalisedMessageText(key, args));
+	}
+	
+	public void
+	stateChanged(
+		I2PHelperRouter	router )
+	{
+		String address = router.getB32Address();
+		
+		if ( address.length() > 0 ){
+			
+			i2p_address_param.setValue( address );
+		}
 	}
 	
 	private void
@@ -2433,6 +2448,13 @@ I2PHelperPlugin
 					String...	args )
 				{
 					return( "!" + key + "!: " + args );
+				}
+				
+				@Override
+				public void 
+				stateChanged(
+					I2PHelperRouter router ) 
+				{
 				}
 				
 				public void

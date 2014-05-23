@@ -267,15 +267,29 @@ I2PHelperSocksProxy
 				
 				remote_dest = new Destination();
 	       
-				remote_dest.fromBase64( address );
+				try{
+					remote_dest.fromBase64( address );
+					
+				}catch( Throwable e ){
+					
+					remote_dest = null;
+				}
+			}
+			
+			I2PSocketManager socket_manager = getSocketManager();
+
+			if ( remote_dest == null ){
+				
+				if ( address.endsWith( ".b32.i2p" )){
+					
+					remote_dest = socket_manager.getSession().lookupDest( address, 30*1000 );
+				}
 			}
 			
 			if ( remote_dest == null ){
 				
 				throw( new Exception( "Failed to resolve address '" + address + "'" ));
 			}
-			
-			I2PSocketManager socket_manager = getSocketManager();
 			
 			if ( remote_dest.getHash().equals( socket_manager.getSession().getMyDestination().getHash())){
 				

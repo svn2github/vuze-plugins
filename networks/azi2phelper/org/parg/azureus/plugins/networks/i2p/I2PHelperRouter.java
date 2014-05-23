@@ -107,6 +107,8 @@ I2PHelperRouter
 	private volatile I2PSocketManager 		dht_socket_manager;
 	private volatile I2PServerSocket		dht_server_socket;
 	
+	private String		b32_dest = "";
+	
 	private I2PHelperDHT		dht;
 	
 	private Map<String,ServerInstance>		servers = new HashMap<String, ServerInstance>();
@@ -653,8 +655,11 @@ I2PHelperRouter
 			Destination my_dest = dht_session.getMyDestination();
 			
 			String	full_dest 	= my_dest.toBase64() + ".i2p";
-			String	b32_dest	= Base32.encode( my_dest.calculateHash().getData()) + ".b32.i2p";
+						
+			b32_dest	= Base32.encode( my_dest.calculateHash().getData()) + ".b32.i2p";
 			
+			adapter.stateChanged( this );
+
 				// some older trackers require ip to be explicitly set to the full destination name :(
 			
 			/*
@@ -921,6 +926,12 @@ I2PHelperRouter
 			// just used for testing, leave blocking
 		
 		return( dht_session.lookupDest( new Hash( hash ), 30*1000 ));
+	}
+	
+	protected String
+	getB32Address()
+	{
+		return( b32_dest );
 	}
 	
 	public I2PSocketManager

@@ -49,6 +49,10 @@ I2PHelperAdapter
 		boolean		force );
 	
 	public void
+	stateChanged(
+		I2PHelperRouter	router );
+	
+	public void
 	incomingConnection(
 		I2PSocket		socket )
 		
