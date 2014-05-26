@@ -63,6 +63,7 @@ import net.i2p.data.Destination;
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.torrent.TOTorrent;
 import org.gudy.azureus2.core3.torrent.TOTorrentFactory;
+import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.BDecoder;
@@ -123,7 +124,7 @@ I2PHelperPlugin
 {	
 	/*
 	 *	Router: commented out System.setProperties for timezone, http agent etc in static initialiser
-	 *	RoutingKeyGenerator: Fixed up SimpleDateFormat as it assumes GMT (TimeZone default used within SimpleDateFormat)
+	 *	RoutingKeyGenerator: (patch integrated in 0.9.13, yay!) Fixed up SimpleDateFormat as it assumes GMT (TimeZone default used within SimpleDateFormat)
 	 *    	private final static SimpleDateFormat _fmt = new SimpleDateFormat(FORMAT, Locale.UK);
     		static{
     			_fmt.setCalendar( _cal );	 // PARG
@@ -131,6 +132,7 @@ I2PHelperPlugin
     		
     		
     	NativeBigInteger: Added load attempt from classes's loader (i.e. plugin class loader)
+    		URL resource = ClassLoader.getSystemResource(resourceName);	// existing line in loadFromResource
     	    if (resource == null) {
         		// PARG added search via plugin class loader as well
         		resource = NativeBigInteger.class.getClassLoader().getResource(resourceName);
@@ -1598,6 +1600,12 @@ I2PHelperPlugin
 											        				TOTorrent torrent = TOTorrentFactory.deserialiseFromBEncodedByteArray( torrent_bytes );
 											        				
 											        				if ( torrent != null && Arrays.equals( torrent.getHash(), hash )){
+											        					
+											        					try{
+										        							TorrentUtils.setNetworkCache( torrent, Arrays.asList( AENetworkClassifier.AT_I2P ));
+											        						
+											        					}catch( Throwable e ){
+											        					}
 											        					
 											        					synchronized( result ){
 											        					
