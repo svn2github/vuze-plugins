@@ -1900,7 +1900,7 @@ XMWebUIPlugin
 		
 		List listSupports = new ArrayList();
 		Collections.addAll(listSupports, "rpc:receive-gzip", "field:files-hc",
-				"method:tags-get-list");
+				"method:tags-get-list", "rpc:torrent-set-name");
 
 		synchronized( json_server_method_lock ){
   		for (String key : json_server_methods.keySet()) {
