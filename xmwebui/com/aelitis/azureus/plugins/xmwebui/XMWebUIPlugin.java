@@ -1678,8 +1678,13 @@ XMWebUIPlugin
 		}
 		
 		File file = new File((String) oPath);
+		while (file != null && !file.exists()) {
+			file = file.getParentFile();
+		}
+		if (file == null) {
+			return;
+		}
 		long space = FileUtil.getUsableSpace(file);
-		
 		result.put("path", oPath);
 		result.put("size-bytes", space);
 	}
