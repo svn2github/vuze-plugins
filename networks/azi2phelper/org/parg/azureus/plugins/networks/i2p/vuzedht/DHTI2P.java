@@ -1058,8 +1058,7 @@ DHTI2P
 	{
 		private long						create_time = SystemTime.getMonotonousTime();
 		
-		private Set<String>					leecher_hosts 		= new HashSet<String>();
-		private Set<String>					seed_hosts 			= new HashSet<String>();
+		private Map<String,Object[]>		contacts 			= new HashMap<String, Object[]>();
 		
 		private CopyOnWriteList<I2PHelperDHTListener>	listeners 	= new CopyOnWriteList<I2PHelperDHTListener>();
 
@@ -1109,21 +1108,16 @@ DHTI2P
 					// deal with the fact that a 'complete' event might sneak in before we've informed
 					// the listener of the pending 'valueRead' events...
 				
-				for ( String host: leecher_hosts ){
+				for ( Object[] entry: contacts.values()){
 					
-					try{
-						listener.valueRead( host, false );
-						
-					}catch( Throwable e ){
-						
-						Debug.out( e );
-					}
-				}
-				
-				for ( String host: seed_hosts ){
+					DHTTransportContactI2P 	contact = (DHTTransportContactI2P)entry[0];
+					DHTTransportValue 		value	= (DHTTransportValue)entry[1];
 					
+					String 	host 	=  Base32.encode( value.getValue()) + ".b32.i2p";
+					boolean	is_seed = ( value.getFlags() & DHT.FLAG_SEEDING ) != 0;
+
 					try{
-						listener.valueRead( host, true );
+						listener.valueRead( contact, host, is_seed );
 						
 					}catch( Throwable e ){
 						
@@ -1161,26 +1155,19 @@ DHTI2P
 			
 			synchronized( this ){
 			
-				if ( seed_hosts.contains( host ) || leecher_hosts.contains( host )){
+				if ( contacts.containsKey( host )){
 					
 					return;
 				}
 				
-				boolean	is_seed = ( value.getFlags() & DHT.FLAG_SEEDING ) != 0;
-
-				if ( is_seed ){
+				contacts.put( host, new Object[]{ contact, value });
 				
-					seed_hosts.add( host );
-					
-				}else{
-					
-					leecher_hosts.add( host );
-				}
+				boolean	is_seed = ( value.getFlags() & DHT.FLAG_SEEDING ) != 0;
 							
 				for ( I2PHelperDHTListener listener: listeners ){
 			
 					try{
-						listener.valueRead( host, is_seed );
+						listener.valueRead((DHTTransportContactI2P)contact, host, is_seed );
 						
 					}catch( Throwable e ){
 						

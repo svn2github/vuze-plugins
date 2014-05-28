@@ -87,7 +87,7 @@ DHTTransportContactI2P
 		version	= _version;
 	}
 	
-	protected int
+	public int
 	getVersion()
 	{
 		return( version );

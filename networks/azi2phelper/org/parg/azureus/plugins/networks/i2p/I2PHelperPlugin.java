@@ -103,6 +103,8 @@ import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 import org.parg.azureus.plugins.networks.i2p.swt.I2PHelperView;
+import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTI2P;
+import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTTransportContactI2P;
 
 import com.aelitis.azureus.core.networkmanager.NetworkManager;
 import com.aelitis.azureus.core.proxy.AEProxyAddressMapper;
@@ -195,7 +197,12 @@ I2PHelperPlugin
 			{
 				if ( args.contains( "maggot_sha1" )){
 					
-					return( handleMaggotRequest( progress, hash, args, timeout ));
+						// Snark blacklists nodes that attempt to get maggots and we currently can't tell Snark addresses
+						// returned from get_peers from ones that don't blacklist :( So disable this for the moment
+					
+					return( null );
+
+					//return( handleMaggotRequest( progress, hash, args, timeout ));
 					
 				}else{
 					
@@ -1481,15 +1488,20 @@ I2PHelperPlugin
 								progress.reportActivity( "I2P: Searching " + host );
 							}
 							
+							@Override
 							public void 
 							valueRead(
-								String 		host ,
-								boolean		is_seed )
+								DHTTransportContactI2P		contact,
+								String 						host,
+								boolean						is_seed )
 							{
 								if ( progress.cancelled()){
 									
 									return;
 								}
+	
+									// remember the contact version is that of the node frmo which the reply was received,
+									// NOT the host value returned....
 								
 								progress.reportActivity( "I2P: Found " + host );
 								

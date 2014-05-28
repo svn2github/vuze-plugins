@@ -21,6 +21,8 @@
 
 package org.parg.azureus.plugins.networks.i2p;
 
+import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTTransportContactI2P;
+
 public interface 
 I2PHelperDHTListener 
 {
@@ -30,8 +32,9 @@ I2PHelperDHTListener
 	
 	public void
 	valueRead(
-		String		host,
-		boolean		is_seed );
+		DHTTransportContactI2P		contact,
+		String						host,
+		boolean						is_seed );
 	
 	public void
 	complete(

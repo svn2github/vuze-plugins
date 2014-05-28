@@ -53,6 +53,7 @@ import org.gudy.azureus2.plugins.utils.UTTimer;
 import org.gudy.azureus2.plugins.utils.UTTimerEvent;
 import org.gudy.azureus2.plugins.utils.UTTimerEventPerformer;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
+import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTTransportContactI2P;
 
 import com.aelitis.azureus.core.dht.DHT;
 
@@ -1171,7 +1172,7 @@ I2PDHTTrackerPlugin
 					//false,
 					new I2PHelperDHTAdapter()
 					{
-						
+						@Override
 						public void
 						complete(
 							boolean		timeout )
@@ -1238,11 +1239,12 @@ I2PDHTTrackerPlugin
 						
 						boolean	complete;
 						
-						
+						@Override
 						public void
 						valueRead(
-							String		host,
-							boolean		is_seed )
+							DHTTransportContactI2P		contact,
+							String						host,
+							boolean						is_seed )
 						{
 							synchronized( this ){
 								
@@ -1277,6 +1279,7 @@ I2PDHTTrackerPlugin
 							}
 						}
 	
+						@Override
 						public void
 						complete(
 							boolean		timeout )
@@ -1755,6 +1758,7 @@ I2PDHTTrackerPlugin
 						"Tracker dereg of '" + download.getName() + "'" + target.getDesc(),
 						new I2PHelperDHTAdapter()
 						{
+							@Override
 							public void
 							complete(
 								boolean	timeout_occurred )
@@ -1794,6 +1798,7 @@ I2PDHTTrackerPlugin
 					"Tracker dereg of '" + download.getName() + "'" + target.getDesc(),
 					new I2PHelperDHTAdapter()
 					{
+						@Override
 						public void
 						complete(
 							boolean	timeout_occurred )
@@ -1967,10 +1972,12 @@ I2PDHTTrackerPlugin
 								private int 	leechers = 0;
 								private int 	seeds	 = 0;
 								
+								@Override
 								public void
 								valueRead(
-									String		host,
-									boolean		is_seed )
+									DHTTransportContactI2P		contact,
+									String						host,
+									boolean						is_seed )
 								{
 									if ( is_seed ){
 
@@ -1982,7 +1989,7 @@ I2PDHTTrackerPlugin
 									}
 								}
 								
-								
+								@Override
 								public void
 								complete(
 									boolean		timeout )
