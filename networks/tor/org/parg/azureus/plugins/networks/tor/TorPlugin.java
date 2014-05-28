@@ -463,6 +463,8 @@ TorPlugin
 			*/
 			
 			if ( Constants.isWindows || Constants.isOSX ){
+			
+					// no linux browser support yet
 				
 				LabelParameter browser_info1 = config_model.addLabelParameter2( "aztorplugin.browser.info1" );
 				LabelParameter browser_info2 = config_model.addLabelParameter2( "aztorplugin.browser.info2" );
@@ -1180,7 +1182,7 @@ TorPlugin
 	{
 		log( "Starting server" );
 		
-		File exe_file = new File( plugin_dir, Constants.isWindows?"AzureusTor.exe":"AzureusTor" );
+		File exe_file = new File( plugin_dir, Constants.isWindows?"AzureusTor.exe":(Constants.isOSX?"AzureusTor":"tor" ));
 		
 		checkPermissions( exe_file );
 		
@@ -1205,6 +1207,12 @@ TorPlugin
 				
 				pb.environment().put(
 						"DYLD_LIBRARY_PATH",
+						exe_file.getParentFile().getAbsolutePath());
+				
+			}else if ( Constants.isLinux ){
+				
+				pb.environment().put(
+						"LD_LIBRARY_PATH",
 						exe_file.getParentFile().getAbsolutePath());
 			}
 			
@@ -1490,7 +1498,7 @@ TorPlugin
 	checkPermissions(
 		File		exe )
 	{
-		if ( Constants.isOSX ){
+		if ( Constants.isOSX || Constants.isLinux ){
 
 			synchronized( this ){
 				
@@ -1518,7 +1526,11 @@ TorPlugin
 					
 					for ( File file: files ){
 						
-						if ( file.getName().endsWith( ".dylib" )){
+						String name = file.getName();
+								
+						if ( 	name.endsWith( ".dylib" ) 	||
+								name.endsWith( ".so" )		||
+								name.contains( ".so." )){
 							
 							Runtime.getRuntime().exec(
 									new String[]{
