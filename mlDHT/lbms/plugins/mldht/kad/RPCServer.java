@@ -44,6 +44,7 @@ public class RPCServer implements Runnable, RPCServerBase {
 	static Map<InetAddress,RPCServer> interfacesInUse = new HashMap<InetAddress, RPCServer>(); 
 	
 	private DatagramSocket							sock;
+	private RPCServerListener						serverListener;
 	private DHT										dh_table;
 	private ConcurrentMap<ByteWrapper, RPCCallBase>	calls;
 	private Queue<RPCCallBase>						call_queue;
@@ -57,9 +58,10 @@ public class RPCServer implements Runnable, RPCServerBase {
 	
 	private Key										derivedId;
 
-	public RPCServer (DHT dh_table, int port, RPCStats stats) {
+	public RPCServer (DHT dh_table, int port, RPCStats stats, RPCServerListener serverListener ) {
 		this.port = port;
 		this.dh_table = dh_table;
+		this.serverListener = serverListener;
 		timeoutFilter = new ResponseTimeoutFilter();
 		calls = new ConcurrentHashMap<ByteWrapper, RPCCallBase>(80,0.75f,3);
 		call_queue = new ConcurrentLinkedQueue<RPCCallBase>();
@@ -300,7 +302,9 @@ public class RPCServer implements Runnable, RPCServerBase {
 		}
 		
 		public void onStall(RPCCallBase c) {}
-		public void onResponse(RPCCallBase c, MessageBase rsp) {}
+		public void onResponse(RPCCallBase c, MessageBase rsp) {
+			serverListener.replyReceived( rsp.getOrigin());
+		}
 	}; 
 	
 	private void dispatchCall(RPCCallBase call, short mtid)

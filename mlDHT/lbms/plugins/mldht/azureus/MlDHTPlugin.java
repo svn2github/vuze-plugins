@@ -19,6 +19,7 @@ package lbms.plugins.mldht.azureus;
 import java.io.File;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.util.Map;
 
@@ -27,7 +28,11 @@ import lbms.plugins.mldht.kad.DHT;
 import lbms.plugins.mldht.kad.DHTConstants;
 import lbms.plugins.mldht.kad.DHTLogger;
 import lbms.plugins.mldht.kad.DHT.DHTtype;
+import lbms.plugins.mldht.kad.RPCServerListener;
 
+import org.gudy.azureus2.core3.util.AERunnable;
+import org.gudy.azureus2.core3.util.AESemaphore;
+import org.gudy.azureus2.core3.util.AsyncDispatcher;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
@@ -67,8 +72,12 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 	private LoggerChannelListener	logListener;
 	private UIManagerListener		uiListener;
 
+	private AlternativeContactHandler	alt_contact_handler;
+	
 	//private Display					display;
 
+	private volatile boolean		unloaded;
+	
 	private UIHelper				uiHelper;
 
 	private Object					mlDHTProvider;
@@ -88,7 +97,7 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 			throw new IllegalStateException("Plugin already initialized");
 		}
 		singleton = this;
-
+		
 		this.pluginInterface = pluginInterface;
 		UIManager ui_manager = pluginInterface.getUIManager();
 		config_model = ui_manager.createBasicPluginConfigModel("plugins",
@@ -368,6 +377,9 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 	 * @see org.gudy.azureus2.plugins.UnloadablePlugin#unload()
 	 */
 	public void unload () throws PluginException {
+		
+		unloaded = true;
+		
 		if (uiHelper != null) {
 			uiHelper.onPluginUnload();
 		}
@@ -442,6 +454,7 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 				public void run () {
 					try{
 						startDHT();
+				
 					}catch( Throwable e ){
 						e.printStackTrace();
 					}
@@ -455,58 +468,120 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 
 	//-------------------------------------------------------------------
 
+	// this is all a mess - serialise the start/stop operations in an attempt to get on top of it
+	
+	private AsyncDispatcher	dispatcher = new AsyncDispatcher( "MLDHT:disp", 2500 );
+	
 	public void startDHT () {
 		
-		DHTConfiguration config = new DHTConfiguration() {
-			public boolean noRouterBootstrap() {
-				return pluginInterface.getPluginconfig()
-				.getPluginBooleanParameter(
-					"onlyPeerBootstrap");
-			}
-			
-			public boolean isPersistingID() {
-				return pluginInterface.getPluginconfig().getPluginBooleanParameter("alwaysRestoreID");
-			}
-			
-			public File getNodeCachePath() {
-				return pluginInterface.getPluginconfig().getPluginUserFile("dht.cache");
-			}
-			
-			public int getListeningPort() {
-				return pluginInterface.getPluginconfig().getPluginIntParameter("port");
-			}
-			
-			public boolean allowMultiHoming() {
-				return pluginInterface.getPluginconfig().getPluginBooleanParameter("multihoming");
-			}
-		}; 
-		
-		view_model.getStatus().setText("Initializing");
-		try {
-			for (Map.Entry<DHTtype, DHT> e : dhts.entrySet()) {
-				e.getValue().start(config);
+		dispatcher.dispatch(
+			new AERunnable() {
 
-				e.getValue().bootstrap();
-			}
+				@Override
+				public void 
+				runSupport() 
+				{
+					if ( unloaded ){
+						return;
+					}
 
-			tracker.start();
-			view_model.getStatus().setText("Running");
-		} catch (SocketException e) {
-			e.printStackTrace();
-		}
+					DHTConfiguration config = new DHTConfiguration() {
+						public boolean noRouterBootstrap() {
+							return pluginInterface.getPluginconfig()
+									.getPluginBooleanParameter(
+											"onlyPeerBootstrap");
+						}
+
+						public boolean isPersistingID() {
+							return pluginInterface.getPluginconfig().getPluginBooleanParameter("alwaysRestoreID");
+						}
+
+						public File getNodeCachePath() {
+							return pluginInterface.getPluginconfig().getPluginUserFile("dht.cache");
+						}
+
+						public int getListeningPort() {
+							return pluginInterface.getPluginconfig().getPluginIntParameter("port");
+						}
+
+						public boolean allowMultiHoming() {
+							return pluginInterface.getPluginconfig().getPluginBooleanParameter("multihoming");
+						}
+					}; 
+
+					try{
+						alt_contact_handler = new AlternativeContactHandler();
+						
+					}catch( Throwable e ){
+					}
+					
+					RPCServerListener serverListener = 
+							new RPCServerListener() {
+								@Override
+								public void 
+								replyReceived(
+									InetSocketAddress from_node) 
+								{
+									alt_contact_handler.nodeAlive( from_node );
+								}
+							};
+							
+					view_model.getStatus().setText("Initializing");
+					try {
+						for (Map.Entry<DHTtype, DHT> e : dhts.entrySet()) {
+							e.getValue().start(config, serverListener);
+
+							e.getValue().bootstrap();
+						}
+
+						tracker.start();
+						view_model.getStatus().setText("Running");
+					} catch (SocketException e) {
+						e.printStackTrace();
+					}
+				}
+			});
 	}
 
 	public void stopDHT () {
-		if ( tracker != null ){
-			tracker.stop();
-		}
-		if ( dhts != null ){
-			for (DHT dht : dhts.values()) {
-				dht.stop();
-			}
-		}
-		if ( view_model != null ){
-			view_model.getStatus().setText("Stopped");
+		
+		final AESemaphore sem = new AESemaphore( "MLDHT:Stopper" );
+				
+		dispatcher.dispatch(
+			new AERunnable() {
+				
+				@Override
+				public void 
+				runSupport() 
+				{
+					try{
+						if ( tracker != null ){
+							tracker.stop();
+						}
+						if ( dhts != null ){
+							for (DHT dht : dhts.values()) {
+								dht.stop();
+							}
+						}
+						
+						if ( alt_contact_handler != null ){
+							
+							alt_contact_handler.destroy();
+						}
+						
+						if ( view_model != null ){
+							view_model.getStatus().setText("Stopped");
+						}
+					}finally{
+						
+						sem.release();
+					}
+				}
+			});
+		
+		if ( !sem.reserve(30*1000)){
+			
+			Debug.out( "Timeout waiting for DHT to stop" );
 		}
 	}
 }

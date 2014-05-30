@@ -518,7 +518,7 @@ public class DHT implements DHTBase {
 	 * 
 	 * @see lbms.plugins.mldht.kad.DHTBase#start(java.lang.String, int)
 	 */
-	public void start (DHTConfiguration config)
+	public void start (DHTConfiguration config, final RPCServerListener serverListener)
 			throws SocketException {
 		if (running || stopped) {
 			return;
@@ -563,13 +563,13 @@ public class DHT implements DHTBase {
 
 		// initialize as many RPC servers as we need 
 		for(int i = 0;i< AddressUtils.getAvailableAddrs(config.allowMultiHoming(), type.PREFERRED_ADDRESS_TYPE).size();i++)
-			new RPCServer(this, getPort(),serverStats);
+			new RPCServer(this, getPort(),serverStats, serverListener);
 		
 		
 		bootstrapping = true;
 		node.loadTable(new Runnable() {
 			public void run () {
-				started();				
+				started(serverListener);				
 			}
 		});
 
@@ -632,7 +632,7 @@ public class DHT implements DHTBase {
 	 * 
 	 * @see lbms.plugins.mldht.kad.DHTBase#started()
 	 */
-	public void started () {
+	protected void started ( final RPCServerListener serverListener) {
 		if ( stopped ){
 			return;
 		}
@@ -652,7 +652,7 @@ public class DHT implements DHTBase {
 		scheduledActions.add(scheduler.scheduleAtFixedRate(new Runnable() {
 			public void run () {
 				try {
-					update();
+					update( serverListener );
 				} catch (Throwable e) {
 					log(e, LogLevel.Fatal);
 				}
@@ -772,7 +772,7 @@ public class DHT implements DHTBase {
 	 * 
 	 * @see lbms.plugins.mldht.kad.DHTBase#update()
 	 */
-	public void update () {
+	protected void update ( final RPCServerListener serverListener ) {
 		long mono_now = SystemTime.getMonotonousTime();
 		
 		if ( running ){
@@ -795,7 +795,7 @@ public class DHT implements DHTBase {
 					
 					last_rpc_create = mono_now;
 					
-					new RPCServer(this, getPort(),serverStats);
+					new RPCServer(this, getPort(),serverStats,serverListener);
 					
 					server_create_counter++;
 					

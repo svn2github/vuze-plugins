@@ -1,0 +1,214 @@
+/*
+ * Created on May 29, 2014
+ * Created by Paul Gardner
+ * 
+ * Copyright 2014 Azureus Software, Inc.  All rights reserved.
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License only.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
+ */
+
+
+package lbms.plugins.mldht.azureus;
+
+import java.net.Inet4Address;
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.gudy.azureus2.core3.util.BEncoder;
+import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.SystemTime;
+
+import com.aelitis.azureus.core.dht.transport.DHTTransportAlternativeContact;
+import com.aelitis.azureus.core.dht.transport.DHTTransportAlternativeNetwork;
+import com.aelitis.azureus.core.dht.transport.udp.impl.DHTUDPUtils;
+
+public class 
+AlternativeContactHandler 
+{
+	private DHTTransportAlternativeNetworkImpl		ipv4_net = new DHTTransportAlternativeNetworkImpl( DHTTransportAlternativeNetwork.AT_MLDHT_IPV4 );
+	private DHTTransportAlternativeNetworkImpl		ipv6_net = new DHTTransportAlternativeNetworkImpl( DHTTransportAlternativeNetwork.AT_MLDHT_IPV6 );
+	
+	protected
+	AlternativeContactHandler()
+	{
+		DHTUDPUtils.registerAlternativeNetwork( ipv4_net );
+		DHTUDPUtils.registerAlternativeNetwork( ipv6_net );
+	}
+	
+	protected void
+	nodeAlive(
+		InetSocketAddress	address )
+	{
+		if ( address.getAddress() instanceof Inet4Address ){
+			
+			ipv4_net.addAddress( address );
+			
+		}else{
+			
+			ipv6_net.addAddress( address );
+		}
+	}
+	
+	protected void
+	destroy()
+	{
+		DHTUDPUtils.unregisterAlternativeNetwork( ipv4_net );
+		DHTUDPUtils.unregisterAlternativeNetwork( ipv6_net );
+	}
+	
+	private static class
+	DHTTransportAlternativeNetworkImpl
+		implements DHTTransportAlternativeNetwork
+	{
+		private static final int ADDRESS_HISTORY_MAX	= 32;
+		
+		private int	network;
+		
+		private Map<InetSocketAddress,Long>	address_history = 
+				new LinkedHashMap<InetSocketAddress,Long>(ADDRESS_HISTORY_MAX,0.75f,true)
+				{
+					protected boolean 
+					removeEldestEntry(
+				   		Map.Entry<InetSocketAddress,Long> eldest) 
+					{
+						return size() > ADDRESS_HISTORY_MAX;
+					}
+				};
+		private
+		DHTTransportAlternativeNetworkImpl(
+			int			net )
+		{
+			network	= net;
+		}
+		
+		public int
+		getNetworkType()
+		{
+			return( network );
+		}
+		
+		private void
+		addAddress(
+			InetSocketAddress	address )
+		{
+			synchronized( address_history ){
+				
+				address_history.put( address, new Long( SystemTime.getMonotonousTime()));
+			}
+		}
+		
+		public List<DHTTransportAlternativeContact>
+		getContacts(
+			int		max )
+		{
+			List<DHTTransportAlternativeContact> result = new ArrayList<DHTTransportAlternativeContact>( max );
+			
+			synchronized( address_history ){
+				
+				for ( Map.Entry<InetSocketAddress,Long> entry: address_history.entrySet()){
+					
+					result.add( new DHTTransportAlternativeContactImpl( entry.getKey(), entry.getValue()));
+				}
+			}
+			
+			return( result );
+		}
+		
+		private class
+		DHTTransportAlternativeContactImpl
+			implements DHTTransportAlternativeContact
+		{
+			private final InetSocketAddress		address;
+			private final int	 				seen_secs;
+			private final int	 				id;
+			
+			private
+			DHTTransportAlternativeContactImpl(
+				InetSocketAddress		_address,
+				long					seen )
+			{
+				address	= _address;
+				
+				seen_secs = (int)( seen/1000 );
+				
+				int	_id;
+				
+				try{
+				
+					_id = Arrays.hashCode( BEncoder.encode(getProperties()));
+					
+				}catch( Throwable e ){
+					
+					Debug.out( e );
+					
+					_id = 0;
+				}
+				
+				id	= _id;
+			}
+			
+			public int
+			getNetworkType()
+			{
+				return( network );
+			}
+			
+			public int
+			getVersion()
+			{
+				return( 1 );
+			}
+			
+			public int
+			getID()
+			{
+				return( id );
+			}
+			
+			public int
+			getLastAlive()
+			{
+				return( seen_secs );
+			}
+			
+			public int
+			getAge()
+			{
+				return(((int)( SystemTime.getMonotonousTime()/1000)) - seen_secs );
+			}
+			
+			public Map<String,Object>
+			getProperties()
+			{
+				Map<String,Object>	properties = new HashMap<String, Object>();
+				
+				try{
+					properties.put( "a", address.getAddress().getAddress());
+					properties.put( "p", new Long( address.getPort()));
+					
+				}catch( Throwable e ){
+					
+					Debug.out( e );
+				}
+				
+				return( properties );
+			}
+		}
+	}
+}

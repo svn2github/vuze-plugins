@@ -39,7 +39,7 @@ public interface DHTBase {
 	/**
 	 * Start the DHT
 	 */
-	void start (DHTConfiguration config) throws SocketException;
+	void start (DHTConfiguration config, RPCServerListener serverListener) throws SocketException;
 
 	/**
 	 * Stop the DHT
@@ -49,7 +49,7 @@ public interface DHTBase {
 	/**
 	 * Update the DHT
 	 */
-	void update ();
+	//void update ();
 
 	/**
 	 * A Peer has received a PORT message, and uses this function to alert the DHT of it.
@@ -86,9 +86,9 @@ public interface DHTBase {
 	 */
 	void addDHTNode (String host, int hport);
 
-	void started ();
+	//void started ();
 
-	void stopped ();
+	//void stopped ();
 
 	public void ping (PingRequest r);
 
