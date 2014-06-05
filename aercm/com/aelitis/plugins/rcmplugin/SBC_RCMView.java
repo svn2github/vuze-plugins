@@ -111,6 +111,8 @@ SBC_RCMView
 
 	private int minRank;
 
+	private int minSize;
+	
 	private boolean showIndirect = true;
 
 	private Object ds;
@@ -259,6 +261,8 @@ SBC_RCMView
 				}
 			});
 			
+				// min rank
+			
 			label = new Label(cRow, SWT.VERTICAL | SWT.SEPARATOR);
 			label.setLayoutData(new RowData(-1, sepHeight));
 
@@ -268,7 +272,7 @@ SBC_RCMView
 			layout.marginBottom = layout.marginTop = layout.marginLeft = layout.marginRight = 0;
 			cMinRank.setLayout(layout);
 			Label lblMinRank = new Label(cMinRank, SWT.NONE);
-			lblMinRank.setText(MessageText.getString("rcmview.filter.minRank"));;
+			lblMinRank.setText(MessageText.getString("rcmview.filter.minRank"));
 			Spinner spinMinRank = new Spinner(cMinRank, SWT.BORDER);
 			spinMinRank.setMinimum(0);
 			spinMinRank.setSelection(minRank);
@@ -279,6 +283,31 @@ SBC_RCMView
 				}
 			});
 
+				// min size
+			
+			label = new Label(cRow, SWT.VERTICAL | SWT.SEPARATOR);
+			label.setLayoutData(new RowData(-1, sepHeight));
+
+			Composite cMinSize = new Composite(cRow, SWT.NONE);
+			layout = new GridLayout(2, false);
+			layout.marginWidth = 0;
+			layout.marginBottom = layout.marginTop = layout.marginLeft = layout.marginRight = 0;
+			cMinSize.setLayout(layout);
+			Label lblMinSize = new Label(cMinSize, SWT.NONE);
+			lblMinSize.setText(MessageText.getString("rcmview.filter.minSize"));
+			Spinner spinMinSize = new Spinner(cMinSize, SWT.BORDER);
+			spinMinSize.setMinimum(0);
+			spinMinSize.setMaximum(100*1024*1024);	// 100 TB should do...
+			spinMinSize.setSelection(minSize);
+			spinMinSize.addListener(SWT.Selection, new Listener() {
+				public void handleEvent(Event event) {
+					minSize = ((Spinner) event.widget).getSelection();
+					refilter();
+				}
+			});
+			
+				// show indirect
+			
 			label = new Label(cRow, SWT.VERTICAL | SWT.SEPARATOR);
 			label.setLayoutData(new RowData(-1, sepHeight));
 
@@ -325,6 +354,7 @@ SBC_RCMView
 		boolean show = ((c.getSeeds() >= minSeeds) || (showUnknownSeeds && c.getSeeds() < 0)) 
 			&& (createdMsAgo == 0 || (SystemTime.getCurrentTime() - c.getPublishDate() < createdMsAgo))
 			&& ((c.getRank() >= minRank))
+			&& ((c.getSize() >= 1024L*1024*minSize))
 			&& (showIndirect || c.getHash() != null);
 		
 		if ( show ){
