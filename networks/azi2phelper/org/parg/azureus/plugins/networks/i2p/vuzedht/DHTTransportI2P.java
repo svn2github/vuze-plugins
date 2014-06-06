@@ -1060,14 +1060,127 @@ DHTTransportI2P
 	sendStore(
 		final DHTTransportReplyHandler	handler,
 		final DHTTransportContactI2P	contact,
+		final byte[][]					keys,
+		final DHTTransportValue[][]		value_sets )
+	{
+		try{
+			byte[]	token = contact.getRandomID2();
+			
+			if ( TRACE ) trace( "sendStore: keys=" + keys.length + ", token=" + token + ", contact=" + contact.getString());
+			
+			if ( token == null || token == DHTTransportContactI2P.DEFAULT_TOKEN ){
+
+				throw( new DHTTransportException( "No token available for store operation" ));
+			}
+
+				// default expiry for these is 10 minutes for non-vuze peers
+			
+			long	token_age = contact.getRandomID2Age();
+			
+			if ( TRACE ) trace( "Token age: " + token_age + ", token=" + ByteFormatter.encodeString( token ));
+			
+			if ( 	contact.getVersion() == DHTI2P.DHT_VERSION_NON_VUZE &&
+					token_age > 9*60*1000 + 30*1000 ){
+				
+				byte[] nid = contact.getID();
+				
+				byte[] new_target = new byte[nid.length];
+				
+				RandomUtils.nextBytes( new_target );
+				
+				System.arraycopy( nid, 0, new_target, 0, nid.length - 8 );
+				
+				sendFindValue( 
+					new DHTTransportReplyHandlerAdapter()
+					{
+						private boolean complete;
+						
+						public void
+						findValueReply(
+							DHTTransportContact 	contact,
+							DHTTransportValue[]		values,
+							byte					diversification_type,
+							boolean					more_to_come )
+						{
+							done();
+						}
+						
+						public void
+						findValueReply(
+							DHTTransportContact 	contact,
+							DHTTransportContact[]	contacts )
+						{
+							done();
+						}
+						
+						public void 
+						failed(
+							DHTTransportContact 	contact,
+							Throwable 				error) 
+						{
+							synchronized( this ){
+								
+								if ( complete ){
+									
+									return;
+								}
+								
+								complete = true;
+							}
+
+							handler.failed( contact, new DHTTransportException( "sendStore token refresh failed", error )) ;
+						}
+						
+						private void
+						done()
+						{
+							synchronized( this ){
+								
+								if ( complete ){
+									
+									return;
+								}
+								
+								complete = true;
+							}
+							
+							long	token_age = contact.getRandomID2Age();
+							
+							if ( TRACE ) trace( "Refreshed Token age: " + token_age + ", token=" + ByteFormatter.encodeString( contact.getRandomID2()));
+
+							sendStoreSupport( handler, contact, keys, value_sets );
+						}
+					},
+					contact,
+					new_target,
+					DHT.FLAG_NONE  );
+			}else{
+				
+				sendStoreSupport( handler, contact, keys, value_sets );
+			}	
+		}catch( Throwable e ){
+
+			if ( e instanceof DHTTransportException ){
+
+				handler.failed( contact, (DHTTransportException)e) ;
+
+			}else{
+
+				handler.failed( contact, new DHTTransportException( "sendStore failed", e )) ;
+			}
+		}	
+	}
+	
+	private void
+	sendStoreSupport(
+		final DHTTransportReplyHandler	handler,
+		final DHTTransportContactI2P	contact,
 		byte[][]						keys,
 		DHTTransportValue[][]			value_sets )
-	{
-		byte[]	token = contact.getRandomID2();
-		
-		if ( TRACE ) trace( "sendStore: keys=" + keys.length + ", token=" + token + ", contact=" + contact.getString());
-		
+	{				
 		try{
+			byte[]	token = contact.getRandomID2();
+
 			if ( token == null || token == DHTTransportContactI2P.DEFAULT_TOKEN ){
 
 				throw( new DHTTransportException( "No token available for store operation" ));

@@ -30,6 +30,7 @@ import net.i2p.data.Base32;
 
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.SystemTime;
 import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 
 import com.aelitis.azureus.core.dht.netcoords.DHTNetworkPosition;
@@ -56,6 +57,7 @@ DHTTransportContactI2P
 	
 	
 	private byte[]				random_id	= DEFAULT_TOKEN;
+	private long				random_id_set_time;				
 	
 	protected
 	DHTTransportContactI2P(
@@ -146,6 +148,7 @@ DHTTransportContactI2P
 	getRandomID()
 	{
 		System.out.println( "nuhuh" );
+		
 		return(0);
 	}
 	
@@ -154,6 +157,19 @@ DHTTransportContactI2P
 		byte[]		id )
 	{
 		random_id = id;
+		
+		random_id_set_time = SystemTime.getMonotonousTime();
+	}
+	
+	protected long
+	getRandomID2Age()
+	{
+		if ( random_id_set_time == 0  ){
+			
+			return( -1 );
+		}
+		
+		return( SystemTime.getMonotonousTime() - random_id_set_time );
 	}
 	
 	public byte[]

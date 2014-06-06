@@ -89,6 +89,7 @@ import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
 import org.gudy.azureus2.plugins.torrent.Torrent;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManager;
+import org.gudy.azureus2.plugins.ui.UIManagerEvent;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
 import org.gudy.azureus2.plugins.ui.config.ActionParameter;
 import org.gudy.azureus2.plugins.ui.config.BooleanParameter;
@@ -472,6 +473,28 @@ I2PHelperPlugin
 				// I2P Internals
 			
 			i2p_address_param 	= config_model.addInfoParameter2( "azi2phelper.i2p.address", getMessageText( "azi2phelper.i2p.address.pending" ));
+			
+			final ActionParameter new_id = config_model.addActionParameter2( "azi2phelper.new.identity", "azi2phelper.new.identity.button" );
+			
+			new_id.addListener(
+				new ParameterListener() {
+					
+					@Override
+					public void 
+					parameterChanged(
+						Parameter param) 
+					{
+						COConfigurationManager.setParameter( "azi2phelper.new.identity.required", true );
+						
+						COConfigurationManager.save();
+						
+						ui_manager.showMessageBox(
+								"azi2phelper.restart.title",
+								"azi2phelper.restart.message",
+								UIManagerEvent.MT_OK );
+					}
+				});
+				
 			int_port_param 		= config_model.addIntParameter2( "azi2phelper.internal.port", "azi2phelper.internal.port", 0 );
 			ext_port_param	 	= config_model.addIntParameter2( "azi2phelper.external.port", "azi2phelper.external.port", 0 );
 			socks_port_param 	= config_model.addIntParameter2( "azi2phelper.socks.port", "azi2phelper.socks.port", 0 );
@@ -552,7 +575,7 @@ I2PHelperPlugin
 			config_model.createGroup( 
 				"azi2phelper.internals.group",
 				new Parameter[]{ 
-						i2p_address_param, int_port_param, ext_port_param, socks_port_param,
+						i2p_address_param, new_id, int_port_param, ext_port_param, socks_port_param,
 						port_info_param, use_upnp, always_socks, ext_i2p_param, ext_i2p_host_param, ext_i2p_port_param });
 			
 			
@@ -626,6 +649,7 @@ I2PHelperPlugin
 							net_mix_comp_num.setEnabled( plugin_enabled );
 							
 							i2p_address_param.setEnabled( plugin_enabled );
+							new_id.setEnabled( plugin_enabled );
 							int_port_param.setEnabled( enabled_not_ext );
 							ext_port_param.setEnabled( enabled_not_ext);
 							socks_port_param.setEnabled( plugin_enabled );
@@ -705,9 +729,11 @@ I2PHelperPlugin
 							try{
 								I2PHelperRouter my_router	= null;
 
-								try{																
+								try{	
+									boolean new_id = COConfigurationManager.getBooleanParameter( "azi2phelper.new.identity.required", false );
+
 									my_router = router = 
-											new I2PHelperRouter( plugin_dir, router_properties, is_bootstrap_node, is_vuze_dht, I2PHelperPlugin.this );
+											new I2PHelperRouter( plugin_dir, router_properties, is_bootstrap_node, is_vuze_dht, new_id, I2PHelperPlugin.this );
 									
 									if ( ext_i2p_param.getValue()){
 											
@@ -719,6 +745,13 @@ I2PHelperPlugin
 									}
 										
 									my_router.initialiseDHT();
+									
+									if ( new_id ){
+									
+										COConfigurationManager.setParameter( "azi2phelper.new.identity.required", false );
+									
+										COConfigurationManager.save();
+									}
 									
 									if ( !unloaded ){
 										
@@ -2538,7 +2571,7 @@ I2PHelperPlugin
 			};
 			
 		try{
-			I2PHelperRouter router = f_router[0] = new I2PHelperRouter( config_dir, new HashMap<String, Object>(), bootstrap, vuze_dht, adapter );
+			I2PHelperRouter router = f_router[0] = new I2PHelperRouter( config_dir, new HashMap<String, Object>(), bootstrap, vuze_dht, false, adapter );
 			
 				// 19817 must be used for bootstrap node
 			

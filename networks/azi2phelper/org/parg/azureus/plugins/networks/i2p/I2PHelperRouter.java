@@ -21,13 +21,14 @@
 
 package org.parg.azureus.plugins.networks.i2p;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -41,7 +42,6 @@ import java.util.Vector;
 
 import net.i2p.CoreVersion;
 import net.i2p.I2PAppContext;
-import net.i2p.client.I2PClient;
 import net.i2p.client.I2PClientFactory;
 import net.i2p.client.I2PSession;
 import net.i2p.client.streaming.I2PServerSocket;
@@ -90,6 +90,7 @@ I2PHelperRouter
 	
 	private final boolean					is_bootstrap_node;
 	private final boolean					is_vuze_dht;
+	private final boolean					force_new_address;
 	private final I2PHelperAdapter			adapter;
 	
 	private boolean		is_external_router;
@@ -121,12 +122,14 @@ I2PHelperRouter
 		Map<String,Object>		_properties,
 		boolean					_is_bootstrap_node,
 		boolean					_is_vuze_dht,
+		boolean					_force_new_address,
 		I2PHelperAdapter		_adapter )
 	{
 		config_dir			= _config_dir;
 		router_properties	= _properties;
 		is_bootstrap_node	= _is_bootstrap_node;		// could be props one day
 		is_vuze_dht			= _is_vuze_dht;
+		force_new_address	= _force_new_address;
 		adapter				= _adapter;
 	}
 	
@@ -423,7 +426,7 @@ I2PHelperRouter
 			
 			router_props.put( "i2cp.port", i2p_internal_port );
 			router_props.put( "i2np.upnp.enable", false );
-			router_props.put( "i2p.streaming.answerPings", true );		// testing
+			router_props.put( "i2p.streaming.answerPings", false );		// reverted this to false, 29/5/14 as things seem to be working
 			
 				// Note that TCP defaults to the same as UDP port
 						
@@ -468,11 +471,12 @@ I2PHelperRouter
 			
 			router.runRouter();
 				
-			router.setKillVMOnEnd( false );	// has to be done again after run phase as set true in that code :(
+			// not needed since 0.9.13 as setting moved to Router constructor
+			// router.setKillVMOnEnd( false );	// has to be done again after run phase as set true in that code :(
 
 			RouterContext router_ctx = router.getContext();
 			
-			adapter.log( "Waiting for router startup" );;
+			adapter.log( "Waiting for internal router startup on " + i2p_host + ":" + i2p_port );
 						
 			while( true ){
 				
@@ -482,7 +486,9 @@ I2PHelperRouter
 				}
 				
 				try{
-					Socket s = new Socket( i2p_internal_host, i2p_internal_port );
+					Socket s = new Socket( Proxy.NO_PROXY );
+					
+					s.connect( new InetSocketAddress( i2p_internal_host, i2p_internal_port ), 1000 );
 				
 					s.close();
 				
@@ -542,7 +548,7 @@ I2PHelperRouter
 			
 			init( config_dir );
 		
-			adapter.log( "Waiting for router startup" );;
+			adapter.log( "Waiting for external router startup on " + i2p_host + ":" + i2p_port );
 						
 			while( true ){
 				
@@ -552,7 +558,9 @@ I2PHelperRouter
 				}
 				
 				try{
-					Socket s = new Socket( i2p_separate_host, i2p_separate_port );
+					Socket s = new Socket( Proxy.NO_PROXY );
+					
+					s.connect( new InetSocketAddress( i2p_separate_host, i2p_separate_port ), 1000 );
 				
 					s.close();
 				
@@ -601,10 +609,8 @@ I2PHelperRouter
 			
 			File dht_config 	= new File( config_dir,  "dht.config" );
 			File dest_key_file 	= new File( config_dir,  "dest_key.dat" );
-	
-
 	        
-	        boolean	use_existing_key = dest_key_file.exists();
+	        boolean	use_existing_key = dest_key_file.exists() && !force_new_address;
 	        	
 	        I2PSocketManager	sm = null;
 	        
