@@ -23,12 +23,7 @@ package lbms.plugins.mldht.azureus;
 
 import java.net.Inet4Address;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import org.gudy.azureus2.core3.util.BEncoder;
 import org.gudy.azureus2.core3.util.Debug;
@@ -80,16 +75,8 @@ AlternativeContactHandler
 		
 		private int	network;
 		
-		private Map<InetSocketAddress,Long>	address_history = 
-				new LinkedHashMap<InetSocketAddress,Long>(ADDRESS_HISTORY_MAX,0.75f,true)
-				{
-					protected boolean 
-					removeEldestEntry(
-				   		Map.Entry<InetSocketAddress,Long> eldest) 
-					{
-						return size() > ADDRESS_HISTORY_MAX;
-					}
-				};
+		private LinkedList<Object[]>	address_history = new LinkedList<Object[]>();
+			
 		private
 		DHTTransportAlternativeNetworkImpl(
 			int			net )
@@ -109,7 +96,12 @@ AlternativeContactHandler
 		{
 			synchronized( address_history ){
 				
-				address_history.put( address, new Long( SystemTime.getMonotonousTime()));
+				address_history.addFirst(new Object[]{  address, new Long( SystemTime.getMonotonousTime())});
+				
+				if ( address_history.size() > ADDRESS_HISTORY_MAX ){
+					
+					address_history.removeLast();
+				}
 			}
 		}
 		
@@ -121,9 +113,14 @@ AlternativeContactHandler
 			
 			synchronized( address_history ){
 				
-				for ( Map.Entry<InetSocketAddress,Long> entry: address_history.entrySet()){
+				for ( Object[] entry: address_history ){
 					
-					result.add( new DHTTransportAlternativeContactImpl( entry.getKey(), entry.getValue()));
+					result.add( new DHTTransportAlternativeContactImpl((InetSocketAddress)entry[0],(Long)entry[1]));
+					
+					if ( result.size() == max ){
+						
+						break;
+					}
 				}
 			}
 			
