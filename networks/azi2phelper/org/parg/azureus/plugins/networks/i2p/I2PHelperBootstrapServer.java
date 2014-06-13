@@ -136,7 +136,7 @@ I2PHelperBootstrapServer
 			
 			request_count++;
 				
-			I2PHelperDHT dht = router.getDHT();
+			I2PHelperDHT dht = router.selectDHT().getDHT();
 			
 			List<NodeInfo> nodes = dht.getNodesForBootstrap( 8 );
 			

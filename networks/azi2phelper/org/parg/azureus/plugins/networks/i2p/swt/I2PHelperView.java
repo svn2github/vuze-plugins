@@ -76,8 +76,8 @@ I2PHelperView
 
 	private Composite	composite;
 
-	private DHTView 		dht_view;
-	private DHTOpsView		ops_view;
+	private DHTView[] 			dht_views;
+	private DHTOpsView[]		ops_views;
 	
 	private TimerEventPeriodic	view_timer;
 	private TimerEventPeriodic	status_timer;
@@ -99,6 +99,9 @@ I2PHelperView
 		plugin	= _plugin;
 		ui 		= (UISWTInstance)_ui;
 		view_id	= _view_id;
+		
+		dht_views	= new DHTView[ plugin.getDHTCount()];
+		ops_views	= new DHTOpsView[ plugin.getDHTCount()];
 		
 		ui.addView( UISWTInstance.VIEW_MAIN, view_id, this );
 		
@@ -250,47 +253,57 @@ I2PHelperView
 		grid_data = new GridData(GridData.FILL_BOTH);
 		tab_folder.setLayoutData(grid_data);
 		
-			// DHT stats view
+		CTabItem first_stats_item = null;
 		
-		CTabItem stats_item = new CTabItem(tab_folder, SWT.NULL);
-
-		stats_item.setText( plugin.getMessageText("azi2phelper.ui.dht_stats") );
-		
-		dht_view = new DHTView( false );
-		Composite stats_comp = new Composite( tab_folder, SWT.NULL );
-		stats_item.setControl( stats_comp );
-		layout = new GridLayout();
-		layout.numColumns = 1;
-		layout.marginHeight = 0;
-		layout.marginWidth = 0;
-		stats_comp.setLayout(layout);
-		grid_data = new GridData(GridData.FILL_BOTH);
-		stats_comp.setLayoutData(grid_data);
-		dht_view.initialize( stats_comp );
+		for ( int i=0;i<dht_views.length;i++){
+				
+				// DHT stats view
 			
-		fixupView( stats_comp );
-		
-			// DHT Graph view
-		
-		CTabItem ops_item = new CTabItem(tab_folder, SWT.NULL);
-
-		ops_item.setText( plugin.getMessageText("azi2phelper.ui.dht_graph") );
-		
-		ops_view = new DHTOpsView( false, false );
-		Composite ops_comp = new Composite( tab_folder, SWT.NULL );
-		ops_item.setControl( ops_comp );
-		layout = new GridLayout();
-		layout.numColumns = 1;
-		layout.marginHeight = 0;
-		layout.marginWidth = 0;
-		ops_comp.setLayout(layout);
-		grid_data = new GridData(GridData.FILL_BOTH);
-		ops_comp.setLayoutData(grid_data);
-		ops_view.initialize( ops_comp );
+			CTabItem stats_item = new CTabItem(tab_folder, SWT.NULL);
+	
+			if ( i == 0 ){
+				
+				first_stats_item = stats_item;
+			}
 			
-		fixupView( ops_comp );
+			stats_item.setText( plugin.getMessageText("azi2phelper.ui.dht_stats") + (i==0?"":(" " + String.valueOf(i))));
+			
+			DHTView dht_view = dht_views[i] = new DHTView( false );
+			Composite stats_comp = new Composite( tab_folder, SWT.NULL );
+			stats_item.setControl( stats_comp );
+			layout = new GridLayout();
+			layout.numColumns = 1;
+			layout.marginHeight = 0;
+			layout.marginWidth = 0;
+			stats_comp.setLayout(layout);
+			grid_data = new GridData(GridData.FILL_BOTH);
+			stats_comp.setLayoutData(grid_data);
+			dht_view.initialize( stats_comp );
+				
+			fixupView( stats_comp );
+			
+				// DHT Graph view
+			
+			CTabItem ops_item = new CTabItem(tab_folder, SWT.NULL);
+	
+			ops_item.setText( plugin.getMessageText("azi2phelper.ui.dht_graph")  + (i==0?"":(" " + String.valueOf(i))));
+			
+			DHTOpsView ops_view = ops_views[i] = new DHTOpsView( false, false );
+			Composite ops_comp = new Composite( tab_folder, SWT.NULL );
+			ops_item.setControl( ops_comp );
+			layout = new GridLayout();
+			layout.numColumns = 1;
+			layout.marginHeight = 0;
+			layout.marginWidth = 0;
+			ops_comp.setLayout(layout);
+			grid_data = new GridData(GridData.FILL_BOTH);
+			ops_comp.setLayoutData(grid_data);
+			ops_view.initialize( ops_comp );
+				
+			fixupView( ops_comp );
+		}
 		
-		tab_folder.setSelection( stats_item );
+		tab_folder.setSelection( first_stats_item );
 	}
 
 	private void
@@ -338,7 +351,7 @@ I2PHelperView
 						perform(
 							TimerEvent event ) 
 						{
-							if ( dht_view != null ){
+							if ( dht_views[0] != null ){
 								
 								Utils.execSWTThread(
 									new Runnable()
@@ -346,20 +359,23 @@ I2PHelperView
 										public void
 										run()
 										{
-											dht_view.eventOccurred(
-												new UISWTViewEvent() {										
-													public UISWTView getView() {
-														return null;
-													}
-													
-													public int getType() {
-														return( StatsView.EVENT_PERIODIC_UPDATE );
-													}										
-													public Object getData() {
-													
-														return null;
-													}
-												});
+											for ( DHTView dht_view: dht_views ){
+												
+												dht_view.eventOccurred(
+													new UISWTViewEvent() {										
+														public UISWTView getView() {
+															return null;
+														}
+														
+														public int getType() {
+															return( StatsView.EVENT_PERIODIC_UPDATE );
+														}										
+														public Object getData() {
+														
+															return null;
+														}
+													});
+											}
 										}
 									});
 							}
@@ -376,25 +392,31 @@ I2PHelperView
 			}
 			case UISWTViewEvent.TYPE_REFRESH:{
 				
-				if ( dht_view != null && ops_view != null ){
+				for ( int i=0;i<dht_views.length;i++){
 					
-					I2PHelperRouter router = plugin.getRouter();
+					DHTView 	dht_view = dht_views[i];
+					DHTOpsView 	ops_view = ops_views[i];
 					
-					if ( router != null ){
+					if ( dht_view != null && ops_view != null ){
 						
-						I2PHelperDHT dht_helper = router.getDHT();
+						I2PHelperRouter router = plugin.getRouter();
 						
-						if ( dht_helper instanceof DHTI2P ){
+						if ( router != null ){
 							
-							DHT dht = ((DHTI2P)dht_helper).getDHT();
+							I2PHelperDHT dht_helper = router.getAllDHTs()[i].getDHT();
 							
-							dht_view.setDHT( dht );
-							ops_view.setDHT( dht );
+							if ( dht_helper instanceof DHTI2P ){
+								
+								DHT dht = ((DHTI2P)dht_helper).getDHT();
+								
+								dht_view.setDHT( dht );
+								ops_view.setDHT( dht );
+							}
 						}
+						
+						dht_view.eventOccurred(event);
+						ops_view.eventOccurred(event);
 					}
-					
-					dht_view.eventOccurred(event);
-					ops_view.eventOccurred(event);
 				}
 				
 				break;

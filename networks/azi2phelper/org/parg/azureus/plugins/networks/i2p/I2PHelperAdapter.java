@@ -46,11 +46,12 @@ I2PHelperAdapter
 	
 	public void
 	tryExternalBootstrap(
-		boolean		force );
+		I2PHelperDHT	dht,
+		boolean			force );
 	
 	public void
 	stateChanged(
-		I2PHelperRouter	router );
+		I2PHelperRouterDHT		dht );
 	
 	public void
 	incomingConnection(

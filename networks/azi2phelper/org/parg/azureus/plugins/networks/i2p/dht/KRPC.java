@@ -2035,7 +2035,7 @@ public class KRPC implements I2PSessionMuxedListener, DHT {
             				
             				_adapter.log( "Bootstrap not resolved" );
             				
-          					_adapter.tryExternalBootstrap( force_bootstrap );
+          					_adapter.tryExternalBootstrap( KRPC.this, force_bootstrap );
             			}
             			
             			force_bootstrap = false;

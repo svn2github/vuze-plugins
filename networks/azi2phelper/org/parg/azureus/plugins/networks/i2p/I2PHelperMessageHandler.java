@@ -38,7 +38,6 @@ import com.aelitis.azureus.core.peermanager.messaging.Message;
 import com.aelitis.azureus.core.peermanager.messaging.MessageException;
 import com.aelitis.azureus.core.peermanager.messaging.MessageManager;
 import com.aelitis.azureus.core.peermanager.messaging.MessagingUtil;
-import com.aelitis.azureus.core.peermanager.messaging.azureus.AZHandshake;
 import com.aelitis.azureus.core.peermanager.messaging.azureus.AZStylePeerExchange;
 import com.aelitis.azureus.core.peermanager.messaging.bittorrent.BTHandshake;
 import com.aelitis.azureus.core.peermanager.messaging.bittorrent.BTMessageFactory;
@@ -70,9 +69,6 @@ I2PHelperMessageHandler
 			lt_message_ids.add( message.getID());
 		}
 	}
-
-	private int		q_port;
-	private	int		r_port;
 	
 	protected
 	I2PHelperMessageHandler(
@@ -188,6 +184,8 @@ I2PHelperMessageHandler
 				connection.getIncomingMessageQueue().registerQueueListener(
 					new IncomingMessageQueue.MessageQueueListener() {
 						
+						private byte[] torrent_hash;
+						
 						@Override
 						public void protocolBytesReceived(int byte_count) {
 						}
@@ -207,6 +205,8 @@ I2PHelperMessageHandler
 									// for i2p_dht and i2p_pex
 								
 								bt_handshake.getReserved()[5] &= ~3;
+								
+								torrent_hash = bt_handshake.getDataHash();
 								
 							}else if ( message instanceof LTHandshake ){
 								
@@ -320,27 +320,16 @@ I2PHelperMessageHandler
 								}
 								
 								if ( encoder.supportsExtension( LTI2PDHT.MSG_ID )){
-									
-									if ( q_port == 0 ){
-										
+																			
 											// can take a bit of time for the DHT to become available - could queue
 											// missed connections for later message send I guess?
 										
-										I2PHelperRouter router = plugin.getRouter();
-										
-										if ( router != null ){
-											
-											I2PHelperDHT dht = router.getDHT();
-											
-											if ( dht != null ){
-												
-												q_port 	= dht.getQueryPort();
-												r_port	= dht.getReplyPort();
-											}
-										}
-									}
+									I2PHelperDHT dht = plugin.selectDHT( torrent_hash );
 									
-									if ( q_port != 0 ){
+									if ( dht != null ){
+											
+										int q_port 	= dht.getQueryPort();
+										int r_port	= dht.getReplyPort();
 									
 										out_queue.addMessage( new LTI2PDHT( q_port, r_port ), false );
 									}

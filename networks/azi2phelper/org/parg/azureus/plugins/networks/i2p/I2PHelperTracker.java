@@ -33,7 +33,7 @@ import org.gudy.azureus2.plugins.PluginInterface;
 public class 
 I2PHelperTracker 
 {
-	private I2PHelperDHT				dht;
+	private I2PHelperRouter				router;
 	private I2PHelperAdapter			adapter;
 	
 	private I2PDHTTrackerPlugin			tracker;
@@ -41,16 +41,16 @@ I2PHelperTracker
 	protected
 	I2PHelperTracker(
 		I2PHelperAdapter	_adapter,
-		I2PHelperDHT		_dht )
+		I2PHelperRouter		_router )
 	{
 		adapter	= _adapter;
-		dht		= _dht;
+		router	= _router;
 		
 		PluginInterface	pi = adapter.getPluginInterface();
 		
 		if ( pi != null ){
 			
-			tracker = new I2PDHTTrackerPlugin( adapter, dht );
+			tracker = new I2PDHTTrackerPlugin( adapter, router );
 		}
 	}
 	
@@ -63,6 +63,8 @@ I2PHelperTracker
 		long						timeout,
 		I2PHelperDHTListener		listener )
 	{
+		I2PHelperDHT dht = router.selectDHT().getDHT();
+		
 		dht.get( hash, reason, flags, num_want, timeout, listener );
 	}
 	
@@ -73,6 +75,8 @@ I2PHelperTracker
 		byte						flags,
 		I2PHelperDHTListener		listener )
 	{
+		I2PHelperDHT dht = router.selectDHT().getDHT();
+
 		dht.put( hash, reason, flags, listener );
 	}
 	
@@ -89,6 +93,8 @@ I2PHelperTracker
 		
 		long	start = SystemTime.getMonotonousTime();
 		
+		I2PHelperDHT dht = router.selectDHT().getDHT();
+
 		Collection<Hash> peer_hashes = dht.getPeersAndNoAnnounce( torrent_hash, num_want, get_timeout, num_put, put_timeout );
 		
 			// Note that we can get duplicates here as use the target node as the originator node (don't actually know the originator in I2P DHT...)
@@ -112,6 +118,8 @@ I2PHelperTracker
 		
 		long	start = SystemTime.getMonotonousTime();
 		
+		I2PHelperDHT dht = router.selectDHT().getDHT();
+
 		Collection<Hash> peer_hashes = dht.getPeersAndAnnounce( torrent_hash, num_want, get_timeout, num_put, put_timeout );
 		
 		adapter.log( "put -> " + peer_hashes.size() + ", elapsed=" + (SystemTime.getMonotonousTime() - start ));

@@ -70,7 +70,8 @@ DHTI2P
 	public static final int		DHT_NETWORK		= 10;
 	
 	private static final int	REQUEST_TIMEOUT	= 45*1000;
-			
+		
+	private final int					dht_index;
 	private DHT 						dht;
 	private DHTTransportI2P				transport;
 	private DHTPluginStorageManager 	storage_manager;
@@ -109,15 +110,17 @@ DHTI2P
 	public 
 	DHTI2P(
 		File				dir,
+		int					_dht_index,
 		I2PSession			session,
 		NodeInfo			_my_node,
 		NodeInfo			boot_node,
 		I2PHelperAdapter	_adapter )
 	{
+		dht_index	= _dht_index;
 		my_node		= _my_node;
 		adapter		= _adapter;
 		
-		File storage_dir = new File( dir, "dhtdata");
+		File storage_dir = new File( dir, "dhtdata" + (dht_index==0?"":String.valueOf(dht_index)));
 		
 		if ( !storage_dir.isDirectory()){
 		
@@ -742,7 +745,7 @@ DHTI2P
         				
         				log( "Bootstrap not resolved" );
         				
-        				adapter.tryExternalBootstrap( force_bootstrap );
+        				adapter.tryExternalBootstrap( this, force_bootstrap );
         			}
         			
         			force_bootstrap = false;

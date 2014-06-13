@@ -123,7 +123,7 @@ I2PDHTTrackerPlugin
 	
 	private I2PHelperAdapter		adapter;
 	private PluginInterface			plugin_interface;
-	private I2PHelperDHT			dht;
+	private I2PHelperRouter			router;
 	
 	private UTTimer				timer;
 	private TorrentAttribute 	ta_networks;
@@ -161,10 +161,10 @@ I2PDHTTrackerPlugin
 	protected
 	I2PDHTTrackerPlugin(
 		I2PHelperAdapter	_adapter,
-		I2PHelperDHT		_dht )
+		I2PHelperRouter		_router )
 	{	
 		adapter				= _adapter;
-		dht					= _dht;
+		router				= _router;
 						
 		plugin_interface	= adapter.getPluginInterface();
 		
@@ -1164,7 +1164,7 @@ I2PDHTTrackerPlugin
 
 			}else{
 				
-				dht.put( 
+				router.selectDHT( download ).getDHT().put( 
 					target.getHash(),
 					"Tracker reg of '" + download.getName() + "'" + target.getDesc() + " -> " + encoded,
 					//encoded_bytes,
@@ -1223,7 +1223,7 @@ I2PDHTTrackerPlugin
 			
 			num_done++;
 			
-			dht.get(target.getHash(), 
+			router.selectDHT( download ).getDHT().get(target.getHash(), 
 					"Tracker announce for '" + download.getName() + "'" + target.getDesc(),
 					(byte)( isComplete( download )?DHT.FLAG_SEEDING:DHT.FLAG_DOWNLOADING),
 					NUM_WANT, 
@@ -1379,7 +1379,7 @@ I2PDHTTrackerPlugin
 							
 							if ( ext_address == null ){
 								
-								ext_address = dht.getLocalAddress();
+								ext_address = router.selectDHT( download ).getDHT().getLocalAddress();
 							}
 							
 							for (int i=0;i<addresses.size();i++){
@@ -1745,6 +1745,8 @@ I2PDHTTrackerPlugin
 		
 		trackerTarget[] targets = details.getTargets( true );
 		
+		I2PHelperDHT dht = router.selectDHT( download ).getDHT();
+		
 		for (int i=0;i<targets.length;i++){
 			
 			final trackerTarget target = targets[i];
@@ -1789,6 +1791,8 @@ I2PDHTTrackerPlugin
 		
 		final 	long	start = SystemTime.getCurrentTime();
 		
+		I2PHelperDHT dht = router.selectDHT( download ).getDHT();
+
 		if ( dht.hasLocalKey( target.getHash())){
 			
 			increaseActive( download );
@@ -1960,6 +1964,8 @@ I2PDHTTrackerPlugin
 				final long start 		= now;
 				final long f_next_check = ready_download_next_check;
 				
+				final I2PHelperDHT dht = router.selectDHT( ready_download ).getDHT();
+
 				dht.get(	torrent.getHash(), 
 							"Presence query for '" + ready_download.getName() + "'",
 							(byte)0,

@@ -104,7 +104,6 @@ import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 import org.parg.azureus.plugins.networks.i2p.swt.I2PHelperView;
-import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTI2P;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTTransportContactI2P;
 
 import com.aelitis.azureus.core.networkmanager.NetworkManager;
@@ -151,6 +150,9 @@ I2PHelperPlugin
 	private BasicPluginViewModel	view_model;
 	private LocaleUtilities			loc_utils;
 
+	private int						dht_count	= 2;
+	private String[]				dht_addresses = new String[ dht_count ];
+	
 	private InfoParameter			i2p_address_param;
 	private IntParameter 			int_port_param;
 	private IntParameter 			ext_port_param;
@@ -307,7 +309,12 @@ I2PHelperPlugin
 							int		type,
 							String	content )
 						{
-							view_model.getLogArea().appendText( content + "\n" );
+							BasicPluginViewModel vm = view_model;
+							
+							if ( vm != null ){
+							
+								vm.getLogArea().appendText( content + "\n" );
+							}
 						}
 						
 						public void
@@ -315,8 +322,13 @@ I2PHelperPlugin
 							String		str,
 							Throwable	error )
 						{
-							view_model.getLogArea().appendText( str + "\n" );
-							view_model.getLogArea().appendText( error.toString() + "\n" );
+							BasicPluginViewModel vm = view_model;
+							
+							if ( vm != null ){
+								
+								vm.getLogArea().appendText( str + "\n" );
+								vm.getLogArea().appendText( error.toString() + "\n" );
+							}
 						}
 					});
 					
@@ -486,6 +498,8 @@ I2PHelperPlugin
 					{
 						COConfigurationManager.setParameter( "azi2phelper.new.identity.required", true );
 						
+						COConfigurationManager.setParameter( "azi2phelper.change.id.time", SystemTime.getCurrentTime());
+						
 						COConfigurationManager.save();
 						
 						ui_manager.showMessageBox(
@@ -495,6 +509,49 @@ I2PHelperPlugin
 					}
 				});
 				
+			final IntParameter 	change_id	= config_model.addIntParameter2( "azi2phelper.change.id", "azi2phelper.change.id", 7, -1, 1024 );
+
+			long	now = SystemTime.getCurrentTime();
+			
+			if ( !COConfigurationManager.getBooleanParameter( "azi2phelper.new.identity.required" )){
+			
+				int change_id_days = change_id.getValue();
+			
+				boolean change_it = false;
+				
+				if ( change_id_days < 0 ){
+					
+				}else if ( change_id_days == 0 ){
+					
+					change_it = true;
+					
+				}else{
+					
+					long last_change = COConfigurationManager.getLongParameter( "azi2phelper.change.id.time", 0 );
+					
+					if ( last_change == 0 ){
+						
+						COConfigurationManager.setParameter( "azi2phelper.change.id.time", now );
+						
+					}else{
+						
+						long	elapsed_days = ( now - last_change )/(24*60*60*1000);
+						
+						if ( elapsed_days >= change_id_days ){
+							
+							change_it = true;
+						}
+					}
+				}
+				
+				if ( change_it ){
+					
+					COConfigurationManager.setParameter( "azi2phelper.change.id.time", now );
+
+					COConfigurationManager.setParameter( "azi2phelper.new.identity.required", true );
+				}
+			}
+						
 			int_port_param 		= config_model.addIntParameter2( "azi2phelper.internal.port", "azi2phelper.internal.port", 0 );
 			ext_port_param	 	= config_model.addIntParameter2( "azi2phelper.external.port", "azi2phelper.external.port", 0 );
 			socks_port_param 	= config_model.addIntParameter2( "azi2phelper.socks.port", "azi2phelper.socks.port", 0 );
@@ -575,7 +632,7 @@ I2PHelperPlugin
 			config_model.createGroup( 
 				"azi2phelper.internals.group",
 				new Parameter[]{ 
-						i2p_address_param, new_id, int_port_param, ext_port_param, socks_port_param,
+						i2p_address_param, new_id, change_id, int_port_param, ext_port_param, socks_port_param,
 						port_info_param, use_upnp, always_socks, ext_i2p_param, ext_i2p_host_param, ext_i2p_port_param });
 			
 			
@@ -733,7 +790,7 @@ I2PHelperPlugin
 									boolean new_id = COConfigurationManager.getBooleanParameter( "azi2phelper.new.identity.required", false );
 
 									my_router = router = 
-											new I2PHelperRouter( plugin_dir, router_properties, is_bootstrap_node, is_vuze_dht, new_id, I2PHelperPlugin.this );
+											new I2PHelperRouter( I2PHelperPlugin.this, plugin_dir, router_properties, is_bootstrap_node, is_vuze_dht, new_id, dht_count, I2PHelperPlugin.this );
 									
 									if ( ext_i2p_param.getValue()){
 											
@@ -744,7 +801,7 @@ I2PHelperPlugin
 										my_router.initialiseRouter( f_int_port, f_ext_port );
 									}
 										
-									my_router.initialiseDHT();
+									my_router.initialiseDHTs();
 									
 									if ( new_id ){
 									
@@ -757,7 +814,7 @@ I2PHelperPlugin
 										
 										boolean	first_run = true;
 
-										tracker = new I2PHelperTracker( I2PHelperPlugin.this, my_router.getDHT());
+										tracker = new I2PHelperTracker( I2PHelperPlugin.this, my_router);
 										
 										network_mixer = new I2PHelperNetworkMixer( I2PHelperPlugin.this, net_mix_enable, net_mix_incomp_num, net_mix_comp_num );
 
@@ -913,13 +970,23 @@ I2PHelperPlugin
 	
 	public void
 	stateChanged(
-		I2PHelperRouter	router )
+		I2PHelperRouterDHT	dht )
 	{
-		String address = router.getB32Address();
+		String address = dht.getB32Address();
 		
 		if ( address.length() > 0 ){
 			
-			i2p_address_param.setValue( address );
+			int	 index = dht.getDHTIndex();
+			
+			dht_addresses[ index ] = address;
+			
+			String str = "";
+			
+			for ( int i=0;i<dht_addresses.length;i++){
+				
+				str += ( str.length()==0?"":", " ) + (dht_addresses[i]==null?"<pending>":dht_addresses[i]);
+			}
+			i2p_address_param.setValue( str );
 		}
 	}
 	
@@ -947,6 +1014,12 @@ I2PHelperPlugin
 	getRouter()
 	{
 		return( router );
+	}
+	
+	public int
+	getDHTCount()
+	{
+		return( dht_count );
 	}
 	
 	private I2PHelperSocksProxy
@@ -1006,7 +1079,7 @@ I2PHelperPlugin
 			
 		}else{
 		
-			I2PHelperDHT dht = router.getDHT();
+			I2PHelperDHT dht = router.selectDHT().getDHT();
 			
 			if ( dht == null ){
 				
@@ -1124,10 +1197,11 @@ I2PHelperPlugin
 		
 	public void
 	tryExternalBootstrap(
-		boolean		force )
+		I2PHelperDHT	dht,
+		boolean			force )
 	{
 		long	now = SystemTime.getMonotonousTime();
-		
+				
 		if ( 	force ||
 				last_external_bootstrap == 0 || 
 				now - last_external_bootstrap >= EXTERNAL_BOOTSTRAP_PERIOD ){
@@ -1165,7 +1239,7 @@ I2PHelperPlugin
 							
 							for ( Map m: nodes ){
 								
-								NodeInfo ni = router.getDHT().heardAbout( m );
+								NodeInfo ni = dht.heardAbout( m );
 								
 								if ( ni != null ){
 									
@@ -1221,7 +1295,7 @@ I2PHelperPlugin
 					
 						// these have no NID yet
 					
-					router.getDHT().ping( ni.getDestination(), ni.getPort());
+					dht.ping( ni.getDestination(), ni.getPort());
 				}
 				
 				if ( temp.size() > 5 ){
@@ -1239,10 +1313,29 @@ I2PHelperPlugin
 				
 				for ( Map m: last_external_bootstrap_nodes ){
 					
-					router.getDHT().heardAbout( m );
+					dht.heardAbout( m );
 				}
 			}
 		}
+	}
+	
+	public I2PHelperDHT
+	selectDHT(
+		byte[]		torrent_hash )
+	{
+		I2PHelperRouter router = getRouter();
+		
+		if ( router != null ){
+	
+			I2PHelperRouterDHT dht = router.selectDHT( torrent_hash );
+			
+			if ( dht != null ){
+				
+				return( dht.getDHT());
+			}
+		}
+		
+		return( null );
 	}
 	
 	public void
@@ -1582,8 +1675,16 @@ I2PHelperPlugin
 													try{
 								        				Destination dest = I2PAppContext.getGlobalContext().namingService().lookup( host );
 
-								        				I2PSocketManager socket_manager = router.getDHTSocketManager();
-								        						
+								        				I2PSocketManager socket_manager = router.selectDHT().getDHTSocketManager();
+								        				
+								        					// if we ever re-enable this then we'd need to think which DHT we used for maggot
+								        					// lookups...
+								        				
+								        				if ( true ){
+								        					
+								        					throw( new Exception( "derp" ));
+								        				}
+								        				
 								        				I2PSocketOptions opts = socket_manager.buildOptions();
 								        				
 								        				opts.setPort( 80 );
@@ -2003,11 +2104,25 @@ I2PHelperPlugin
 		}
 	}
 
+		// IPC methods
+	
 	public Object[]
 	getProxy(
 		String		reason,
 		String		host,
 		int			port )
+	
+		throws IPCException
+	{
+		return( getProxy( reason, host, port, null ));
+	}
+	
+	public Object[]
+	getProxy(
+		String					reason,
+		String					host,
+		int						port,
+		Map<String,Object>		proxy_options )
 	
 		throws IPCException
 	{
@@ -2021,6 +2136,13 @@ I2PHelperPlugin
 			return( null );
 		}
 		
+		if ( proxy_options == null ){
+			
+			proxy_options = new HashMap<String, Object>();
+		}
+		
+		//System.out.println( "getProxy: " + reason + "/" + host + ":" + port + ", opt=" + getOptionsString( proxy_options ));
+		
 		synchronized( this ){
 			
 			if ( unloaded ){
@@ -2033,7 +2155,7 @@ I2PHelperPlugin
 			try{
 				int intermediate_port = socks_proxy.getPort();
 				
-				String intermediate_host = socks_proxy.getIntermediateHost( host );
+				String intermediate_host = socks_proxy.getIntermediateHost( host, proxy_options );
 		
 				Proxy proxy = new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( "127.0.0.1", intermediate_port ));	
 								
@@ -2056,8 +2178,19 @@ I2PHelperPlugin
 	
 	public Object[]
 	getProxy(
-		String		reason,
-		URL			url )
+		String					reason,
+		URL						url )
+		
+		throws IPCException
+	{
+		return( getProxy( reason, url,null ));
+	}
+	
+	public Object[]
+	getProxy(
+		String					reason,
+		URL						url,
+		Map<String,Object>		proxy_options )
 		
 		throws IPCException
 	{
@@ -2073,6 +2206,14 @@ I2PHelperPlugin
 			return( null );
 		}
 		
+		if ( proxy_options == null ){
+			
+			proxy_options = new HashMap<String, Object>();
+		}
+		
+		//System.out.println( "getProxy: " + reason + "/" + url + ", opt=" + getOptionsString( proxy_options ));
+
+		
 		synchronized( this ){
 			
 			if ( unloaded ){
@@ -2085,7 +2226,7 @@ I2PHelperPlugin
 			try{
 				int intermediate_port = socks_proxy.getPort();
 				
-				String intermediate_host = socks_proxy.getIntermediateHost( host );
+				String intermediate_host = socks_proxy.getIntermediateHost( host, proxy_options );
 		
 				Proxy proxy = new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( "127.0.0.1", intermediate_port ));	
 								
@@ -2230,6 +2371,8 @@ I2PHelperPlugin
 		}
 	}
 	
+		// End IPC
+	
 	public void
 	unload()
 	{
@@ -2329,6 +2472,26 @@ I2PHelperPlugin
 		}
 	}
 	
+	private String
+	getOptionsString(
+		Map<String,Object>	opts )
+	{
+		String[] nets = (String[])opts.get( "peer_networks" );
+		
+		if ( nets != null ){
+			
+			String str = "";
+			
+			for ( String net: nets ){
+				
+				str += (str.length()==0?"":",") + net;
+			}
+			
+			return( "peer_networks=" + str );
+		}
+		
+		return( "" );
+	}
 
 	private boolean
 	testPort(
@@ -2506,13 +2669,14 @@ I2PHelperPlugin
 				@Override
 				public void 
 				stateChanged(
-					I2PHelperRouter router ) 
+					I2PHelperRouterDHT dht ) 
 				{
 				}
 				
 				public void
 				tryExternalBootstrap(
-					boolean	force )
+					I2PHelperDHT		dht,
+					boolean				force )
 				{
 					log( "External bootstrap test" );
 					
@@ -2533,7 +2697,7 @@ I2PHelperPlugin
 						
 						for ( Map m: nodes ){
 							
-							NodeInfo ni = f_router[0].getDHT().heardAbout( m );
+							NodeInfo ni = dht.heardAbout( m );
 							
 							if ( ni != null ){
 								
@@ -2571,16 +2735,18 @@ I2PHelperPlugin
 			};
 			
 		try{
-			I2PHelperRouter router = f_router[0] = new I2PHelperRouter( config_dir, new HashMap<String, Object>(), bootstrap, vuze_dht, false, adapter );
+			I2PHelperRouter router = f_router[0] = new I2PHelperRouter( null, config_dir, new HashMap<String, Object>(), bootstrap, vuze_dht, false, 1, adapter );
 			
 				// 19817 must be used for bootstrap node
 			
-			//router.initialiseRouter( 17654, bootstrap?19817:28513 );
-			router.initialiseRouter( "192.168.1.5", 7654 );
+			router.initialiseRouter( 17654, bootstrap?19817:28513 );
+			//router.initialiseRouter( "192.168.1.5", 7654 );
 
-			router.initialiseDHT();
+			router.initialiseDHTs();
 			
-			I2PHelperTracker tracker = new I2PHelperTracker( adapter, router.getDHT());
+			I2PHelperDHT dht = router.selectDHT().getDHT();
+			
+			I2PHelperTracker tracker = new I2PHelperTracker( adapter, router );
 			
 			I2PHelperConsole console = new I2PHelperConsole();
 			
@@ -2613,7 +2779,7 @@ I2PHelperPlugin
 						
 					}else if ( line.equals( "extboot" )){
 						
-						adapter.tryExternalBootstrap( true );
+						adapter.tryExternalBootstrap( dht, true );
 						
 					}else if ( line.equals( "createserver" )){
 						

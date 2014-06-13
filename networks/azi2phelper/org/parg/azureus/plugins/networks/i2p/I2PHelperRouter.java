@@ -25,20 +25,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-import java.util.Vector;
+import java.util.*;
 
 import net.i2p.CoreVersion;
 import net.i2p.I2PAppContext;
@@ -51,20 +41,19 @@ import net.i2p.client.streaming.I2PSocketManagerFactory;
 import net.i2p.client.streaming.I2PSocketOptions;
 import net.i2p.data.Base32;
 import net.i2p.data.Destination;
-import net.i2p.data.Hash;
-import net.i2p.data.PrivateKeyFile;
 import net.i2p.router.Router;
 import net.i2p.router.RouterContext;
 import net.i2p.router.TunnelManagerFacade;
 import net.i2p.router.transport.FIFOBandwidthLimiter;
 
+import org.gudy.azureus2.core3.util.AENetworkClassifier;
+import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.DisplayFormatters;
-import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.SystemTime;
-import org.parg.azureus.plugins.networks.i2p.dht.*;
-import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTI2P;
+import org.gudy.azureus2.plugins.download.Download;
+import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 
 
 public class 
@@ -83,6 +72,7 @@ I2PHelperRouter
 	
 	private static final boolean	FULL_STATS = false;
 
+	private final I2PHelperPlugin			plugin;
 	private final File						config_dir;
 
 	private final Map<String,Object>		router_properties;
@@ -100,37 +90,43 @@ I2PHelperRouter
 	
 	private volatile Router 			router;
 	
-	private Properties						sm_properties = new Properties();
-
-		// DHT stuff
+	private Properties						sm_properties = new Properties();	
 	
-	private volatile I2PSession 			dht_session;
-	private volatile I2PSocketManager 		dht_socket_manager;
-	private volatile I2PServerSocket		dht_server_socket;
-	
-	private String		b32_dest = "";
-	
-	private I2PHelperDHT		dht;
+	private I2PHelperRouterDHT[]			dhts;
 	
 	private Map<String,ServerInstance>		servers = new HashMap<String, ServerInstance>();
+	
+	private AESemaphore			init_sem	= new AESemaphore( "I2PRouterInit" );
 	
 	private volatile boolean	destroyed;
 	
 	protected
 	I2PHelperRouter(
+		I2PHelperPlugin			_plugin,
 		File					_config_dir,
 		Map<String,Object>		_properties,
 		boolean					_is_bootstrap_node,
 		boolean					_is_vuze_dht,
 		boolean					_force_new_address,
+		int						_dht_count,
 		I2PHelperAdapter		_adapter )
 	{
+		plugin				= _plugin;
 		config_dir			= _config_dir;
 		router_properties	= _properties;
 		is_bootstrap_node	= _is_bootstrap_node;		// could be props one day
 		is_vuze_dht			= _is_vuze_dht;
 		force_new_address	= _force_new_address;
 		adapter				= _adapter;
+		
+		dhts = new I2PHelperRouterDHT[_dht_count ];
+
+		for ( int i=0;i<dhts.length;i++){
+		
+			I2PHelperRouterDHT dht = new I2PHelperRouterDHT( this, config_dir, i, is_bootstrap_node, is_vuze_dht, force_new_address, adapter );
+			
+			dhts[i] = dht;
+		}
 	}
 	
 	private int
@@ -232,93 +228,11 @@ I2PHelperRouter
 		
 		addRateLimitProperties( props );
 		
-		normalizeProperties( props );
+		I2PHelperUtils.normalizeProperties( props );
 		
 		router.saveConfig( props, null );
 		
 		router.getContext().bandwidthLimiter().reinitialize();
-	}
-	
-	private Properties
-	readProperties(
-		File		file )
-	{
-		Properties props = new Properties();
-		
-		try{
-		
-			if ( file.exists()){
-				
-				InputStream is = new FileInputStream( file );
-			
-				try{
-					props.load( new InputStreamReader( is, "UTF-8" ));
-					
-				}finally{
-					
-					is.close();
-				}
-			}
-		}catch( Throwable e ){
-			
-			e.printStackTrace();
-		}
-		
-		return( props );
-	}
-	
-	private void
-	normalizeProperties(
-		Properties	props )
-	{
-		Set<Object> keys = props.keySet();
-		
-		for ( Object key: keys ){
-			
-			Object value = props.get( key );
-			
-			if ( !(value instanceof String )){
-				
-				props.put( key, String.valueOf( value ));
-			}
-		}
-	}
-	
-
-	private void
-	writeProperties(
-		File		file,
-		Properties	_props )
-	{
-		try{
-			Properties props = 
-				new Properties()
-				{
-			    	public Enumeration<Object> keys() {
-			    	
-			    		List<String> keys = new ArrayList<String>((Set<String>)(Object)keySet());
-			    		
-			    		Collections.sort( keys );
-			    		
-			    		return( new Vector<Object>( keys ).elements());
-			        }
-				};
-			
-			props.putAll( _props );
-			
-			FileOutputStream os = new FileOutputStream( file );
-			
-			try{
-				props.store( new OutputStreamWriter(os, "UTF-8" ), "" );
-				
-			}finally{
-				
-				os.close();
-			}
-		}catch( Throwable e ){
-			
-			e.printStackTrace();
-		}
 	}
 	
 	private void
@@ -420,7 +334,7 @@ I2PHelperRouter
 			
 			File router_config = new File( config_dir, "router.config" );
 			
-			Properties router_props = readProperties( router_config );
+			Properties router_props = I2PHelperUtils.readProperties( router_config );
 			
 				// router config
 			
@@ -446,9 +360,9 @@ I2PHelperRouter
 			router_props.put( "router.outboundPool.lengthVariance", 0 );
 			router_props.put( "router.outboundPool.quantity", 2 );
 									
-			normalizeProperties( router_props );
+			I2PHelperUtils.normalizeProperties( router_props );
 			
-			writeProperties( router_config, router_props );
+			I2PHelperUtils.writeProperties( router_config, router_props );
 			
 			router_props.setProperty( "router.configLocation", router_config.getAbsolutePath());
 			router_props.setProperty( "i2p.dir.base" , config_dir.getAbsolutePath());
@@ -475,6 +389,8 @@ I2PHelperRouter
 			// router.setKillVMOnEnd( false );	// has to be done again after run phase as set true in that code :(
 
 			RouterContext router_ctx = router.getContext();
+			
+			long start = SystemTime.getMonotonousTime();
 			
 			adapter.log( "Waiting for internal router startup on " + i2p_host + ":" + i2p_port );
 						
@@ -507,23 +423,15 @@ I2PHelperRouter
 				
 			setupSMOpts( router_ctx );
             
-			adapter.log( "Router startup complete: version=" + CoreVersion.VERSION );
+			adapter.log( "Router startup complete: version=" + CoreVersion.VERSION + ", elapsed=" + (SystemTime.getMonotonousTime() - start ));
 
+			init_sem.releaseForever();
+			
 		}catch( Throwable e ){
 			
 			destroy();
 			
 			throw( new Exception( "Initialisation failed", e ));
-			
-		}finally{
-			
-			synchronized( this ){
-				
-				if ( destroyed ){
-					
-					destroy();
-				}
-			}
 		}
 	}
 	
@@ -548,6 +456,8 @@ I2PHelperRouter
 			
 			init( config_dir );
 		
+			long start = SystemTime.getMonotonousTime();
+			
 			adapter.log( "Waiting for external router startup on " + i2p_host + ":" + i2p_port );
 						
 			while( true ){
@@ -579,296 +489,145 @@ I2PHelperRouter
 			
 			setupSMOpts( null );
 			
-			adapter.log( "Router startup complete" );
-			            
+			adapter.log( "Router startup complete, elapsed=" + (SystemTime.getMonotonousTime() - start ));
+			       
+			init_sem.releaseForever();
+			
 		}catch( Throwable e ){
 			
 			destroy();
 			
-			throw( new Exception( "Initialisation failed", e ));
-			
-		}finally{
-			
-			synchronized( this ){
-				
-				if ( destroyed ){
-					
-					destroy();
-				}
-			}
+			throw( new Exception( "Initialisation failed", e ));	
 		}
 	}
 	
-	protected void 
-	initialiseDHT()
-		
+	protected void
+	waitForInitialisation()
+	
 		throws Exception
 	{
-		try{
-			adapter.log( "Initializing DHT..." );
+		init_sem.reserve();
+		
+		if ( destroyed ){
 			
-			File dht_config 	= new File( config_dir,  "dht.config" );
-			File dest_key_file 	= new File( config_dir,  "dest_key.dat" );
-	        
-	        boolean	use_existing_key = dest_key_file.exists() && !force_new_address;
-	        	
-	        I2PSocketManager	sm = null;
-	        
-			if ( use_existing_key ){
-	         	
-	    		InputStream is = new FileInputStream( dest_key_file );
-	    	
-	    		try{
-	    			sm = I2PSocketManagerFactory.createManager( is, i2p_host, i2p_port, sm_properties );
-	    	
-	    		}finally{
-	    		
-	    			is.close();
-	    		}
-	        }else{
-	        	
-	        	sm = I2PSocketManagerFactory.createManager( i2p_host, i2p_port, sm_properties );
-	        }
-			
-			if ( sm == null ){
-				
-				throw( new Exception ( "Failed to create socket manager" ));
-			}
-			
-			adapter.log( "Waiting for socket manager startup" );
-			
-			while( true ){
-				
-				if ( destroyed ){
-					
-					sm.destroySocketManager();
-					
-					throw( new Exception( "Router destroyed" ));
-				}
-				
-				dht_session = sm.getSession();
-				
-				if ( dht_session != null ){
-					
-					break;
-				}
-				
-				Thread.sleep(250);
-			}
-			
-			adapter.log( "Socket manager startup complete" );
-			
-			Destination my_dest = dht_session.getMyDestination();
-			
-			String	full_dest 	= my_dest.toBase64() + ".i2p";
-						
-			b32_dest	= Base32.encode( my_dest.calculateHash().getData()) + ".b32.i2p";
-			
-			adapter.stateChanged( this );
-
-				// some older trackers require ip to be explicitly set to the full destination name :(
-			
-			/*
-			 * don't do this anymore, the socks proxy adds this in when required
-			 * 
-		    String explicit_ips = COConfigurationManager.getStringParameter( "Override Ip", "" ).trim();
+			throw( new Exception( "Router destroyed" ));
+		}
+	}
 	
-		    if ( !explicit_ips.contains( full_dest )){
-		    	
-		    	if ( explicit_ips.length() == 0 ){
-		    		
-		    		explicit_ips = full_dest;
-		    		
-		    	}else{
-		    
-		    		String[]	bits = explicit_ips.split( ";" );
-		    		
-		    		explicit_ips = "";
-		    		
-		    		for ( String bit: bits ){
-		    			
-		    			bit = bit.trim();
-		    			
-		    			if ( bit.length() > 0 ){
-		    				
-		    				if ( !bit.endsWith( ".i2p" )){
-		    						    			
-		    					explicit_ips += ( explicit_ips.length()==0?"":"; ") + bit;
-		    				}
-		    			}
-		    		}
-		    		
-		    		explicit_ips += ( explicit_ips.length()==0?"":"; ") + full_dest;
-		    	}
-		    	
-		    	COConfigurationManager.setParameter( "Override Ip", explicit_ips );
-		    }
-		    */
-			
-			dht_socket_manager	= sm;
-					
-			dht_server_socket = dht_socket_manager.getServerSocket();
-			
-			new AEThread2( "I2P:accepter" )
-			{
-				public void
-				run()
-				{
-					while( !destroyed ){
-						
-						try{
-							I2PSocket socket = dht_server_socket.accept();
-							
-							if ( socket == null ){
-								
-								if ( destroyed ){
-									
-									break;
-									
-								}else{
-									
-									Thread.sleep(500);
-								}
-							}else{
-								try{
-								
-									adapter.incomingConnection( socket );
-								
-								}catch( Throwable e ){
-									
-									Debug.out( e );
-									
-									try{
-										socket.close();
-										
-									}catch( Throwable f ){
-									}
-								}
-							}
-						}catch( Throwable e ){
-							
-							Debug.out( e );
-							
-							break;
-						}
-					}
-				}
-			}.start();
-			
-			Properties dht_props;
-			
-			if ( !use_existing_key ){
-				
-				new PrivateKeyFile( dest_key_file , dht_session ).write();
-				
-				dht_props = new Properties();
-				
-			}else{
-			
-				dht_props = readProperties( dht_config );
-			}
-			
-			String dht_port_str = dht_props.getProperty( "port" );
-			String dht_NID_str 	= dht_props.getProperty( "nid" );
-				
-			boolean	use_existing_nid = dht_port_str != null && dht_NID_str != null;
-				
-			
-			String 	boot_dest 	= "N0e4jfsxy~NYzyr-0bY1nwpnhTza8fn1wWr6IHHOmaIEnbEvgltJvyJn8LWvwlu589mUPhQXQb9BtMrkEan8RZSL4Vo2iFgMCxjTOnfA2dW1~JpL0ddGM28OQITya-1YDgNZFmyX0Me-~RjJjTg31YNozDoosIQ-Uvz2s5aUrzI0gt0r3M4PFUThb0eefd51Yb-eEQMpBb-Hd~EU07yw46ljy2uP4tiEPlWt0l0YR8nbeH0Eg6i3fCoSVgWpSeRjJ9vJeHvwGymO2rPHCSCPgIVwwyqNYpgkqGWnn9Qg97Wc-zrTBiRJp0Dn4lcYvkbbeBrblZDOy6PnPFp33-WZ7lcaVeR6uNGqphQxCYv8pbti5Q9QYcc6IzYpvzsgDCbIVhuzQ9Px2-l6qVg6S-i-cYwQfxBYnVSyVmryuGSkIha2AezYJk2~0k7-byeJ0q57Re~aZy6boIDa2qtaOyi-RDbCWAoIIfOycwkAvqf5nG8KOVwGzvFEjYuExyP3f9ZlAAAA";
-			int		boot_port 	= 52896;
-			String	boot_nid	= "6d3dh2bwrafjdx4ba46zb6jvbnnt2g3r";
-				
-			NodeInfo boot_ninf = new NodeInfo( new NID( Base32.decode( boot_nid )), new Destination( boot_dest ), boot_port );
+	protected void
+	initialiseDHTs()
 	
-			if ( destroyed ){
-				
-				throw( new Exception( "Router destroyed" ));
-			}
-			
-			I2PAppContext ctx = I2PAppContext.getGlobalContext();
+		throws Exception
+	{
+			// second DHT is lazy initialised if/when selected
+		
+		dhts[0].initialiseDHT( i2p_host, i2p_port, sm_properties );
+	}
 	
-			if ( !is_vuze_dht ){
-				
-				DHTNodes.setBootstrap( is_bootstrap_node ); 
+	public I2PHelperRouterDHT
+	selectDHT()
+	{
+		return(selectDHT((String[])null ));
+	}
 	
-				KRPC	snark_dht;
-				
-				if ( use_existing_nid ){
+	public I2PHelperRouterDHT
+	selectDHT(
+		byte[]	torrent_hash )
+	{
+		if ( plugin != null ){
 					
-					int	dht_port = Integer.parseInt( dht_port_str );
-					NID	dht_nid	= new NID( Base32.decode( dht_NID_str ));
+			try{
+				Download download = plugin.getPluginInterface().getDownloadManager().getDownload( torrent_hash );
+				
+				return( selectDHT( download ));
 			
-					dht = snark_dht = new KRPC( ctx, "i2pvuze", dht_session, dht_port, dht_nid, adapter );
-					
-				}else{	
-					
-		    		dht = snark_dht = new KRPC( ctx, "i2pvuze", dht_session, adapter );
-		    	}
-							
-				if ( !use_existing_nid ){
-					
-					dht_props.setProperty( "dest", my_dest.toBase64());
-					dht_props.setProperty( "port", String.valueOf( snark_dht.getPort()));
-					dht_props.setProperty( "nid", Base32.encode( snark_dht.getNID().getData()));
-					
-					writeProperties( dht_config, dht_props );
-				}
-				
-				if ( !is_bootstrap_node ){
-										
-					snark_dht.setBootstrapNode( boot_ninf );
-				}
-				
-				adapter.log( "MyDest: " + full_dest);
-				adapter.log( "        " + b32_dest  + ", existing=" + use_existing_key );
-				adapter.log( "MyNID:  " + Base32.encode( snark_dht.getNID().getData()) + ", existing=" + use_existing_nid );
-				
-			}else{
-				
-				int		dht_port;
-				NID		dht_nid;
-				
-				if ( use_existing_nid ){
-					
-					dht_port = Integer.parseInt( dht_port_str );
-					dht_nid	= new NID( Base32.decode( dht_NID_str ));
-	
-				}else{
-					
-					dht_port = 10000 + RandomUtils.nextInt( 65535 - 10000 );
-					dht_nid = NodeInfo.generateNID(my_dest.calculateHash(), dht_port, ctx.random());
-					
-					dht_props.setProperty( "dest", my_dest.toBase64());
-					dht_props.setProperty( "port", String.valueOf( dht_port ));
-					dht_props.setProperty( "nid", Base32.encode( dht_nid.getData()));
-					
-					writeProperties( dht_config, dht_props );
-				}
-				
-				NodeInfo my_node_info = new NodeInfo( dht_nid, my_dest, dht_port );
-	
-				adapter.log( "MyDest: " + full_dest );
-				adapter.log( "        " + b32_dest  + ", existing=" + use_existing_key );
-				adapter.log( "MyNID:  " + Base32.encode( dht_nid.getData()) + ", existing=" + use_existing_nid );
-	
-				dht = new DHTI2P( config_dir, dht_session, my_node_info, is_bootstrap_node?null:boot_ninf, adapter );						
-			}
-		}catch( Throwable e ){
-			
-			destroy();
-			
-			throw( new Exception( "Initialisation failed", e ));
-			
-		}finally{
-			
-			synchronized( this ){
-				
-				if ( destroyed ){
-					
-					destroy();
-				}
+			}catch( Exception e ){
 			}
 		}
+		
+		return( selectDHT());
+	}
+	
+	public I2PHelperRouterDHT
+	selectDHT(
+		Download	download )
+			
+	{ 
+		if ( download == null ){
+		
+			return( selectDHT());
+			
+		}else{
+			
+			return( selectDHT( PluginCoreUtils.unwrap( download ).getDownloadState().getNetworks()));
+		}
+	}
+	
+	public I2PHelperRouterDHT
+	selectDHT(
+		Map<String,Object>		options )
+	{
+		String[] peer_networks = options==null?null:(String[])options.get( "peer_networks" );
+		
+		return( selectDHT( peer_networks ));
+	}
+	
+	public I2PHelperRouterDHT
+	selectDHT(
+		String[]		peer_networks )
+	{
+		String str = "";
+		
+		if ( peer_networks != null ){
+			
+			for ( String net: peer_networks ){
+			
+				str += (str.length()==0?"":", ") + net;
+			}
+		}
+			
+		if ( dhts.length < 2 ){
+			
+			return( dhts[0] );
+		}
+		
+		if ( peer_networks == null || peer_networks.length == 0 ){
+			
+			return( dhts[0] );
+		}
+		
+		if ( peer_networks.length == 1 && peer_networks[0] == AENetworkClassifier.AT_I2P ){
+			
+			I2PHelperRouterDHT dht = dhts[1];
+			
+			if ( !dht.isDHTInitialised()){
+				
+				try{
+					dht.initialiseDHT( i2p_host, i2p_port, sm_properties );
+					
+				}catch( Throwable e ){
+				}
+			}
+			
+			return( dht );
+		}
+		
+		return( dhts[0] );
+	}
+	
+	public I2PHelperRouterDHT[]
+	getAllDHTs()
+	{
+		return( dhts );
+	}
+	
+	public Destination
+	lookupDestination(
+		byte[]		hash )
+	
+		throws Exception
+	{
+		return( dhts[0].lookupDestination( hash ));
 	}
 	
 	protected ServerInstance 
@@ -922,36 +681,6 @@ I2PHelperRouter
 		return( server );
 	}
 	
-	
-	public Destination
-	lookupDestination(
-		byte[]		hash )
-	
-		throws Exception
-	{
-			// just used for testing, leave blocking
-		
-		return( dht_session.lookupDest( new Hash( hash ), 30*1000 ));
-	}
-	
-	protected String
-	getB32Address()
-	{
-		return( b32_dest );
-	}
-	
-	public I2PSocketManager
-	getDHTSocketManager()
-	{
-		return( dht_socket_manager );
-	}
-	
-	public I2PHelperDHT
-	getDHT()
-	{
-		return( dht );
-	}
-	
 	protected void
 	destroy()
 	{
@@ -964,6 +693,8 @@ I2PHelperRouter
 			
 			destroyed	= true;
 			
+			init_sem.releaseForever();
+			
 			try{
 				if ( router != null ){
 		
@@ -972,18 +703,9 @@ I2PHelperRouter
 					router = null;
 				}
 				
-				if ( dht != null ){
-					
-					dht.stop();
-					
-					dht = null;
-				}
+				for ( I2PHelperRouterDHT dht: dhts ){
 				
-				if ( dht_server_socket != null ){
-					
-					dht_server_socket.close();
-					
-					dht_server_socket = null;
+					dht.destroy();
 				}
 			}catch( Throwable e ){
 				
@@ -1008,22 +730,36 @@ I2PHelperRouter
 	protected void
 	logInfo()
 	{
-		I2PHelperDHT	dht		= this.dht;
+		if ( destroyed ){
+			
+			return;
+		}
+		
 		Router 			router 	= this.router;
 		
-		if ( dht == null ){
+		for ( int i=0;i<dhts.length;i++){
 			
-			adapter.log( "DHT is inactive" );
-			
-		}else{
-			
-			String html = dht.renderStatusHTML();
-			
-			if ( html.length() > 0 ){
-				adapter.log( html );
+			I2PHelperDHT	dht		= dhts[i].getDHT();
+
+			if( dhts.length > 1 ){
+				
+				adapter.log( "DHT " + i );
 			}
 			
-			adapter.log( dht.getStats());
+			if ( dht == null ){
+				
+				adapter.log( "DHT is inactive" );
+				
+			}else{
+				
+				String html = dht.renderStatusHTML();
+				
+				if ( html.length() > 0 ){
+					adapter.log( html );
+				}
+				
+				adapter.log( dht.getStats());
+			}
 		}
 		
 		if ( router == null ){
@@ -1073,16 +809,32 @@ I2PHelperRouter
 	public String
 	getStatusText()
 	{	
-		I2PHelperDHT	dht		= this.dht;
+		if ( destroyed ){
+			
+			return( "Destroyed" );
+		}
+		
 		Router 			router 	= this.router;
 		
-		if ( router == null || dht == null ){
+		String dht_status = "";
+		
+		for ( int i=0;i<dhts.length;i++){
+			
+			I2PHelperDHT	dht		= dhts[i].getDHT();
+			
+			if ( dht != null ){
+				
+				dht_status += (dht_status.length()==0?"":"\n") + dht.getStatusString();
+			}
+		}
+		
+		if ( router == null  ){
 			
 			if ( is_external_router ){
 				
-				if ( dht != null ){
+				if ( dht_status.length() > 0 ){
 					
-					return( dht.getStatusString() + "\nExternal Router" );
+					return( dht_status + "\nExternal Router" );
 				}
 			}
 			
@@ -1108,7 +860,7 @@ I2PHelperRouter
 					recv_limit_str + DisplayFormatters.formatByteCountToKiBEtcPerSec(recv_rate),
 					send_limit_str + DisplayFormatters.formatByteCountToKiBEtcPerSec(send_rate));
 
-		return( dht.getStatusString() + "\n" + router_str );
+		return( dht_status + "\n" + router_str );
 	}
 	
 	protected interface
@@ -1225,12 +977,14 @@ I2PHelperRouter
 					
 					}else{
 						
-						if ( SystemTime.getMonotonousTime() - start > 3*60*1000 ){
+							// I've seen timeouts with 3 mins, crank it up
+						
+						if ( SystemTime.getMonotonousTime() - start > 15*60*1000 ){
 							
 							throw( new Exception( "Timeout creating socket manager" ));
 						}
 						
-						Thread.sleep( 250 );
+						Thread.sleep( 5000 );
 									
 						if ( server_destroyed ){
 							

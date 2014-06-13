@@ -98,8 +98,8 @@ I2PHelperSocksProxy
 	
 	private AESocksProxy 		proxy;
 	
-	private Map<String,String>	intermediate_host_map	= new HashMap<String, String>();
-	private int					next_intermediate_host	= 1;
+	private Map<String,Object[]>	intermediate_host_map	= new HashMap<String, Object[]>();
+	private int						next_intermediate_host	= 1;
 	
 	private boolean				destroyed;
 	
@@ -129,7 +129,8 @@ I2PHelperSocksProxy
 	
 	protected String
 	getIntermediateHost(
-		String		host )
+		String					host,
+		Map<String,Object>		opts )
 		
 		throws AEProxyException
 	{
@@ -153,7 +154,7 @@ I2PHelperSocksProxy
 				
 				if ( !intermediate_host_map.containsKey( intermediate_host )){
 					
-					intermediate_host_map.put( intermediate_host, host );
+					intermediate_host_map.put( intermediate_host, new Object[]{ host, opts });
 					
 					return( intermediate_host );
 				}
@@ -206,7 +207,8 @@ I2PHelperSocksProxy
 	}
 	
 	private I2PSocketManager
-	getSocketManager()
+	getSocketManager(
+		Map<String,Object>		options )
 	
 		throws Exception
 	{
@@ -219,7 +221,7 @@ I2PHelperSocksProxy
 				throw( new Exception( "SOCKS proxy destroyed" ));
 			}
 			
-			I2PSocketManager sm = router.getDHTSocketManager();
+			I2PSocketManager sm = router.selectDHT( options ).getDHTSocketManager();
 			
 			if ( sm != null ){
 				
@@ -239,8 +241,9 @@ I2PHelperSocksProxy
 	
 	private I2PSocket
 	connectToAddress(
-		String		address,
-		int			port )
+		String				address,
+		int					port,
+		Map<String,Object>	options )
 		
 		throws Exception
 	{
@@ -276,7 +279,7 @@ I2PHelperSocksProxy
 				}
 			}
 			
-			I2PSocketManager socket_manager = getSocketManager();
+			I2PSocketManager socket_manager = getSocketManager( options );
 
 			if ( remote_dest == null ){
 				
@@ -402,12 +405,13 @@ I2PHelperSocksProxy
 		
 		public static final int RELAY_BUFFER_SIZE	= 64*1024 + 256;
 		
-		protected I2PSocket						socket;
-		protected boolean						socket_closed;
+		private I2PSocket					socket;
+		private boolean						socket_closed;
 		
-		protected AESocksProxyConnection		proxy_connection;
+		private AESocksProxyConnection		proxy_connection;
+		private Map<String,Object>			options;
 		
-		protected proxyStateRelayData			relay_state;
+		private proxyStateRelayData			relay_state;
 		
 		protected
 		SOCKSProxyConnection(
@@ -444,17 +448,18 @@ I2PHelperSocksProxy
 		{
 			InetAddress resolved 	= _address.getAddress();
 			String		unresolved	= _address.getUnresolvedAddress();
-			
+						
 			if ( resolved != null ){
 				
 				synchronized( this ){
 					
-					String	intermediate = intermediate_host_map.remove( resolved.getHostAddress());
+					Object[]	intermediate = intermediate_host_map.remove( resolved.getHostAddress());
 					
 					if ( intermediate != null ){
 						
 						resolved	= null;
-						unresolved	= intermediate;
+						unresolved	= (String)intermediate[0];
+						options		= (Map<String,Object>)intermediate[1];
 					}
 				}
 			}
@@ -491,7 +496,7 @@ I2PHelperSocksProxy
 						delegate.connect( _address );
 	
 					}else{
-	
+							
 						connect_pool.run(
 							new AERunnable()
 							{
@@ -506,7 +511,7 @@ I2PHelperSocksProxy
 										
 										String new_externalised_address = externalised_address.substring( 0, externalised_address.length() - 4 );
 										
-								        socket = connectToAddress( new_externalised_address, _address.getPort());
+								        socket = connectToAddress( new_externalised_address, _address.getPort(), options );
 								       	
 								        proxy_connection.connected();
 								        
@@ -926,7 +931,7 @@ I2PHelperSocksProxy
 																		sb.append( "info_hash=" + arg_map.get( "info_hash" ));
 																		sb.append( "&peer_id=" + arg_map.get( "peer_id" ));
 																		sb.append( "&port=6881" );
-																		sb.append( "&ip=" + router.getDHTSocketManager().getSession().getMyDestination().toBase64() + ".i2p" );
+																		sb.append( "&ip=" + getSocketManager( options ).getSession().getMyDestination().toBase64() + ".i2p" );
 																		sb.append( "&uploaded=" + arg_map.get( "uploaded" ));
 																		sb.append( "&downloaded=" + arg_map.get( "downloaded" ));
 																		sb.append( "&left=" + arg_map.get( "left" ));
