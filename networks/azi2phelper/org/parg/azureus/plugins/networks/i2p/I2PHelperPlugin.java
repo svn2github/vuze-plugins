@@ -64,8 +64,10 @@ import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.torrent.TOTorrent;
 import org.gudy.azureus2.core3.torrent.TOTorrentFactory;
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
+import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.AEThread2;
+import org.gudy.azureus2.core3.util.AsyncDispatcher;
 import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
@@ -84,6 +86,7 @@ import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.UnloadablePlugin;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.ipc.IPCException;
+import org.gudy.azureus2.plugins.ipc.IPCInterface;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
 import org.gudy.azureus2.plugins.torrent.Torrent;
@@ -110,6 +113,7 @@ import com.aelitis.azureus.core.networkmanager.NetworkManager;
 import com.aelitis.azureus.core.proxy.AEProxyAddressMapper;
 import com.aelitis.azureus.core.proxy.AEProxyFactory;
 import com.aelitis.azureus.core.proxy.AEProxyFactory.PluginProxy;
+import com.aelitis.azureus.core.tracker.TrackerPeerSource;
 import com.aelitis.azureus.core.util.bloom.BloomFilter;
 import com.aelitis.azureus.core.util.bloom.BloomFilterFactory;
 import com.aelitis.azureus.plugins.upnp.UPnPMapping;
@@ -168,6 +172,11 @@ I2PHelperPlugin
 	
 	private volatile I2PHelperRouter		router;
 	private volatile I2PHelperTracker		tracker;
+	
+	private final AESemaphore		router_init_sem = new AESemaphore( "I2P:routerinit" );
+	
+	private final AsyncDispatcher	lookup_dispatcher = new AsyncDispatcher( "I2P:lookup" );
+	
 	
 	private File			lock_file;
 	private InputStream		lock_stream;
@@ -818,6 +827,8 @@ I2PHelperPlugin
 										
 										network_mixer = new I2PHelperNetworkMixer( I2PHelperPlugin.this, net_mix_enable, net_mix_incomp_num, net_mix_comp_num );
 
+										router_init_sem.releaseForever();
+										
 										while( !unloaded ){
 											
 											if ( first_run ){
@@ -1619,7 +1630,7 @@ I2PHelperPlugin
 							valueRead(
 								DHTTransportContactI2P		contact,
 								String 						host,
-								boolean						is_seed )
+								int							contact_state )
 							{
 								if ( progress.cancelled()){
 									
@@ -2371,6 +2382,146 @@ I2PHelperPlugin
 		}
 	}
 	
+	public void
+	lookupTorrent(
+		final String				reason,
+		final byte[]				torrent_hash,
+		final Map<String,Object>	options,
+		final IPCInterface			callback )
+		
+		throws IPCException
+	{
+		if ( unloaded || !plugin_enabled || lookup_dispatcher.getQueueSize() > 32 ){
+			
+			reportLookupStatus( callback, TrackerPeerSource.ST_UNAVAILABLE );
+			
+			return;
+		}
+		
+		reportLookupStatus( callback, TrackerPeerSource.ST_INITIALISING );
+
+		lookup_dispatcher.dispatch(
+			new AERunnable() {
+				
+				@Override
+				public void 
+				runSupport() 
+				{
+					try{
+						I2PDHTTrackerPlugin tracker_plugin = null;
+						
+						long	start = SystemTime.getMonotonousTime();
+						
+						while( true ){
+							
+							I2PHelperTracker t = tracker;
+							
+							if ( t != null ){
+								
+								tracker_plugin = t.getTrackerPlugin();
+								
+								if ( tracker_plugin != null ){
+									
+									break;
+								}
+							}
+							
+							router_init_sem.reserve(2500);
+							
+							if ( unloaded || !plugin_enabled || ( SystemTime.getMonotonousTime() - start > 2*60*1000 )){
+								
+								reportLookupStatus( callback, TrackerPeerSource.ST_UNAVAILABLE );
+	
+								return;
+							}
+						}
+						
+						reportLookupStatus( callback, TrackerPeerSource.ST_UPDATING );
+
+						tracker_plugin.trackerGet( 
+							reason,
+							torrent_hash,
+							options,
+							new I2PHelperDHTAdapter()
+							{
+								private volatile int	leechers	= 0;
+								private volatile int 	seeds		= 0;
+								private volatile int 	peers		= 0;
+								
+								@Override
+								public void
+								valueRead(
+									DHTTransportContactI2P		contact,
+									String						host,
+									int							contact_state )
+								{
+									if ( contact_state == CS_SEED ){
+										
+										seeds++;
+										
+									}else if ( contact_state == CS_LEECH ){
+										
+										leechers++;
+										
+									}else{
+										
+										peers++;
+									}
+									
+									reportLookupStatus( callback, TrackerPeerSource.ST_UPDATING, seeds, leechers, peers );
+								}
+	
+								public void
+								complete(
+									boolean		timeout )
+								{
+									reportLookupStatus( callback, TrackerPeerSource.ST_ONLINE, seeds, leechers, peers );
+								}
+							});				
+					}catch( Throwable e ){
+						
+						reportLookupStatus( callback, TrackerPeerSource.ST_UNAVAILABLE );
+					}
+				}
+			});
+	}
+	
+	private void
+	reportLookupStatus(
+		IPCInterface		callback,
+		int					status )
+	{
+		try{
+			callback.invoke(
+				"statusUpdate",
+				new Object[]{
+					status
+				});
+			
+		}catch( Throwable e){
+		}	
+	}
+	
+	private void
+	reportLookupStatus(
+		IPCInterface		callback,
+		int					status,
+		int					seeds,
+		int					leechers,
+		int					peers )
+	{
+		try{
+			callback.invoke(
+				"statusUpdate",
+				new Object[]{
+					status, seeds, leechers, peers
+				});
+			
+		}catch( Throwable e){
+			
+		}
+	}
+		
 		// End IPC
 	
 	public void

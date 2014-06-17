@@ -54,6 +54,12 @@ I2PHelperTracker
 		}
 	}
 	
+	protected I2PDHTTrackerPlugin
+	getTrackerPlugin()
+	{
+		return( tracker );
+	}
+	
 	protected void
 	get(
 		byte[]						hash,

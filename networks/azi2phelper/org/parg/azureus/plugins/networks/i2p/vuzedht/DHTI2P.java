@@ -69,6 +69,12 @@ DHTI2P
 	
 	public static final int		DHT_NETWORK		= 10;
 	
+		// increased as snark 0.9.13-2 increased expiry to 3 hours along with num-stores to 4. given that
+		// we store at 20 it seems reasonable to bump this up. Remember though that snark re-announces fairly
+		// frequently whereas we only re-announce if things change
+	
+	public static final int		REPUBLISH_PERIOD	= (int)( 1.5*60*60*1000 );		// 40*60*1000;
+	
 	private static final int	REQUEST_TIMEOUT	= 45*1000;
 		
 	private final int					dht_index;
@@ -140,7 +146,7 @@ DHTI2P
 			// need to check out the republish / cache forward logic required
 		
 		props.put( DHT.PR_CACHE_REPUBLISH_INTERVAL, 	new Integer( 0 ));	// disabled :(
-		props.put( DHT.PR_ORIGINAL_REPUBLISH_INTERVAL, 	new Integer( 40*60*1000 ));
+		props.put( DHT.PR_ORIGINAL_REPUBLISH_INTERVAL, 	new Integer( REPUBLISH_PERIOD ));
 		props.put( DHT.PR_ENCODE_KEYS, 					0 );		// raw keys, no sha1'ing them
 
 		/*
@@ -1119,8 +1125,10 @@ DHTI2P
 					String 	host 	=  Base32.encode( value.getValue()) + ".b32.i2p";
 					boolean	is_seed = ( value.getFlags() & DHT.FLAG_SEEDING ) != 0;
 
+					int	state = is_seed?I2PHelperDHTListener.CS_SEED:(contact.getVersion()==DHTI2P.DHT_VERSION_NON_VUZE?I2PHelperDHTListener.CS_UNKNOWN:I2PHelperDHTListener.CS_LEECH );
+					
 					try{
-						listener.valueRead( contact, host, is_seed );
+						listener.valueRead( contact, host, state );
 						
 					}catch( Throwable e ){
 						
@@ -1151,7 +1159,7 @@ DHTI2P
 		
 		public void 
 		read(
-			DHTTransportContact 	contact, 
+			DHTTransportContact 	_contact, 
 			DHTTransportValue 		value)
 		{
 			String host =  Base32.encode( value.getValue()) + ".b32.i2p";
@@ -1163,14 +1171,18 @@ DHTI2P
 					return;
 				}
 				
+				DHTTransportContactI2P contact = (DHTTransportContactI2P)_contact;
+				
 				contacts.put( host, new Object[]{ contact, value });
 				
 				boolean	is_seed = ( value.getFlags() & DHT.FLAG_SEEDING ) != 0;
-							
+					
+				int	state = is_seed?I2PHelperDHTListener.CS_SEED:(contact.getVersion()==DHTI2P.DHT_VERSION_NON_VUZE?I2PHelperDHTListener.CS_UNKNOWN:I2PHelperDHTListener.CS_LEECH );
+				
 				for ( I2PHelperDHTListener listener: listeners ){
 			
 					try{
-						listener.valueRead((DHTTransportContactI2P)contact, host, is_seed );
+						listener.valueRead((DHTTransportContactI2P)contact, host, state );
 						
 					}catch( Throwable e ){
 						

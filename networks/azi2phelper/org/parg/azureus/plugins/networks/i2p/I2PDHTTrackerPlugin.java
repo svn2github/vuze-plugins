@@ -1244,7 +1244,7 @@ I2PDHTTrackerPlugin
 						valueRead(
 							DHTTransportContactI2P		contact,
 							String						host,
-							boolean						is_seed )
+							int							contact_state )
 						{
 							synchronized( this ){
 								
@@ -1258,7 +1258,7 @@ I2PDHTTrackerPlugin
 									
 									addresses.add( host ); 
 									
-									if ( is_seed ){
+									if ( contact_state ==  CS_SEED ){
 											
 										is_seeds.add( new Boolean( true ));
 										
@@ -1702,6 +1702,22 @@ I2PDHTTrackerPlugin
 		return( num_done );
 	}
 	
+	protected void
+	trackerGet(
+		String					reason,
+		byte[]					torrent_hash,
+		Map<String,Object>		options,
+		I2PHelperDHTAdapter		listener )
+	{
+			router.selectDHT( options ).getDHT().get(torrent_hash, 
+					reason,
+					(byte)DHT.FLAG_DOWNLOADING,
+					NUM_WANT, 
+					ANNOUNCE_DERIVED_TIMEOUT,
+					//false, false,
+					listener );
+	}
+	
 	protected boolean
 	isComplete(
 		Download	download )
@@ -1983,9 +1999,9 @@ I2PDHTTrackerPlugin
 								valueRead(
 									DHTTransportContactI2P		contact,
 									String						host,
-									boolean						is_seed )
+									int							contact_state )
 								{
-									if ( is_seed ){
+									if ( contact_state == CS_SEED ){
 
 										seeds++;
 										

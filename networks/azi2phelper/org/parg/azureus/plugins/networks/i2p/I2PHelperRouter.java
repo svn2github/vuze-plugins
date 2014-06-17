@@ -860,7 +860,12 @@ I2PHelperRouter
 					recv_limit_str + DisplayFormatters.formatByteCountToKiBEtcPerSec(recv_rate),
 					send_limit_str + DisplayFormatters.formatByteCountToKiBEtcPerSec(send_rate));
 
-		return( dht_status + "\n" + router_str );
+		if ( dht_status.length() > 0 ){
+			
+			dht_status += "\n";
+		}
+		
+		return( dht_status + router_str );
 	}
 	
 	protected interface
