@@ -11,9 +11,9 @@
         </sealing>
     </manifest>
     <selectedElements exportClassFiles="true" exportJavaFiles="false" exportOutputFolder="false">
+        <file path="/azautorelocate/Messages_pt_BR.properties"/>
+        <file path="/azautorelocate/Messages.properties"/>
         <javaElement handleIdentifier="=azautorelocate/&lt;pointdefence.az.plugin"/>
         <file path="/azautorelocate/plugin.properties"/>
-        <file path="/azautorelocate/Messages.properties"/>
     </selectedElements>
-    <fatjar builder="org.eclipse.jdt.ui.plain_jar_builder" launchConfig=""/>
 </jardesc>
