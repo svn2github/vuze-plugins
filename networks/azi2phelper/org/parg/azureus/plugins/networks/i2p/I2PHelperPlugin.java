@@ -1330,6 +1330,83 @@ I2PHelperPlugin
 		}
 	}
 	
+	public int
+	selectDHTIndex()
+	{
+		return(selectDHTIndex((String[])null ));
+	}
+	
+	public int
+	selectDHTIndex(
+		byte[]	torrent_hash )
+	{
+		try{
+			Download download = plugin_interface.getDownloadManager().getDownload( torrent_hash );
+				
+			return( selectDHTIndex( download ));
+			
+		}catch( Exception e ){
+		}
+		
+		return( selectDHTIndex());
+	}
+	
+	public int
+	selectDHTIndex(
+		Download	download )
+			
+	{ 
+		if ( download == null ){
+		
+			return( selectDHTIndex());
+			
+		}else{
+			
+			return( selectDHTIndex( PluginCoreUtils.unwrap( download ).getDownloadState().getNetworks()));
+		}
+	}
+	
+	public int
+	selectDHTIndex(
+		Map<String,Object>		options )
+	{
+		String[] peer_networks = options==null?null:(String[])options.get( "peer_networks" );
+		
+		return( selectDHTIndex( peer_networks ));
+	}
+	
+	public int
+	selectDHTIndex(
+		String[]		peer_networks )
+	{
+		String str = "";
+		
+		if ( peer_networks != null ){
+			
+			for ( String net: peer_networks ){
+			
+				str += (str.length()==0?"":", ") + net;
+			}
+		}
+			
+		if ( dht_count < 2 ){
+			
+			return( 0 );
+		}
+		
+		if ( peer_networks == null || peer_networks.length == 0 ){
+			
+			return( 0 );
+		}
+		
+		if ( peer_networks.length == 1 && peer_networks[0] == AENetworkClassifier.AT_I2P ){
+			
+			return( 1 );
+		}
+		
+		return( 0 );
+	}
+	
 	public I2PHelperDHT
 	selectDHT(
 		byte[]		torrent_hash )

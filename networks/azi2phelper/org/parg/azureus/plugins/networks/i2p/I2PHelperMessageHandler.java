@@ -32,6 +32,8 @@ import org.gudy.azureus2.core3.util.BEncoder;
 import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.DirectByteBuffer;
+import org.gudy.azureus2.core3.util.RandomUtils;
+import org.gudy.azureus2.core3.util.SHA1Simple;
 
 import com.aelitis.azureus.core.networkmanager.*;
 import com.aelitis.azureus.core.peermanager.messaging.Message;
@@ -55,7 +57,13 @@ I2PHelperMessageHandler
 	implements NetworkConnectionFactory.NetworkConnectionFactoryListener
 {
 	private I2PHelperPlugin		plugin;
-		
+	
+	private byte[]	peer_id_mask = new byte[12];
+	
+	{
+		RandomUtils.nextSecureBytes( peer_id_mask );
+	}
+	
 	private LTI2PDHT	i2p_dht	= new LTI2PDHT();
 	private LTI2PPEX	i2p_pex	= new LTI2PPEX();
 
@@ -160,9 +168,34 @@ I2PHelperMessageHandler
 								
 								bt_handshake.getReserved()[5] &= ~3;
 
+									// deterministically switch peer-id (factor in dht network in case we switch nets)
+								
+								byte[] peer_id = bt_handshake.getPeerId();
+								
+								for ( int i=0;i<peer_id_mask.length;i++){
+									
+									peer_id[i+8] ^= peer_id_mask[i];
+								}
+								
+								byte	dht_index = (byte)plugin.selectDHTIndex( bt_handshake.getDataHash());
+								
+								peer_id[19] += dht_index;
+								
+								byte[] sha1 = new SHA1Simple().calculateHash( peer_id );
+								
+								for ( int i=8;i<20;i++){
+									
+									peer_id[i] = sha1[i];
+								}
 							}else if ( message instanceof LTHandshake ){
 								
 								LTHandshake lt_handshake = (LTHandshake)message;
+								
+								Map data_map = lt_handshake.getDataMap();
+								
+								data_map.put( "p", new Long( 6881 ));
+								
+								data_map.remove( "ipv6" );	// shouldn't be set but whatever...
 								
 								lt_handshake.addOptionalExtensionMapping( LTI2PDHT.MSG_ID, LTI2PDHT.SUBID_I2P_DHT );
 								

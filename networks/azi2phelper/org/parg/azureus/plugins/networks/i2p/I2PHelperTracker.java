@@ -69,9 +69,15 @@ I2PHelperTracker
 		long						timeout,
 		I2PHelperDHTListener		listener )
 	{
-		I2PHelperDHT dht = router.selectDHT().getDHT();
-		
-		dht.get( hash, reason, flags, num_want, timeout, listener );
+		try{
+			I2PHelperDHT dht = router.selectDHT().getDHT(true);
+			
+			dht.get( hash, reason, flags, num_want, timeout, listener );
+			
+		}catch( Throwable e ){
+			
+			e.printStackTrace();
+		}
 	}
 	
 	protected void
@@ -81,9 +87,15 @@ I2PHelperTracker
 		byte						flags,
 		I2PHelperDHTListener		listener )
 	{
-		I2PHelperDHT dht = router.selectDHT().getDHT();
-
-		dht.put( hash, reason, flags, listener );
+		try{
+			I2PHelperDHT dht = router.selectDHT().getDHT(true);
+	
+			dht.put( hash, reason, flags, listener );
+			
+		}catch( Throwable e ){
+			
+			e.printStackTrace();
+		}
 	}
 	
 	
@@ -91,44 +103,55 @@ I2PHelperTracker
 	protected void
 	get(
 		byte[]		torrent_hash )
-	{		
-		int	num_want 		= 30;
-		int	get_timeout		= 5*60*1000;
-		int	num_put			= 1;
-		int	put_timeout		= 3*60*1000;
-		
-		long	start = SystemTime.getMonotonousTime();
-		
-		I2PHelperDHT dht = router.selectDHT().getDHT();
-
-		Collection<Hash> peer_hashes = dht.getPeersAndNoAnnounce( torrent_hash, num_want, get_timeout, num_put, put_timeout );
-		
-			// Note that we can get duplicates here as use the target node as the originator node (don't actually know the originator in I2P DHT...)
-		
-		adapter.log( "get -> " + peer_hashes.size() + ", elapsed=" + (SystemTime.getMonotonousTime() - start ));
-		
-		for ( Hash hash: peer_hashes ){
+	{	
+		try{
+			int	num_want 		= 30;
+			int	get_timeout		= 5*60*1000;
+			int	num_put			= 1;
+			int	put_timeout		= 3*60*1000;
 			
-			adapter.log( "    " + Base32.encode( hash.getData()) + ".b32.i2p" );
-		}
+			long	start = SystemTime.getMonotonousTime();
+			
+			I2PHelperDHT dht = router.selectDHT().getDHT(true);
+	
+			Collection<Hash> peer_hashes = dht.getPeersAndNoAnnounce( torrent_hash, num_want, get_timeout, num_put, put_timeout );
+			
+				// Note that we can get duplicates here as use the target node as the originator node (don't actually know the originator in I2P DHT...)
+			
+			adapter.log( "get -> " + peer_hashes.size() + ", elapsed=" + (SystemTime.getMonotonousTime() - start ));
+			
+			for ( Hash hash: peer_hashes ){
+				
+				adapter.log( "    " + Base32.encode( hash.getData()) + ".b32.i2p" );
+			}
+		}catch( Throwable e ){
+			
+			e.printStackTrace();
+		}	
 	}
 	
 	protected void
 	put(
 		byte[]		torrent_hash )
-	{		
-		int	num_want 		= 30;
-		int	get_timeout		= 5*60*1000;
-		int	num_put			= 1;
-		int	put_timeout		= 3*60*1000;
-		
-		long	start = SystemTime.getMonotonousTime();
-		
-		I2PHelperDHT dht = router.selectDHT().getDHT();
-
-		Collection<Hash> peer_hashes = dht.getPeersAndAnnounce( torrent_hash, num_want, get_timeout, num_put, put_timeout );
-		
-		adapter.log( "put -> " + peer_hashes.size() + ", elapsed=" + (SystemTime.getMonotonousTime() - start ));
+	{	
+		try{
+			int	num_want 		= 30;
+			int	get_timeout		= 5*60*1000;
+			int	num_put			= 1;
+			int	put_timeout		= 3*60*1000;
+			
+			long	start = SystemTime.getMonotonousTime();
+			
+			I2PHelperDHT dht = router.selectDHT().getDHT(true);
+	
+			Collection<Hash> peer_hashes = dht.getPeersAndAnnounce( torrent_hash, num_want, get_timeout, num_put, put_timeout );
+			
+			adapter.log( "put -> " + peer_hashes.size() + ", elapsed=" + (SystemTime.getMonotonousTime() - start ));
+			
+		}catch( Throwable e ){
+			
+			e.printStackTrace();
+		}
 	}
 	
 	public void

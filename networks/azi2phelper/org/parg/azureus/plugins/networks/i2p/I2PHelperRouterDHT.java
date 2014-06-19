@@ -428,16 +428,40 @@ I2PHelperRouterDHT
 		return( b32_dest );
 	}
 	
+		/**
+		 * May return null
+		 * @return
+		 */
 	public I2PSocketManager
 	getDHTSocketManager()
 	{
 		return( dht_socket_manager );
 	}
 	
+		/**
+		 * May return null
+		 * @return
+		 */
 	public I2PHelperDHT
 	getDHT()
 	{
 		return( dht );
+	}
+	
+	public I2PHelperDHT
+	getDHT(
+		boolean	throw_if_null )
+		
+		throws Exception
+	{
+		I2PHelperDHT result = dht;
+		
+		if ( result == null && throw_if_null ){
+			
+			throw( new Exception( "DHT unavailable" ));
+		}
+		
+		return( result );
 	}
 	
 	private void
