@@ -19,6 +19,9 @@
 
 package com.aimedia.autocat;
 
+import java.util.List;
+
+import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.download.DownloadListener;
 import org.gudy.azureus2.plugins.download.DownloadManager;
@@ -27,7 +30,12 @@ import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.torrent.Torrent;
 import org.gudy.azureus2.plugins.torrent.TorrentAttribute;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
+import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 
+import com.aelitis.azureus.core.tag.Tag;
+import com.aelitis.azureus.core.tag.TagManager;
+import com.aelitis.azureus.core.tag.TagManagerFactory;
+import com.aelitis.azureus.core.tag.TagType;
 import com.aimedia.autocat.config.Config;
 import com.aimedia.autocat2.matching.IRuleSetListener;
 import com.aimedia.autocat2.matching.OrderedRuleSet;
@@ -101,28 +109,70 @@ public class AutoCategorizer implements IRuleSetListener, DownloadManagerListene
 
     private void match (final Download download) {
         final Torrent torrent = download.getTorrent ();
-        String categoryName = download.getCategoryName ();
+        if ( config.isUseTags()){
+        	TagManager tm = TagManagerFactory.getTagManager();
+        	
+        	List<Tag> existing_tags = tm.getTagsForTaggable( TagType.TT_DOWNLOAD_MANUAL, PluginCoreUtils.unwrap( download ));
+        	
+        	if ( existing_tags.size() > 0 ){
+        		 if (! config.isModifyExistingCategories ()){
+ 	                return;
+ 	            }
+        	}
+        	
+        	final String tag_name = config.getRules ().match (torrent);
+        	
+ 	        if (tag_name == null) { 
+ 	        	// as below
+ 	        }else{
+ 	        	TagType tt = tm.getTagType( TagType.TT_DOWNLOAD_MANUAL );
+ 	        	 
+ 	        	Tag tag = tt.getTag( tag_name, true );
+				
+				if ( tag == null ){
+					
+					try{
+						tag = tt.createTag( tag_name, true );
+						
+					}catch( Throwable e ){
+						
+						Debug.out( e );
+					}
+				}
 
-        // : if so configured, ignore already-categorized torrents.
-        if (! "Categories.uncategorized".equals (categoryName)) {
-            if (! config.isModifyExistingCategories ()) {
-                return;
-            }
-        }
-
-        final String cat = config.getRules ().match (torrent);
-        if (cat == null) { // NOPMD
-            // TODO Not too sure why I disabled this...
-            // d.setCategory("Categories.uncategorized");
-            // log.log(LoggerChannel.LT_INFORMATION, locale
-            // .getLocalisedMessageText("autocat.matcher.nomatch",
-            // new String[] { cat, t.getName() }));
-        }
-        else {
-            download.setCategory (cat);
-            log.log (LoggerChannel.LT_INFORMATION, locale.getLocalisedMessageText ("autocat.matcher.matched",
-                    new String[] { cat, torrent.getName () }));
+				if ( tag != null ){
+					
+					tag.addTaggable( PluginCoreUtils.unwrap( download ));
+				}
+				
+	            log.log (LoggerChannel.LT_INFORMATION, locale.getLocalisedMessageText ("autocat.matcher.matched",
+	                    new String[] { tag_name, torrent.getName () }));
+ 	        }
+        }else{
+	        String categoryName = download.getCategoryName ();
+	
+	        // : if so configured, ignore already-categorized torrents.
+	        if (! "Categories.uncategorized".equals (categoryName)) {
+	            if (! config.isModifyExistingCategories ()) {
+	                return;
+	            }
+	        }
+	
+	        final String cat = config.getRules ().match (torrent);
+	        if (cat == null) { // NOPMD
+	            // TODO Not too sure why I disabled this...
+	            // d.setCategory("Categories.uncategorized");
+	            // log.log(LoggerChannel.LT_INFORMATION, locale
+	            // .getLocalisedMessageText("autocat.matcher.nomatch",
+	            // new String[] { cat, t.getName() }));
+	        	
+	        }else{
+	        	
+	            download.setCategory (cat);
+	            
+	            log.log (LoggerChannel.LT_INFORMATION, locale.getLocalisedMessageText ("autocat.matcher.matched",
+	                    new String[] { cat, torrent.getName () }));
+	        }
         }
     }
-
 }

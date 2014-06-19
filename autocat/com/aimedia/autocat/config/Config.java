@@ -25,6 +25,8 @@ public class Config implements ConfigSection {
 
     private boolean               enabled;
 
+    private boolean               useTags;
+    
     private boolean               modifyExistingCategories;
 
     private PluginInterface pi;
@@ -71,6 +73,7 @@ public class Config implements ConfigSection {
 
         enabled = pi.getPluginconfig ().getPluginBooleanParameter ("enabled", false);
         modifyExistingCategories = pi.getPluginconfig ().getPluginBooleanParameter ("modifyExistingCategories", true);
+        useTags = pi.getPluginconfig ().getPluginBooleanParameter ("useTags", false);
     }
 
     /*
@@ -120,6 +123,7 @@ public class Config implements ConfigSection {
         final PluginConfig cfg = pi.getPluginconfig ();
         cfg.setPluginParameter ("enabled", enabled);
         cfg.setPluginParameter ("modifyExistingCategories", modifyExistingCategories);
+        cfg.setPluginParameter ("useTags", useTags);
         try {
             cfg.save ();
             log.log ("configSectionSave() clean exit");
@@ -155,6 +159,16 @@ public class Config implements ConfigSection {
         return rules;
     }
 
+    public boolean isUseTags () {
+        return useTags;
+    }
+
+    public void setUseTags (boolean set) {
+        if (this.useTags != set) {
+            this.useTags = set;
+        }
+    }
+    
     public boolean isModifyExistingCategories () {
         return modifyExistingCategories;
     }

@@ -54,6 +54,9 @@ import org.gudy.azureus2.plugins.ui.config.ConfigSection;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.gudy.azureus2.ui.swt.plugins.UISWTConfigSection;
 
+import com.aelitis.azureus.core.tag.Tag;
+import com.aelitis.azureus.core.tag.TagManagerFactory;
+import com.aelitis.azureus.core.tag.TagType;
 import com.aimedia.autocat.AutoCatPlugin;
 import com.aimedia.autocat2.matching.AdvancedRuleSet;
 import com.aimedia.autocat2.matching.IRuleSetListener;
@@ -71,6 +74,10 @@ public class ConfigUI implements UISWTConfigSection, IRuleSetListener {
     private Label                 lblField                     = null;
 
     private Button                chkEnabled                   = null;
+   
+    private Label                 lblUseTags                   = null;
+
+    private Button                chkUseTags                   = null;
 
     private Table                 tblRules                     = null;
 
@@ -128,11 +135,19 @@ public class ConfigUI implements UISWTConfigSection, IRuleSetListener {
         final GridData gridData1 = new org.eclipse.swt.layout.GridData ();
         final GridData gridData3 = new org.eclipse.swt.layout.GridData ();
         final GridData gridData2 = new org.eclipse.swt.layout.GridData ();
+        final GridData gridData6 = new org.eclipse.swt.layout.GridData ();
+        final GridData gridData7 = new org.eclipse.swt.layout.GridData ();
         final GridLayout gridLayout1 = new GridLayout ();
+        
         lblEnabled = new Label (panel, SWT.NONE);
         chkEnabled = new Button (panel, SWT.CHECK);
+        
+        lblUseTags = new Label (panel, SWT.NONE);
+        chkUseTags = new Button (panel, SWT.CHECK);
+        
         lblModExisting = new Label (panel, SWT.NONE);
         chkModExisting = new Button (panel, SWT.CHECK);
+        
         createTable (panel);
         lblTrigger = new Label (panel, SWT.NONE);
         txtTrigger = new Text (panel, SWT.BORDER);
@@ -141,21 +156,34 @@ public class ConfigUI implements UISWTConfigSection, IRuleSetListener {
         lblField = new Label (panel, SWT.NONE);
         createFieldCombo (panel);
         createControlPanel (panel);
+        
         gridData3.horizontalSpan = 4;
         gridData3.horizontalAlignment = org.eclipse.swt.layout.GridData.BEGINNING;
         gridData3.verticalAlignment = org.eclipse.swt.layout.GridData.CENTER;
         gridData3.grabExcessHorizontalSpace = true;
         chkEnabled.setLayoutData (gridData3);
+        
+        gridData6.horizontalSpan = 4;
+        gridData6.horizontalAlignment = org.eclipse.swt.layout.GridData.BEGINNING;
+        gridData6.verticalAlignment = org.eclipse.swt.layout.GridData.CENTER;
+        gridData6.grabExcessHorizontalSpace = true;
+        chkUseTags.setLayoutData (gridData6);
+
         gridData2.horizontalSpan = 4;
         gridData2.horizontalAlignment = org.eclipse.swt.layout.GridData.BEGINNING;
         gridData2.verticalAlignment = org.eclipse.swt.layout.GridData.CENTER;
         gridData2.grabExcessHorizontalSpace = true;
         chkModExisting.setLayoutData (gridData2);
+        
         gridData4.grabExcessHorizontalSpace = false;
         gridData4.horizontalSpan = 2;
         gridData1.grabExcessHorizontalSpace = false;
         gridData1.horizontalSpan = 2;
-        lblEnabled.setLayoutData (gridData4);
+        gridData7.grabExcessHorizontalSpace = false;
+        gridData7.horizontalSpan = 2;
+        
+        lblEnabled.setLayoutData (gridData4);  
+        lblUseTags.setLayoutData (gridData7);  
         lblModExisting.setLayoutData (gridData1);
         lblTrigger.setText (locale.getLocalisedMessageText ("autocat.trigger"));
         lblTrigger.setToolTipText (locale.getLocalisedMessageText ("autocat.trigger.tooltip"));
@@ -171,9 +199,11 @@ public class ConfigUI implements UISWTConfigSection, IRuleSetListener {
                 e.doit = true;
             }
         });
-        lblCategory.setText ("Category");
+        lblCategory.setText (locale.getLocalisedMessageText ("autocat.category"));
         lblEnabled.setText (locale.getLocalisedMessageText ("autocat.enabled"));
         chkEnabled.setToolTipText (locale.getLocalisedMessageText ("autocat.enabled.tooltip"));
+        lblUseTags.setText (locale.getLocalisedMessageText ("autocat.use_tags"));
+        chkUseTags.setToolTipText (locale.getLocalisedMessageText ("autocat.use_tags.tooltip"));
         lblModExisting.setText (locale.getLocalisedMessageText ("autocat.modify_existing"));
         chkModExisting.setToolTipText (locale.getLocalisedMessageText ("autocat.modify_existing.tooltip"));
         panel.setLayout (gridLayout1);
@@ -192,6 +222,7 @@ public class ConfigUI implements UISWTConfigSection, IRuleSetListener {
                 config.setEnabled (enablement);
 
                 chkModExisting.setEnabled (enablement);
+                chkUseTags.setEnabled (enablement);
                 txtTrigger.setEnabled (enablement);
                 cmbCategory.setEnabled (enablement);
                 tblRules.setEnabled (enablement);
@@ -207,6 +238,14 @@ public class ConfigUI implements UISWTConfigSection, IRuleSetListener {
             }
         });
 
+        chkUseTags.addSelectionListener (new SelectionAdapter () {
+            public void widgetSelected (SelectionEvent e) {
+                final Button b = (Button) e.widget;
+                config.setUseTags (b.getSelection ());
+                loadCategoriesOrTags(cmbCategory);
+            }
+        });
+        
         chkModExisting.addSelectionListener (new SelectionAdapter () {
             public void widgetSelected (SelectionEvent e) {
                 final Button b = (Button) e.widget;
@@ -216,6 +255,8 @@ public class ConfigUI implements UISWTConfigSection, IRuleSetListener {
 
         boolean enablement = config.isEnabled ();
         chkEnabled.setSelection (enablement);
+        chkUseTags.setEnabled (enablement);
+        chkUseTags.setSelection (config.isUseTags());
         chkModExisting.setEnabled (enablement);
         chkModExisting.setSelection (config.isModifyExistingCategories ());
         txtTrigger.setEnabled (enablement);
@@ -228,10 +269,24 @@ public class ConfigUI implements UISWTConfigSection, IRuleSetListener {
         return panel;
     }
 
-    void loadCategories (final Combo cmb) {
-        final TorrentAttribute ta = pi.getTorrentManager ().getAttribute (TorrentAttribute.TA_CATEGORY);
-        cmb.removeAll ();
-        cmb.setItems (ta.getDefinedValues ());
+    void loadCategoriesOrTags (final Combo cmb) {
+    	if ( config.isUseTags()){
+	       	TagType tt = TagManagerFactory.getTagManager().getTagType( TagType.TT_DOWNLOAD_MANUAL );
+
+	       	List<Tag> tags = tt.getTags();
+	       	
+	       	String[] tag_names = new String[tags.size()];
+	       	
+	       	for ( int i=0;i<tags.size();i++){
+	       		tag_names[i] = tags.get(i).getTagName( true );
+	       	}
+	        cmb.removeAll ();
+	        cmb.setItems (tag_names );
+    	}else{
+	        final TorrentAttribute ta = pi.getTorrentManager ().getAttribute (TorrentAttribute.TA_CATEGORY);
+	        cmb.removeAll ();
+	        cmb.setItems (ta.getDefinedValues ());
+    	}
     }
 
     void loadFields (final Combo cmb) {
@@ -287,7 +342,7 @@ public class ConfigUI implements UISWTConfigSection, IRuleSetListener {
         gridData13.verticalAlignment = org.eclipse.swt.layout.GridData.CENTER;
         cmbCategory.setLayoutData (gridData13);
         cmbCategory.setToolTipText (locale.getLocalisedMessageText ("autocat.category.tooltip"));
-        loadCategories (cmbCategory);
+        loadCategoriesOrTags (cmbCategory);
     }
 
     /**
@@ -335,7 +390,7 @@ public class ConfigUI implements UISWTConfigSection, IRuleSetListener {
                     log.log (locale.getLocalisedMessageText ("autocat.err.badregex", new String[] { txtTrigger
                             .getText () }));
                 }
-                loadCategories (cmbCategory);
+                loadCategoriesOrTags (cmbCategory);
             }
         });
         btnDel.setText (locale.getLocalisedMessageText ("autocat.config.remove"));
