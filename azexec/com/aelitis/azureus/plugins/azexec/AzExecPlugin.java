@@ -30,7 +30,6 @@ import org.gudy.azureus2.plugins.Plugin;
 import org.gudy.azureus2.plugins.PluginConfig;
 import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
-
 import org.gudy.azureus2.plugins.config.*;
 import org.gudy.azureus2.plugins.ui.model.*;
 import org.gudy.azureus2.plugins.download.*;
@@ -38,10 +37,14 @@ import org.gudy.azureus2.plugins.logging.*;
 import org.gudy.azureus2.plugins.torrent.*;
 import org.gudy.azureus2.plugins.ui.config.*;
 import org.gudy.azureus2.plugins.ui.menus.*;
-
 import org.gudy.azureus2.plugins.ui.*;
+import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.gudy.azureus2.ui.swt.plugins.*;
 import org.gudy.azureus2.core3.util.ByteFormatter;
+
+import com.aelitis.azureus.core.tag.Tag;
+import com.aelitis.azureus.core.tag.TagManagerFactory;
+import com.aelitis.azureus.core.tag.TagType;
 
 public class AzExecPlugin implements Plugin, DownloadCompletionListener, MenuItemListener, MenuItemFillListener {
 	
@@ -187,7 +190,28 @@ public class AzExecPlugin implements Plugin, DownloadCompletionListener, MenuIte
 		command_t = d.getTorrent().getAnnounceURL().getHost(), 
 		command_i = ByteFormatter.encodeString( d.getTorrent().getHash());
 		
-		if (command_l == null) {command_l = "Uncategorised";}
+		if (command_l == null) {
+			
+			try{
+				List<Tag> tags = TagManagerFactory.getTagManager().getTagsForTaggable( TagType.TT_DOWNLOAD_MANUAL, PluginCoreUtils.unwrap( d ));
+				
+				if ( tags.size() > 0 ){
+					
+					String str = "";
+					
+					for (Tag t: tags ){
+						str += (str.length()==0?"":",") + t.getTagName( true );
+					}
+					
+					command_l = str;
+				}
+			}catch( Throwable e ){
+			}
+			
+			if (command_l == null) {
+				command_l = "Uncategorised";
+			}
+		}
 		
 		if (d.getTorrent().isSimpleTorrent()) {
 			command_f = save_path.getName();
