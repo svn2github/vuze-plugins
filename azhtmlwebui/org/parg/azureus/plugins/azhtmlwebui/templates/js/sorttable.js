@@ -8,7 +8,7 @@ function sortables_init() {
     tbls = document.getElementsByTagName("table");
     for (ti=0;ti<tbls.length;ti++) {
         thisTbl = tbls[ti];
-        if (((' '+thisTbl.className+' ').indexOf("azcontent") != -1) && (thisTbl.id) && (' '+thisTbl.className+' ').indexOf("azcontent_") == -1 ) {
+        if (((' '+thisTbl.className+' ').indexOf("azcontent") != -1) && (thisTbl.id)) {
             //initTable(thisTbl.id);
             ts_makeSortable(thisTbl);
         }

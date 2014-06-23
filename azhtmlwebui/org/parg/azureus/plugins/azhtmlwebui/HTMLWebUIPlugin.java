@@ -32,15 +32,12 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
-import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLDecoder;
-import java.net.URLEncoder;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.Hashtable;
 import java.util.Iterator;
@@ -75,13 +72,9 @@ import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.gudy.azureus2.plugins.utils.Utilities;
 import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloader;
 import org.gudy.azureus2.ui.webplugin.WebPlugin;
-import org.json.simple.JSONArray;
-import org.json.simple.parser.JSONParser;
+
 
 import HTML.Template;
-
-import com.aelitis.json.JsonDecoder;
-import com.aelitis.json.JsonMapEncoder;
 
 
 public class 
@@ -100,9 +93,6 @@ HTMLWebUIPlugin
 	
 	public static final String	CONFIG_HTML_WEBUI_3TABS					= "Show completed torrents in a separate tab";
 	public static final boolean	CONFIG_HTML_WEBUI_3TABS_DEFAULT			= false;
-	
-	public static final String	CONFIG_HTML_WEBUI_PAGINATION_PER_PAGE	= "Number of Items per page";
-	public static final int CONFIG_HTML_WEBUI_PAGINATION_PER_PAGE_DEFAULT = 0;
 	
 	public static final String		CONFIG_CSS				= "HTML WebUI CSS";
 	public static final String[]	CONFIG_CSS_BUILTIN		= { "theme.css", "hs_theme.css", "oldtheme.css" };
@@ -253,8 +243,6 @@ HTMLWebUIPlugin
 		
 		config_model.addBooleanParameter2(CONFIG_HTML_WEBUI_3TABS, "azhtmlwebui.completedtab", CONFIG_HTML_WEBUI_3TABS_DEFAULT);
 		
-		config_model.addIntParameter2(CONFIG_HTML_WEBUI_PAGINATION_PER_PAGE, "azhtmlwebui.pagination.per_page", CONFIG_HTML_WEBUI_PAGINATION_PER_PAGE_DEFAULT);
-		
 		String[]	css_list = getAvailableCSS();
 		
 		config_model.addStringListParameter2( CONFIG_CSS, "azhtmlwebui.css", css_list, CONFIG_CSS_DEFAULT );
@@ -268,7 +256,6 @@ HTMLWebUIPlugin
 		properties.put( PR_CONFIG_MODEL, config_model );
 		properties.put( PR_VIEW_MODEL, view_model );
 		properties.put( PR_HIDE_RESOURCE_CONFIG, new Boolean( true ));
-		properties.put( PR_PAIRING_SID, "jswebui" );
 		
 		super.initialize( plugin_interface );
 		
@@ -374,7 +361,7 @@ HTMLWebUIPlugin
 			url = "/index.tmpl";
 
 		}
-		Hashtable	params = null;
+				Hashtable	params = null;
 		
 		url = mapHomePage( url );
 		
@@ -412,11 +399,8 @@ HTMLWebUIPlugin
 				return( handleTemplate( url, params, args, os ));
 				
 			} else if(file_type.equals("ajax")){
-				return handleAjax( url, params, os , response);
-			} else if(file_type.equals("upload")) {
-				return handleUpload( url, params, os, response);
+				return handleAjax( url, params, os);
 			}else{ 
-			
 				
 				FileInputStream	fis = null;
 				
@@ -462,9 +446,7 @@ HTMLWebUIPlugin
 				return( handleTemplate( url, params, args, os ));
 					
 			}else if(file_type.equals("ajax")){
-				return handleAjax( url, params, os, response);
-			} else if(file_type.equals("upload")) {
-				return handleUpload( url, params, os, response);
+				return handleAjax( url, params, os);
 			}else{ 
 											
 				response.useStream( file_type, is );
@@ -506,69 +488,13 @@ HTMLWebUIPlugin
 		return( false );
 	}
 	
-	protected boolean 
-	handleUpload(
-			String page_url,
-			Hashtable params,
-			OutputStream os,
-			TrackerWebPageResponse response) throws IOException
-	{
-		
-		System.out.println("handling Upload!");
-		
-		try {
-			
-			String up_dir = utilities.getAzureusUserDir() + File.separator + "torrents" + System.getProperty("file.separator");
-			
-		    File dir = new File( up_dir );
-		    if (!dir.exists()) {
-		      dir.mkdirs();
-		    }
-
-			uploadTorrent(pageRequest, up_dir);
-			
-			String torrent_msg = "";
-			
-			/*for(int i=0; i<t_uploaded_names.length;i++){
-				if(t_uploaded_names[i][0] != null) System.out.println(i + ".0: " + t_uploaded_names[i][0] + " - " + i + ".1: " + t_uploaded_names[i][1]);
-			}*/
-			for(int i=0; i<t_uploaded_names.length;i++){
-				if(t_uploaded_names[i][0] != null){
-					if(t_uploaded_names[i][1].equals("1")) {
-						torrent_msg += escapeXML(t_uploaded_names[i][0]) + " " + 
-										getLocalisedMessageText("template.upload.local.msg.success") + " " + up_dir + "<br/>";
-					} else {
-						torrent_msg = getLocalisedMessageText("template.upload.local.msg.error") + " " + escapeXML(t_uploaded_names[i][0]) + "<br/>";
-					}
-				}
-			}
-			//t.setParam("url_load_msg", torrent_msg );
-			
-			t_uploaded_names = new String[3][2];
-			
-		} catch (Exception e) {
-			
-			if(debugOn) System.out.println("Loading of local torrent failed");
-			
-			//t.setParam("url_load_msg", getLocalisedMessageText("template.upload.local.msg.error"));
-			
-			e.printStackTrace();
-			
-		}
-		
-		return true;
-	}
-	
 	protected boolean
 	handleAjax(
 			String page_url,
 			Hashtable params,
-			OutputStream os,
-			TrackerWebPageResponse response) throws IOException
+			OutputStream os ) throws IOException
 	{
-		String responseText="";
-		
-		PrintWriter pw = new PrintWriter(new OutputStreamWriter(os, DEFAULT_ENCODING), true);
+		String response="";
 		
 		if(debugOn) System.out.println("Ajax request: " + page_url + params.toString());
 		
@@ -580,15 +506,6 @@ HTMLWebUIPlugin
 			
 			String cat = (String)params.get("cat");
 			
-			String remove		= (String)params.get("rem");
-			String delete		= (String)params.get("del");
-			
-			String act = (String)params.get("act");
-			
-			String update = (String)params.get("update");
-			
-			String display = (String)params.get("d");
-			
 			if(refresh != null) {
 				int rate;
 				try {
@@ -599,16 +516,16 @@ HTMLWebUIPlugin
 				}
 				
 				refresh_rate = (rate>4) ? rate : 5;
-				responseText = "" + refresh_rate;
+				response = "" + refresh_rate;
 				
 			} else if(autoUseDefDir != null) {
 				
 				try{
 					plugin_config.setBooleanParameter("Use default data dir", true);
-					responseText = getLocalisedMessageText("template.upload.auto.on");
+					response = getLocalisedMessageText("template.upload.auto.on");
 					
 				} catch(Exception e) {
-					responseText = getLocalisedMessageText("template.upload.auto.off");
+					response = getLocalisedMessageText("template.upload.auto.off");
 					e.printStackTrace();
 				}
 				
@@ -667,7 +584,7 @@ HTMLWebUIPlugin
 					e.printStackTrace();
 					p = 5;
 				}
-				responseText = ""+p;
+				response = ""+p;
 				
 				
 			} else if(cat != null) {
@@ -677,7 +594,6 @@ HTMLWebUIPlugin
 				 * 	set: set category
 				 * 	new: new category + set
 				 * 	rem: delete category
-				 * 	menu: display the cat menu
 				 */
 				String cmd = (String)params.get("cmd");	
 				String hash = (String)params.get("hash");
@@ -690,8 +606,6 @@ HTMLWebUIPlugin
 					String set_cat = cat;
 					
 					set_cat = URLDecoder.decode(set_cat, DEFAULT_ENCODING);
-					
-					if (debugOn) System.out.println("decoded cat: " + set_cat);
 					
 					String[]	x = torrent_categories.getDefinedValues();
 					
@@ -718,14 +632,14 @@ HTMLWebUIPlugin
 
 						for (int i=0; i < TorrentsList.length ;i++) {
 							
-							if (formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash()).equals(hash)) {
+							if (formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash()).substring(0, 5).equals(hash)) {
 								
 								try {
 									if(debugOn) System.out.println("Assigning category " + set_cat + " to torrent " + TorrentsList[i].getTorrent().getName());
 								
 									TorrentsList[i].setAttribute(torrent_categories, set_cat);
 									
-									responseText = cat;
+									response = cat;
 									
 								} catch (Exception e) {
 									
@@ -756,14 +670,14 @@ HTMLWebUIPlugin
 		
 						for (int i=0; i < TorrentsList.length ;i++) {
 							
-							if (formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash()).equals(hash)) {
+							if (formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash()).substring(0, 5).equals(hash)) {
 								
 								try {
 									if(debugOn) System.out.println("Assigning new category " + new_cat + " to torrent " + TorrentsList[i].getTorrent().getName());
 								
 									TorrentsList[i].setAttribute(torrent_categories, new_cat);
 									
-									responseText = cat;
+									response = cat;
 									
 								} catch (Exception e) {
 									
@@ -807,7 +721,7 @@ HTMLWebUIPlugin
 							
 								TorrentsList[i].setAttribute(torrent_categories, null);
 								
-								responseText = CATEGORY_UNKNOWN;
+								response = CATEGORY_UNKNOWN;
 								
 							} catch (Exception e) {
 								
@@ -820,770 +734,6 @@ HTMLWebUIPlugin
 					}
 				}
 				
-				if(cmd.equalsIgnoreCase("menu")) {
-					
-					/*
-					 * Display category menu
-					 */
-					
-					response.setContentType("text/xml;charset=utf-8");
-					response.setHeader("Cache-Control", "no-cache, must-revalidate");
-					
-					pw.println("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>");
-					
-					if ( torrent_categories != null ){
-						
-						responseText += ("<categories>");
-					
-						String[]	x = torrent_categories.getDefinedValues();
-						
-						for (int j=0;j<x.length;j++){
-							
-							responseText += ("	<cat>");
-							responseText += ("		<name>");
-							responseText += ("			" + escapeXML(x[j]));
-							responseText += ("		</name>");
-							responseText += ("	</cat>");
-
-						}
-						
-						responseText += ("	<cat>");
-						responseText += ("		<name>");
-						responseText += ("			" + CATEGORY_UNKNOWN);
-						responseText += ("		</name>");
-						responseText += ("	</cat>");
-						
-						responseText += ("	<cat>");
-						responseText += ("		<value>");
-						responseText += ("			" + "new");
-						responseText += ("		</value>");
-						responseText += ("		<name>");
-						responseText += ("			" + getLocalisedMessageText("template.cmd.cat.new"));
-						responseText += ("		</name>");
-						responseText += ("	</cat>");
-						
-						responseText += ("	<cat>");
-						responseText += ("		<value>");
-						responseText += ("			" + "rem");
-						responseText += ("		</value>");
-						responseText += ("		<name>");
-						responseText += ("			" + getLocalisedMessageText("template.cmd.cat.rem"));
-						responseText += ("		</name>");
-						responseText += ("	</cat>");
-						
-						responseText += ("</categories>");
-						
-						if (debugOn) System.out.println("Categories updated: " + responseText);
-						
-					}
-					
-				
-				}
-				
-				
-			} else if(remove != null && delete != null) {
-					
-				Download[] TorrentsList = download_manager.getDownloads(false);
-				
-				for (int i=0; i < TorrentsList.length ;i++) {
-					
-					if (formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash()).equals(remove)) {
-						
-						try {
-								
-							if(TorrentsList[i].getState() != Download.ST_STOPPED && TorrentsList[i].getState() != Download.ST_STOPPING) {
-								
-								TorrentsList[i].stop();
-								
-							}
-							
-							if (delete.equals("0")) {
-								TorrentsList[i].remove(false, false);
-								if(debugOn) System.out.println("Removing " + TorrentsList[i].getName());
-							} else if ( delete.equals("1")) {
-								TorrentsList[i].remove(true, false);
-								if(debugOn) System.out.println("Removing AND DELETING torrent of " + TorrentsList[i].getName());
-							} else if ( delete.equals("2")) {
-								TorrentsList[i].remove(false, true);
-								if(debugOn) System.out.println("Removing AND DELETING data of " + TorrentsList[i].getName());
-							} else if ( delete.equals("3")) {
-								TorrentsList[i].remove(true, true);
-								if(debugOn) System.out.println("Removing AND DELETING torrent AND data of " + TorrentsList[i].getName());
-							}
-							
-							responseText = "ok";
-							
-						} catch (Exception e) {
-							
-							e.printStackTrace();
-							
-							if(debugOn) System.out.println("Removing of " + TorrentsList[i].getName() + " failed");
-							
-							continue;
-							
-						}
-					}
-				}
-			} else if(act != null) {
-				
-				String hash = (String)params.get("hash");
-				
-				/*
-				 * act: 0 : start
-				 * 		1 : stop
-				 * 		2 : force start
-				 * 		3 : unforce
-				 * 
-				 * 		update : update torrent info
-				 * 
-				 * 		stats : get global stats (state)
-				 */
-			
-				/*
-				 * Start a download
-				 */
-				
-				//String start 		= (String)params.get("start");
-				
-				if(hash != null && act.equals("0")) {
-					
-					//t.setParam("refresh_rate", "3");
-					Download[] Torrents = new Download[1];
-						
-					Download[] Torrents2 = download_manager.getDownloads(true);
-
-					for (int i=0; i < Torrents2.length ;i++) {
-						
-						if (formatters.encodeBytesToString(Torrents2[i].getTorrent().getHash()).equals(hash)) {
-								
-								Torrents[0] = Torrents2[i];
-						}
-					}
-					
-					
-					startTorrent(Torrents);
-					
-					responseText = Torrents[0].getStats().getStatus(true);
-				}
-				
-				/*
-				 * Force Start a download / seed
-				 */
-				
-				//String fstart 		= (String)params.get("fstart");
-				
-				if(hash != null && act.equals("2")) {
-					
-					//t.setParam("refresh_rate", "3");
-					
-					Download[] TorrentsList = download_manager.getDownloads(true);
-					
-					for (int i=0; i < TorrentsList.length ;i++) {
-						
-						String _hash = formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash());
-						
-						if (hash.equals(_hash)) {
-							
-							try {
-								
-								if(debugOn) System.out.println("Force Starting " + TorrentsList[i].getName());
-							
-								TorrentsList[i].setForceStart(true);
-								
-								responseText = TorrentsList[i].getStats().getStatus(true);
-								
-							} catch (Exception e) {
-								
-								e.printStackTrace();
-								
-								continue;
-								
-							}
-						}
-					}
-				}
-				
-				/*
-				 * Set Force Start to false
-				 */
-				
-				//String fstop 		= (String)params.get("fstop");
-				
-				if(hash != null && act.equals("3")) {
-					
-					//t.setParam("refresh_rate", "3");
-					
-					Download[] TorrentsList = download_manager.getDownloads(true);
-					
-					for (int i=0; i < TorrentsList.length ;i++) {
-						
-						String _hash = formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash());
-						
-						if (hash.equals(_hash)) {
-							
-							try {
-								
-								if(debugOn) System.out.println("Setting Force Start to false for " + TorrentsList[i].getName());
-							
-								TorrentsList[i].setForceStart(false);
-								
-								responseText = TorrentsList[i].getStats().getStatus(true);
-								
-							} catch (Exception e) {
-								
-								e.printStackTrace();
-								
-								continue;
-								
-							}
-						}
-					}
-				}
-				
-				/*
-				 * Stop a download / seed
-				 */
-				
-				//String stop 		= (String)params.get("stop");
-				Download[] Torrents = new Download[1];
-				
-				if(hash != null && act.equals("1")) {
-					
-					//t.setParam("refresh_rate", "3");
-					
-						
-						Download[] Torrents2 = download_manager.getDownloads(false);
-					
-						for (int i=0; i < Torrents2.length ;i++) {
-							
-							String _hash = formatters.encodeBytesToString(Torrents2[i].getTorrent().getHash());
-							
-							if (hash.equals(_hash)) {
-								
-								Torrents[0] = Torrents2[i];
-									
-							}
-						}
-					
-					
-					stopTorrents(Torrents);
-					
-					responseText = Torrents[0].getStats().getStatus(true);
-				}
-				
-				/*
-				 * Update a torrent row / a list of torrents rows
-				 */
-				
-				if(hash != null && act.equals("update")) {
-					
-					Hashtable t_ 			= new Hashtable();
-					Hashtable torrents_		= new Hashtable();
-					
-					//torrent_info.add( t_row );
-					
-					Download[] Torrents2 = download_manager.getDownloads(true);
-					
-					/*Map hashes = JsonDecoder.decodeJSON(URLDecoder.decode(hash, "UTF8"));
-					
-					Set entries0 = hashes.entrySet();
-					
-					Iterator iterator0 = entries0.iterator();
-					
-					while(iterator0.hasNext()){
-						
-						Map.Entry entry = (Map.Entry)iterator0.next();
-						
-						System.out.println(entry.getKey() + ": " + entry.getValue());
-						
-					}
-					
-					JSONArray j = (JSONArray)hashes.get("value");*/
-					
-					String[] j = URLDecoder.decode(hash, "UTF8").split(",");
-					
-					Map hhh = new Hashtable();
-					
-					hhh.put("hashes", j);
-					
-					//t_.put("size", ""+j.size());
-					
-					//t_.put("hashes", hashes.get("value"));
-					
-					t_.put("size", ""+j.length);
-					
-					//t_.put("hashes", JsonMapEncoder.encodes(hhh));
-					
-					//for(int k=0; k < j.size(); k ++) {	
-						
-					for(int k=0; k < j.length; k ++) {	
-						
-						//String h = (String)(j.toArray())[k]; 
-						String h = j[k]; 
-						Hashtable t_row 			= new Hashtable();
-					
-					
-					Download torrent = null;
-					
-					for (int i=0; i < Torrents2.length ;i++) {
-						
-						String _hash = formatters.encodeBytesToString(Torrents2[i].getTorrent().getHash());
-						
-						if (h.equals(_hash)) {
-							
-							torrent = Torrents2[i];
-							
-							t_row.put("index", "" + i);
-								
-						}
-					}
-					
-					if(torrent != null) {
-					
-					String torrent_name = torrent.getName();
-					
-					if (torrent_name.length() > 35) {
-						t_row.put("short_name", escapeXML(torrent_name.substring(0, 35)) + "...");
-						t_row.put("name_too_long", "1");
-					} else {
-						t_row.put("short_name", escapeXML(torrent_name));
-						t_row.put("name_too_long", "0");
-					}
-					
-					t_row.put("name", escapeXML(torrent_name));
-					
-					t_row.put("url_name", formatters.encodeBytesToString( torrent.getTorrent().getHash()));
-					
-					t_row.put("hash_short", formatters.encodeBytesToString( torrent.getTorrent().getHash()));
-					
-					t_row.put("position", "" + torrent.getPosition());
-					
-					boolean bTorrentNoMagnet = torrent.getTorrent().isPrivate() || !torrent.getTorrent().isDecentralisedBackupEnabled();
-					
-					t_row.put("has_magnet", bTorrentNoMagnet?"0":"1");
-					
-					try{
-						t_row.put("magnet", ""+torrent.getTorrent().getMagnetURI());
-					}catch(TorrentException tex) {
-						tex.printStackTrace();
-					}
-					
-					t_row.put("ontracker", "0");
-					
-					Set entries = torrentsHostedorPublished.entrySet();
-					
-					Iterator iterator = entries.iterator();
-					
-					while(iterator.hasNext()){
-						
-						Map.Entry entry = (Map.Entry)iterator.next();
-						
-						if (entry.getKey().equals(torrent.getTorrent().getHash())) {
-
-							t_row.put("ontracker", "1");
-						}
-						
-					}
-
-					String	c = torrent.getAttribute( torrent_categories );
-					
-					if ( c == null || c.equals( "Categories.uncategorized" )){
-						
-						c = CATEGORY_UNKNOWN;
-					}
-
-					//t_row.put("category", URLEncoder.encode(c, DEFAULT_ENCODING));
-					t_row.put("category", escapeXML(c));
-					
-					long torrent_peers = 0;
-					long torrent_seeds = 0;
-					
-					boolean isDownloading = false;
-					boolean isSeeding	= false;
-					boolean isStartable = false;		
-					boolean isFStart	= false;
-					boolean isCompleteAndStopped = false;
-					
-					int	status = torrent.getState();
-					String	status_str = torrent.getStats().getStatus(true);
-					
-					if ( status == Download.ST_STOPPED ){
-						
-						isStartable = true;
-						
-						if(torrent.isComplete(false)) isCompleteAndStopped = true;
-						
-					}else if ( status == Download.ST_DOWNLOADING ){
-						
-						isDownloading = true;
-						
-						try {
-							torrent_seeds = torrent.getPeerManager().getStats().getConnectedSeeds() ;
-						} catch (Throwable e) {
-							torrent_seeds = 0 ;
-						}
-						
-						try {
-							torrent_peers = torrent.getPeerManager().getStats().getConnectedLeechers() ;
-						} catch (Throwable e) {
-							torrent_peers = 0 ;
-						}
-						
-					}else if ( status == Download.ST_SEEDING ){
-						
-						isSeeding = true;
-						
-						try {
-							torrent_peers = torrent.getPeerManager().getStats().getConnectedLeechers() ;
-						} catch (Throwable e) {
-							torrent_peers = 0;
-						}
-					}
-					
-					if( torrent.isForceStart()) isFStart = true;
-					
-					t_row.put("isFStart", isFStart? "1":"0");
-					
-					t_row.put("status", status_str);
-					
-					t_row.put("isDLing", isDownloading? "1":"0");
-					
-					t_row.put("isCDing", isSeeding? "1":"0");
-					
-					t_row.put("isStartable", isStartable? "1":"0");
-					
-					long torrent_size = torrent.getTorrent().getSize();
-//					total_size += torrent_size;
-					
-					t_row.put("size", torrent_size<=0 ? "N/A": formatters.formatByteCountToKiBEtc(torrent_size));
-					
-					t_row.put("percent_done", "" + (torrent.getStats().getCompleted()/10.0f));
-					
-					long torrent_downloaded = torrent.getStats().getDownloaded();
-					long torrent_uploaded = torrent.getStats().getUploaded();
-					
-//					total_downloaded += torrent_downloaded;
-//					total_uploaded += torrent_uploaded;
-					
-					t_row.put("downloaded", "" + formatters.formatByteCountToKiBEtc(torrent_downloaded));
-					
-					t_row.put("uploaded", "" + formatters.formatByteCountToKiBEtc(torrent_uploaded));
-					
-					long torrent_dl_speed = torrent.getStats().getDownloadAverage();
-					long torrent_ul_speed = torrent.getStats().getUploadAverage();
-					
-					long total_download = download_manager.getStats().getDataReceiveRate();
-					long total_upload = download_manager.getStats().getDataSendRate();
-					
-					t_row.put("total_download", formatters.formatByteCountToKiBEtcPerSec(total_download));
-					t_row.put("total_upload", formatters.formatByteCountToKiBEtcPerSec(total_upload));
-					
-					t_row.put("dl_speed", formatters.formatByteCountToKiBEtcPerSec(torrent_dl_speed));
-					
-					t_row.put("ul_speed", formatters.formatByteCountToKiBEtcPerSec(torrent_ul_speed));
-					
-					String torrent_total_seeds = "" + torrent.getLastScrapeResult().getSeedCount();
-					
-					if ( torrent_total_seeds.equals("-1")) torrent_total_seeds = "-";
-					
-					t_row.put("seeds", "" + torrent_seeds);
-					
-					t_row.put("total_seeds", "" + torrent_total_seeds);
-					
-					String torrent_total_peers = "" + torrent.getLastScrapeResult().getNonSeedCount();
-					
-					if ( torrent_total_peers.equals("-1")) torrent_total_peers = "-";
-					
-					t_row.put("peers", "" + torrent_peers);
-					
-					t_row.put("total_peers", "" + torrent_total_peers);
-					
-					final NumberFormat sr_format;
-					sr_format = NumberFormat.getInstance();
-					sr_format.setMaximumFractionDigits(3);
-					sr_format.setMinimumFractionDigits(1);
-					
-					float availf = torrent.getStats().getAvailability();
-					t_row.put("avail", (availf == -1.0) ? "" : sr_format.format(availf) );
-					
-					int sr = torrent.getStats().getShareRatio();
-					String share_ratio = "";
-					
-					if (sr ==  -1 ) {
-						share_ratio = "&#8734;";
-					} else {
-						t_row.put("isFP", (sr < minSR) ? "1" : "0");
-						
-						share_ratio = sr_format.format( sr/1000.0f );
-					}
-					
-					t_row.put("share_ratio", "" + share_ratio );
-					
-					t_row.put("eta", torrent.getStats().getETA() );
-					
-					boolean isInSeedList = !(isCompleteAndStopped && bCompletedTab);
-					
-					t_row.put("type", torrent.isComplete(false) ? ( isInSeedList ? "1" : "2" ) : "0");
-
-					t_row.put( "count_0" , getDownloadingTorrentsCount() + "");
-					t_row.put( "count_1" , bCompletedTab?getSeedingTorrentsCount(false) + "":getSeedingTorrentsCount(true) + "");
-					
-					if(bCompletedTab) t_row.put( "count_2" , getCompletedTorrentsCount() + "");
-					
-					}
-						
-						torrents_.put(h, t_row);
-					}
-					
-					t_.put("torrents", torrents_);
-					
-					responseText = JsonMapEncoder.encodes(t_);
-					
-				}
-				
-				/*
-				 * Update global stats
-				 */
-				
-				if (act.equals("stats")){
-					
-					String st = (String)params.get("st");
-					int state = Integer.parseInt(st);
-					
-					Download[] torrents = null;
-					
-					Hashtable statsMap	= new Hashtable();
-					
-					switch (state) {
-					case 0:
-						torrents = getDLDownloadingTorrentsByPos();
-						break;
-					case 1:
-						torrents = getDLSeedingTorrentsByPos( bCompletedTab );
-						break;
-					case 2:
-						torrents = getDLCompletedTorrentsByPos();
-						break;
-
-					default:
-						break;
-					}
-					
-					long total_transferred = 0;
-					long total_download = 0;
-					long total_upload = 0;
-					long total_size = 0;
-					
-					for(int i = 0; i < torrents.length; i++) {
-						
-						DownloadStats torrent_stats = torrents[i].getStats();
-						
-						total_download += torrent_stats.getDownloadAverage();
-						total_upload += torrent_stats.getUploadAverage();
-						total_transferred += (state==0)?torrent_stats.getDownloaded():torrent_stats.getUploaded();
-						total_size += torrents[i].getTorrent().getSize();
-										
-					}
-					
-					statsMap.put("total_download", formatters.formatByteCountToKiBEtcPerSec(total_download));
-					
-					statsMap.put("total_upload", formatters.formatByteCountToKiBEtcPerSec(total_upload));
-					
-					statsMap.put("total_transferred", "" + formatters.formatByteCountToKiBEtc(total_transferred));
-					
-					statsMap.put("total_size", "" + formatters.formatByteCountToKiBEtc(total_size));
-					
-					int max_ul_speed	= plugin_config.getIntParameter( PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_KBYTES_PER_SEC );
-					
-					int max_ul_speed_seed = plugin_config.getIntParameter(PluginConfig.CORE_PARAM_INT_MAX_UPLOAD_SPEED_SEEDING_KBYTES_PER_SEC);
-					
-					boolean isSeedingOnly = download_manager.isSeedingOnly();
-					
-					boolean max_ul_speed_seed_enabled = plugin_config.getBooleanParameter(PluginConfig.CORE_PARAM_BOOLEAN_MAX_UPLOAD_SPEED_SEEDING);
-
-					int max_dl_speed	= plugin_config.getIntParameter( PluginConfig.CORE_PARAM_INT_MAX_DOWNLOAD_SPEED_KBYTES_PER_SEC );
-					
-					statsMap.put("max_upload_speed", (isSeedingOnly && max_ul_speed_seed_enabled)?max_ul_speed_seed==0? getLocalisedMessageText("template.speed.unlimited")+"*" : formatters.formatByteCountToKiBEtcPerSec( max_ul_speed_seed * 1024 )+"*":max_ul_speed==0? getLocalisedMessageText("template.speed.unlimited") : formatters.formatByteCountToKiBEtcPerSec( max_ul_speed * 1024 ));
-					
-					statsMap.put("max_dl_speed", max_dl_speed==0? getLocalisedMessageText("template.speed.unlimited") : formatters.formatByteCountToKiBEtcPerSec( max_dl_speed * 1024));
-					
-					statsMap.put("total_up", formatters.formatByteCountToKiBEtcPerSec(download_manager.getStats().getDataSendRate()));
-					
-					statsMap.put("total_dl", formatters.formatByteCountToKiBEtcPerSec(download_manager.getStats().getDataReceiveRate()));
-					
-					statsMap.put( "count_0" , getDownloadingTorrentsCount() + "");
-					statsMap.put( "count_1" , bCompletedTab?getSeedingTorrentsCount(false) + "":getSeedingTorrentsCount(true) + "");
-					
-					if(bCompletedTab) statsMap.put( "count_2" , getCompletedTorrentsCount() + "");
-					
-					Long usableSpace = null;
-					
-					//if(torrents.length > 0){
-//						File f = new File(torrents[0].getTorrentFileName());
-						File f = plugin_config.getPluginUserFile("plugin.properties"); 
-					
-						try {
-							Method usableSpaceMethod = File.class.getMethod("getUsableSpace", new Class[]{});
-							usableSpace = (Long)usableSpaceMethod.invoke(f, new Object[]{});
-							
-						}catch(Exception e){//TODO better exception handling maybe ? or not ... whatever
-							e.printStackTrace();
-						}
-					//}
-					statsMap.put("usable_space", (usableSpace!= null)?""+formatters.formatByteCountToKiBEtc(usableSpace.longValue()):"N/A (requires Java 6)" );
-					
-					responseText = JsonMapEncoder.encodes(statsMap);
-				}
-			
-			} else if( update != null ){
-				
-				// XXX
-				
-				String st = (String)params.get("st");
-				int state = Integer.parseInt(st);
-				//String search = URLDecoder.decode((String)params.get("search"),"UTF8");
-				
-				String _page = (String)params.get("page");
-				int page = 1;
-				if(_page != null) page = Integer.parseInt(_page);
-				
-				int nbPerPage = plugin_config.getPluginIntParameter(CONFIG_HTML_WEBUI_PAGINATION_PER_PAGE);
-				
-				
-				if(update.equals("hashes")){
-				
-					Download[] torrents = null;
-					int l,count,startIndex,endIndex;
-					Hashtable t_row 			= new Hashtable();
-					
-					switch (state) {
-					case 0:
-						//torrents = getDLDownloadingTorrentsByPos();
-						count = getDownloadingTorrentsCount(null);
-						startIndex = (page-1)*nbPerPage;
-						startIndex = (startIndex<0 || startIndex >= count)?0:startIndex;
-						endIndex = startIndex + nbPerPage;
-						endIndex = (endIndex>count || endIndex == 0)?count:endIndex;
-						l = endIndex - startIndex;
-						torrents = new Download[l];
-						if(debugOn) System.out.println("State " + state + " :: Copying " + l + " torrents / count: " + count +  " / nbPerPage: " + nbPerPage + " / startIndex: " + startIndex + " / endIndex: " + endIndex + " / l: " + l );
-						System.arraycopy(getDLDownloadingTorrentsByPos(), startIndex, torrents, 0, l);
-						break;
-					case 1:
-						//torrents = getDLSeedingTorrentsByPos( bCompletedTab );
-						count = getSeedingTorrentsCount(!bCompletedTab, null);
-						startIndex = (page-1)*nbPerPage;
-						startIndex = (startIndex<0 || startIndex >= count)?0:startIndex;
-						endIndex = startIndex + nbPerPage;
-						endIndex = (endIndex>count || endIndex == 0)?count:endIndex;
-						l = endIndex - startIndex;
-						torrents = new Download[l];
-						if(debugOn) System.out.println("State " + state + " :: Copying " + l + " torrents / count: " + count +  " / nbPerPage: " + nbPerPage + " / startIndex: " + startIndex + " / endIndex: " + endIndex + " / l: " + l );
-						System.arraycopy(getDLSeedingTorrentsByPos( bCompletedTab ), startIndex, torrents, 0, l);
-						break;
-					case 2:
-						//torrents = getDLCompletedTorrentsByPos();
-						count = getCompletedTorrentsCount(null);
-						startIndex = (page-1)*nbPerPage;
-						startIndex = (startIndex<0 || startIndex >= count)?0:startIndex;
-						endIndex = startIndex + nbPerPage;
-						endIndex = (endIndex>count || endIndex == 0)?count:endIndex;
-						l = endIndex - startIndex;
-						torrents = new Download[l];
-						if(debugOn) System.out.println("State " + state + " :: Copying " + l + " torrents / count: " + count +  " / nbPerPage: " + nbPerPage + " / startIndex: " + startIndex + " / endIndex: " + endIndex + " / l: " + l );
-						System.arraycopy(getDLCompletedTorrentsByPos(), startIndex, torrents, 0, l);
-						break;
-	
-					default:
-						break;
-					}
-					
-					for(int i = 0; i < torrents.length; i++) {
-						
-						Hashtable tor = new Hashtable();
-	//					for(int j=0; j<3; j++){
-							tor.put("hash", formatters.encodeBytesToString(torrents[i].getTorrent().getHash()));
-							tor.put("index", "0");
-							tor.put("pos", "" + torrents[i].getPosition());
-	//					}
-						t_row.put(""+i, tor);
-					}
-					
-					t_row.put("size", "" + torrents.length);
-					
-					responseText = JsonMapEncoder.encodes(t_row);
-				
-				}
-				
-				if(update.equals("pagination")) {
-					
-					int l = 1;
-					
-					if(nbPerPage>0){
-						
-						switch (state) {
-						case 0:
-							//torrents = getDLDownloadingTorrentsByPos();
-							l = (int)Math.ceil((double)getDownloadingTorrentsCount(null) / nbPerPage);
-							break;
-						case 1:
-							//torrents = getDLSeedingTorrentsByPos( bCompletedTab );
-							l = (int)Math.ceil((double)getSeedingTorrentsCount(!bCompletedTab, null) / nbPerPage);
-							break;
-						case 2:
-							//torrents = getDLCompletedTorrentsByPos();
-							l = (int)Math.ceil((double)getCompletedTorrentsCount(null) / nbPerPage);
-							break;
-		
-						default:
-							break;
-						}
-					}
-					responseText = ""+l;
-					
-				}
-				
-			} else if(display != null && display.equals("u")) {
-				
-				final String up_url = (String)params.get("upurl");
-				
-				if(up_url != null) {
-					
-					String d_url = URLDecoder.decode(up_url, DEFAULT_ENCODING);
-					
-					String url_load_msg = "";
-						
-					  String[] urls = d_url.split(";"); 
-					  
-					  for(int i =0; i < urls.length; i++ ) {
-						  
-						  try {
-						
-					          URL url = new URL(urls[i]);
-					          
-					          ResourceDownloader rd = plugin_interface.getUtilities().getResourceDownloaderFactory().create(url);
-					            
-					          InputStream is = rd.download();
-					          
-					          final Torrent torrent = plugin_interface.getTorrentManager().createFromBEncodedInputStream(is);
-					          
-					          download_manager.addDownload(torrent);
-								
-					          url_load_msg += escapeXML(torrent.getName()) + " " + getLocalisedMessageText("template.upload.url.msg.success") + "<br>";
-							
-							} catch (Exception e) {
-								
-								if(debugOn) System.out.println("Loading of " + urls[i] + " failed");
-								
-								url_load_msg += getLocalisedMessageText("template.upload.url.msg.error") + " " + escapeXML(urls[i]) + "<br>";
-								
-								e.printStackTrace();
-								
-							}
-					  }
-					  
-					  responseText = url_load_msg;
-				}
 				
 			} else {
 			
@@ -1617,8 +767,6 @@ HTMLWebUIPlugin
 			
 			boolean current_compTab = plugin_config.getPluginBooleanParameter(CONFIG_HTML_WEBUI_3TABS); 
 			
-			int current_pagination = plugin_config.getPluginIntParameter(CONFIG_HTML_WEBUI_PAGINATION_PER_PAGE);
-			
 			String set_max_dl		= (String)params.get("max_dl");
 			
 			String set_max_active	= (String)params.get("max_active");
@@ -1646,8 +794,6 @@ HTMLWebUIPlugin
 			String set_max_ups_seed	= (String)params.get("max_ups_seed");
 			
 			String set_comp_tab = (String)params.get("comp_tab");
-			
-			String set_pagination_per_page = (String)params.get("pagination_per_page");
 			
 			String op_set_msg ="";
 			
@@ -1981,7 +1127,7 @@ HTMLWebUIPlugin
 			
 			if(set_comp_tab != null) {
 				
-				boolean compTab = (Integer.parseInt(set_comp_tab) == 1)?true:false;
+				boolean compTab = (Integer.parseInt(set_comp_tab) == 1)?true:false;;
 				
 				if (current_compTab != compTab) {
 					
@@ -1990,8 +1136,6 @@ HTMLWebUIPlugin
 						op_set_msg += getLocalisedMessageText("template.options.comptab") + " ";
 						
 						plugin_config.setPluginParameter( CONFIG_HTML_WEBUI_3TABS, compTab );
-						
-						bCompletedTab = compTab;
 						
 						op_set_msg += (compTab?
 								getLocalisedMessageText("template.options.enabled"):
@@ -2009,47 +1153,17 @@ HTMLWebUIPlugin
 				}
 			}
 			
-			if(set_pagination_per_page != null) {
-				
-				boolean pagination = (Integer.parseInt(set_pagination_per_page) > 0)?true:false;
-				boolean cur_pag = current_pagination > 0;
-				
-				if(debugOn) System.out.println("Current Pagination: " + current_pagination + " changing to " + set_pagination_per_page);
-				
-				if(current_pagination != Integer.parseInt(set_pagination_per_page)){
-					try {
-						
-						op_set_msg += getLocalisedMessageText("template.options.pagination") + " ";
-						
-						if(debugOn) System.out.println(op_set_msg);
-						
-						plugin_config.setPluginParameter( CONFIG_HTML_WEBUI_PAGINATION_PER_PAGE, Integer.parseInt(set_pagination_per_page) );
-						
-						op_set_msg += (pagination?
-								getLocalisedMessageText("template.options.enabled") + "(" + set_pagination_per_page + " " + getLocalisedMessageText("template.options.pagination.per_page") + ")":
-								getLocalisedMessageText("template.options.disabled")) + " ";
-						if(debugOn) System.out.println(op_set_msg);
-					} catch(Exception e) {
-						
-						e.printStackTrace();
-						
-						op_set_msg += (pagination?
-								getLocalisedMessageText("template.options.enabled.not"):
-								getLocalisedMessageText("template.options.disabled.not")) + " ";
-						
-					}
-				}
-			}
-			
-			responseText = (!op_set_msg.equals(""))?op_set_msg:getLocalisedMessageText("template.options.nothingchanged");
+			response = (!op_set_msg.equals(""))?op_set_msg:getLocalisedMessageText("template.options.nothingchanged");
 			
 			////////
 			}
 		}
 		
-		if(debugOn) System.out.println("Ajax response: " + responseText);
+		if(debugOn) System.out.println("Ajax response: " + response);
 		
-		pw.print(responseText);
+		PrintWriter pw = new PrintWriter(new OutputStreamWriter(os, DEFAULT_ENCODING), true);
+		
+		pw.print(response);
 		pw.flush();
 		
 		return ( true );
@@ -2129,8 +1243,6 @@ HTMLWebUIPlugin
 		t.setParam("cmd_del1", getMessageText("MyTorrentsView.menu.removeand.deletetorrent"));
 		t.setParam("cmd_del2", getMessageText("MyTorrentsView.menu.removeand.deletedata"));
 		t.setParam("cmd_del3", getMessageText("MyTorrentsView.menu.removeand.deleteboth"));
-		
-		t.setParam( "display_state", 0);
 		
 		t.setParam("cmd_cat_new", getLocalisedMessageText("template.cmd.cat.new"));
 		t.setParam("cmd_cat_rem", getLocalisedMessageText("template.cmd.cat.rem"));
@@ -2252,10 +1364,6 @@ HTMLWebUIPlugin
 		
 		t.setParam("comp_tab", current_comp_tab);
 		
-		int current_pagination = plugin_config.getPluginIntParameter(CONFIG_HTML_WEBUI_PAGINATION_PER_PAGE);
-		
-		t.setParam("pagination_per_page", current_pagination);
-		
 		minSR = plugin_config.getIntParameter("StartStopManager_iFirstPriority_ShareRatio");
 		
 		t.setParam("refresh_rate", refresh_rate);
@@ -2280,32 +1388,7 @@ HTMLWebUIPlugin
 		
 		boolean bSearch = false;
 		
-		/* options menu */
-		//t.setParam( "page_js", page_url + "?d=o");
-		
-		//t.setParam("op_set_msg",  op_set_msg.equals("") ? getLocalisedMessageText("template.options.currentSettings") : op_set_msg);
-		
-		t.setParam("max_active_txt", getMessageText("ConfigView.label.maxactivetorrents"));
-		t.setParam("max_active_seed_txt", getMessageText("ConfigView.label.queue.maxactivetorrentswhenseeding"));
-		t.setParam("max_dls_txt", getMessageText("ConfigView.label.maxdownloads"));
-		t.setParam("max_conn_pertorrent_txt", getMessageText("ConfigView.label.max_peers_per_torrent"));
-		t.setParam("max_conn_txt", getMessageText("ConfigView.label.max_peers_total"));
-		t.setParam("max_down_txt", getMessageText("ConfigView.label.maxdownloadspeed"));
-		t.setParam("max_up_txt", getMessageText("ConfigView.label.maxuploadspeed"));
-		t.setParam("max_up_seed_txt", getMessageText("ConfigView.label.maxuploadspeedseeding"));
-		t.setParam("max_up_speed_auto_txt", getMessageText("template.options.autospeed"));
-		t.setParam("max_ups_txt", getMessageText("ConfigView.label.maxuploads"));
-		t.setParam("max_ups_seed_txt", getMessageText("ConfigView.label.maxuploadsseeding"));
-		t.setParam("comp_tab_txt", getLocalisedMessageText("azhtmlwebui.completedtab"));
-		t.setParam("pagination_per_page_txt", getMessageText("template.options.pagination.per_page_txt"));
-
-		t.setParam("options_set", getLocalisedMessageText("template.options.link.set"));
-		
-		//t.setParam("torrent_op_on", true);
-		
-		//t.setParam("torrent_refresh_on", false);
-		
-		//t.setParam("search", "");
+		t.setParam("search", "");
 		
 		try {
 			
@@ -2353,7 +1436,7 @@ HTMLWebUIPlugin
 					Torrents = getDLDownloadingTorrentsByPos();
 					
 				} else if( start.equals("alls") ) {
-					Torrents = getDLSeedingTorrentsByPos( false );
+					Torrents = getDLSeedingTorrentsByPos();
 					
 				} else {
 					
@@ -2361,7 +1444,7 @@ HTMLWebUIPlugin
 
 					for (int i=0; i < Torrents2.length ;i++) {
 						
-						if (formatters.encodeBytesToString(Torrents2[i].getTorrent().getHash()).equals(start)) {
+						if (formatters.encodeBytesToString(Torrents2[i].getTorrent().getHash()).substring(0, 5).equals(start)) {
 								
 								Torrents[0] = Torrents2[i];
 						}
@@ -2385,7 +1468,7 @@ HTMLWebUIPlugin
 				
 				for (int i=0; i < TorrentsList.length ;i++) {
 					
-					String hash = formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash());
+					String hash = formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash()).substring(0, 5);
 					
 					if (hash.equals(fstart)) {
 						
@@ -2420,7 +1503,7 @@ HTMLWebUIPlugin
 				
 				for (int i=0; i < TorrentsList.length ;i++) {
 					
-					String hash = formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash());
+					String hash = formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash()).substring(0, 5);
 					
 					if (hash.equals(fstop)) {
 						
@@ -2458,7 +1541,7 @@ HTMLWebUIPlugin
 					
 				} else if(stop.equals("alls")) {
 					
-					Torrents = getDLSeedingTorrentsByPos( true );
+					Torrents = getDLSeedingTorrentsByPos();
 					
 				} else {
 					
@@ -2466,7 +1549,7 @@ HTMLWebUIPlugin
 				
 					for (int i=0; i < Torrents2.length ;i++) {
 						
-						String hash = formatters.encodeBytesToString(Torrents2[i].getTorrent().getHash());
+						String hash = formatters.encodeBytesToString(Torrents2[i].getTorrent().getHash()).substring(0, 5);
 						
 						if (hash.equals(stop)) {
 							
@@ -2515,7 +1598,7 @@ HTMLWebUIPlugin
 				
 				for (int i=0; i < TorrentsList.length ;i++) {
 					
-					String hash = formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash());
+					String hash = formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash()).substring(0, 5);
 					
 					if (hash.equals(publish)) {
 						
@@ -2551,7 +1634,7 @@ HTMLWebUIPlugin
 				
 				for (int i=0; i < TorrentsList.length ;i++) {
 					
-					String hash = formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash());
+					String hash = formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash()).substring(0, 5);
 					
 					if (hash.equals(host)) {
 						
@@ -2584,7 +1667,7 @@ HTMLWebUIPlugin
 				
 				for (int i=0; i < trackerTorrent.length ;i++) {
 					
-					String hash = formatters.encodeBytesToString(trackerTorrent[i].getTorrent().getHash());
+					String hash = formatters.encodeBytesToString(trackerTorrent[i].getTorrent().getHash()).substring(0, 5);
 					
 					if (hash.equals(remove_from_tracker)) {
 						
@@ -2621,7 +1704,7 @@ HTMLWebUIPlugin
 				
 				for (int i=0; i < TorrentsList.length ;i++) {
 					
-					if (formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash()).equals(move_up)) {
+					if (formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash()).substring(0, 5).equals(move_up)) {
 						
 						try {
 							
@@ -2656,7 +1739,7 @@ HTMLWebUIPlugin
 				
 				for (int i=0; i < TorrentsList.length ;i++) {
 					
-					if (formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash()).equals(top)) {
+					if (formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash()).substring(0, 5).equals(top)) {
 						
 						try {
 							
@@ -2706,7 +1789,7 @@ HTMLWebUIPlugin
 				
 				for (int i=0; i < TorrentsList.length ;i++) {
 					
-					if (formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash()).equals(move)) {
+					if (formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash()).substring(0, 5).equals(move)) {
 						
 						try {
 							
@@ -2741,7 +1824,7 @@ HTMLWebUIPlugin
 				
 				for (int i=0; i < TorrentsList.length ;i++) {
 					
-					if (formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash()).equals(bottom)) {
+					if (formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash()).substring(0, 5).equals(bottom)) {
 						
 						try {
 							
@@ -2798,7 +1881,7 @@ HTMLWebUIPlugin
 				
 				for (int i=0; i < TorrentsList.length ;i++) {
 					
-					if (formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash()).equals(remove)) {
+					if (formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash()).substring(0, 5).equals(remove)) {
 						
 						try {
 								
@@ -2939,7 +2022,7 @@ HTMLWebUIPlugin
 			search = (String)params.get("search");
 			
 			if(search != null && !search.equals("")) {
-				t.setParam("search", URLEncoder.encode(search, "UTF-8"));
+				t.setParam("search", search);
 				String search2 = URLDecoder.decode(search, DEFAULT_ENCODING);
 				search_items = search2.split( " " );
 				t.setParam("search_decoded", escapeXSS(search2));
@@ -2968,8 +2051,6 @@ HTMLWebUIPlugin
 					t.setParam( "page_js", page_url + "?d=s" + ((bSearch?("&search=" + search):"")) );
 					t.setParam( "page", page_url + "?d=s");
 					
-					t.setParam( "display_state", 1);
-					
 					t = populateTemplate(t, "up", search_items);
 					
 				} else if(display.equals("c") && bCompletedTab) {	// Completed Torrents Page
@@ -2977,8 +2058,6 @@ HTMLWebUIPlugin
 					t.setParam( "page_url", page_url + "?d=c" + escapeXML((bSearch?("&search=" + search):"")) );
 					t.setParam( "page_js", page_url + "?d=c" + ((bSearch?("&search=" + search):"")) );
 					t.setParam( "page", page_url + "?d=c");
-					
-					t.setParam( "display_state", 2);
 					
 					t = populateTemplate(t, "co", search_items);
 					
@@ -3048,8 +2127,6 @@ HTMLWebUIPlugin
 					// Display torrent details
 					String thash = (String)params.get( "t" );
 					
-					thash = URLEncoder.encode(thash, "UTF-8");
-					
 					t.setParam( "page_url", page_url + "?d=d&t="+thash);
 					t.setParam( "page_js", page_url + "?d=d&t="+thash);
 					t.setParam( "page", page_url + "?d=d&t="+thash);
@@ -3060,7 +2137,7 @@ HTMLWebUIPlugin
 					Download download = null;
 
 					for (int i=0; i < TorrentsList.length ;i++) {						
-						if (formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash()).equals(thash)) {
+						if (formatters.encodeBytesToString(TorrentsList[i].getTorrent().getHash()).substring(0, 5).equals(thash)) {
 							download = TorrentsList[i]; 
 						}
 					}
@@ -3184,7 +2261,7 @@ HTMLWebUIPlugin
 				
 				Hashtable ht = new Hashtable();
 				
-				ht.put( "name", escapeXML(x[j]) );
+				ht.put( "name", x[j] );
 				
 				category_names.add(ht);
 			}
@@ -3343,7 +2420,7 @@ private Template populateTemplate(Template t, String type, String[] s_items) {
 			
 			t_row.put("torrent_url_name", formatters.encodeBytesToString( torrent.getTorrent().getHash()));
 			
-			t_row.put("torrent_hash_short", formatters.encodeBytesToString( torrent.getTorrent().getHash()));
+			t_row.put("torrent_hash_short", formatters.encodeBytesToString( torrent.getTorrent().getHash()).substring(0, 5));
 			
 			t_row.put("torrent_position", "" + torrent.getPosition());
 			
@@ -3592,22 +2669,17 @@ protected Download[] getDownloadsByPos() {
 
 					int	res = comparator.compare( "" + d1.getPosition(),  "" + d2.getPosition() );
 					
-					return(  res );
+					return( res );
 				}
 			});
-	
-	Download[] down = TorrentsList;
-	for(int i = 0; i < down.length; i++){
-		if(debugOn) System.out.println("getDownloadsByPos:: " + down[i].getPosition());
-	}
+
 	
 	return( TorrentsList );
 }
 
 protected List getListDownloadingTorrentsByPos(String[] s_items) {
 	
-//	Download[] downloads = getDownloadsByPos();
-	Download[] downloads = download_manager.getDownloads(true);
+	Download[] downloads = getDownloadsByPos();
 	
 	List torrents = new ArrayList();
 	
@@ -3622,8 +2694,6 @@ protected List getListDownloadingTorrentsByPos(String[] s_items) {
 }
 
 protected int getDownloadingTorrentsCount(String[] s_items) {
-	
-	if(s_items == null) return getDownloadingTorrentsCount();
 	
 	Download[] downloads = download_manager.getDownloads();
 	
@@ -3651,8 +2721,6 @@ protected int getDownloadingTorrentsCount() {
 }
 
 protected int getSeedingTorrentsCount(boolean all, String[] s_items) {
-	
-	if(s_items == null) return getSeedingTorrentsCount( all );
 	
 	Download[] downloads = download_manager.getDownloads();
 	
@@ -3684,8 +2752,6 @@ protected int getSeedingTorrentsCount(boolean all) {
 }
 
 protected int getCompletedTorrentsCount(String[] s_items) {
-	
-	if(s_items == null) return getCompletedTorrentsCount();
 	
 	Download[] downloads = download_manager.getDownloads();
 	
@@ -3743,83 +2809,64 @@ protected List getListCompletedTorrentsByPos(String[] s_items) {
 	return torrents;
 }
 
-protected List orderByPosition( List list) {
-	Collections.sort(list, new Comparator(){
-		public int compare(Object o1, Object o2){
-			Download d1 = (Download)o1;
-			Download d2 = (Download)o2;
-			return comparator.compare(""+d1.getPosition(), ""+d2.getPosition());
-		}
-	});
-	return list;
-}
-
 protected Download[] getDLDownloadingTorrentsByPos() {
 	
-//	Download[] downloads = getDownloadsByPos();
-	Download[] downloads = download_manager.getDownloads(true);
+	Download[] downloads = getDownloadsByPos();
 	
-	List dls = new ArrayList();
+	Hashtable torrents = new Hashtable();
+	
 	for (int i=0; i < downloads.length ;i++) {
 		if (!downloads[i].isComplete(false)) {
-			dls.add(downloads[i]);
+			torrents.put(new Integer(i), new Integer(i));
 		}
 	}
-	dls = orderByPosition(dls);
 	
-	Download[] down = new Download[dls.size()];
-	for(int i = 0; i < dls.size(); i++){
-		down[i]=(Download)dls.get(i);
-		if(debugOn) System.out.println("getDLDownloadingTorrentsByPos:: " + down[i].getPosition());
+	Download[] dls = new Download[torrents.size()];
+	
+	int j = 0;
+	
+	for(Iterator iter=torrents.keySet().iterator();iter.hasNext();) {
+		
+		Integer key = (Integer) torrents.get(iter.next());
+		
+		int value = key.intValue();
+		
+		dls[j] = downloads[value];
+		
+		j++;
 	}
 	
-	return down;
+	return dls;
 }
 
-protected Download[] getDLSeedingTorrentsByPos( boolean completedTab) {
+protected Download[] getDLSeedingTorrentsByPos() {
 	
-//	Download[] downloads = getDownloadsByPos();
-	Download[] downloads = download_manager.getDownloads(true);
+	Download[] downloads = getDownloadsByPos();
 	
-	List dls = new ArrayList();
-	
-	for (int i=0; i < downloads.length ;i++) {
-		if (downloads[i].isComplete(false) && (completedTab? (downloads[i].getState() != Download.ST_STOPPED):true)) {
-			dls.add(downloads[i]);
-		}
-	}
-	dls = orderByPosition(dls);
-	
-	Download[] down = new Download[dls.size()];
-	for(int i = 0; i < dls.size(); i++){
-		down[i]=(Download)dls.get(i);
-		if(debugOn) System.out.println("getDLSeedingTorrentsByPos:: " + down[i].getPosition());
-	}
-	
-	return down;
-}
-
-protected Download[] getDLCompletedTorrentsByPos() {
-	
-//	Download[] downloads = getDownloadsByPos();
-	Download[] downloads = download_manager.getDownloads(true);
-	
-	List dls = new ArrayList();
+	Hashtable torrents = new Hashtable();
 	
 	for (int i=0; i < downloads.length ;i++) {
-		if (downloads[i].isComplete(false) && downloads[i].getState() == Download.ST_STOPPED) {
-			dls.add(downloads[i]);
+		if (downloads[i].isComplete(false)) {
+			torrents.put(new Integer(i), new Integer(i));
 		}
 	}
-	dls = orderByPosition(dls);
 	
-	Download[] down = new Download[dls.size()];
-	for(int i = 0; i < dls.size(); i++){
-		down[i]=(Download)dls.get(i);
-		if(debugOn) System.out.println("getDLCompletedTorrentsByPos:: " + down[i].getPosition());
+	Download[] dls = new Download[torrents.size()];
+	
+	int j = 0;
+	
+	for(Iterator iter=torrents.keySet().iterator();iter.hasNext();) {
+		
+		Integer key = (Integer) torrents.get(iter.next());
+		
+		int value = key.intValue();
+		
+		dls[j] = downloads[value];
+		
+		j++;
 	}
 	
-	return down;
+	return dls;
 }
 
 protected void

@@ -96,7 +96,7 @@ tr.trtorrent {
 	background-color: #EAF3FF;
 	font-size: 8pt;
 	color: #333333;
-	/*height: 23px*/
+	height: 23px
 }
 
 /* (odd) rows of the torrent tables (first is odd) */
@@ -104,30 +104,27 @@ tr.trtorrent_odd {
 	background-color: #FFF;
 	font-size: 8pt;
 	color: #333333;
-	/*height: 23px*/
+	height: 23px
 }
 /* (even) active rows of the torrent tables */
 tr.trtorrent_active {
 	background-color: #EAF3FF;
 	font-size: 8pt;
 	color: #121212;
-	/*height: 23px*/
+	height: 23px
 }
 /* (odd) active rows of the torrent tables (first is odd) */
 tr.trtorrent_odd_active {
 	background-color: #FFF;
 	font-size: 8pt;
 	color: #121212;
-	/*height: 23px*/
+	height: 23px
 }
 .azcontent tr.trtorrent_hover {
 	background-color: #FFE8D4;
 	font-size: 8pt;
 	color: #333333;
-	/*height: 23px*/
-}
-tr.selected{
-	background-color: #FFF1E2;
+	height: 23px
 }
 td.seeds {
 	font-weight: bold;
@@ -188,13 +185,13 @@ span#timer {
 #tabs li a:hover {
 	color: #7E1414;
 }
-#tabs .tab_selected {
+#tabs #tab_selected {
 	color: #000;
 	background-color: #fff;
 	border-bottom: 1px solid #fff;
 	margin-top: 0;
 }
-#tabs .tab_selected a {
+#tabs #tab_selected a {
 	color: #000;
 	background-color: #fff;
 }
@@ -210,11 +207,6 @@ input {
 }
 input.none {
 	border: none;
-	background: transparent;
-}
-input.chkbox {
-	border: none;
-	background: transparent;
 }
 input.r {
 	font-size: 8pt;
@@ -314,9 +306,6 @@ div.content {
 	margin: 0;	
 	width: 100%;
 	float: left;
-}
-#pagin {
-	text-align: right;
 }
 /* JAVASCRIPT */
 #popitmenu{

@@ -1,25 +1,25 @@
 function setParams() {
 
-	var maxDL 		= $("max_dl").value;
-	var maxActive	= $("max_active").value;
-	var maxActiveSeed	= $("max_active_seed").value;
-	var maxActiveSeedEnabled = ($("max_active_seed_enabled").checked)?"1":"0";
-	var maxConnPerTor	= $("max_conn_pertorrent").value;
-	var maxConn	= $("max_conn").value;
-	var maxDown 	= $("max_dl_speed").value;
-	var maxAutoUpEnabled = ($("max_ul_speed_auto").checked)?true:false;
-	var maxUp 		= $("max_ul_speed").value;
-	var maxUpSeed 		= $("max_ul_speed_seed").value;
-	var maxUpSeedEnabled = ($("max_ul_speed_seed_enabled").checked)?"1":"0";
-	var maxUps 		= $("max_ups").value;
-	var maxUpsSeed 		= $("max_ups_seed").value;
-	var compTabEnabled = ($("comp_tab").checked)?true:false;
-	var paginationPerPage = $("pagination_per_page").value;
-	var oldPerPage = paginationPerPage;
+	var params = ""
+
+	var maxDL 		= document.getElementById("max_dl").value;
+	var maxActive	= document.getElementById("max_active").value;
+	var maxActiveSeed	= document.getElementById("max_active_seed").value;
+	var maxActiveSeedEnabled = (document.getElementById("max_active_seed_enabled").checked)?"1":"0";
+	var maxConnPerTor	= document.getElementById("max_conn_pertorrent").value;
+	var maxConn	= document.getElementById("max_conn").value;
+	var maxDown 	= document.getElementById("max_dl_speed").value;
+	var maxAutoUpEnabled = (document.getElementById("max_ul_speed_auto").checked)?true:false;
+	var maxUp 		= document.getElementById("max_ul_speed").value;
+	var maxUpSeed 		= document.getElementById("max_ul_speed_seed").value;
+	var maxUpSeedEnabled = (document.getElementById("max_ul_speed_seed_enabled").checked)?"1":"0";
+	var maxUps 		= document.getElementById("max_ups").value;
+	var maxUpsSeed 		= document.getElementById("max_ups_seed").value;
+	var compTabEnabled = (document.getElementById("comp_tab").checked)?true:false;
 	
 	var strAlert = "";
 	
-	if(isNaN(maxDL) || isNaN(maxActive) || isNaN(maxConn) || isNaN(maxDown) || isNaN(maxUp) || isNaN(maxUps) || isNaN(maxUpsSeed) || isNaN(paginationPerPage)) {
+	if(isNaN(maxDL) || isNaN(maxActive) || isNaN(maxConn) || isNaN(maxDown) || isNaN(maxUp) || isNaN(maxUps) || isNaN(maxUpsSeed)) {
 		strAlert+="Numbers Only\n"
 	} else {
 		if(maxDL < 0) {
@@ -58,68 +58,67 @@ function setParams() {
 	}
 	
 	if(strAlert == "") {
-
-		new Ajax.Request(
-			'index.ajax',
-			{
-				method: 'get',
-				parameters: {max_dl:maxDL,max_active:maxActive,max_active_seed:maxActiveSeed,max_active_seed_enabled:maxActiveSeedEnabled,max_conn_pertor:maxConnPerTor,max_conn:maxConn,max_dl_speed:maxDown,max_ups:maxUps,max_ups_seed:maxUpsSeed,
-							max_auto_up:(maxAutoUpEnabled)?"1":"0",
-							max_ul_speed:maxUp,max_ul_speed_seed:maxUpSeed,max_ul_speed_seed_enabled:maxUpSeedEnabled,
-							comp_tab:(compTabEnabled)? "1":"0",
-							pagination_per_page:paginationPerPage,
-							date: new Date().getTime()},
-				onFailure: function(transport) {
-					$('msg').innerHTML = "Problem: " + transport.statusText
-				},
-				onSuccess: function(transport) {
-					$('msg').innerHTML = transport.responseText
-			  		$('msg').style.color = '#444'
-			  		$('msg').style.backgroundColor = '#FDFA47'
-			  		new Effect.Pulsate('msg')
-			  		
-			  		if(compTabEnabled) {
-			  			if(!$('tab_comp').visible()){
-			  				new Effect.Appear('tab_comp',{afterFinish:function(){new Effect.Shake('tab_comp',{duration:0.5})}})
-			  				updateStats( state )
-			  			}
-			  		} else {
-			  			if($('tab_comp').visible()){
-			  				new Effect.Pulsate('tab_comp',{duration:0.5,pulses:2,afterFinish:function(){new Effect.Fade('tab_comp',{afterFinish:function(){setState(ST_SEEDING, {force: true})}})}})
-			  				updateStats( state )
-			  			}
-			  		}
-			  		//if( state != ST_DOWNLOADING ) updateDisplay( state )
-			  		updateTL()
-				}
-			}
-		);
-		
+		params = "max_dl=" + maxDL + "&max_active=" + maxActive + "&max_active_seed=" + maxActiveSeed + "&max_active_seed_enabled=" + maxActiveSeedEnabled + "&max_conn_pertor=" + maxConnPerTor + "&max_conn=" + maxConn + "&max_dl_speed=" + maxDown + "&max_ups=" + maxUps + "&max_ups_seed=" + maxUpsSeed;
+		params += (maxAutoUpEnabled)? "&max_auto_up=1" : "&max_auto_up=0" + "&max_ul_speed=" + maxUp + "&max_ul_speed_seed=" + maxUpSeed  + "&max_ul_speed_seed_enabled=" + maxUpSeedEnabled;
+		params += "&comp_tab=" + ((compTabEnabled)? "1":"0");
+		makePOSTreq(params)
 	} else {
-		$('msg').innerHTML = '<span style="color:#DD6633">' + strAlert + '</span>';
+		document.getElementById('msg').innerHTML = '<span style="color:#DD6633">' + strAlert + '</span>';
 	}
 }
 
 function switchOnlySeeding(id, isChecked) {
 	if(isChecked) {
-		$(id).disabled=false;
+		document.getElementById(id).disabled=false;
 	} else {
-		$(id).disabled=true;
+		document.getElementById(id).disabled=true;
 	}
 }
 function switchAutoSeeding(id, id1, id2, isChecked) {
 	if(!isChecked) {
-		$(id).disabled=false;
-		$(id1).disabled=false;
-		$(id2).disabled=false;
-		switchOnlySeeding('max_ul_speed_seed',$(id2).checked)
+		document.getElementById(id).disabled=false;
+		document.getElementById(id1).disabled=false;
+		document.getElementById(id2).disabled=false;
+		switchOnlySeeding('max_ul_speed_seed',document.getElementById(id2).checked)
 	} else {
-		$(id).disabled=true;
-		$(id1).disabled=true;
-		$(id2).disabled=true;
+		document.getElementById(id).disabled=true;
+		document.getElementById(id1).disabled=true;
+		document.getElementById(id2).disabled=true;
 		switchOnlySeeding('max_ul_speed_seed',false)
 	}
 }
-Event.observe(window,'load',function(e){
-	if(!$("comp_tab").checked) $('tab_comp').hide()
-})
+var page_request = false
+
+function makePOSTreq(parameters){
+
+if (window.XMLHttpRequest) // if Mozilla, Safari etc
+	page_request = new XMLHttpRequest()
+else if (window.ActiveXObject){ // if IE
+	try {
+	page_request = new ActiveXObject("Msxml2.XMLHTTP")
+	} catch (e){
+		try{
+		page_request = new ActiveXObject("Microsoft.XMLHTTP")
+		} catch (e){}
+	}
+}
+else return false
+
+page_request.onreadystatechange=function() { processStateChange(); };
+page_request.open('GET', 'index.ajax?' + parameters + '&date=' + new Date().getTime(), true);
+page_request.setRequestHeader("Cache-Control","no-cache");
+page_request.send(null);
+}
+
+function processStateChange() {
+  if(page_request.readyState == 4) {	      	
+  	document.getElementById('msg').innerHTML = "Updating..."
+  	if(page_request.status == 200) {
+  		document.getElementById('msg').innerHTML = page_request.responseText
+  		document.getElementById('msg').style.color = '#444'
+  		document.getElementById('msg').style.backgroundColor = '#CCEDDA'
+  	} else {
+  	  document.getElementById('msg').innerHTML = "Problem: " + page_request.statusText
+  	}
+  }
+}

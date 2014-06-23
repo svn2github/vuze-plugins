@@ -50,54 +50,13 @@ function createHTTPReq(){
 function processSC( req , id ) {
 
   if(req.readyState == 4) {	      	
-  	document.getElementById( 'up_msg' ).innerHTML += "..."
+  	document.getElementById( up_msg ).innerHTML += "..."
   	if(req.status == 200) {
   		resp = req.responseText
-  		document.getElementById( 'up_msg' ).innerHTML = resp
+  		document.getElementById( up_msg ).innerHTML = resp
   		
   	} else {
   	  alert("Problem: " + req.statusText)
   	}
   }
 }
-
-function urlUpload() {
-	
-	var form = $('myform_url')
-	var params = form.serialize()
-	alert("urlUpload! : index.ajax?" + params)
-	
-	new Ajax.Request( "index.ajax?" + params, {
-		method: 'GET',
-		onFailure: function() {
-		},
-		onSuccess: function( transport ) {
-			var resp = transport.responseText
-			//var jason = (json) ? json : eval( '(' + ( resp ) + ')' )
-			$('up_msg').update( resp )
-			form.reset()
-		}
-	})
-}
-
-function localUpload() {
-	
-	var form = $('myform_local')
-	
-	new Ajax.Request( "index.ajax", {
-		method: 'POST',
-		onFailure: function() {
-		},
-		onSuccess: function( transport ) {
-			var resp = transport.responseText
-			//var jason = (json) ? json : eval( '(' + ( resp ) + ')' )
-			$('up_msg').update( resp )
-			form.reset()
-		}
-	})
-}
-
-function toggleUpload() {
-	Effect.toggle( 'upDiv', 'blind' );
-}
-
