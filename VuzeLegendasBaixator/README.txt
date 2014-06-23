@@ -1,0 +1,3 @@
+This is a copy of https://code.google.com/p/legendasbaixator/source/detail?r=19 dumped here as a historical copy of the source.
+Not tested at all...
+Parg, 2014/06/23
