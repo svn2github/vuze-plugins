@@ -1,0 +1,332 @@
+/* "New" Old Theme */
+
+body {
+	font-family: arial, times;
+	font-size: 8pt;
+	background-color: #DFDFDF;
+	margin: 5px; 
+	color: #333333;
+	padding: 0px
+}
+/* links */
+a {
+	color: #000000;
+	text-decoration: underline;
+}
+a:hover {
+	color: #7E1414;
+	text-decoration: underline;
+}
+/* tracker links */
+a.t {
+	color: #7398CA;
+	text-decoration: none;
+}
+a.t:hover {
+	color: #7398CA;
+	text-decoration: none;
+}
+/* torrent names */
+span.a {
+	color: #333;
+	text-decoration: none;
+}
+span.a:hover {
+	color: #7E1414;
+	text-decoration: none;
+}
+/* active torrent names */
+span.a1 {
+	color: #394281;
+	text-decoration: none;
+}
+span.a1:hover {
+	color: #7E1414;
+	text-decoration: none;
+}
+form {
+	margin: 0;
+	padding: 0;
+}
+
+
+/* main table */
+.azborder {
+	width: 100%
+}
+/* categories/uncategorized tables */
+.azcontent {
+	width: 100%;
+	background-color: #547DB5;
+	border: 0px solid #B2D0F8;
+}
+.azcontent_op {
+	width: 300px;
+	font-size: 8pt;
+	/*background-color: #7398CA;*/
+	border: 1px solid #999;
+}
+.azcontent_op tr {
+	background-color: #999;
+}
+
+/* titles of the torrents tables columns */
+.azcontent th{
+	background-color: #7398CA;
+	font-size: 8pt;
+	font-weight: bold;
+	color: #000000;
+	text-align: left;
+	height: 24px
+}
+tr.head {
+	height: 24px;
+	background: #7398CA;
+	font-size: 8pt;
+}
+/* (even) rows of the torrent tables */
+tr.trtorrent {
+	background-color: #dedede;
+	font-size: 8pt;
+	color: #333333;
+	height: 23px
+}
+
+/* (odd) rows of the torrent tables (first is odd) */
+tr.trtorrent_odd {
+	background-color: #d2d2d2;
+	font-size: 8pt;
+	color: #333333;
+	height: 23px
+}
+/* (even) active rows of the torrent tables */
+tr.trtorrent_active {
+	background-color: #dedede;
+	font-size: 8pt;
+	color: #394281;
+	height: 23px
+}
+/* (odd) active rows of the torrent tables (first is odd) */
+tr.trtorrent_odd_active {
+	background-color: #d2d2d2;
+	font-size: 8pt;
+	color: #394281;
+	height: 23px
+}
+.azcontent tr.trtorrent_hover {
+	background-color: #a9c0df /*#9aaeca #FFE8D4*/;
+	font-size: 8pt;
+	color: #333333;
+	height: 23px
+}
+td.seeds {
+	font-weight: bold;
+	color: #547DB5;
+}
+td.peers {
+	font-weight: bold;
+}
+img {
+}
+/* main title */
+h1 {
+	font-size: 20pt;
+	font-weight: normal;
+	vertical-align: bottom
+}
+/* style of number of peers, seeds & share ratio */
+span {
+	font-weight: bold;
+	color: #547DB5;
+}
+span.totals {
+	color: #444444;
+	font-size: 8pt;
+	font-weight: bold;
+	text-align: center;
+}
+span.sr {
+	font-weight: normal;
+	color: #333;
+}
+span.srfp {
+	font-weight: normal;
+	color: #7E1414;
+}
+span#timer {
+	color: #547DB5;
+	font-size: 8pt;
+}
+/* Tabs menu */
+#tabs {
+	list-style-type: none;
+	text-align: right;
+	padding: 0 2em;
+	margin: 0;
+	border-bottom: 1px solid #9ac;
+}
+#tabs li {
+	display: inline;
+	padding: 0 0.8em 0 0.8em;
+	margin: 1em 0.2em 0 .2em;
+	background-color: #7398CA;
+	border: 1px solid #9ac;
+}
+#tabs li a {
+	text-decoration: none;
+}
+#tabs li a:hover {
+	color: #fff;
+}
+#tabs #tab_selected {
+	color: #000;
+	background-color: #DFDFDF;
+	border-bottom: 1px solid #DFDFDF;
+	margin-top: 0;
+}
+#tabs #tab_selected a {
+	color: #000;
+	background-color: #DFDFDF;
+}
+/* Options */
+form {
+	font-size: 8pt
+}
+input {
+	background-color: #E7E7E7;
+	border: solid 1px #999;
+	font-size: 8pt;
+	/*color: #547DB5*/
+}
+input.none {
+	border: none;
+}
+input.r {
+	font-size: 8pt;
+	background-color: #e1e1e1;
+	border: 1px solid #999;
+	margin: 0 3px 0 3px;
+	
+}
+input.refresh {
+	height: 18px;
+}
+/* DETAILS */
+span.error {
+	color: #AA1111;
+}
+span.name {
+	font-size: 16pt;
+	font-weight: normal;
+}
+span.section {
+	font-size: 10pt;
+	font-weight: bold;
+}
+table.details {
+	border: 1px solid #7398CA;
+	font-size: 9pt;
+	color: #333333;
+}
+.details th {
+	font-weight: bold;
+	text-align: left;
+	font-size: 8pt;
+	vertical-align: top;
+}
+form {
+	display: inline;
+}
+select {
+	border: 1px solid #7398CA;
+}
+select, option {
+	background-color: #dfdfdf;
+	 font-size: 8pt;
+	 color: #547DB5;
+}
+/* MENU */
+div.menu {
+	clear: both;
+}
+/* HEADER */
+div.header{
+	width: 100%;
+	height: 30px;
+	border-width: 0 0 0 0;
+	border-style: solid;
+	border-color: #efefef;
+}
+span.right {
+	float: none;
+	vertical-align: bottom;
+	margin-right: 6px;
+	margin-top: 3px;
+	padding: 3px;
+}
+div.float-right {
+	float: right;
+	vertical-align: bottom;
+	margin: 0 0.1em 0.2em 0.3em;
+	padding: 0 0 0.1em 0.3em;
+}
+div.float-left {
+	float: left;
+	padding: 0.5em 2em 1em 1em;
+	margin: 0 0.5em 0 0;
+}
+span.title {
+	font-size: 20pt;
+	font-weight: normal;
+}
+div.searchgroup {
+	padding: 0.1em 1em 1em 2em;
+	margin: 0 0 0.5em 2em;
+	color: #333;
+	display: none;
+}
+input.s {
+	float: left;
+	width: 160px;
+	height: 18px;
+	font-size: 9pt
+}
+input.sub {
+	float: left;
+	height: 18px;
+	font-size: 9pt;
+	margin: 0 2px;
+	text-align: middle;
+	/*padding-bottom: 1px*/
+}
+/* END HEADER */
+div.content {
+	top: auto;
+	margin: 0;	
+	width: 100%;
+	float: left;
+}
+/* JAVASCRIPT */
+#popitmenu{
+	position: absolute;
+	background-color: #dedede;
+	border:1px solid black;
+	font-family: arial, times;
+	font-size: 8pt;
+	line-height: 18px;
+	z-index: 100;
+	visibility: hidden;
+}
+
+#popitmenu a{
+	text-decoration: none;
+	padding-left: 6px;
+	color: black;
+	display: block;
+}
+
+#popitmenu a:hover{ /*hover background color*/
+	background-color: #7398CA;
+}
+/* END JS */
+

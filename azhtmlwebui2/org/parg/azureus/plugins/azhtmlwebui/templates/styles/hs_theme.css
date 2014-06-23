@@ -1,0 +1,380 @@
+/* azureus modern style v0.7.2 */
+/* created by hannes.scharmann@wattweb.de */
+
+/* stop sign before stopped text*/
+tr.trtorrent_odd td[id]:before {
+	vertical-align: middle;
+	content: url('../images/hs_stopped.gif') " ";
+}
+tr.trtorrent td[id]:before {
+	vertical-align: middle;
+	content: url('../images/hs_stopped.gif') " ";
+}
+
+/* new in version 0.6.5 */
+tr.trtorrent_hover td[id]:before {
+	vertical-align: middle;
+	content: url('../images/hs_stopped.gif') " ";
+}
+
+/* version info */
+small {
+	color: #fff;
+	padding: 5.5em;
+}
+
+body {
+	font-family: verdana, arial, times;
+	font-size: 8pt;
+	background-color: #465D7F; /* #DFDFDF, #465D7F, #142D4E, #19498B #2F5487*/
+	background-image: url('../images/hs_background.gif') !important;
+	background-repeat: no-repeat;
+	background-position: center top;
+	margin: 5px; 
+	color: #FFFFFF; /* #333333*/
+	padding: 0px;
+	font-variant: small-caps;
+}
+
+/* links */
+a {
+	color: #FFFFFF;
+	text-decoration: underline;
+	font-variant: small-caps;
+}
+a:hover {
+	color: #DDDDDD;
+	text-decoration: underline;
+}
+/* tracker links */
+a.t {
+	color: #FFFFFF;
+	text-decoration: none;
+}
+a.t:hover {
+	color: #7398CA;
+	text-decoration: none;
+}
+/* torrent names */
+span.a {
+	color: #FFFFFF;
+	text-decoration: none;
+}
+span.a:hover {
+	color: #DDDDDD;
+	text-decoration: none;
+}
+/* active torrent names */
+span.a1 {
+	color: #FFFFFF;
+	text-decoration: none;
+}
+span.a1:hover {
+	color: #DDDDDD;
+	text-decoration: none;
+}
+
+form {
+	margin: 0;
+	padding: 0;
+}
+
+/* main table */
+.azborder {
+	width: 100%
+}
+/* categories/uncategorized tables */
+.azcontent {
+	width: 100%;
+	font-variant: small-caps;
+}
+.azcontent_op {
+	width: 300px;
+	font-size: 8pt;
+}
+.azcontent_op tr {
+}
+
+
+/* titles of the torrents tables columns */
+.azcontent th{
+	background-color: #406797;
+        font-size: 8pt;
+        font-weight: bold;
+        color: #FFFFFF;
+        text-align: left;
+        height: 24px
+}
+
+.azcontent th.right{ /* for torrent files (details) */
+	background-color: #406797;
+        font-size: 8pt;
+        font-weight: bold;
+        color: #FFFFFF;
+        text-align: right;
+        height: 24px
+}
+
+tr.head {
+	height: 24px;
+	font-size: 8pt;
+}
+
+/* (even) rows of the torrent tables */
+tr.trtorrent {
+	background-color: #464666;
+	font-size: 8pt;
+	color: #FFFFFF;
+	height: 23px;
+	-moz-opacity: 0.9;
+	opacity: 0.9;
+}
+
+/* (odd) rows of the torrent tables (first is odd) */
+tr.trtorrent_odd {
+	background-color: #353555;
+	font-size: 8pt;
+	color: #FFFFFF;
+	height: 23px;
+	-moz-opacity: 0.9;
+	opacity: 0.9;
+}
+
+/* (even) active rows of the torrent tables */
+tr.trtorrent_active {
+	background-color: #464666;
+	font-size: 8pt;
+	color: #FFFFFF;
+	height: 23px;
+	-moz-opacity: 0.9;
+	opacity: 0.9;
+}
+/* (odd) active rows of the torrent tables (first is odd) */
+tr.trtorrent_odd_active {
+	background-color: #353555;
+	font-size: 8pt;
+	color: #FFFFFF;
+	height: 23px;
+	-moz-opacity: 0.9;
+	opacity: 0.9;
+}
+
+/* new in version 0.6.5 */
+.azcontent tr.trtorrent_hover {
+	background-color: #575777;
+	font-size: 8pt;
+	color: #FFFFFF;
+	height: 23px;
+	-moz-opacity: 0.9;
+	opacity: 0.9;
+}
+
+td.seeds {
+	font-weight: bold;
+	color: #FFFFFF;
+}
+td.peers {
+	font-weight: bold;
+}
+img {
+}
+/* main title */
+h1 {
+	font-size: 20pt;
+	font-weight: normal;
+	vertical-align: bottom;
+	color: #FFFFFF;
+	font-variant: small-caps;
+}
+/* style of number of peers, seeds & share ratio */
+span {
+	font-weight: bold;
+}
+span.totals {
+	color: #FFFFFF;
+	font-size: 8pt;
+	font-weight: normal;
+	text-align: center;
+	font-variant: small-caps;
+}
+span.sr {
+	font-weight: normal;
+	color: #7F80FF;
+}
+span.srfp {
+	font-weight: normal;
+	color: #FF1F2D;
+}
+span#timer {
+	color: #fff;
+	font-size: 8pt;
+}
+/* Tabs menu */
+#tabs {
+	list-style-type: none;
+	text-align: right;
+	padding: .45em 2em;
+	margin: 0;
+	border-bottom: 1px solid #fff;
+}
+#tabs li {
+	display: inline;
+	margin: 0 0.2em;
+	padding: .4em .4em;
+	border-left: 1px solid #fff;
+	border-top: 1px solid #fff;
+	border-right: 1px solid #fff;
+	background-color: #686888;
+}
+#tabs li a {
+	text-decoration: none;
+}
+#tabs li:hover {
+	background-color: #464666;
+	color: #fff;
+}
+#tabs #tab_selected {
+	color: #fff;
+	background-color: #464666;
+}
+#tabs #tab_selected a {
+	color: #fff;
+	background-color: #464666;
+}
+/* Options */
+form {
+	font-size: 8pt
+}
+input {
+	font-size: 8pt;
+	background-color: #686888;
+	padding: .2em .2em .2em .2em;
+	font-variant: small-caps;
+	color: #fff;
+}
+input.r {
+	font-size: 8pt;
+	background-color: #686888;
+	border: 1px solid #999;
+	margin: 0 3px 0 3px;
+	color: #fff;
+}
+input.sub {
+	font-size: 8pt;
+	margin: 0 2px
+}
+input.refresh {
+	height: 18px;
+}
+
+input[disabled] {
+	color: #999;
+}
+
+/* DETAILS */
+span.error {
+        color: #FF0000;
+}
+span.name {
+        font-size: 16pt;
+        font-weight: normal;
+	color: #fff;
+}
+span.section {
+        font-size: 10pt;
+        font-weight: bold;
+	color: #fff;
+}
+table.details {
+        border: 1px solid #B2D0F8;
+        font-size: 9pt;
+        color: #FFFFFF;
+}
+.details th {
+        font-weight: bold;
+        text-align: left;
+        font-size: 8pt;
+        vertical-align: top;
+}
+/* MENU */
+div.menu {
+        clear: both;
+}
+
+/* HEADER */
+div.header{
+	width: 100%;
+	height: 30px;
+	border-width: 0 0 0 0;
+	border-style: solid;
+	border-color: #efefef;
+}
+span.right {
+	float: none;
+	vertical-align: bottom;
+	margin-right: 6px;
+	margin-top: 3px;
+	padding: 3px;
+}
+div.float-right {
+	float: right;
+	vertical-align: bottom;
+	margin: 0 0.1em 0.2em 0.3em;
+	padding: 0 0 0.1em 0.3em;
+}
+div.float-left {
+	float: left;
+	padding: 0.5em 2em 1em 1em;
+	margin: 0 0.5em 0 0;
+}
+span.title {
+	font-size: 20pt;
+	font-weight: normal;
+	background-color: #464666;
+	color: #FFFFFF;
+	border-left: 2px #eee solid;
+	border-top: 2px #eee solid;
+	border-right: 2px #aaa solid;
+	border-bottom: 2px #aaa solid;
+	padding: 0 .5em .5em .5em;
+}
+
+div.searchgroup {
+	padding: 0.5em 1em 1em 2em;
+	margin: 0 0 0.5em 2em;
+	color: #333;
+}
+
+/* END HEADER */
+div.content {
+	top: auto;
+	margin: 0;	
+	width: 100%;
+	float: left;
+}
+/* JAVASCRIPT */
+#popitmenu{
+	position: absolute;
+	background-color: #dedede;
+	border:1px solid black;
+	font-family: arial, times;
+	font-size: 8pt;
+	line-height: 18px;
+	z-index: 100;
+	visibility: hidden;
+	-moz-opacity: 0.8;
+	opacity: 0.8;
+}
+
+#popitmenu a{
+	text-decoration: none;
+	padding-left: 6px;
+	color: black;
+	display: block;
+}
+
+#popitmenu a:hover{ /*hover background color*/
+	background-color: #7398CA;
+}
+/* END JS */
+
