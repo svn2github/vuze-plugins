@@ -218,7 +218,10 @@ public class ZoomedScrolledMap extends Composite {
 		
 		/* define color map values for countries based on the min & max values of the
 		 * displayed stats */
-		setColorMapValues(((Long)Collections.min(values)).floatValue(), ((Long)Collections.max(values)).floatValue());
+		
+		if ( values.size() > 0 ){
+			setColorMapValues(((Long)Collections.min(values)).floatValue(), ((Long)Collections.max(values)).floatValue());
+		}
 		
 		/* needed for tooltips */
 		String toolTipLabel = null;
