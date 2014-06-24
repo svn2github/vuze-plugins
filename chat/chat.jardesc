@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="WINDOWS-1252" standalone="no"?>
+<jardesc>
+    <jar path="chat/chat.jar"/>
+    <options buildIfNeeded="true" compress="true" descriptionLocation="/chat/chat.jardesc" exportErrors="true" exportWarnings="true" includeDirectoryEntries="false" overwrite="false" saveDescription="true" storeRefactorings="false" useSourceFolders="false"/>
+    <storedRefactorings deprecationInfo="true" structuralOnly="false"/>
+    <selectedProjects/>
+    <manifest generateManifest="true" manifestLocation="" manifestVersion="1.0" reuseManifest="false" saveManifest="false" usesManifest="true">
+        <sealing sealJar="false">
+            <packagesToSeal/>
+            <packagesToUnSeal/>
+        </sealing>
+    </manifest>
+    <selectedElements exportClassFiles="true" exportJavaFiles="true" exportOutputFolder="false">
+        <javaElement handleIdentifier="=chat/&lt;com.aelitis.azureus.plugins.chat.peer.impl.messaging"/>
+        <javaElement handleIdentifier="=chat/&lt;com.aelitis.azureus.plugins.chat.ui"/>
+        <javaElement handleIdentifier="=chat/&lt;com.aelitis.azureus.plugins.chat.peer"/>
+        <javaElement handleIdentifier="=chat/&lt;com.aelitis.azureus.plugins.chat.ui.icons"/>
+        <javaElement handleIdentifier="=chat/&lt;com.aelitis.azureus.plugins.chat.resources"/>
+        <javaElement handleIdentifier="=chat/&lt;com.aelitis.azureus.plugins.chat.ui.internat"/>
+        <file path="/chat/plugin.properties"/>
+        <javaElement handleIdentifier="=chat/&lt;com.aelitis.azureus.plugins.chat"/>
+        <javaElement handleIdentifier="=chat/&lt;com.aelitis.azureus.plugins.chat.peer.impl"/>
+        <javaElement handleIdentifier="=chat/&lt;com.aelitis.azureus.plugins.chat.messaging"/>
+    </selectedElements>
+</jardesc>
