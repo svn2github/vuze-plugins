@@ -43,7 +43,8 @@ public class SpeedSchedulerPlugin implements Plugin
     private static final String BUILT_IN_AUTO_SPEED_ENABLED_PARAM = PluginConfig.CORE_PARAM_BOOLEAN_AUTO_SPEED_ON;
     private static final String BUILT_IN_AUTO_SPEED_MAX_UPLOAD_CONFIG_VAR = "AutoSpeed Max Upload KBs";
 
-
+    private static final boolean DEFAULT_USE_TAGS_NOT_CATS	= false;
+    
     
 
     /**
@@ -60,7 +61,7 @@ public class SpeedSchedulerPlugin implements Plugin
         // Setup the SpeedScheduler config page:
 		PluginConfigUIFactory factory = pluginInterface.getPluginConfigUIFactory();
 		int i = 0;
-		Parameter parameters[] = new Parameter[10];
+		Parameter parameters[] = new Parameter[11];
 
 		// Schedules, sleeping, and stuff:
 		parameters[++i] = factory.createIntParameter( "thread.sleep.time", 
@@ -77,6 +78,9 @@ public class SpeedSchedulerPlugin implements Plugin
 		parameters[++i] = factory.createIntParameter( "minutes.granularity",
 				"speedscheduler.minutes.granularity", 15 );
 		
+		parameters[++i] = factory.createBooleanParameter( "use.tags.not.cats",
+				"speedscheduler.use.tags.not.cats", DEFAULT_USE_TAGS_NOT_CATS );
+
 		// Logging:
 		parameters[++i] = factory.createFileParameter( "log.file", 
 				"speedscheduler.log.file", "" );
@@ -274,6 +278,12 @@ public class SpeedSchedulerPlugin implements Plugin
     
     public PluginInterface getPluginInterface() {
     	return pluginInterface;
+    }
+    
+    public boolean
+    getUseTagsNotCategories()
+    {
+    	return( pluginConfig.getPluginBooleanParameter( "use.tags.not.cats", DEFAULT_USE_TAGS_NOT_CATS ));
     }
     
 	/**

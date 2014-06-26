@@ -40,7 +40,6 @@ import org.eclipse.swt.widgets.Table;
 import org.eclipse.swt.widgets.TableColumn;
 import org.eclipse.swt.widgets.TableItem;
 import org.gudy.azureus2.plugins.PluginInterface;
-
 import org.gudy.azureus2.ui.swt.plugins.*;
 
 import speedscheduler.ScheduleEditDialog;
@@ -56,7 +55,7 @@ public class SpeedSchedulerView implements ScheduleSelectionChangeListener, UISW
     private static final int BUTTON_PADDING = 5;
     private static final int MARGIN_WIDTH = 15;
     private static final int MARGIN_HEIGHT = 15;
-    private static final String HELP_URL = "http://students.cs.byu.edu/~djsmith/azureus/faq.php";
+    private static final String HELP_URL = "http://thesmithfam.org/blog/azureus-speed-scheduler-faq/";
     private Table scheduleTable;
     private Image watchImage, watchImageDisabled, checkImage;
     private Image defaultImage;
@@ -265,7 +264,10 @@ public class SpeedSchedulerView implements ScheduleSelectionChangeListener, UISW
         hoursCol.setText( "Hours of Day" );
         hoursCol.setWidth( 120 );
         TableColumn catCol = new TableColumn( scheduleTable, SWT.LEFT );
-        catCol.setText( "Category" );
+        
+		boolean use_tags = SpeedSchedulerPlugin.getInstance().getUseTagsNotCategories();
+
+        catCol.setText( use_tags?"Tag":"Category" );
         catCol.setWidth( 120 );
         
         // Make each column header clickable to allow sorting of schedules.

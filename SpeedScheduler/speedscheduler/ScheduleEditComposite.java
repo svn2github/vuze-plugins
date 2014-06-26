@@ -80,11 +80,13 @@ public class ScheduleEditComposite extends Composite
         hourGroupLayout.right = new FormAttachment( 100, 0 );
         hourGroup.setLayoutData( hourGroupLayout );
         
+		boolean use_tags = SpeedSchedulerPlugin.getInstance().getUseTagsNotCategories();
+
         Log.println( "  Drawing the Category.", Log.DEBUG );
         Group catGroup = new Group( this, 0 );
         catGroup.setLayout( rowLayout );
-        catGroup.setText( "Category" );
-        catComposite =  new CatComposite( catGroup, catSelection, category);
+        catGroup.setText( use_tags?"Tag":"Category" );
+        catComposite =  new CatComposite( catGroup, use_tags, catSelection, category);
         FormData catLayout = new FormData();
         catLayout.top = new FormAttachment( hourGroup, 15, 0 );
         catLayout.left = new FormAttachment( 0, 0 );

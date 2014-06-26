@@ -9,6 +9,10 @@ import org.eclipse.swt.events.*;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.torrent.TorrentAttribute;
 
+import com.aelitis.azureus.core.tag.Tag;
+import com.aelitis.azureus.core.tag.TagManagerFactory;
+import com.aelitis.azureus.core.tag.TagType;
+
 /**
  * A widget for choosing a category based schedule. 
  */
@@ -17,6 +21,7 @@ class CatComposite extends Composite
 	private boolean selection[];
 	private String category;
 	private static final String DEFAULT_CAT = "Uncategorized";
+	private static final String DEFAULT_TAG = "";
 	protected TorrentAttribute torrent_categories;
 	protected Vector torrent_cat_names;
 
@@ -27,11 +32,13 @@ class CatComposite extends Composite
 	 * Create a new CatComposite and place it in the specified parent Composite.
 	 * @param parent The parent composite to embed this widget in.
 	 */
+	/*
 	public CatComposite( Composite parent)
 	{
 		this( parent, null, null);
 	}
-
+	*/
+	
 	/**
 	 * Creates a new CatComposite given a parent and default 
 	 * selection (In/Not In) and the Category it applies to.
@@ -39,9 +46,10 @@ class CatComposite extends Composite
 	 * @param selection[] The current selection (In/Not In/Disabled), Note Disabled represented by {fasle,false}. 
 	 * @param defCategory The category chosen to represent the schedule.
 	 */
-	public CatComposite( Composite parent, boolean selection[], String defCategory)
-	{
+	public CatComposite( Composite parent, boolean use_tags, boolean selection[], String defCategory)
+	{		
 		super( parent, SWT.NONE );
+		
 		Log.println( "CatComposite.construct()", Log.DEBUG );
 
 		GridLayout Gridlayout = new GridLayout();
@@ -52,7 +60,7 @@ class CatComposite extends Composite
 			selection = new boolean[] {false,false};
 
 		if(defCategory == null)
-			defCategory = DEFAULT_CAT;
+			defCategory = use_tags?DEFAULT_TAG:DEFAULT_CAT;
 
 		this.selection = selection;
 		this.category = defCategory;
@@ -65,7 +73,7 @@ class CatComposite extends Composite
 				handleCatClick();
 			}});
 		disable.setSelection( this.selection[0] || this.selection[1] );
-		new Label( this, this.getStyle() ).setText("Apply this schedule by category");
+		new Label( this, this.getStyle() ).setText("Apply this schedule by " + (use_tags?"tag":"category" ));
 		new Label( this, this.getStyle() ).setText("");
 		new Label( this, this.getStyle() ).setText("");
 		new Label( this, this.getStyle() ).setText("");
@@ -82,7 +90,7 @@ class CatComposite extends Composite
 		else
 			operationSelectorCombo.select(0);
 
-		new Label( this, this.getStyle() ).setText( "this category:" );
+		new Label( this, this.getStyle() ).setText( "this " + (use_tags?"tag":"category" ) + ":" );
 		catSelectorCombo = new Combo( this, SWT.READ_ONLY | SWT.DROP_DOWN );
 
 		if(selection[0] || selection[1])
@@ -107,14 +115,40 @@ class CatComposite extends Composite
 			}
 		}
 
-		String[] x = torrent_categories.getDefinedValues();
+		String[] x;
+		
+		if ( use_tags ){
+			
+			java.util.List<Tag> tags = TagManagerFactory.getTagManager().getTagType( TagType.TT_DOWNLOAD_MANUAL ).getTags();
+			
+			x = new String[ tags.size()];
+			
+			for ( int i=0;i<x.length;i++){
+				
+				x[i] = tags.get(i).getTagName( true );
+			}
+		}else{
+			
+			x = torrent_categories.getDefinedValues();
+		}
+		
 		torrent_cat_names = new Vector();
 
-		//Add Default Category and set this as the index.
-		int SetIndex = 0;
-		catSelectorCombo.add( DEFAULT_CAT );
-		torrent_cat_names.add( DEFAULT_CAT );
+		int SetIndex;;
+		
+		if ( use_tags ){
+			
+			SetIndex = -1;
 
+		}else{
+			catSelectorCombo.add( DEFAULT_CAT );
+			torrent_cat_names.add( DEFAULT_CAT );
+			
+			//Add Default Category and set this as the index.
+
+			SetIndex = 0;
+		}
+		
 		//Add rest of Azureus Categorys
 		for (int i =0;i<x.length; i++)
 		{
@@ -124,12 +158,16 @@ class CatComposite extends Composite
 
 			//If we find a matching category, change the index
 			if(category.compareTo(x[i]) == 0)
-				SetIndex = i+1;
+				SetIndex = catSelectorCombo.getItemCount()-1;
 		}
 
 		//Get the Combo box to have the correct item selected
-		catSelectorCombo.select(SetIndex);
-
+		
+		if ( SetIndex >= 0 ){
+		
+			catSelectorCombo.select(SetIndex);
+		}
+		
 		// Change the variables when selection change happens.
 		SelectionAdapter catComboSelectionAdapter = new SelectionAdapter()
 		{

@@ -7,14 +7,24 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Vector;
 import java.util.Iterator;
+
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.PluginConfig;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.download.DownloadException;
 import org.gudy.azureus2.plugins.torrent.Torrent;
 import org.gudy.azureus2.plugins.torrent.TorrentAttribute;
+import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
+
+import com.aelitis.azureus.core.tag.Tag;
+import com.aelitis.azureus.core.tag.TagManager;
+import com.aelitis.azureus.core.tag.TagManagerFactory;
+import com.aelitis.azureus.core.tag.TagType;
 
 /**
  * This thread is responsible for monitoring the user-configured schedules
@@ -255,6 +265,8 @@ public class SpeedSchedulerThread extends Thread implements ScheduleChangeListen
 					Log.println( "Not notifying schedule selection listeners, since the schedules chosen did not change.", Log.DEBUG );
 				}
 
+				boolean use_tags = SpeedSchedulerPlugin.getInstance().getUseTagsNotCategories();
+
 				TorrentAttribute[] tas = pluginInterface.getTorrentManager().getDefinedAttributes();
 				TorrentAttribute torrent_categories = null;
 				for (int i = 0; i < tas.length; i++) {
@@ -266,7 +278,9 @@ public class SpeedSchedulerThread extends Thread implements ScheduleChangeListen
 						break;
 					}
 				}
-
+	
+				TagManager tag_manager = TagManagerFactory.getTagManager();
+				
 				// First check to see if downloads are paused now. If so, turn off all downloads
 				if( downloadsPaused ) {                	
 					Download[] torrents = pluginInterface.getDownloadManager().getDownloads();
@@ -275,8 +289,8 @@ public class SpeedSchedulerThread extends Thread implements ScheduleChangeListen
 
 						//Do we have a 'Not in'?
 						boolean not_in = false;
-						String torrent_cat = d.getAttribute(torrent_categories);
-						if(torrent_cat==null) torrent_cat = "Uncategorized";
+						String torrent_cat = getDownloadCatOrTag( use_tags, torrent_categories, tag_manager, d );
+						
 						Iterator ex = categoryExclude.iterator();
 						
 						while(ex.hasNext())
@@ -305,8 +319,8 @@ public class SpeedSchedulerThread extends Thread implements ScheduleChangeListen
 
 						//Do we have a in?
 						boolean in = false;
-						String torrent_cat = d.getAttribute(torrent_categories);
-						if(torrent_cat==null) torrent_cat = "Uncategorized";
+						String torrent_cat = getDownloadCatOrTag( use_tags, torrent_categories, tag_manager, d );
+						
 						Iterator on = categoryOnly.iterator();
 						while(on.hasNext())
 						{
@@ -337,8 +351,8 @@ public class SpeedSchedulerThread extends Thread implements ScheduleChangeListen
 						Download d = torrents[i];
 //						Do we have a not in?
 						boolean not_in = false;
-						String torrent_cat = d.getAttribute(torrent_categories);
-						if(torrent_cat==null) torrent_cat = "Uncategorized";
+						String torrent_cat = getDownloadCatOrTag( use_tags, torrent_categories, tag_manager, d );
+						
 						Iterator ex = categoryExclude.iterator();
 						while(ex.hasNext())
 						{
@@ -369,8 +383,8 @@ public class SpeedSchedulerThread extends Thread implements ScheduleChangeListen
 
 //						Do we have a Only?
 						boolean only = false;
-						String torrent_cat = d.getAttribute(torrent_categories);
-						if(torrent_cat==null) torrent_cat = "Uncategorized";
+						String torrent_cat = getDownloadCatOrTag( use_tags, torrent_categories, tag_manager, d );
+						
 						Iterator on = categoryOnly.iterator();
 						while(on.hasNext())
 						{
@@ -441,7 +455,47 @@ public class SpeedSchedulerThread extends Thread implements ScheduleChangeListen
 
 	}
 
-
+	private String
+	getDownloadCatOrTag(
+		boolean				use_tags,
+		TorrentAttribute	torrent_categories,
+		TagManager			tag_manager,
+		Download			d )
+	{
+		if ( use_tags ){
+			
+			List<Tag> tags = tag_manager.getTagsForTaggable( TagType.TT_DOWNLOAD_MANUAL, PluginCoreUtils.unwrap( d ));
+			
+			if ( tags.size() == 0 ){
+				
+				return( "" );
+				
+			}else if ( tags.size() == 1 ){
+				
+				return( tags.get(0).getTagName( true ));
+				
+			}else{
+				
+				Collections.sort(
+					tags,
+					new Comparator<Tag>()
+					{
+						public int compare(Tag o1, Tag o2) {
+							return( o1.getTagName( true ).compareTo( o2.getTagName( true )));
+						}
+					});
+				
+				return( tags.get(0).getTagName( true ));
+			}
+		}else{
+			String torrent_cat = d.getAttribute(torrent_categories);
+			
+			if (torrent_cat==null) torrent_cat = "Uncategorized";
+			
+			return( torrent_cat );
+		}
+	}
+	
 
 	// ----------------------------------------------------------
 	// All methods below are used for pausing/unpausing Torrents.
