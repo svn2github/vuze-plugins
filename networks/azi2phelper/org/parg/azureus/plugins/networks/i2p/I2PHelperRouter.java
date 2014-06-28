@@ -841,31 +841,39 @@ I2PHelperRouter
 			return( adapter.getMessageText( "azi2phelper.status.initialising" ));
 		}
 
-		RouterContext router_ctx = router.getContext();
-		
-		FIFOBandwidthLimiter bwl = router_ctx.bandwidthLimiter();
-		
-		long recv_rate = (long)bwl.getReceiveBps();
-		long send_rate = (long)bwl.getSendBps();
-		
-		long send_limit = bwl.getOutboundKBytesPerSecond()*1024;
-		long recv_limit = bwl.getInboundKBytesPerSecond()*1024;
-		
-		String recv_limit_str = recv_limit > 50*1024*1024?"": (	"[" + DisplayFormatters.formatByteCountToKiBEtcPerSec(recv_limit) + "] " );
-		String send_limit_str = send_limit > 50*1024*1024?"": (	"[" + DisplayFormatters.formatByteCountToKiBEtcPerSec(send_limit) + "] " );
-		
-		String router_str = 
-			adapter.getMessageText( "azi2phelper.status.router",
-					router_ctx.throttle().getTunnelStatus(),
-					recv_limit_str + DisplayFormatters.formatByteCountToKiBEtcPerSec(recv_rate),
-					send_limit_str + DisplayFormatters.formatByteCountToKiBEtcPerSec(send_rate));
-
-		if ( dht_status.length() > 0 ){
+		try{
+				// can get various NPEs in this chunk when things are closing down so just whatever
 			
-			dht_status += "\n";
+			RouterContext router_ctx = router.getContext();
+			
+			FIFOBandwidthLimiter bwl = router_ctx.bandwidthLimiter();
+			
+			long recv_rate = (long)bwl.getReceiveBps();
+			long send_rate = (long)bwl.getSendBps();
+			
+			long send_limit = bwl.getOutboundKBytesPerSecond()*1024;
+			long recv_limit = bwl.getInboundKBytesPerSecond()*1024;
+			
+			String recv_limit_str = recv_limit > 50*1024*1024?"": (	"[" + DisplayFormatters.formatByteCountToKiBEtcPerSec(recv_limit) + "] " );
+			String send_limit_str = send_limit > 50*1024*1024?"": (	"[" + DisplayFormatters.formatByteCountToKiBEtcPerSec(send_limit) + "] " );
+			
+			String router_str = 
+				adapter.getMessageText( "azi2phelper.status.router",
+						router_ctx.throttle().getTunnelStatus(),
+						recv_limit_str + DisplayFormatters.formatByteCountToKiBEtcPerSec(recv_rate),
+						send_limit_str + DisplayFormatters.formatByteCountToKiBEtcPerSec(send_rate));
+	
+			if ( dht_status.length() > 0 ){
+				
+				dht_status += "\n";
+			}
+			
+			return( dht_status + router_str );
+			
+		}catch( Throwable e ){
+			
+			return( dht_status );
 		}
-		
-		return( dht_status + router_str );
 	}
 	
 	protected interface

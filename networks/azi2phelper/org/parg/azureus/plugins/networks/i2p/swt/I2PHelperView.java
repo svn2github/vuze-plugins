@@ -266,7 +266,7 @@ I2PHelperView
 				first_stats_item = stats_item;
 			}
 			
-			stats_item.setText( plugin.getMessageText("azi2phelper.ui.dht_stats") + (i==0?"":(" " + String.valueOf(i))));
+			stats_item.setText( plugin.getMessageText("azi2phelper.ui.dht_stats" + i ));
 			
 			DHTView dht_view = dht_views[i] = new DHTView( false );
 			Composite stats_comp = new Composite( tab_folder, SWT.NULL );
@@ -286,7 +286,7 @@ I2PHelperView
 			
 			CTabItem ops_item = new CTabItem(tab_folder, SWT.NULL);
 	
-			ops_item.setText( plugin.getMessageText("azi2phelper.ui.dht_graph")  + (i==0?"":(" " + String.valueOf(i))));
+			ops_item.setText( plugin.getMessageText("azi2phelper.ui.dht_graph" + i ));
 			
 			DHTOpsView ops_view = ops_views[i] = new DHTOpsView( false, false );
 			Composite ops_comp = new Composite( tab_folder, SWT.NULL );
