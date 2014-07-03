@@ -19,9 +19,12 @@
 
 package com.aimedia.autocat2.matching;
 
+import java.util.List;
 import java.util.regex.Matcher;
 
+import org.gudy.azureus2.core3.util.TorrentUtils;
 import org.gudy.azureus2.plugins.torrent.Torrent;
+import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 
 /**
  * , created 9-Apr-2005
@@ -37,10 +40,23 @@ public class TrackerURLMatcher extends TorrentMatcher {
     /*
      * @see com.aimedia.autocat2.matching.IMatcher#match(org.gudy.azureus2.plugins.torrent.Torrent)
      */
-    public boolean match (final Torrent torrent) {
-        // TODO Possibly handle mutliple announce URLS
-        final Matcher m = getTriggerPattern ().matcher (torrent.getAnnounceURL ().toString ());
-        return m.find ();
-    }
+    public boolean match (Torrent torrent) {
+     
+    	List<List<String>> all_urls = TorrentUtils.announceGroupsToList(PluginCoreUtils.unwrap( torrent ));
+    	
+    	for ( List<String> l: all_urls ){
+    		
+    		for ( String url: l ){
+    	
+    			Matcher m = getTriggerPattern().matcher( url );
 
+    			if ( m.find()){
+    				
+    				return( true );
+    			}
+    		}
+    	}
+    	
+    	return( false );
+    }
 }

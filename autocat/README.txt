@@ -1,4 +1,4 @@
-AutoCat 1.0.0
+AutoCat 1.2.3
 Copyright(c) 2005 Chris Rose and AIMedia.
 (GPL, blah blah...)
 
@@ -38,6 +38,8 @@ Version History
       behaviour ([ACAT-5](http://offby1.no-ip.org:8080/browse/ACAT-5))
 
 1.2.2 - Added switch to assign downloads to Tags as opposed to Categories (parg)
+
+1.2.3 - Match all torrent URLs, not just the main one (parg)
 
 If you have not received this file either from http://azureus.sourceforge.net/
 or http://offby1.net/ I would suggest that you do so, since anyone could
