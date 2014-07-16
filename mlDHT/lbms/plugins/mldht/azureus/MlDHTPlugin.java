@@ -522,7 +522,16 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 								replyReceived(
 									InetSocketAddress from_node) 
 								{
-									alt_contact_handler.nodeAlive( from_node );
+									if ( alt_contact_handler != null ){
+									
+										try{
+											alt_contact_handler.nodeAlive( from_node );
+											
+										}catch( Throwable e ){
+											
+											Debug.out( e );
+										}
+									}
 								}
 							};
 							
