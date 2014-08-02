@@ -143,6 +143,8 @@ I2PHelperPlugin
         		// PARG added search via plugin class loader as well
         		resource = NativeBigInteger.class.getClassLoader().getResource(resourceName);
         	}
+        	
+        CoreVersion: Added a getVersion method to avoid constant getting cached within Vuze when printing it
 	*/
 	
 	private static final String	BOOTSTRAP_SERVER = "http://i2pboot.vuze.com:60000/?getNodes=true";
@@ -1072,7 +1074,7 @@ I2PHelperPlugin
 		String				cmd_str,
 		I2PHelperRouter		router,
 		I2PHelperTracker	tracker,
-		I2PHelperAdapter	log )
+		I2PHelperAdapter	adapter )
 		
 		throws Exception
 	{
@@ -1082,11 +1084,11 @@ I2PHelperPlugin
 
 		if ( bits.length == 0 ){
 			
-			log.log( "No command" );
+			adapter.log( "No command" );
 			
 		}else if ( router == null ){
 			
-			log.log( "Router is not initialised" );
+			adapter.log( "Router is not initialised" );
 			
 		}else{
 		
@@ -1094,7 +1096,7 @@ I2PHelperPlugin
 			
 			if ( dht == null ){
 				
-				log.log( "DHT is not initialised" );
+				adapter.log( "DHT is not initialised" );
 				
 			}else{
 				
@@ -1121,11 +1123,11 @@ I2PHelperPlugin
 					
 					if ( dest == null ){
 						
-						log.log( "lookup failed" );
+						adapter.log( "lookup failed" );
 						
 					}else{
 					
-						log.log( "lookup -> " + dest.toBase64());
+						adapter.log( "lookup -> " + dest.toBase64());
 					}		
 				}else if ( cmd.equals( "get" )){
 					
@@ -1149,7 +1151,7 @@ I2PHelperPlugin
 				
 					tracker.put( hash );
 
-				}else if ( cmd.equals( "ping_dest" )){
+				}else if ( cmd.equals( "ping_dest" ) || cmd.equals( "az_ping_dest" )){
 					
 					if ( bits.length != 3 ){
 					
@@ -1164,7 +1166,66 @@ I2PHelperPlugin
 					
 					dest.fromBase64( dest_64 );
 					
-					dht.ping( dest, port );
+					dht.ping( dest, port, cmd.startsWith( "az" ));
+				
+				}else if ( cmd.equals( "az_find_node" )){
+
+					if ( bits.length != 4 ){
+						
+						throw( new Exception( "usage: az_find_node <base64_dest> <dht_port> node_id"));
+					}
+					
+					String dest_64 = bits[1];
+					
+					int		port 	= Integer.parseInt( bits[2] );
+					
+					Destination dest = new Destination();
+					
+					dest.fromBase64( dest_64 );
+					
+					byte[]	node_id = decodeHash( bits[3] ); 
+							
+					dht.findNode( dest, port, node_id );
+					
+				}else if ( cmd.equals( "az_find_value" )){
+
+					if ( bits.length != 4 ){
+						
+						throw( new Exception( "usage: az_find_value <base64_dest> <dht_port> id"));
+					}
+					
+					String dest_64 = bits[1];
+					
+					int		port 	= Integer.parseInt( bits[2] );
+					
+					Destination dest = new Destination();
+					
+					dest.fromBase64( dest_64 );
+					
+					byte[]	node_id = decodeHash( bits[3] ); 
+							
+					dht.findValue( dest, port, node_id );
+					
+				}else if ( cmd.equals( "az_store" )){
+
+					if ( bits.length != 5 ){
+						
+						throw( new Exception( "usage: az_store <base64_dest> <dht_port> key value"));
+					}
+					
+					String dest_64 = bits[1];
+					
+					int		port 	= Integer.parseInt( bits[2] );
+					
+					Destination dest = new Destination();
+					
+					dest.fromBase64( dest_64 );
+					
+					byte[]	key = decodeHash( bits[3] ); 
+							
+					byte[] value = bits[4].getBytes( "UTF-8" );
+					
+					dht.store( dest, port, key, value );
 					
 				}else if ( cmd.equals( "ping_node" )){
 
@@ -1179,7 +1240,7 @@ I2PHelperPlugin
 					
 					if ( ni == null ){
 						
-						log.log( "Node not found in routing table" );
+						adapter.log( "Node not found in routing table" );
 						
 					}else{
 						
@@ -1196,11 +1257,16 @@ I2PHelperPlugin
 					
 					for ( NodeInfo node: nodes ){
 						
-						log.log( "    " + node.toString());
+						adapter.log( "    " + node.toString());
 					}
+					
+				}else if ( cmd.equals( "extboot" )){
+					
+					adapter.tryExternalBootstrap( dht, true );
+					
 				}else{
 			
-					log.log( "Usage: print|info..." );
+					adapter.log( "Usage: print|info..." );
 				}
 			}
 		}	
@@ -1306,7 +1372,7 @@ I2PHelperPlugin
 					
 						// these have no NID yet
 					
-					dht.ping( ni.getDestination(), ni.getPort());
+					dht.ping( ni.getDestination(), ni.getPort(), false );
 				}
 				
 				if ( temp.size() > 5 ){

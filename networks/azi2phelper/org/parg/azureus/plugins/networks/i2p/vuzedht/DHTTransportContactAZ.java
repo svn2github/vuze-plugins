@@ -1,5 +1,5 @@
 /*
- * Created on Apr 16, 2014
+ * Created on Jul 16, 2014
  * Created by Paul Gardner
  * 
  * Copyright 2014 Azureus Software, Inc.  All rights reserved.
@@ -40,82 +40,28 @@ import com.aelitis.azureus.core.dht.transport.DHTTransportException;
 import com.aelitis.azureus.core.dht.transport.DHTTransportFullStats;
 import com.aelitis.azureus.core.dht.transport.DHTTransportReplyHandler;
 import com.aelitis.azureus.core.dht.transport.DHTTransportValue;
+import com.aelitis.azureus.core.dht.transport.udp.DHTTransportUDP;
 
 public class 
-DHTTransportContactI2P 
+DHTTransportContactAZ
 	implements DHTTransportContact
 {
-	protected static final byte[]	DEFAULT_TOKEN = {};
-	
-	private DHTTransportI2P		transport;
-	private NodeInfo			node;
-	private byte				version;
-	private int					instance_id;
-	private long				skew;
-	private byte				generic_flags;
-	
-	private InetSocketAddress	address;
-	
-	private byte[]				id;
-	
-	
-	private byte[]				random_id	= DEFAULT_TOKEN;
-	private long				random_id_set_time;				
+	private DHTTransportAZ			transport;
+	private DHTTransportContactI2P	basis;
 	
 	protected
-	DHTTransportContactI2P(
-		DHTTransportI2P		_transport,
-		NodeInfo			_node,
-		byte				_version,
-		int					_instance_id,
-		long				_skew,
-		byte				_generic_flags )
+	DHTTransportContactAZ(
+		DHTTransportAZ			_transport,
+		DHTTransportContactI2P	_basis )
 	{
-		transport 		= _transport;
-		node			= _node;
-		version			= _version;
-		instance_id		= _instance_id;
-		skew			= _skew;
-		generic_flags	= _generic_flags;
-		
-		String 	host = Base32.encode( node.getHash().getData())  + ".b32.i2p";
-		
-		address = InetSocketAddress.createUnresolved( host, node.getPort());
-
-		id		= node.getNID().getData();
+		transport		= _transport;
+		basis			= _basis;
 	}
 	
-	protected void
-	setDetails(
-		int			_instance_id,
-		byte		_flags )
+	protected DHTTransportContactI2P
+	getBasis()
 	{
-		instance_id		= _instance_id;
-		generic_flags	= _flags;
-	}
-	
-	protected void
-	setDetails(
-		int			_instance_id,
-		long		_skew,
-		byte		_flags )
-	{
-		instance_id		= _instance_id;
-		skew			= _skew;
-		generic_flags	= _flags;
-	}
-	
-	protected NodeInfo
-	getNode()
-	{
-		return( node );
-	}
-	
-	protected void
-	setProtocolVersion(
-		byte		_version )
-	{
-		version	= _version;
+		return( basis );
 	}
 	
 	public int
@@ -133,31 +79,27 @@ DHTTransportContactI2P
 	public int
 	getInstanceID()
 	{
-		return( instance_id );
+		return( basis.getInstanceID());
 	}
 	
 	public byte[]
 	getID()
 	{
-		return( id );
+		return( basis.getID());
 	}
 	
 	public byte
 	getProtocolVersion()
 	{
-		return( version );
+			// TODO: There is some interaction with the protocol version and the DHTControlImpl etc
+		
+		return( basis.getProtocolVersion());
 	}
 	
 	public long
 	getClockSkew()
 	{
-		return( skew );
-	}
-	
-	protected byte
-	getGenericFlags()
-	{
-		return( generic_flags );
+		return( basis.getClockSkew());
 	}
 	
 	public int
@@ -185,56 +127,49 @@ DHTTransportContactI2P
 	setRandomID2(
 		byte[]		id )
 	{
-		random_id = id;
-		
-		random_id_set_time = SystemTime.getMonotonousTime();
+		basis.setRandomID2( id );
 	}
 	
 	protected long
 	getRandomID2Age()
 	{
-		if ( random_id_set_time == 0  ){
-			
-			return( -1 );
-		}
-		
-		return( SystemTime.getMonotonousTime() - random_id_set_time );
+		return( basis.getRandomID2Age());
 	}
 	
 	public byte[]
 	getRandomID2()
 	{
-		return( random_id );
+		return( basis.getRandomID2());
 	}
 	
 	public String
 	getName()
 	{
-		return( address.toString());
+		return( basis.getName());
 	}
 	
 	public byte[]
 	getBloomKey()
 	{
-		return( node.getHash().getData());
+		return( basis.getBloomKey());
 	}
 	
 	public InetSocketAddress
 	getAddress()
 	{
-		return( address );
+		return( basis.getAddress());
 	}
 	
 	public InetSocketAddress
 	getTransportAddress()
 	{
-		return( address );
+		return( getAddress());
 	}
 	
 	public InetSocketAddress
 	getExternalAddress()
 	{
-		return( address );
+		return( getAddress());
 	}
 	
 	public boolean
@@ -263,7 +198,7 @@ DHTTransportContactI2P
 	public boolean
 	isSleeping()
 	{
-		return( false );
+		return(( basis.getGenericFlags() & DHTTransportUDP.GF_DHT_SLEEPING ) != 0 );
 	}
 	
 	public void
@@ -329,7 +264,7 @@ DHTTransportContactI2P
 		int							max_values,
 		short						flags )
 	{
-		transport.sendFindValue( handler, this, key, flags );
+		transport.sendFindValue( handler, this, key, max_values, flags );
 	}
 		
 	public void
@@ -355,7 +290,7 @@ DHTTransportContactI2P
 	
 		throws IOException, DHTTransportException
 	{
-		transport.exportContact( os, this );
+		basis.exportContact( os );
 	}
 	
 	public void
@@ -392,6 +327,6 @@ DHTTransportContactI2P
 	public String
 	getString()
 	{
-		return( getName() + ",nid=" + ByteFormatter.encodeString( node.getNID().getData()) + ",v=" + version);
+		return( "AZ:" + basis.getString());
 	}
 }

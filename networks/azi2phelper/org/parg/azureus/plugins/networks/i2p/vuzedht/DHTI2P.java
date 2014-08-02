@@ -40,6 +40,7 @@ import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.gudy.azureus2.core3.util.TimerEventPeriodic;
 import org.gudy.azureus2.plugins.PluginInterface;
+import org.parg.azureus.plugins.networks.i2p.I2PHelperAZDHT;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperDHT;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperAdapter;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperDHTListener;
@@ -53,6 +54,7 @@ import com.aelitis.azureus.core.dht.DHTOperationAdapter;
 import com.aelitis.azureus.core.dht.control.DHTControlContact;
 import com.aelitis.azureus.core.dht.router.DHTRouter;
 import com.aelitis.azureus.core.dht.router.DHTRouterContact;
+import com.aelitis.azureus.core.dht.router.DHTRouterStats;
 import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
 import com.aelitis.azureus.core.dht.transport.DHTTransportValue;
 import com.aelitis.azureus.core.util.CopyOnWriteList;
@@ -62,21 +64,14 @@ public class
 DHTI2P
 	implements DHTLogger, I2PHelperDHT
 {
-	public static final int		DHT_VERSION_NON_VUZE		= 0;
-	public static final int		DHT_VERSION_INITIAL			= 1;	// testing adding version to messages
-	
-	public static final int		DHT_VERSION		= DHT_VERSION_INITIAL;
-	
-	public static final int		DHT_NETWORK		= 10;
-	
+		
 		// increased as snark 0.9.13-2 increased expiry to 3 hours along with num-stores to 4. given that
 		// we store at 20 it seems reasonable to bump this up. Remember though that snark re-announces fairly
 		// frequently whereas we only re-announce if things change
 	
 	public static final int		REPUBLISH_PERIOD	= (int)( 1.5*60*60*1000 );		// 40*60*1000;
-	
-	private static final int	REQUEST_TIMEOUT	= 45*1000;
 		
+	private final File					dir;
 	private final int					dht_index;
 	private DHT 						dht;
 	private DHTTransportI2P				transport;
@@ -85,6 +80,9 @@ DHTI2P
 	private I2PHelperAdapter			adapter;
 	
 	private NodeInfo					bootstrap_node;
+	
+	private I2PHelperAZDHT			az_dht_helper;
+	private DHTAZ					az_dht;
 	
 	private TimerEventPeriodic		timer;
 	
@@ -115,13 +113,14 @@ DHTI2P
 	
 	public 
 	DHTI2P(
-		File				dir,
+		File				_dir,
 		int					_dht_index,
 		I2PSession			session,
 		NodeInfo			_my_node,
 		NodeInfo			boot_node,
 		I2PHelperAdapter	_adapter )
 	{
+		dir			= _dir;
 		dht_index	= _dht_index;
 		my_node		= _my_node;
 		adapter		= _adapter;
@@ -137,9 +136,9 @@ DHTI2P
 		
 		bootstrap_node	= boot_node;
 		
-		storage_manager = new DHTPluginStorageManager( DHT_NETWORK, this, storage_dir );
+		storage_manager = new DHTPluginStorageManager( DHTUtilsI2P.DHT_NETWORK, this, storage_dir );
 
-		transport = new DHTTransportI2P( session, my_node, REQUEST_TIMEOUT );
+		transport = new DHTTransportI2P( session, my_node, DHTUtilsI2P.REQUEST_TIMEOUT );
 				
 		Properties	props = new Properties();
 		
@@ -166,6 +165,10 @@ DHTI2P
 				null,
 				this );
 		
+		az_dht = new DHTAZ( this, adapter );
+		
+		az_dht_helper = new I2PHelperAZDHT( az_dht );
+		
 		storage_manager.importContacts( dht );
 		
 		DHTTransportContactI2P boot_contact = boot_node==null?null:transport.importContact( boot_node, true );
@@ -186,6 +189,8 @@ DHTI2P
 				
 				private volatile boolean bootstrapping;
 				
+				private boolean	seeded;
+				
 				@Override
 				public void
 				perform(
@@ -199,6 +204,16 @@ DHTI2P
 					}
 					
 					tick_count++;
+					
+					if ( !seeded ){
+					
+						if ( dht.getControl().isSeeded()){
+					
+							seeded = true;
+							
+							az_dht.setSeeded();
+						}
+					}
 					
 					if ( tick_count % cache_check_ticks == 0 ){
 						
@@ -281,6 +296,24 @@ DHTI2P
 		return( my_address );
 	}
 	
+	protected File
+	getDir()
+	{
+		return( dir );
+	}
+	
+	public I2PHelperAZDHT
+	getHelperAZDHT()
+	{
+		return( az_dht_helper );
+	}
+	
+	public DHTAZ
+	getAZDHT()
+	{
+		return( az_dht );
+	}
+	
 	public int
 	getQueryPort()
 	{
@@ -297,6 +330,18 @@ DHTI2P
 	getDHT()
 	{
 		return( dht );
+	}
+	
+	protected int
+	getDHTIndex()
+	{
+		return( dht_index );
+	}
+	
+	public DHTTransportI2P
+	getTransport()
+	{
+		return( transport );
 	}
 	
 	/*
@@ -342,9 +387,81 @@ DHTI2P
 	public void
 	ping(
 		Destination		destination,
-		int				port )
+		int				port,
+		boolean			az )
 	{
-		transport.sendPing( destination, port );
+		if ( az ){
+			
+			DHTTransportContactI2P contact = 
+				new DHTTransportContactI2P( 
+						transport, 
+						new NodeInfo( destination, port ), 
+						DHTUtilsI2P.PROTOCOL_VERSION,
+						0,
+						0,
+						(byte)0 );
+			
+			az_dht.ping( contact );
+			
+		}else{
+		
+			transport.sendPing( destination, port );
+		}
+	}
+	
+	public void
+	findNode(
+		Destination		destination,
+		int				port,
+		byte[]			id )
+	{
+		DHTTransportContactI2P contact = 
+				new DHTTransportContactI2P( 
+						transport, 
+						new NodeInfo( destination, port ), 
+						DHTUtilsI2P.PROTOCOL_VERSION,
+						0,
+						0,
+						(byte)0 );
+			
+		az_dht.findNode( contact, id );
+	}
+	
+	public void
+	findValue(
+		Destination		destination,
+		int				port,
+		byte[]			id )
+	{
+		DHTTransportContactI2P contact = 
+				new DHTTransportContactI2P( 
+						transport, 
+						new NodeInfo( destination, port ), 
+						DHTUtilsI2P.PROTOCOL_VERSION,
+						0,
+						0,
+						(byte)0 );
+			
+		az_dht.findValue( contact, id );
+	}
+	
+	public void
+	store(
+		Destination		destination,
+		int				port,
+		byte[]			key,
+		byte[]			value )
+	{
+		DHTTransportContactI2P contact = 
+				new DHTTransportContactI2P( 
+						transport, 
+						new NodeInfo( destination, port ), 
+						DHTUtilsI2P.PROTOCOL_VERSION,
+						0,
+						0,
+						(byte)0 );
+			
+		az_dht.store( contact, key, value );	
 	}
 	
 	public void
@@ -1043,7 +1160,7 @@ DHTI2P
 	public String
 	getStats()
 	{
-		return( transport.getStats().getString());
+		return( transport.getStats().getString() + "/" + az_dht.getDHT().getTransport().getStats().getString() + ":" + az_dht.getDHT().getRouter().getStats().getStats()[DHTRouterStats.ST_CONTACTS]);
 	}
 	
 	public String 
@@ -1057,7 +1174,7 @@ DHTI2P
 					
 		}else{
 		
-			return( adapter.getMessageText( "azi2phelper.status.node.est", String.valueOf( size )));
+			return( adapter.getMessageText( "azi2phelper.status.node.est", String.valueOf( size ) + "/" + az_dht.getDHT().getControl().getStats().getEstimatedDHTSize()));
 		}
 	}
 	
@@ -1125,7 +1242,7 @@ DHTI2P
 					String 	host 	=  Base32.encode( value.getValue()) + ".b32.i2p";
 					boolean	is_seed = ( value.getFlags() & DHT.FLAG_SEEDING ) != 0;
 
-					int	state = is_seed?I2PHelperDHTListener.CS_SEED:(contact.getVersion()==DHTI2P.DHT_VERSION_NON_VUZE?I2PHelperDHTListener.CS_UNKNOWN:I2PHelperDHTListener.CS_LEECH );
+					int	state = is_seed?I2PHelperDHTListener.CS_SEED:(contact.getProtocolVersion()==DHTUtilsI2P.PROTOCOL_VERSION_NON_VUZE?I2PHelperDHTListener.CS_UNKNOWN:I2PHelperDHTListener.CS_LEECH );
 					
 					try{
 						listener.valueRead( contact, host, state );
@@ -1177,7 +1294,7 @@ DHTI2P
 				
 				boolean	is_seed = ( value.getFlags() & DHT.FLAG_SEEDING ) != 0;
 					
-				int	state = is_seed?I2PHelperDHTListener.CS_SEED:(contact.getVersion()==DHTI2P.DHT_VERSION_NON_VUZE?I2PHelperDHTListener.CS_UNKNOWN:I2PHelperDHTListener.CS_LEECH );
+				int	state = is_seed?I2PHelperDHTListener.CS_SEED:(contact.getProtocolVersion()==DHTUtilsI2P.PROTOCOL_VERSION_NON_VUZE?I2PHelperDHTListener.CS_UNKNOWN:I2PHelperDHTListener.CS_LEECH );
 				
 				for ( I2PHelperDHTListener listener: listeners ){
 			

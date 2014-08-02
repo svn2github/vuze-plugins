@@ -73,6 +73,7 @@ import com.aelitis.azureus.core.dht.transport.DHTTransportRequestHandler;
 import com.aelitis.azureus.core.dht.transport.DHTTransportStats;
 import com.aelitis.azureus.core.dht.transport.DHTTransportTransferHandler;
 import com.aelitis.azureus.core.dht.transport.DHTTransportValue;
+import com.aelitis.azureus.core.dht.transport.udp.DHTTransportUDP;
 import com.aelitis.azureus.core.dht.transport.util.DHTTransportRequestCounter;
 import com.aelitis.azureus.core.dht.transport.util.DHTTransportStatsImpl;
 import com.aelitis.azureus.util.MapUtils;
@@ -82,9 +83,6 @@ DHTTransportI2P
 	implements DHTTransport, I2PSessionMuxedListener
 {
 	private static final boolean TRACE = false;
-	
-	private static final byte PROTOCOL_VERSION		= 1;
-	private static final byte PROTOCOL_VERSION_MIN	= 1;
 	
 	private static final int NUM_WANT	= 16;
 	
@@ -99,11 +97,14 @@ DHTTransportI2P
 	private DHTTransportContactI2P		local_contact;
 	
 	private DHTTransportRequestHandler	request_handler;
+	private AZRequestHandler			az_request_handler;
 	
 	private TimerEventPeriodic 			timer_event;
 	
 	private long						request_timeout;
 	
+	private byte						generic_flags	= DHTTransportUDP.GF_NONE;
+
 	private static final int TOKEN_MAP_MAX = 512;
 	
 	private Map<HashWrapper,NodeInfo>	token_map =
@@ -137,7 +138,12 @@ DHTTransportI2P
 		
 		stats = new DHTTransportStatsI2P();
 				
-		local_contact = new DHTTransportContactI2P( this, my_node, DHTI2P.DHT_VERSION );
+		local_contact = 
+			new DHTTransportContactI2P( 
+				this, 
+				my_node, 
+				DHTUtilsI2P.PROTOCOL_VERSION,
+				RandomUtils.nextAbsoluteInt(), 0, (byte)0 );
 		
         session.addMuxedSessionListener( this, I2PSession.PROTO_DATAGRAM_RAW, reply_port );
         session.addMuxedSessionListener( this, I2PSession.PROTO_DATAGRAM, query_port );
@@ -170,9 +176,25 @@ DHTTransportI2P
 		NodeInfo		node,
 		boolean			is_bootstrap )
 	{
-		DHTTransportContactI2P	contact = new DHTTransportContactI2P( this, node, 0 );
+		DHTTransportContactI2P	contact = new DHTTransportContactI2P( this, node, (byte)0, 0, 0, (byte)0 );
 		
 		request_handler.contactImported( contact, is_bootstrap );
+		
+		return( contact );
+	}
+	
+	protected DHTTransportContactI2P
+	importContact(
+		byte[]		hash,
+		int			port,
+		byte[]		id,
+		int			version )
+	{
+		NodeInfo node = new NodeInfo( new NID( id), new Hash( hash ), port );
+		
+		DHTTransportContactI2P	contact = new DHTTransportContactI2P( this, node, (byte)version, 0, 0, (byte)0 );
+		
+		request_handler.contactImported( contact, false );
 		
 		return( contact );
 	}
@@ -211,19 +233,19 @@ DHTTransportI2P
 	public byte
 	getProtocolVersion()
 	{
-		return( PROTOCOL_VERSION );
+		return( DHTUtilsI2P.PROTOCOL_VERSION );
 	}
 	
 	public byte
 	getMinimumProtocolVersion()
 	{
-		return( PROTOCOL_VERSION_MIN );
+		return( DHTUtilsI2P.PROTOCOL_VERSION_MIN );
 	}
 	
 	public int
 	getNetwork()
 	{
-		return( DHTI2P.DHT_NETWORK );
+		return( DHTUtilsI2P.DHT_NETWORK );
 	}
 
 	public boolean
@@ -235,7 +257,7 @@ DHTTransportI2P
 	public byte
 	getGenericFlags()
 	{
-		return( 0 );
+		return( generic_flags );
 	}
 	
 	public void
@@ -243,7 +265,17 @@ DHTTransportI2P
 		byte		flag,
 		boolean		value )
 	{
-		
+		synchronized( this ){
+			
+			if ( value ){
+				
+				generic_flags |= flag;
+				
+			}else{
+				
+				generic_flags &= ~flag;
+			}
+		}
 	}
 	
 	public void
@@ -341,7 +373,7 @@ DHTTransportI2P
 		
 		DHTUtilsI2P.serialiseByteArray( os, b_dest, 512 );
 		
-		os.writeInt( contact.getVersion());
+		os.writeInt( contact.getProtocolVersion());
 	}
 	
 	public DHTTransportContact
@@ -393,7 +425,7 @@ DHTTransportI2P
 			contact_version = 0;
 		}
 		
-		DHTTransportContact contact = new DHTTransportContactI2P( this, node, contact_version );
+		DHTTransportContact contact = new DHTTransportContactI2P( this, node, (byte)contact_version, 0, 0, (byte)0 );
 		
 		request_handler.contactImported( contact, is_bootstrap );
 
@@ -414,6 +446,13 @@ DHTTransportI2P
 		request_handler	= new DHTTransportRequestCounter( _request_handler, stats );
 	}
 	
+	public void
+	setAZRequestHandler(
+		AZRequestHandler		_azrh )
+	{
+		az_request_handler = _azrh;
+	}
+	
 	public DHTTransportStats
 	getStats()
 	{
@@ -422,8 +461,6 @@ DHTTransportI2P
 	
 		// RPCs
 	
-	final int DEST_LOOKUP_TIMEOUT = 20*1000;
-
 	private HashMap<HashWrapper,Request>		requests = new HashMap<HashWrapper, Request>();
 	
 	public void
@@ -464,7 +501,7 @@ DHTTransportI2P
 	        final AESemaphore sem = new AESemaphore( "i2p:wait" );
 	        
 	        sendQuery( 
-	        	new ReplyHandler()
+	        	new ReplyHandlerAdapter()
 	        	{
 	        		@Override
 	        		public void 
@@ -521,7 +558,7 @@ DHTTransportI2P
 	        map.put( "a", args );
 	        
 	        sendQuery( 
-	        	new ReplyHandler()
+	        	new ReplyHandlerAdapter()
 	        	{
 	        		@Override
 	        		public void 
@@ -531,7 +568,7 @@ DHTTransportI2P
 	        		{
 	        			if ( TRACE ) trace( "good pingReply" );
 	        			
-	        			contact.setVersion( originator_version );
+	        			contact.setProtocolVersion((byte)originator_version );
 	        			
 	        			handler.pingReply( contact, -1 );
 	        			
@@ -608,7 +645,7 @@ DHTTransportI2P
 	        final AESemaphore sem = new AESemaphore( "i2p:wait" );
 	        
 	        sendQuery( 
-	        	new ReplyHandler()
+	        	new ReplyHandlerAdapter()
 	        	{
 	        		@Override
 	        		public void 
@@ -622,7 +659,7 @@ DHTTransportI2P
 	        				
 	        				NodeInfo node = new NodeInfo( nodes, off );
 	        				
-	        				request_handler.contactImported( new DHTTransportContactI2P( DHTTransportI2P.this, node, 0 ), false );
+	        				request_handler.contactImported( new DHTTransportContactI2P( DHTTransportI2P.this, node, (byte)0, 0, 0, (byte)0 ), false );
 	        			}
 	        			
 	        			stats.findNodeOK();
@@ -722,7 +759,7 @@ DHTTransportI2P
 		        args.put( "target", target );
 		        
 		        sendQuery( 
-		        	new ReplyHandler()
+		        	new ReplyHandlerAdapter()
 		        	{
 		        		@Override
 		        		public void 
@@ -730,7 +767,7 @@ DHTTransportI2P
 		        			int		originator_version,
 		        			Map 	reply ) 
 		        		{
-		        			contact.setVersion( originator_version );
+		        			contact.setProtocolVersion((byte)originator_version );
 		        			
 		        			if ( TRACE ) trace( "good findNodeReply: " + reply );
 		        				        			
@@ -750,7 +787,7 @@ DHTTransportI2P
 		        				
 		        				NodeInfo node = new NodeInfo( nodes, off );
 		        				
-		        				contacts[pos++] = new DHTTransportContactI2P( DHTTransportI2P.this, node, 0 );
+		        				contacts[pos++] = new DHTTransportContactI2P( DHTTransportI2P.this, node, (byte)0, 0, 0, (byte)0 );
 		        			}
 		        			
 		        			handler.findNodeReply( contact, contacts );
@@ -849,7 +886,7 @@ DHTTransportI2P
 	        }
 	        
 	        sendQuery( 
-	        	new ReplyHandler()
+	        	new ReplyHandlerAdapter()
 	        	{
 	        		@Override
 	        		public void 
@@ -859,7 +896,7 @@ DHTTransportI2P
 	        		{
 	        			if ( TRACE ) trace( "good sendFindValue: " + reply );
 	        			
-	        			contact.setVersion( originator_version );
+	        			contact.setProtocolVersion((byte)originator_version );
 	        			
 	        			byte[]	token = (byte[])reply.get( "token" );
 	        			
@@ -880,7 +917,7 @@ DHTTransportI2P
 		        				
 		        				NodeInfo node = new NodeInfo( nodes, off );
 		        				
-		        				contacts[pos++] = new DHTTransportContactI2P( DHTTransportI2P.this, node, 0 );
+		        				contacts[pos++] = new DHTTransportContactI2P( DHTTransportI2P.this, node, (byte)0, 0, 0, (byte)0 );
 		        			}
 		        			
 		        			handler.findValueReply( contact, contacts );
@@ -985,7 +1022,7 @@ DHTTransportI2P
 			
 			byte[]	caller_hash = originator.getNode().getHash().getData();
 
-			boolean	caller_non_vuze = originator.getVersion() == DHTI2P.DHT_VERSION_NON_VUZE;
+			boolean	caller_non_vuze = originator.getProtocolVersion() == DHTUtilsI2P.PROTOCOL_VERSION_NON_VUZE;
 
 			if ( caller_non_vuze ){
 				
@@ -1079,7 +1116,7 @@ DHTTransportI2P
 			
 			if ( TRACE ) trace( "Token age: " + token_age + ", token=" + ByteFormatter.encodeString( token ));
 			
-			if ( 	contact.getVersion() == DHTI2P.DHT_VERSION_NON_VUZE &&
+			if ( 	contact.getProtocolVersion() == DHTUtilsI2P.PROTOCOL_VERSION_NON_VUZE &&
 					token_age > 9*60*1000 + 30*1000 ){
 				
 				byte[] nid = contact.getID();
@@ -1235,7 +1272,7 @@ DHTTransportI2P
 						args.put( "seed", new Long(seed?1:0));
 											
 						sendQuery( 
-								new ReplyHandler()
+								new ReplyHandlerAdapter()
 								{
 									@Override
 									public void 
@@ -1245,7 +1282,7 @@ DHTTransportI2P
 									{
 										if ( TRACE ) trace( "good sendStoreReply" );
 	
-										contact.setVersion( originator_version );
+										contact.setProtocolVersion((byte)originator_version );
 										
 										if ( report_result ){
 	
@@ -1324,6 +1361,155 @@ DHTTransportI2P
 		sendResponse( originator, message_id, map );
 	}
 	
+	
+	public void
+	sendAZRequest(
+		final AZReplyHandler				handler,
+		final DHTTransportContactI2P		contact,
+		Map<String, Object>					payload )	
+	{
+		if ( TRACE ) trace( "sendAZRequest: " + payload );
+		
+		try{
+	        Map<String, Object> map = new HashMap<String, Object>();
+	        
+	        map.put( "q", "azrequest" );
+	        
+	        Map<String, Object> args = new HashMap<String, Object>();
+	        
+	        map.put( "a", args );
+	        
+	        if ( payload != null ){
+	        
+	        	args.put( "p", payload );
+	        }
+	        
+	        byte[] token = contact.getRandomID2();
+	        
+	        if ( token != null ){
+	        	
+	        	args.put( "token", token );
+	        }
+	        
+        	sendQuery( 
+	        	new ReplyHandler()
+	        	{
+	        		@Override
+	        		public void 
+	        		packetSent(
+	        			int length ) 
+	        		{
+	        			handler.packetSent( length );
+	        		}
+	        		
+	        		@Override
+	        		public void 
+	        		packetReceived(
+	        			int length ) 
+	        		{
+	        			handler.packetReceived( length );
+	        		}
+	        		
+	        		@Override
+	        		public void 
+	        		handleReply(
+	        			int					originator_version,
+	        			Map<String,Object> 	reply ) 
+	        		{
+	        			if ( TRACE ) trace( "good AZReply" );
+	        			
+	        			contact.setProtocolVersion((byte)originator_version );
+	        			
+	        			byte[] token = (byte[])reply.get( "token" );
+	        			
+	        			if ( token != null ){
+	        				
+	        				contact.setRandomID2( token );
+	        			}
+	        			
+	        			handler.reply( contact, (Map<String,Object>)reply.get( "p" ));
+	        		}
+	        		
+	        		@Override
+	        		public void 
+	        		handleError(
+	        			DHTTransportException error) 
+	        		{
+	        			if ( TRACE ) trace( "error AZReply: " + Debug.getNestedExceptionMessage( error ));
+
+	        			handler.failed( contact, error );
+	        		}
+	        	}, 
+	        	contact, map, true );
+	        	        
+		}catch( Throwable e ){
+			
+			if ( e instanceof DHTTransportException ){
+				
+				handler.failed( contact, (DHTTransportException)e) ;
+				
+			}else{
+				
+				handler.failed( contact, new DHTTransportException( "ping failed", e )) ;
+			}
+		}
+    }
+	
+	protected void 
+	receiveAZRequest(
+		DHTTransportContactI2P		originator,
+		int							packet_length,
+		byte[]						message_id,
+		Map<String,Object>			args )
+		
+		throws Exception
+	{		
+		Map<String, Object>	payload_in = (Map<String, Object>)args.get( "p" );
+	
+		if ( TRACE ) trace( "receiveAZRequest: " + payload_in );
+
+		if ( az_request_handler == null ){
+			
+			throw( new Exception( "No request handler available" ));
+		}
+		
+		az_request_handler.packetReceived( packet_length );
+		
+		byte[]	token_in = (byte[])args.get( "token" );
+		
+		if ( token_in != null ){
+			
+			originator.setRandomID2( token_in );
+		}
+		
+		Map<String, Object>	payload_out = az_request_handler.receiveRequest( originator, payload_in );
+		
+		
+			// dispatch reply
+		
+		Map<String, Object> map = new HashMap<String, Object>();
+		
+		Map<String, Object> resps = new HashMap<String, Object>();
+		
+		map.put( "r", resps);
+				
+		byte[] token_out = (byte[])originator.getRandomID2();
+		
+		if ( token_out != null ){
+			
+			if ( token_in == null || !Arrays.equals( token_in, token_out )){
+		
+				resps.put( "token", token_out );
+			}
+		}
+		
+		resps.put( "p", payload_out );
+		
+		int sent = sendResponse( originator, message_id, map );
+		
+		az_request_handler.packetSent( sent );
+	}
+	
 		// -------------
 	
 	protected boolean
@@ -1335,7 +1521,7 @@ DHTTransportI2P
 				// already async. Also we want to force the lookup regardless of whether or not
 				// we have a dest
 			
-			Destination dest = session.lookupDest( node.getHash(), DEST_LOOKUP_TIMEOUT );
+			Destination dest = session.lookupDest( node.getHash(), DHTUtilsI2P.DEST_LOOKUP_TIMEOUT );
         
             if ( dest != null ){
             
@@ -1392,7 +1578,7 @@ DHTTransportI2P
 						try{
 							long	start = SystemTime.getMonotonousTime();
 							
-							Destination dest = session.lookupDest( node.getHash(), DEST_LOOKUP_TIMEOUT );
+							Destination dest = session.lookupDest( node.getHash(), DHTUtilsI2P.DEST_LOOKUP_TIMEOUT );
             
 							if ( dest != null ){
             
@@ -1470,9 +1656,15 @@ DHTTransportI2P
 	    boolean	ok = false;
 	    
 	    try{
-	    	sendMessage( dest, port, map, repliable );
+	    	int res = sendMessage( dest, port, map, repliable );
 	    	
 	    	ok	= true;
+	    	
+	    	try{
+	    		handler.packetSent( res );
+	    		
+	    	}catch( Throwable e ){
+	    	}
 	    	
 	    }finally{
 	    	
@@ -1486,7 +1678,7 @@ DHTTransportI2P
 	    }
 	}
     
-    private void
+    private int
     sendResponse(
     	DHTTransportContactI2P 		originator, 
     	byte[]						message_id, 
@@ -1502,7 +1694,7 @@ DHTTransportI2P
         	
         	Debug.out( "Hmm, destination is null" );
         	
-        	return;
+        	return( 0 );
         }
         
         map.put( "y", "r" );
@@ -1515,14 +1707,14 @@ DHTTransportI2P
         
         encodeVersion( resps );
         
-        sendMessage( dest, node.getPort() + 1, map, false );
+        return( sendMessage( dest, node.getPort() + 1, map, false ));
     }
     
     
     private static final int SEND_CRYPTO_TAGS 	= 8;
     private static final int LOW_CRYPTO_TAGS 	= 4;
 
-    private void 
+    private int 
     sendMessage(
     	Destination 			dest, 
     	int 					toPort, 
@@ -1533,7 +1725,7 @@ DHTTransportI2P
     {
 
         byte[] payload = BEncoder.encode( map );
-
+        
         	// Always send query port, peer will increment for unsigned replies
         
         int fromPort = query_port;
@@ -1576,6 +1768,8 @@ DHTTransportI2P
                 toPort, 
                 opts )){
         	
+        	return( payload.length );
+        	
         }else{
         	
         	throw( new DHTTransportException( "sendMessage failed" ));
@@ -1601,6 +1795,8 @@ DHTTransportI2P
 	    		return;
 	    	}
 	    	
+	    	int raw_payload_length = payload.length;
+	    	
 	        if ( to_port == query_port ){
 	
 	        		// repliable
@@ -1613,11 +1809,11 @@ DHTTransportI2P
 	
 	        	Destination from = dgDiss.getSender();
 	
-	        	receiveMessage( from, from_port, payload);
+	        	receiveMessage( from, from_port, raw_payload_length, payload);
 	
 	        }else if ( to_port == reply_port) {
 	
-	        	receiveMessage( null, from_port, payload );
+	        	receiveMessage( null, from_port, raw_payload_length, payload );
 	        }
     	}catch( Throwable e ){
     		
@@ -1629,7 +1825,7 @@ DHTTransportI2P
     encodeVersion(
     	Map		map )
     {
-    	map.put( "_v", "AZ" + DHTI2P.DHT_VERSION );
+    	map.put( "_v", "AZ" +DHTUtilsI2P.PROTOCOL_VERSION );
     }
     
     private int
@@ -1650,11 +1846,12 @@ DHTTransportI2P
     receiveMessage(
     	Destination 	from_dest, 
     	int 			from_port, 
+    	int				raw_payload_length,
     	byte[]			payload ) 
     {
     	stats.total_packets_received++;
     	
-    	stats.total_bytes_received += payload.length;
+    	stats.total_bytes_received += raw_payload_length;
     	
     	try{
 	    	Map		map = BDecoder.decode( payload );
@@ -1671,7 +1868,7 @@ DHTTransportI2P
 	            
 	            Map args = (Map)map.get( "a" );
 	            
-	            receiveQuery( msg_id, from_dest, from_port, method, args );
+	            receiveQuery( msg_id, from_dest, from_port, raw_payload_length, method, args );
 	            
 	        }else if ( type.equals("r") || type.equals("e")){
 	        	
@@ -1690,8 +1887,10 @@ DHTTransportI2P
 		                if ( type.equals("r")){
 		                	
 		                    Map reply = (Map)map.get( "r" );
-		                    		                    
+		                                        
 		                    int	contact_version = decodeVersion( reply );
+		                    
+		                    reply_handler.packetReceived( raw_payload_length );
 		                    
 		                    reply_handler.handleReply( contact_version, reply );
 		                    
@@ -1718,6 +1917,7 @@ DHTTransportI2P
     	byte[] 			msg_id, 
     	Destination 	dest, 
     	int 			from_port, 
+    	int				packet_length,
     	String 			method, 
     	Map				args )
     	
@@ -1768,7 +1968,7 @@ DHTTransportI2P
        
         int originator_version = decodeVersion( args );
         
-        DHTTransportContactI2P originator = new DHTTransportContactI2P( this, node, originator_version );
+        DHTTransportContactI2P originator = new DHTTransportContactI2P( this, node, (byte)originator_version, 0, 0, (byte)0 );
         
         if ( method.equals("ping")){
         	
@@ -1803,7 +2003,11 @@ DHTTransportI2P
             
             boolean is_seed = n_is_seed!=null&&n_is_seed.intValue()!=0;
             
-            receiveStore( originator, msg_id, hash, is_seed );   
+            receiveStore( originator, msg_id, hash, is_seed );
+            
+        }else if ( method.equals("azrequest")) {
+
+        	receiveAZRequest( originator, packet_length, msg_id, args );
         }
     }
     
@@ -1947,19 +2151,23 @@ DHTTransportI2P
 	protected void
 	destroy()
 	{
+		List<Request>	to_fail = new ArrayList<Request>();
+		
 		synchronized( requests ){
 			
 			destroyed	= true;			
 
-			for ( Request request: requests.values() ){
+			to_fail = new ArrayList<Request>( requests.values());
+		}
+		
+		for ( Request request: to_fail ){
+			
+			try{
+				request.handler.handleError( new DHTTransportException( "Transport destroyed" ));
 				
-				try{
-					request.handler.handleError( new DHTTransportException( "Transport destroyed" ));
-					
-				}catch( Throwable e ){
-					
-					Debug.out( e );
-				}
+			}catch( Throwable e ){
+				
+				Debug.out( e );
 			}
 		}
 		
@@ -1973,13 +2181,38 @@ DHTTransportI2P
 		System.out.println( str );
 	}
 	
+	private abstract class
+	ReplyHandlerAdapter
+		implements ReplyHandler
+	{
+		public void
+		packetSent(
+			int		length )
+		{	
+		}
+		
+		public void
+		packetReceived(
+			int		length )
+		{	
+		}
+	}
+	
 	private interface
 	ReplyHandler
 	{
 		public void
+		packetSent(
+			int		length );
+		
+		public void
+		packetReceived(
+			int		length );
+		
+		public void
 		handleReply(
-			int		originator_version,
-			Map		reply );
+			int						originator_version,
+			Map<String,Object>		reply );
 		
 		public void
 		handleError(
@@ -2026,7 +2259,7 @@ DHTTransportI2P
 		private 
 		DHTTransportStatsI2P()
 		{
-			super( PROTOCOL_VERSION );
+			super( DHTUtilsI2P.PROTOCOL_VERSION );
 		}
 		
 		public DHTTransportStats snapshot() {
@@ -2075,7 +2308,7 @@ DHTTransportI2P
 		}
 	}
 	
-	private static class
+	protected static class
 	DHTTransportValueImpl
 		implements DHTTransportValue
 	{
@@ -2083,7 +2316,7 @@ DHTTransportI2P
 		private short					flags;
 		private byte[]					value_bytes;
 		
-		private
+		protected
 		DHTTransportValueImpl(
 			DHTTransportContact		_originator,
 			short					_flags,
@@ -2115,7 +2348,7 @@ DHTTransportI2P
 		public int
 		getVersion()
 		{
-			return( DHTI2P.DHT_VERSION );
+			return( 0 );
 		}
 		
 		public DHTTransportContact
@@ -2160,4 +2393,45 @@ DHTTransportI2P
 			return( DHTLog.getString( value_bytes ));
 		}
 	};
+	
+	public interface
+	AZRequestHandler
+	{
+		public void
+		packetSent(
+			int		length );
+		
+		public void
+		packetReceived(
+			int		length );
+		
+		public Map<String,Object>
+		receiveRequest(
+			DHTTransportContactI2P		contact,
+			Map<String,Object>			args )
+			
+			throws Exception;
+	}
+	
+	public interface
+	AZReplyHandler
+	{
+		public void
+		packetSent(
+			int		length );
+		
+		public void
+		packetReceived(
+			int		length );
+		
+		public void
+		reply(
+			DHTTransportContactI2P		contact,
+			Map							map );
+		
+		public void
+		failed(
+			DHTTransportContactI2P		contact,
+			DHTTransportException		error );
+	}
 }

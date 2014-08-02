@@ -423,7 +423,7 @@ I2PHelperRouter
 				
 			setupSMOpts( router_ctx );
             
-			adapter.log( "Router startup complete: version=" + CoreVersion.VERSION + ", elapsed=" + (SystemTime.getMonotonousTime() - start ));
+			adapter.log( "Router startup complete: version=" + CoreVersion.getVersion() + ", elapsed=" + (SystemTime.getMonotonousTime() - start ));
 
 			init_sem.releaseForever();
 			
@@ -613,6 +613,29 @@ I2PHelperRouter
 		}
 		
 		return( dhts[0] );
+	}
+	
+	public I2PHelperRouterDHT
+	selectDHT(
+		int		index )
+	{
+		if ( dhts.length <= dhts.length ){
+			
+			return( null );
+		}
+		
+		I2PHelperRouterDHT dht = dhts[index];
+		
+		if ( !dht.isDHTInitialised()){
+			
+			try{
+				dht.initialiseDHT( i2p_host, i2p_port, sm_properties );
+				
+			}catch( Throwable e ){
+			}
+		}
+		
+		return( dht );
 	}
 	
 	public I2PHelperRouterDHT[]

@@ -1,0 +1,1164 @@
+/*
+ * Created on Apr 16, 2014
+ * Created by Paul Gardner
+ * 
+ * Copyright 2014 Azureus Software, Inc.  All rights reserved.
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License only.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
+ */
+
+
+package org.parg.azureus.plugins.networks.i2p.vuzedht;
+
+import java.io.*;
+import java.util.*;
+
+import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.SystemTime;
+import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
+
+import com.aelitis.azureus.core.dht.DHT;
+import com.aelitis.azureus.core.dht.impl.DHTLog;
+import com.aelitis.azureus.core.dht.transport.DHTTransport;
+import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
+import com.aelitis.azureus.core.dht.transport.DHTTransportException;
+import com.aelitis.azureus.core.dht.transport.DHTTransportFindValueReply;
+import com.aelitis.azureus.core.dht.transport.DHTTransportFullStats;
+import com.aelitis.azureus.core.dht.transport.DHTTransportListener;
+import com.aelitis.azureus.core.dht.transport.DHTTransportProgressListener;
+import com.aelitis.azureus.core.dht.transport.DHTTransportReplyHandler;
+import com.aelitis.azureus.core.dht.transport.DHTTransportReplyHandlerAdapter;
+import com.aelitis.azureus.core.dht.transport.DHTTransportRequestHandler;
+import com.aelitis.azureus.core.dht.transport.DHTTransportStats;
+import com.aelitis.azureus.core.dht.transport.DHTTransportStoreReply;
+import com.aelitis.azureus.core.dht.transport.DHTTransportTransferHandler;
+import com.aelitis.azureus.core.dht.transport.DHTTransportValue;
+import com.aelitis.azureus.core.dht.transport.util.DHTTransportRequestCounter;
+import com.aelitis.azureus.core.dht.transport.util.DHTTransportStatsImpl;
+import com.aelitis.azureus.util.MapUtils;
+
+public class 
+DHTTransportAZ
+	implements DHTTransport, DHTTransportI2P.AZRequestHandler
+{
+	private static final boolean TRACE = false;
+
+	private static final int	METHOD_PING			= 0;
+	private static final int	METHOD_FIND_NODE	= 1;
+	private static final int	METHOD_FIND_VALUE	= 2;
+	private static final int	METHOD_STORE		= 3;
+	
+	private DHTAZ						dht;
+	
+	private DHTTransportI2P				base_transport;
+	
+	private DHTTransportStatsI2P		stats;
+	
+	private DHTTransportContactAZ		local_contact;
+	
+	private DHTTransportRequestHandler	request_handler;
+	
+
+	
+
+	private volatile boolean			destroyed;
+	
+	protected
+	DHTTransportAZ(
+		DHTAZ				_dht,
+		DHTTransportI2P		_base_transport )
+	{
+		dht				= _dht;
+		base_transport	= _base_transport;
+		
+		stats = new DHTTransportStatsI2P();
+				
+		local_contact = 
+			new DHTTransportContactAZ( this, (DHTTransportContactI2P)base_transport.getLocalContact());
+		
+		base_transport.setAZRequestHandler( this );
+	}
+	
+
+	public byte
+	getProtocolVersion()
+	{
+		return( DHTUtilsI2P.PROTOCOL_VERSION );
+	}
+	
+	public byte
+	getMinimumProtocolVersion()
+	{
+		return( DHTUtilsI2P.PROTOCOL_VERSION_MIN );
+	}
+	
+	public int
+	getNetwork()
+	{
+		return( DHTUtilsI2P.DHT_NETWORK );
+	}
+
+	public boolean
+	isIPV6()
+	{
+		return( false );
+	}
+	
+	public byte
+	getGenericFlags()
+	{
+		return( base_transport.getGenericFlags());
+	}
+	
+	public void
+	setGenericFlag(
+		byte		flag,
+		boolean		value )
+	{
+		base_transport.setGenericFlag(flag, value);
+	}
+	
+	public void
+	setSuspended(
+		boolean			susp )
+	{
+		
+	}
+
+	
+	public DHTTransportContact
+	getLocalContact()
+	{
+		return( local_contact );
+	}
+	
+	public int
+	getPort()
+	{
+		return( base_transport.getPort());
+	}
+	
+	public void
+	setPort(
+		int	port )
+	
+		throws DHTTransportException
+	{
+		base_transport.setPort( port );
+	}
+	
+	public long
+	getTimeout()
+	{
+		return( base_transport.getTimeout());
+	}
+	
+	public void
+	setTimeout(
+		long		millis )
+	{
+		base_transport.setTimeout( millis );
+	}
+	
+	protected DHTTransportFullStats
+	getFullStats(
+		DHTTransportContactAZ	contact )
+	{
+		if ( contact == local_contact ){
+			
+			return( request_handler.statsRequest( contact ));
+		}
+		
+		Debug.out( "Status not supported for remote contacts" );
+		
+		return( null );
+	}
+	
+
+	protected void
+	contactAlive(
+		DHTTransportContactI2P		i2p_contact )
+	{
+		request_handler.contactImported( new DHTTransportContactAZ( this, i2p_contact ), false );
+	}
+	
+	protected void
+	contactDead(
+		DHTTransportContactI2P		i2p_contact )
+	{
+		request_handler.contactRemoved( new DHTTransportContactAZ( this, i2p_contact ));
+	}
+	
+	public DHTTransportContact
+	importContact(
+		DataInputStream		is,
+		boolean				is_bootstrap )
+	
+		throws IOException, DHTTransportException
+	{
+		throw( new DHTTransportException( "Not supported" ));
+	}
+	
+	protected void
+	removeContact(
+		DHTTransportContactAZ	contact )
+	{
+		request_handler.contactRemoved( contact );
+	}
+	
+	public void
+	setRequestHandler(
+		DHTTransportRequestHandler	_request_handler )
+	{
+		request_handler	= new DHTTransportRequestCounter( _request_handler, stats );
+	}
+	
+	public DHTTransportStats
+	getStats()
+	{
+		return( stats );
+	}
+	
+	public void
+	sendPing(
+		final DHTTransportReplyHandler		handler,
+		final DHTTransportContactAZ			contact )
+	{		
+		boolean known = dht.isBaseContact( contact );
+		
+		if ( known ){
+			
+			handler.pingReply( contact, -1 );
+			
+		}else{
+			
+			if ( contact.getProtocolVersion() < DHTUtilsI2P.PROTOCOL_VERSION_AZ_MSGS ){
+				
+				handler.failed( contact, new Exception( "Contact doesn't support az messaging" ));
+				
+				return;
+			}
+
+			stats.pingSent( null );
+			
+			Map<String,Object>	payload = new HashMap<String, Object>();
+									
+			sendRequest(
+				new AZReplyHandlerAdapter()
+				{	
+					@Override
+					public void
+					reply(
+						DHTTransportContactI2P 		basis,
+						Map							map )
+					{
+						stats.pingOK();
+						
+						handler.pingReply( contact, -1 );
+					}
+					
+					@Override
+					public void 
+					failed(
+						DHTTransportContactI2P 		basis, 
+						DHTTransportException 		error) 
+					{
+						stats.pingFailed();
+						
+						handler.failed( contact, error );
+					}
+				},
+				contact,
+				METHOD_PING,
+				payload );
+			
+			System.out.println( "AZ: sendPing - " + contact.getString() + ", known=" + known + ", router=" + dht.getDHT().getRouter().getAllContacts().size());
+		}
+	}
+	
+	private Map<String,Object>
+	receivePing(
+		DHTTransportContactAZ		contact,
+		Map<String,Object>			payload )
+	{
+		request_handler.pingRequest( contact );
+		
+		return( new HashMap<String,Object>());
+	}
+		
+	public void
+	sendFindNode(
+		final DHTTransportReplyHandler		handler,
+		final DHTTransportContactAZ			contact,
+		byte[]								target,
+		short								flags )
+	{
+		System.out.println( "AZ: sendFindNode" );
+		
+		if ( contact.getProtocolVersion() < DHTUtilsI2P.PROTOCOL_VERSION_AZ_MSGS ){
+			
+			handler.failed( contact, new Exception( "Contact doesn't support az messaging" ));
+			
+			return;
+		}
+		
+		stats.findNodeSent( null );
+		
+		Map<String,Object>	payload = new HashMap<String, Object>();
+		
+		payload.put("h", target );
+		
+			// flag not used 
+		
+		sendRequest(
+			new AZReplyHandlerAdapter()
+			{	
+				@Override
+				public void
+				reply(
+					DHTTransportContactI2P 		basis,
+					Map							map )
+				{
+					stats.findNodeOK();
+					
+					List<Map<String,Object>>	l_contacts = (List<Map<String,Object>>)map.get("c");
+					
+					DHTTransportContact[] contacts = decodeContacts( l_contacts );
+					
+					handler.findNodeReply(
+						contact,
+						contacts );
+				}
+				
+				@Override
+				public void 
+				failed(
+					DHTTransportContactI2P 		basis, 
+					DHTTransportException 		error) 
+				{
+					stats.findNodeFailed();
+					
+					handler.failed( contact, error );
+				}
+			},
+			contact,
+			METHOD_FIND_NODE,
+			payload );
+	}
+    
+	private Map<String,Object>
+	receiveFindNode(
+		DHTTransportContactAZ		contact,
+		Map<String,Object>			payload )
+	{
+		byte[]	hash = (byte[])payload.get( "h" );
+		
+		DHTTransportContact[] contacts = request_handler.findNodeRequest( contact, hash );
+		
+		List<Map<String,Object>>	l_contacts = encodeContacts( contacts );
+		
+		Map<String,Object> reply = new HashMap<String,Object>();
+		
+		reply.put( "c", l_contacts );
+		
+		return( reply );
+	}
+	
+	public void
+	sendFindValue(
+		final DHTTransportReplyHandler		handler,
+		final DHTTransportContactAZ			contact,
+		byte[]								target,
+		int									max_values,
+		short								flags )
+	{
+		System.out.println( "AZ: sendFindValue" );
+		
+		if ( contact.getProtocolVersion() < DHTUtilsI2P.PROTOCOL_VERSION_AZ_MSGS ){
+			
+			handler.failed( contact, new Exception( "Contact doesn't support az messaging" ));
+			
+			return;
+		}
+		
+		stats.findValueSent( null );
+		
+		Map<String,Object>	payload = new HashMap<String, Object>();
+		
+		payload.put("h", target );
+		payload.put("m", max_values );
+		payload.put("f", new Long(flags));
+				
+		sendRequest(
+			new AZReplyHandlerAdapter()
+			{	
+				@Override
+				public void
+				reply(
+					DHTTransportContactI2P 		basis,
+					Map							map )
+				{
+					stats.findValueOK();
+					
+					if ( map.containsKey( "b" )){
+						
+						byte[]	key = (byte[])map.get("k");
+						byte[]	sig = (byte[])map.get("s");
+						
+						handler.keyBlockRequest( contact, key, sig );
+						
+						handler.failed( contact, new Throwable( "key blocked" ));
+						
+					}else if ( map.containsKey( "c" )){
+					
+						List<Map<String,Object>>	l_contacts = (List<Map<String,Object>>)map.get("c");
+					
+						DHTTransportContact[] contacts = decodeContacts( l_contacts );
+					
+						handler.findValueReply(
+							contact,
+							contacts );
+						
+					}else{
+						
+						List<Map<String,Object>>	l_values = (List<Map<String,Object>>)map.get("v");
+						
+						DHTTransportValue[] values = decodeValues( l_values, 0 );
+						
+						byte div = ((Number)map.get( "d")).byteValue();
+						
+						handler.findValueReply(
+							contact,
+							values,
+							div,
+							false );
+					}
+				}
+				
+				@Override
+				public void 
+				failed(
+					DHTTransportContactI2P 		basis, 
+					DHTTransportException 		error) 
+				{
+					stats.findValueFailed();
+					
+					handler.failed( contact, error );
+				}
+			},
+			contact,
+			METHOD_FIND_VALUE,
+			payload );
+    }
+
+	private Map<String,Object>
+	receiveFindValue(
+		DHTTransportContactAZ		contact,
+		Map<String,Object>			payload )
+	{
+		byte[]	hash 		= (byte[])payload.get( "h" );
+		int		max_values 	= ((Number)payload.get("m" )).intValue();
+		short	flags		= ((Number)payload.get("f" )).shortValue();
+		
+		DHTTransportFindValueReply fv_reply = request_handler.findValueRequest( contact, hash, max_values, flags );
+		
+		Map<String,Object> reply = new HashMap<String,Object>();
+
+		if ( fv_reply.blocked()){
+			
+			reply.put( "b", 1 );
+			reply.put( "k", fv_reply.getBlockedKey());
+			reply.put( "s", fv_reply.getBlockedSignature());
+			
+		}else if ( fv_reply.hit()){
+			
+			List<Map<String,Object>>	l_values = encodeValues( fv_reply.getValues(), -contact.getClockSkew());
+			
+			reply.put( "v", l_values );
+			reply.put( "d", (long)(fv_reply.getDiversificationType()&0xff));
+			
+		}else{
+			
+			List<Map<String,Object>>	l_contacts = encodeContacts( fv_reply.getContacts());
+			
+			reply.put( "c", l_contacts );
+		}
+		
+		return( reply );
+	}
+	
+	
+	protected void
+	sendStore(
+		final DHTTransportReplyHandler	handler,
+		final DHTTransportContactAZ		contact,
+		byte[][]						keys,
+		DHTTransportValue[][]			value_sets )
+	{
+		System.out.println( "AZ: sendStore" );
+
+		if ( contact.getProtocolVersion() < DHTUtilsI2P.PROTOCOL_VERSION_AZ_MSGS ){
+			
+			handler.failed( contact, new Exception( "Contact doesn't support az messaging" ));
+			
+			return;
+		}
+		
+		stats.storeSent( null );
+		
+		Map<String,Object>	payload = new HashMap<String, Object>();
+		
+		List<byte[]>	keys_l = new ArrayList<byte[]>( keys.length );
+		
+		for ( byte[] key: keys ){
+			
+			keys_l.add( key );
+		}
+		
+		payload.put( "k", keys_l );
+		
+		List<List<Map<String,Object>>> values_l = new ArrayList<List<Map<String,Object>>>( value_sets.length );
+		
+		for ( DHTTransportValue[] values: value_sets ){
+			
+			values_l.add( encodeValues( values, 0 ));	// skew is 0 when sending store as we are the originator
+		}
+		
+		payload.put( "v", values_l );
+		
+		sendRequest(
+			new AZReplyHandlerAdapter()
+			{	
+				@Override
+				public void
+				reply(
+					DHTTransportContactI2P 		basis,
+					Map							map )
+				{
+					stats.storeOK();
+					
+					if ( map.containsKey( "b" )){
+						
+						byte[]	key = (byte[])map.get("k");
+						byte[]	sig = (byte[])map.get("s");
+						
+						handler.keyBlockRequest( contact, key, sig );
+						
+						handler.failed( contact, new Throwable( "key blocked" ));
+						
+					}else{
+						
+						byte[]	divs =	(byte[])map.get( "d" );
+					
+						handler.storeReply( contact, divs );
+					}
+				}
+				
+				@Override
+				public void 
+				failed(
+					DHTTransportContactI2P 		basis, 
+					DHTTransportException 		error) 
+				{
+					stats.storeFailed();
+					
+					handler.failed( contact, error );
+				}
+			},
+			contact,
+			METHOD_STORE,
+			payload );
+	}
+	
+	private Map<String,Object>
+	receiveStore(
+		DHTTransportContactAZ		contact,
+		Map<String,Object>			payload )
+	{
+		List<byte[]> keys_l = (List<byte[]>)payload.get( "k" );
+		
+		byte[][] keys = new byte[keys_l.size()][];
+		
+		for ( int i=0;i<keys.length;i++){
+			
+			keys[i] = keys_l.get(i);
+		}
+		
+		List<List<Map<String,Object>>> values_l =  (List<List<Map<String,Object>>>)payload.get( "v" );
+		
+		DHTTransportValue[][]	value_sets = new DHTTransportValue[values_l.size()][];
+		
+		for ( int i=0;i<value_sets.length;i++){
+			
+			value_sets[i] = decodeValues( values_l.get(i), contact.getClockSkew());
+		}
+
+		DHTTransportStoreReply store_reply = request_handler.storeRequest(contact, keys, value_sets);
+				
+		Map<String,Object> reply = new HashMap<String,Object>();
+		
+		if ( store_reply.blocked()){
+			
+			reply.put( "b", 1 );
+			reply.put( "k", store_reply.getBlockRequest());
+			reply.put( "s", store_reply.getBlockSignature());
+
+		}else{
+			
+			reply.put( "d", store_reply.getDiversificationTypes());
+		}
+		
+		return( reply );
+	}
+	
+		// --------------
+	
+	private List<Map<String,Object>>
+	encodeContacts(
+		DHTTransportContact[]		contacts )
+	{
+		List<Map<String,Object>>	result = new ArrayList<Map<String,Object>>( contacts.length );
+		
+		for ( DHTTransportContact c: contacts ){
+			
+			result.add( encodeContact( c ));
+		}
+		
+		return( result );
+	}
+	
+	private DHTTransportContact[]
+	decodeContacts(
+		List<Map<String,Object>>		l_contacts )
+	{
+		List<DHTTransportContact> contacts = new ArrayList<DHTTransportContact>( l_contacts.size());
+		
+		for ( Map<String,Object>	c: l_contacts ){
+			
+			try{
+				contacts.add( decodeContact( c ));
+				
+			}catch( Throwable e ){
+				
+			}
+		}
+		
+		return( contacts.toArray( new DHTTransportContact[contacts.size()]));
+	}
+	
+	private Map<String,Object>
+	encodeContact(
+		DHTTransportContact		c )
+	{
+		DHTTransportContactAZ	contact = (DHTTransportContactAZ)c;
+		
+		NodeInfo node_info = contact.getBasis().getNode();
+		
+		Map<String,Object>	result = new HashMap<String, Object>();
+		
+		result.put( "v", new Long(c.getProtocolVersion()&0xff));
+		result.put( "h", node_info.getHash().getData());
+		result.put( "p", node_info.getPort());
+		result.put( "i", node_info.getNID().getData());
+		
+		return( result );
+	}
+	
+	private DHTTransportContact
+	decodeContact(
+		Map<String,Object>	c )
+	{
+		int		ver		= ((Number)c.get( "v" )).intValue();
+		byte[]	hash 	= (byte[])c.get( "h" );
+		int		port	= ((Number)c.get( "p" )).intValue();
+		byte[]	id	 	= (byte[])c.get( "i" );
+		
+		DHTTransportContactI2P base_contact = base_transport.importContact( hash, port, id, ver );
+		
+		return( new DHTTransportContactAZ( this, base_contact ));
+	}
+	
+	private List<Map<String,Object>>
+	encodeValues(
+		DHTTransportValue[]		values,
+		long					skew )
+	{
+		List<Map<String,Object>>	result = new ArrayList<Map<String,Object>>( values.length );
+		
+		for ( DHTTransportValue v: values ){
+			
+			result.add( encodeValue( v, skew ));
+		}
+		
+		return( result );
+	}
+	
+	private DHTTransportValue[]
+	decodeValues(
+		List<Map<String,Object>>	values_l,
+		long						skew )
+	{
+		DHTTransportValue[]	result = new DHTTransportValue[ values_l.size()];
+		
+		for ( int i=0;i<result.length;i++){
+			
+			result[i] = decodeValue(values_l.get(i), skew );
+		}
+		
+		return( result );
+	}
+			
+	private Map<String,Object>
+	encodeValue(
+		DHTTransportValue		value,
+		long					skew )
+	{
+		 Map<String,Object>	result = new HashMap<String, Object>();
+		 
+		 result.put( "v", value.getVersion());
+		 result.put( "t", value.getCreationTime() + skew );
+		 result.put( "w", value.getValue());
+		 
+		 result.put( "o", encodeContact( value.getOriginator()));
+		 
+		 result.put( "f", value.getFlags());
+		 result.put( "l", value.getLifeTimeHours());
+		 
+		 return( result );
+	}
+	
+	private DHTTransportValue
+	decodeValue(
+		Map<String,Object>		map,
+		long					skew )
+	{
+		final int	version		= ((Number)map.get("v")).intValue();
+
+		long create_time = (Long)map.get( "t" );
+		
+		final long 	created		= create_time + skew;
+
+		final byte[]	value_bytes	= (byte[])map.get( "w" );
+		
+		final DHTTransportContact	originator = decodeContact((Map<String,Object>)map.get("o"));
+		
+		final int	flags		= ((Number)map.get("f")).intValue();
+		final int 	life_hours 	= ((Number)map.get( "l" )).intValue();
+
+		
+		DHTTransportValue value = 
+			new DHTTransportValue()
+			{
+				public boolean
+				isLocal()
+				{
+					return( false );
+				}
+				
+				public long
+				getCreationTime()
+				{
+					return( created );
+				}
+				
+				public byte[]
+				getValue()
+				{
+					return( value_bytes );
+				}
+				
+				public int
+				getVersion()
+				{
+					return( version );
+				}
+				
+				public DHTTransportContact
+				getOriginator()
+				{
+					return( originator );
+				}
+				
+				public int
+				getFlags()
+				{
+					return( flags );
+				}
+				
+				public int
+				getLifeTimeHours()
+				{
+					return( life_hours );
+				}
+				
+				public byte
+				getReplicationControl()
+				{
+					return( DHT.REP_FACT_DEFAULT );
+				}
+				
+				public byte 
+				getReplicationFactor() 
+				{
+					return( DHT.REP_FACT_DEFAULT );
+				}
+				
+				public byte 
+				getReplicationFrequencyHours() 
+				{
+					return( DHT.REP_FACT_DEFAULT);
+				}
+				
+				public String
+				getString()
+				{
+					long	now = SystemTime.getCurrentTime();
+					
+					return( DHTLog.getString( value_bytes ) + " - " + new String(value_bytes) + "{v=" + version + ",f=" + 
+							Integer.toHexString(flags) + ",l=" + life_hours + ",r=" + Integer.toHexString(getReplicationControl()) + ",ca=" + (now - created ) + ",or=" + originator.getString() +"}" );
+				}
+			};
+			
+		return( value );
+	}
+	
+		// --------------
+	
+	private void
+	sendRequest(
+		final DHTTransportI2P.AZReplyHandler	reply_handler,
+		final DHTTransportContactAZ				contact,
+		int										method,
+		Map<String,Object>						payload )
+	{
+		payload.put( "_m", method );
+
+		payload.put( "_i", getLocalContact().getInstanceID());
+		payload.put( "_t", SystemTime.getCurrentTime());
+		payload.put( "_f", (int)getGenericFlags());
+		
+		base_transport.sendAZRequest(
+			new DHTTransportI2P.AZReplyHandler()
+			{
+				@Override
+				public void 
+				packetSent(int length) 
+				{
+					reply_handler.packetSent(length);
+				} 
+				
+				@Override
+				public void 
+				packetReceived(int length) 
+				{
+					reply_handler.packetReceived(length);
+				}
+				
+				@Override
+				public void
+				reply(
+					DHTTransportContactI2P		contact,
+					Map							payload )
+				{
+					int		instance_id	= ((Number)payload.get( "_i" )).intValue();
+					int		flags		= ((Number)payload.get( "_f" )).intValue();
+					
+					contact.setDetails( instance_id, (byte)flags);
+					
+					reply_handler.reply( contact, payload );
+				}
+				
+				@Override
+				public void
+				failed(
+					DHTTransportContactI2P		contact,
+					DHTTransportException		error )
+				{
+					reply_handler.failed(contact, error);
+				}
+			},
+			contact.getBasis(),
+			payload );
+	}
+	
+	@Override
+	public void 
+	packetSent(
+		int length) 
+	{
+		stats.total_packets_sent++;
+		stats.total_bytes_sent += length;
+	}
+
+	@Override
+	public void 
+	packetReceived(
+		int length) 
+	{
+		stats.total_packets_received++;
+		stats.total_bytes_received += length;
+	}
+	
+	public Map<String,Object>
+	receiveRequest(
+		DHTTransportContactI2P		contact,
+		Map<String,Object>			payload_in )
+		
+		throws Exception
+	{
+		if ( request_handler == null ){
+			
+			throw( new Exception( "Not ready to process requests" ));
+		}
+		
+		int		method		= ((Number)payload_in.get( "_m" )).intValue();
+
+		int		instance_id	= ((Number)payload_in.get( "_i" )).intValue();
+		long	time		= ((Number)payload_in.get( "_t" )).longValue();
+		int		flags		= ((Number)payload_in.get( "_f" )).intValue();
+		
+		long skew = SystemTime.getCurrentTime() - time;
+		
+		contact.setDetails( instance_id, skew, (byte)flags );
+		
+		Map<String,Object>		payload_out = new HashMap<String, Object>();
+		
+		System.out.println( "Received request: " + payload_in );
+		
+		DHTTransportContactAZ az_contact = new DHTTransportContactAZ( this, contact );
+		
+		switch( method ){
+			case METHOD_PING:{
+				payload_out = receivePing( az_contact, payload_in );
+				break;
+			}
+			case METHOD_FIND_NODE:{
+				payload_out = receiveFindNode( az_contact, payload_in );
+				break;
+			}
+			case METHOD_STORE:{
+				payload_out = receiveStore( az_contact, payload_in );
+				break;
+			}
+			case METHOD_FIND_VALUE:{
+				payload_out = receiveFindValue( az_contact, payload_in );
+				break;
+			}
+
+			default:{
+					
+				throw( new Exception( "Unknown method: " + method ));
+			}
+		}
+		
+		payload_out.put( "_i", getLocalContact().getInstanceID());
+		payload_out.put( "_f", (int)getGenericFlags());
+		
+		return( payload_out );
+	}
+
+
+    
+		// direct contact-contact communication
+	
+	public void
+	registerTransferHandler(
+		byte[]						handler_key,
+		DHTTransportTransferHandler	handler )
+	{
+		throw( new RuntimeException( "Not Supported" ));
+	}
+	
+	public byte[]
+	readTransfer(
+		DHTTransportProgressListener	listener,
+		DHTTransportContact				target,
+		byte[]							handler_key,
+		byte[]							key,
+		long							timeout )
+	
+		throws DHTTransportException
+	{
+		throw( new RuntimeException( "Not Supported" ));
+	}
+	
+	public void
+	writeTransfer(
+		DHTTransportProgressListener	listener,
+		DHTTransportContact				target,
+		byte[]							handler_key,
+		byte[]							key,
+		byte[]							data,
+		long							timeout )
+	
+		throws DHTTransportException
+	{
+		throw( new RuntimeException( "Not Supported" ));
+	}
+	
+	public byte[]
+	writeReadTransfer(
+		DHTTransportProgressListener	listener,
+		DHTTransportContact				target,
+		byte[]							handler_key,
+		byte[]							data,
+		long							timeout )	
+	
+		throws DHTTransportException
+	{
+		throw( new RuntimeException( "Not Supported" ));
+	}
+
+	public boolean
+	supportsStorage()
+	{
+		return( true );
+	}
+	
+	public boolean
+	isReachable()
+	{
+		return( true );
+	}
+	
+	public DHTTransportContact[]
+	getReachableContacts()
+	{
+		return( new DHTTransportContact[0]);
+	}
+	
+	public DHTTransportContact[]
+	getRecentContacts()
+	{
+		return( new DHTTransportContact[0]);		
+	}
+	
+	public void
+	addListener(
+		DHTTransportListener	l )
+	{
+		
+	}
+	
+	public void
+	removeListener(
+		DHTTransportListener	l )
+	{
+		
+	}
+	
+	protected void
+	destroy()
+	{
+		synchronized( this ){
+			
+			destroyed	= true;			
+
+		}
+	}
+	
+	private void
+	trace(
+		String	str )
+	{
+		System.out.println( str );
+	}
+	
+	private abstract class
+	AZReplyHandlerAdapter
+		implements DHTTransportI2P.AZReplyHandler
+	{
+		@Override
+		public void 
+		packetSent(
+			int length) 
+		{
+			stats.total_packets_sent++;
+			stats.total_bytes_sent += length;
+		}
+		
+		@Override
+		public void 
+		packetReceived(
+			int length) 
+		{
+			stats.total_packets_received++;
+			stats.total_bytes_received += length;
+		}
+	}
+	
+	private class
+	DHTTransportStatsI2P
+		extends DHTTransportStatsImpl
+	{
+		private long	total_request_timeouts;
+		private long	total_packets_sent;
+		private long	total_packets_received;
+		private long	total_bytes_sent;
+		private long	total_bytes_received;
+
+		private 
+		DHTTransportStatsI2P()
+		{
+			super( DHTUtilsI2P.PROTOCOL_VERSION );
+		}
+		
+		public DHTTransportStats snapshot() {
+			
+			DHTTransportStatsI2P res = new DHTTransportStatsI2P();
+			
+			snapshotSupport( res );
+			
+			res.total_request_timeouts		= total_request_timeouts;
+			res.total_packets_sent			= total_packets_sent;
+			res.total_packets_received		= total_packets_received;
+			res.total_bytes_sent			= total_bytes_sent;
+			res.total_bytes_received		= total_bytes_received;
+			
+			return( res );
+		}
+		
+		@Override
+		public int getRouteablePercentage() {
+			return( 100 );
+		}
+		
+		@Override
+		public long getRequestsTimedOut() {
+			return( total_request_timeouts );
+		}
+		
+		@Override
+		public long getPacketsSent() {
+			return( total_packets_sent );
+		}
+		
+		@Override
+		public long getPacketsReceived() {
+			return( total_packets_received );
+		}
+		
+		@Override
+		public long getBytesSent() {
+			return( total_bytes_sent );
+		}
+		
+		@Override
+		public long getBytesReceived() {
+			return( total_bytes_received );
+		}
+	}
+	
+
+}

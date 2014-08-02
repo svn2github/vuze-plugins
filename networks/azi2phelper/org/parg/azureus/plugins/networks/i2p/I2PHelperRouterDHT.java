@@ -41,8 +41,10 @@ import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.SystemTime;
+/*
 import org.parg.azureus.plugins.networks.i2p.dht.DHTNodes;
 import org.parg.azureus.plugins.networks.i2p.dht.KRPC;
+*/
 import org.parg.azureus.plugins.networks.i2p.dht.NID;
 import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTI2P;
@@ -333,6 +335,8 @@ I2PHelperRouterDHT
 		
 				if ( !is_vuze_dht ){
 					
+					throw( new Exception( "Not supported" ));
+					/*
 					DHTNodes.setBootstrap( is_bootstrap_node ); 
 		
 					KRPC	snark_dht;
@@ -366,6 +370,7 @@ I2PHelperRouterDHT
 					adapter.log( "MyDest: " + full_dest);
 					adapter.log( "        " + b32_dest  + ", existing=" + use_existing_key );
 					adapter.log( "MyNID:  " + Base32.encode( snark_dht.getNID().getData()) + ", existing=" + use_existing_nid );
+					*/
 					
 				}else{
 					

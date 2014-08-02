@@ -25,6 +25,8 @@ import net.i2p.util.RandomSource;
  */
 
 public class NodeInfo extends SimpleDataStructure {
+    public static final boolean SECURE_NID = true;
+    public static final NID FAKE_NID = new NID(new byte[NID.HASH_LENGTH]);
 
     private final NID nID;
     private final Hash hash;
@@ -38,7 +40,7 @@ public class NodeInfo extends SimpleDataStructure {
      */
     public NodeInfo(Destination dest, int port) {
         super();
-        this.nID = KRPC.FAKE_NID;
+        this.nID = FAKE_NID;
         this.dest = dest;
         this.hash = dest.calculateHash();
         this.port = port;
@@ -162,7 +164,7 @@ public class NodeInfo extends SimpleDataStructure {
      * @throws IllegalArgumentException on mismatch
      */
     private void verify() {
-        if (!KRPC.SECURE_NID)
+        if (!SECURE_NID)
             return;
         byte[] nb = nID.getData();
         byte[] hb = hash.getData();

@@ -33,6 +33,9 @@ import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 public interface 
 I2PHelperDHT 
 {
+	public I2PHelperAZDHT
+	getHelperAZDHT();
+	
 	public String
 	getLocalAddress();
 	
@@ -53,11 +56,32 @@ I2PHelperDHT
 	public void
 	ping(
 		Destination		destination,
-		int				port );
+		int				port,
+		boolean			az );
 	
 	public void
 	ping(
 		NodeInfo		node );
+	
+	public void
+	findNode(
+		Destination		destination,
+		int				port,
+		byte[]			id );
+	
+	public void
+	findValue(
+		Destination		destination,
+		int				port,
+		byte[]			id );
+	
+	public void
+	store(
+		Destination		destination,
+		int				port,
+		byte[]			key,
+		byte[]			value );
+	
 	
 	public boolean
 	hasLocalKey(

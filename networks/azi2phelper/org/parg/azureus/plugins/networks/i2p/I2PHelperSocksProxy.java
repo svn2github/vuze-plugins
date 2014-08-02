@@ -910,7 +910,7 @@ I2PHelperSocksProxy
 																	
 																	for ( String arg: args ){
 																		
-																		String[] bits = arg.split( "=" );
+																		String[] bits = arg.split( "=", 2 );
 																		
 																		if ( bits.length == 2 ){
 																			String 	lhs = bits[0];

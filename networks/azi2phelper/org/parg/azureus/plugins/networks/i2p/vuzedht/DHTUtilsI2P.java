@@ -28,6 +28,19 @@ import java.io.IOException;
 public class 
 DHTUtilsI2P 
 {
+	public static final int		PROTOCOL_VERSION_NON_VUZE		= 0;
+	public static final int		PROTOCOL_VERSION_INITIAL		= 1;	// testing adding version to messages
+	public static final int		PROTOCOL_VERSION_AZ_MSGS		= 2;	// support vuze messaging
+	
+
+	protected static final byte PROTOCOL_VERSION		= PROTOCOL_VERSION_AZ_MSGS;
+	protected static final byte PROTOCOL_VERSION_MIN	= PROTOCOL_VERSION_INITIAL;
+	
+	protected static final int		REQUEST_TIMEOUT	= 45*1000;
+	protected static final int 		DEST_LOOKUP_TIMEOUT = 20*1000;
+
+	protected static final int		DHT_NETWORK		= 10;
+
 	protected static void
 	serialiseLength(
 		DataOutputStream	os,

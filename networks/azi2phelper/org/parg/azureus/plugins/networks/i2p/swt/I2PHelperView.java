@@ -67,6 +67,8 @@ I2PHelperView
 {
 	private static final String	resource_path = "org/parg/azureus/plugins/networks/i2p/swt/";
 
+	private static final boolean	SHOW_AZ_DHTS = true;
+	
 	private I2PHelperPlugin		plugin;
 	private UISWTInstance		ui;
 	private String				view_id;
@@ -100,8 +102,15 @@ I2PHelperView
 		ui 		= (UISWTInstance)_ui;
 		view_id	= _view_id;
 		
-		dht_views	= new DHTView[ plugin.getDHTCount()];
-		ops_views	= new DHTOpsView[ plugin.getDHTCount()];
+		int	view_count = plugin.getDHTCount();
+		
+		if ( SHOW_AZ_DHTS ){
+			
+			view_count *= 2;
+		}
+		
+		dht_views	= new DHTView[ view_count ];
+		ops_views	= new DHTOpsView[ view_count ];
 		
 		ui.addView( UISWTInstance.VIEW_MAIN, view_id, this );
 		
@@ -255,6 +264,8 @@ I2PHelperView
 		
 		CTabItem first_stats_item = null;
 		
+		int dht_count = plugin.getDHTCount();
+
 		for ( int i=0;i<dht_views.length;i++){
 				
 				// DHT stats view
@@ -266,7 +277,16 @@ I2PHelperView
 				first_stats_item = stats_item;
 			}
 			
-			stats_item.setText( plugin.getMessageText("azi2phelper.ui.dht_stats" + i ));
+			String stats_text = plugin.getMessageText("azi2phelper.ui.dht_stats" + (i%dht_count));
+			String graph_text = plugin.getMessageText("azi2phelper.ui.dht_graph" + (i%dht_count));
+			
+			if ( i >= dht_count ){
+				
+				stats_text = stats_text + " (AZ)";
+				graph_text = graph_text + " (AZ)";
+			}
+			
+			stats_item.setText( stats_text );
 			
 			DHTView dht_view = dht_views[i] = new DHTView( false );
 			Composite stats_comp = new Composite( tab_folder, SWT.NULL );
@@ -286,7 +306,7 @@ I2PHelperView
 			
 			CTabItem ops_item = new CTabItem(tab_folder, SWT.NULL);
 	
-			ops_item.setText( plugin.getMessageText("azi2phelper.ui.dht_graph" + i ));
+			ops_item.setText( graph_text );
 			
 			DHTOpsView ops_view = ops_views[i] = new DHTOpsView( false, false );
 			Composite ops_comp = new Composite( tab_folder, SWT.NULL );
@@ -403,11 +423,21 @@ I2PHelperView
 						
 						if ( router != null ){
 							
-							I2PHelperDHT dht_helper = router.getAllDHTs()[i].getDHT();
+							int	view_count = plugin.getDHTCount();
+
+							I2PHelperDHT dht_helper = router.getAllDHTs()[i%view_count].getDHT();
 							
 							if ( dht_helper instanceof DHTI2P ){
 								
-								DHT dht = ((DHTI2P)dht_helper).getDHT();
+								DHT dht;
+								
+								if ( i < view_count ){
+									
+									dht = ((DHTI2P)dht_helper).getDHT();
+								}else{
+									
+									dht = ((DHTI2P)dht_helper).getAZDHT().getDHT();
+								}
 								
 								dht_view.setDHT( dht );
 								ops_view.setDHT( dht );
