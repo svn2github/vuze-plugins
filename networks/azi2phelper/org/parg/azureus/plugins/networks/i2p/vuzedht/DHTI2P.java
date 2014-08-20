@@ -506,11 +506,13 @@ DHTI2P
 	get(
 		byte[] 					ih,
 		String					reason,
-		byte					flags,
+		short					flags,
 		int 					max, 
 		long					maxWait,
 		I2PHelperDHTListener	listener )
-	{
+	{		
+		flags |= I2PHelperAZDHT.FLAG_HIGH_PRIORITY;
+		
 		String key = ByteFormatter.encodeString( ih ) + "/" + max + "/" + maxWait;
 		
 		GetCacheEntry 	cache_entry;
@@ -555,9 +557,11 @@ DHTI2P
 	put(
 		byte[] 						ih,
 		String						reason,
-		byte						flags,
+		short						flags,
 		final I2PHelperDHTListener	listener )
 	{
+		flags |= I2PHelperAZDHT.FLAG_HIGH_PRIORITY;
+
 		dht.put(	ih,
 					reason + " for " + ByteFormatter.encodeString( ih ),
 					new byte[1],
@@ -626,7 +630,7 @@ DHTI2P
 		
 		dht.get(	ih,
 					"Get for " + ByteFormatter.encodeString( ih ),
-					DHT.FLAG_NONE,
+					I2PHelperAZDHT.FLAG_HIGH_PRIORITY,
 					max,
 					maxWait,
 					false,
@@ -678,7 +682,7 @@ DHTI2P
 		dht.put(	ih,
 					"Put for " + ByteFormatter.encodeString( ih ),
 					new byte[1],
-					DHT.FLAG_NONE,
+					I2PHelperAZDHT.FLAG_HIGH_PRIORITY,
 					new DHTOperationAdapter() {
 						
 						public void 

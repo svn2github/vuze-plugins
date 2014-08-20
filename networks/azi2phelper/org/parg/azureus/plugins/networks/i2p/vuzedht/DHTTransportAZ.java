@@ -24,8 +24,10 @@ package org.parg.azureus.plugins.networks.i2p.vuzedht;
 import java.io.*;
 import java.util.*;
 
+import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.SystemTime;
+import org.parg.azureus.plugins.networks.i2p.I2PHelperAZDHT;
 import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 
 import com.aelitis.azureus.core.dht.DHT;
@@ -38,7 +40,6 @@ import com.aelitis.azureus.core.dht.transport.DHTTransportFullStats;
 import com.aelitis.azureus.core.dht.transport.DHTTransportListener;
 import com.aelitis.azureus.core.dht.transport.DHTTransportProgressListener;
 import com.aelitis.azureus.core.dht.transport.DHTTransportReplyHandler;
-import com.aelitis.azureus.core.dht.transport.DHTTransportReplyHandlerAdapter;
 import com.aelitis.azureus.core.dht.transport.DHTTransportRequestHandler;
 import com.aelitis.azureus.core.dht.transport.DHTTransportStats;
 import com.aelitis.azureus.core.dht.transport.DHTTransportStoreReply;
@@ -46,7 +47,6 @@ import com.aelitis.azureus.core.dht.transport.DHTTransportTransferHandler;
 import com.aelitis.azureus.core.dht.transport.DHTTransportValue;
 import com.aelitis.azureus.core.dht.transport.util.DHTTransportRequestCounter;
 import com.aelitis.azureus.core.dht.transport.util.DHTTransportStatsImpl;
-import com.aelitis.azureus.util.MapUtils;
 
 public class 
 DHTTransportAZ
@@ -281,9 +281,10 @@ DHTTransportAZ
 				},
 				contact,
 				METHOD_PING,
+				false,
 				payload );
 			
-			System.out.println( "AZ: sendPing - " + contact.getString() + ", known=" + known + ", router=" + dht.getDHT().getRouter().getAllContacts().size());
+			if ( TRACE ) trace( "AZ: sendPing - " + contact.getString() + ", known=" + known + ", router=" + dht.getDHT().getRouter().getAllContacts().size());
 		}
 	}
 	
@@ -304,7 +305,9 @@ DHTTransportAZ
 		byte[]								target,
 		short								flags )
 	{
-		System.out.println( "AZ: sendFindNode" );
+		boolean priority = (flags&I2PHelperAZDHT.FLAG_HIGH_PRIORITY) != 0;
+		
+		if ( TRACE ) trace( "AZ: sendFindNode for " + ByteFormatter.encodeString( target ) + " to " + contact.getString());
 		
 		if ( contact.getProtocolVersion() < DHTUtilsI2P.PROTOCOL_VERSION_AZ_MSGS ){
 			
@@ -330,6 +333,8 @@ DHTTransportAZ
 					DHTTransportContactI2P 		basis,
 					Map							map )
 				{
+					if ( TRACE ) trace( "AZ: sendFindNode to " + contact.getString() + " OK" );
+
 					stats.findNodeOK();
 					
 					List<Map<String,Object>>	l_contacts = (List<Map<String,Object>>)map.get("c");
@@ -347,6 +352,8 @@ DHTTransportAZ
 					DHTTransportContactI2P 		basis, 
 					DHTTransportException 		error) 
 				{
+					if ( TRACE ) trace( "AZ: sendFindNode to " + contact.getString() + " failed" );
+
 					stats.findNodeFailed();
 					
 					handler.failed( contact, error );
@@ -354,6 +361,7 @@ DHTTransportAZ
 			},
 			contact,
 			METHOD_FIND_NODE,
+			priority,
 			payload );
 	}
     
@@ -383,7 +391,9 @@ DHTTransportAZ
 		int									max_values,
 		short								flags )
 	{
-		System.out.println( "AZ: sendFindValue" );
+		boolean priority = (flags&I2PHelperAZDHT.FLAG_HIGH_PRIORITY) != 0;
+		
+		if ( TRACE ) trace( "AZ: sendFindValue" );
 		
 		if ( contact.getProtocolVersion() < DHTUtilsI2P.PROTOCOL_VERSION_AZ_MSGS ){
 			
@@ -459,6 +469,7 @@ DHTTransportAZ
 			},
 			contact,
 			METHOD_FIND_VALUE,
+			priority,
 			payload );
     }
 
@@ -506,7 +517,7 @@ DHTTransportAZ
 		byte[][]						keys,
 		DHTTransportValue[][]			value_sets )
 	{
-		System.out.println( "AZ: sendStore" );
+		if ( TRACE ) trace( "AZ: sendStore" );
 
 		if ( contact.getProtocolVersion() < DHTUtilsI2P.PROTOCOL_VERSION_AZ_MSGS ){
 			
@@ -578,6 +589,7 @@ DHTTransportAZ
 			},
 			contact,
 			METHOD_STORE,
+			false,	// destination should be resolved already when storing so whatever 
 			payload );
 	}
 	
@@ -840,6 +852,7 @@ DHTTransportAZ
 		final DHTTransportI2P.AZReplyHandler	reply_handler,
 		final DHTTransportContactAZ				contact,
 		int										method,
+		boolean									priority,
 		Map<String,Object>						payload )
 	{
 		payload.put( "_m", method );
@@ -889,6 +902,7 @@ DHTTransportAZ
 				}
 			},
 			contact.getBasis(),
+			priority,
 			payload );
 	}
 	
@@ -934,7 +948,7 @@ DHTTransportAZ
 		
 		Map<String,Object>		payload_out = new HashMap<String, Object>();
 		
-		System.out.println( "Received request: " + payload_in );
+		if ( TRACE ) trace( "Received request: " + payload_in );
 		
 		DHTTransportContactAZ az_contact = new DHTTransportContactAZ( this, contact );
 		

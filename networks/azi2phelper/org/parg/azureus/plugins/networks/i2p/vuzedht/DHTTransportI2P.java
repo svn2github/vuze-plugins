@@ -46,6 +46,7 @@ import org.gudy.azureus2.core3.util.ThreadPool;
 import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.gudy.azureus2.core3.util.TimerEventPeriodic;
+import org.parg.azureus.plugins.networks.i2p.I2PHelperAZDHT;
 import org.parg.azureus.plugins.networks.i2p.dht.NID;
 import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 
@@ -118,7 +119,8 @@ DHTTransportI2P
 				}
 			};
 	
-	private ThreadPool	destination_lookup_pool 	= new ThreadPool("DHTTransportI2P::destlookup", 5, true );
+	private ThreadPool	destination_lookup_pool_lp 	= new ThreadPool("DHTTransportI2P::destlookup-lp", 5, true );
+	private ThreadPool	destination_lookup_pool_hp 	= new ThreadPool("DHTTransportI2P::destlookup-hp", 10, true );
 
 	private volatile boolean			destroyed;
 	
@@ -526,7 +528,7 @@ DHTTransportI2P
 	        			sem.release();
 	        		}
 	        	}, 
-	        	node, map, true );
+	        	node, map, true, false );
 	        
 	        if ( wait_for_reply ){
 	        
@@ -587,7 +589,7 @@ DHTTransportI2P
 	        			stats.pingFailed();
 	        		}
 	        	}, 
-	        	contact, map, true );
+	        	contact, map, true, false );
 	        	        
 		}catch( Throwable e ){
 			
@@ -680,7 +682,7 @@ DHTTransportI2P
 	        			sem.release();
 	        		}
 	        	}, 
-	        	node, map, true );
+	        	node, map, true, true );
 	        
 	        sem.reserve();
 	        
@@ -699,6 +701,8 @@ DHTTransportI2P
 	{
 		if ( TRACE ) trace( "sendFindNode, flags=" + flags );
 		
+		boolean priority = (flags&I2PHelperAZDHT.FLAG_HIGH_PRIORITY) != 0;
+
 		if (( flags & DHT.FLAG_LOOKUP_FOR_STORE ) != 0 ){
 			
 				// only way tokens get allocated is via findValue (get_peers)
@@ -742,9 +746,11 @@ DHTTransportI2P
 				},
 				contact,
 				new_target,
-				flags );
+				flags,
+				priority );
 			
 		}else{
+			
 			try{
 		        stats.findNodeSent( null );
 	
@@ -807,7 +813,7 @@ DHTTransportI2P
 		        			stats.findNodeFailed();
 		        		}
 		        	}, 
-		        	contact, map, true );
+		        	contact, map, true, priority );
 		        	        
 			}catch( Throwable e ){
 				
@@ -863,7 +869,8 @@ DHTTransportI2P
 		final DHTTransportReplyHandler		handler,
 		final DHTTransportContactI2P		contact,
 		byte[]								target,
-		short								flags )
+		short								flags,
+		boolean								priority )
 	{
 		if ( TRACE ) trace( "sendFindValue: contact=" + contact.getString() + ", target=" + ByteFormatter.encodeString( target ));
 		
@@ -968,7 +975,7 @@ DHTTransportI2P
 	        			stats.findValueFailed();
 	        		}
 	        	}, 
-	        	contact, map, true );
+	        	contact, map, true, priority );
 	        	        
 		}catch( Throwable e ){
 			
@@ -1190,7 +1197,8 @@ DHTTransportI2P
 					},
 					contact,
 					new_target,
-					DHT.FLAG_NONE  );
+					DHT.FLAG_NONE,
+					false );
 			}else{
 				
 				sendStoreSupport( handler, contact, keys, value_sets );
@@ -1307,7 +1315,7 @@ DHTTransportI2P
 										}
 									}
 								}, 
-								contact, map, false );		// NOT repliable. Note however that we still get a reply as the target has (or should have) our dest cached against the token...
+								contact, map, false, false );		// NOT repliable. Note however that we still get a reply as the target has (or should have) our dest cached against the token...
 	
 					}catch( Throwable e ){
 	
@@ -1366,6 +1374,7 @@ DHTTransportI2P
 	sendAZRequest(
 		final AZReplyHandler				handler,
 		final DHTTransportContactI2P		contact,
+		boolean								priority,
 		Map<String, Object>					payload )	
 	{
 		if ( TRACE ) trace( "sendAZRequest: " + payload );
@@ -1440,7 +1449,7 @@ DHTTransportI2P
 	        			handler.failed( contact, error );
 	        		}
 	        	}, 
-	        	contact, map, true );
+	        	contact, map, true, priority );
 	        	        
 		}catch( Throwable e ){
 			
@@ -1540,13 +1549,14 @@ DHTTransportI2P
     	ReplyHandler				handler,
     	DHTTransportContactI2P		contact,
     	Map					 		map, 
-    	boolean 					repliable ) 
+    	boolean 					repliable,
+    	boolean						priority ) 
     	
     	throws Exception
     {
 	   	NodeInfo node = contact.getNode();
 	   
-		sendQuery( handler, node, map, repliable );
+		sendQuery( handler, node, map, repliable, priority );
     }
    
     private void 
@@ -1554,7 +1564,8 @@ DHTTransportI2P
     	final ReplyHandler				handler,
     	final NodeInfo					node,
     	final Map				 		map, 
-    	final boolean 					repliable ) 
+    	final boolean 					repliable,
+    	final boolean					priority )
     	
     	throws Exception
     {
@@ -1566,10 +1577,12 @@ DHTTransportI2P
     	Destination	dest = node.getDestination();
     	
     	if ( dest == null ) {
-
-    		if ( TRACE ) trace( "Scheduling dest lookup: active=" + destination_lookup_pool.getRunningCount() + ", queued=" + destination_lookup_pool.getQueueSize());
     		
-    		destination_lookup_pool.run(
+    		ThreadPool pool = priority?destination_lookup_pool_hp:destination_lookup_pool_lp;
+    		
+    		if ( TRACE ) trace( "Scheduling dest lookup: active=" + pool.getRunningCount() + ", queued=" + pool.getQueueSize() + ", priority=" + priority );
+
+    		pool.run(
     			new AERunnable() 
     			{
 					public void 
@@ -1583,7 +1596,7 @@ DHTTransportI2P
 							if ( dest != null ){
             
 								if ( TRACE ) trace( "Destination lookup ok - elapsed=" + (SystemTime.getMonotonousTime()-start));
-								
+
 								node.setDestination( dest );
 								
 					    		sendQuery( handler, dest, node.getPort(), map, repliable );
@@ -1605,6 +1618,7 @@ DHTTransportI2P
 						}
 					}
     			});
+    		    		
     	}else{
     		
     		sendQuery( handler, dest, node.getPort(), map, repliable );
@@ -1881,6 +1895,10 @@ DHTTransportI2P
 	        	
 	        	if ( request != null ){
 	        		
+	        		long elapsed = SystemTime.getMonotonousTime() - request.getStartTime();
+	        		
+	        		if ( TRACE ) trace( "Request took " + elapsed );
+	        		
 	        		ReplyHandler reply_handler = request.getHandler();
 	        		
 	        		try{
@@ -1904,6 +1922,9 @@ DHTTransportI2P
 	        			
 	        			reply_handler.handleError( new DHTTransportException( "Reply processing failed", e ));
 	        		}
+	        	}else{
+	        		
+	        		if ( TRACE ) trace( "Got reply to timed-out request" );
 	        	}
 	        }
     	}catch( Throwable e ){

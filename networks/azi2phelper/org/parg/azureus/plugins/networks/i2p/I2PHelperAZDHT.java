@@ -32,8 +32,10 @@ import com.aelitis.azureus.core.dht.transport.DHTTransportValue;
 public class 
 I2PHelperAZDHT 
 {
-	public static final byte		FLAG_NON_ANON		= DHT.FLAG_SINGLE_VALUE;	// getters will get putter's address
-	public static final byte		FLAG_ANON			= DHT.FLAG_ANON;			// getters don't get putters address
+	public static final short		FLAG_NONE			= DHT.FLAG_NONE;			
+	public static final short		FLAG_NON_ANON		= DHT.FLAG_SINGLE_VALUE;	// getters will get putter's address
+	public static final short		FLAG_ANON			= DHT.FLAG_ANON;			// getters don't get putters address
+	public static final short		FLAG_HIGH_PRIORITY	= 0x0200; // update to DHT.FLAG_HIGH_PRIORITY;	sometime		
 
 	private DHTAZ		dht;
 	
@@ -53,11 +55,107 @@ I2PHelperAZDHT
 		boolean						high_priority,
 		final OperationListener		listener)
 	{
+		if ( high_priority ){
+			
+			flags |= FLAG_HIGH_PRIORITY;
+		}
+		
 		dht.getDHT().put(
 			key, 
 			description, 
 			value, 
 			flags, 
+			high_priority,
+			new DHTOperationListener()
+			{
+				private boolean	started;
+				
+				public void
+				searching(
+					DHTTransportContact	contact,
+					int					level,
+					int					active_searches )
+				{
+					if ( listener != null ){
+						
+						synchronized( this ){
+							
+							if ( started ){
+								
+								return;
+							}
+							
+							started = true;
+						}
+						
+						listener.starts( key );
+					}
+				}
+				
+				public boolean
+				diversified(
+					String				desc )
+				{
+					return( listener.diversified( key ));
+				}
+				
+				public void
+				found(
+					DHTTransportContact		contact,
+					boolean					is_closest )
+				{
+					// nada
+				}
+				
+				public void
+				read(
+					DHTTransportContact		contact,
+					DHTTransportValue		value )
+				{
+					listener.valueRead(key, new DHTContactImpl( contact ), new DHTValueImpl( value ));
+				}
+				
+				public void
+				wrote(
+					DHTTransportContact		contact,
+					DHTTransportValue		value )
+				{
+					listener.valueWritten(key, new DHTContactImpl( contact ), new DHTValueImpl( value ));
+				}
+				
+				public void
+				complete(
+					boolean					timeout )
+				{
+					listener.complete( key, timeout );
+				}
+			});
+	}
+	
+	public void
+	get(
+		final byte[]				key,
+		String						description,
+		int							max_values,
+		long						timeout,
+		boolean						high_priority,
+		final OperationListener		listener)
+	{
+		short flags = FLAG_NONE;
+		
+		if ( high_priority ){
+			
+			flags |= FLAG_HIGH_PRIORITY;
+		}
+		
+		dht.getDHT().get(
+			key, 
+			description, 
+			flags, 
+			max_values,
+			timeout,
+			false,	// exhaustive
+			high_priority,
 			new DHTOperationListener()
 			{
 				private boolean	started;
@@ -248,7 +346,7 @@ I2PHelperAZDHT
 		
 		public void
 		valueWritten(
-			byte[]				ley,
+			byte[]				key,
 			DHTContact			target,
 			DHTValue			value );
 		
@@ -256,5 +354,51 @@ I2PHelperAZDHT
 		complete(
 			byte[]				key,
 			boolean				timeout_occurred );
+	}
+	
+	public static class
+	OperationAdapter
+		implements OperationListener
+	{
+		@Override
+		public void
+		starts(
+			byte[]				key )
+		{
+		}
+		
+		@Override
+		public boolean
+		diversified(
+			byte[]				key )
+		{
+			return( true );
+		}
+		
+		@Override
+		public void
+		valueRead(
+			byte[]				key,
+			DHTContact			originator,
+			DHTValue			value )
+		{
+		}
+		
+		@Override
+		public void
+		valueWritten(
+			byte[]				key,
+			DHTContact			target,
+			DHTValue			value )
+		{
+		}
+		
+		@Override
+		public void
+		complete(
+			byte[]				key,
+			boolean				timeout_occurred )
+		{
+		}
 	}
 }

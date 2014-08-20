@@ -36,8 +36,8 @@ DHTUtilsI2P
 	protected static final byte PROTOCOL_VERSION		= PROTOCOL_VERSION_AZ_MSGS;
 	protected static final byte PROTOCOL_VERSION_MIN	= PROTOCOL_VERSION_INITIAL;
 	
-	protected static final int		REQUEST_TIMEOUT	= 45*1000;
-	protected static final int 		DEST_LOOKUP_TIMEOUT = 20*1000;
+	protected static final int		REQUEST_TIMEOUT		= 30*1000;	// from observation requests rarely complete in > 30 sec
+	protected static final int 		DEST_LOOKUP_TIMEOUT = 20*1000;  
 
 	protected static final int		DHT_NETWORK		= 10;
 

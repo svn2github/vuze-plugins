@@ -91,7 +91,7 @@ I2PHelperDHT
 	get(
 		byte[] 						ih, 
 		String						reason,
-		byte						flags,
+		short						flags,
 		int 						max, 
 		long						maxWait,
 		I2PHelperDHTListener		listener );
@@ -100,7 +100,7 @@ I2PHelperDHT
 	put(
 		byte[] 						ih, 
 		String						reason,
-		byte						flags,
+		short						flags,
 		I2PHelperDHTListener		listener );
 	
 	public void

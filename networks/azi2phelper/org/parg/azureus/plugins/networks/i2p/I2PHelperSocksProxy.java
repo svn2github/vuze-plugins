@@ -81,7 +81,7 @@ I2PHelperSocksProxy
 
 	{
 		try{
-			local_address = InetAddress.getLocalHost();
+			local_address = InetAddress.getByName( "127.0.0.1" );
 			
 		}catch( Throwable e ){
 			
@@ -958,7 +958,7 @@ I2PHelperSocksProxy
 																		// System.out.println( line );
 																	}
 																}
-																
+													
 																headers.add( line );
 															}
 														}else{
@@ -989,8 +989,13 @@ I2PHelperSocksProxy
 																	}
 																	
 																	headers.add( "Host: " + Base32.encode( peer_dest.calculateHash().getData()) + ".b32.i2p" );
-																	
+																
+																}else if ( kw.equals( "USER-AGENT" )){
+	
+																	headers.add( "User-Agent: " + "Azureus" );
+
 																}else{
+																	
 																	headers.add( line );
 																}
 															}
@@ -1009,7 +1014,13 @@ I2PHelperSocksProxy
 														
 														sb.append( "\r\n" );
 														
-														output_stream.write( sb.toString().getBytes( "ISO8859-1" ));
+														String oh = sb.toString();
+														
+														//System.out.println( oh );
+														
+														byte[] output_headers = oh.getBytes( "ISO8859-1" );
+														
+														output_stream.write( output_headers );
 													
 														array_offset = i+4;
 													}

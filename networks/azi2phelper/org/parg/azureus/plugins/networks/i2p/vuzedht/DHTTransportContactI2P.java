@@ -31,6 +31,7 @@ import net.i2p.data.Base32;
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.SystemTime;
+import org.parg.azureus.plugins.networks.i2p.I2PHelperAZDHT;
 import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 
 import com.aelitis.azureus.core.dht.netcoords.DHTNetworkPosition;
@@ -329,7 +330,9 @@ DHTTransportContactI2P
 		int							max_values,
 		short						flags )
 	{
-		transport.sendFindValue( handler, this, key, flags );
+		boolean priority = (flags&I2PHelperAZDHT.FLAG_HIGH_PRIORITY) != 0;
+
+		transport.sendFindValue( handler, this, key, flags, priority );
 	}
 		
 	public void

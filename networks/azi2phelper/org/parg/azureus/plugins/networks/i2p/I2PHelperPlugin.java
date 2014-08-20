@@ -105,6 +105,8 @@ import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
+import org.parg.azureus.plugins.networks.i2p.I2PHelperAZDHT.DHTContact;
+import org.parg.azureus.plugins.networks.i2p.I2PHelperAZDHT.DHTValue;
 import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 import org.parg.azureus.plugins.networks.i2p.swt.I2PHelperView;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTTransportContactI2P;
@@ -1080,7 +1082,7 @@ I2PHelperPlugin
 	{
 		cmd_str = cmd_str.trim();
 		
-		String[] bits = cmd_str.split( " " );
+		String[] bits = cmd_str.split( "\\s+" );
 
 		if ( bits.length == 0 ){
 			
@@ -1226,6 +1228,80 @@ I2PHelperPlugin
 					byte[] value = bits[4].getBytes( "UTF-8" );
 					
 					dht.store( dest, port, key, value );
+					
+				}else if ( cmd.equals( "az_put" )){
+
+					if ( bits.length != 3 ){
+						
+						throw( new Exception( "usage: az_put key value"));
+					}
+					
+					byte[]	key = decodeHash( bits[1] ); 
+							
+					byte[] value = bits[2].getBytes( "UTF-8" );
+					
+					dht.getHelperAZDHT().put(
+						key, "az_put", value, I2PHelperAZDHT.FLAG_NON_ANON, true, 
+						new I2PHelperAZDHT.OperationAdapter() {
+							
+							@Override
+							public void
+							valueWritten(
+								byte[]				key,
+								DHTContact			target,
+								DHTValue			value )
+							{
+								System.out.println( "az_put: write to " + target.getAddress());
+							}
+							
+							@Override
+							public void
+							complete(
+								byte[]				key,
+								boolean				timeout_occurred )
+							{
+								System.out.println( "az_put complete" );
+							}
+						});
+
+				}else if ( cmd.equals( "az_get" )){
+
+					if ( bits.length != 2 ){
+						
+						throw( new Exception( "usage: az_get key"));
+					}
+					
+					byte[]	key = decodeHash( bits[1] ); 
+												
+					dht.getHelperAZDHT().get(
+						key, "az_get", 16, 3*60*1000, true, 
+						new I2PHelperAZDHT.OperationAdapter() {
+							
+							@Override
+							public void
+							valueRead(
+								byte[]				key,
+								DHTContact			target,
+								DHTValue			value )
+							{
+								try{
+									System.out.println( "az_get: read from " + target.getAddress() + ", value=" + new String( value.getValue(), "UTF-8" ));
+									
+								}catch( Throwable e ){
+									
+									e.printStackTrace();
+								}
+							}
+							
+							@Override
+							public void
+							complete(
+								byte[]				key,
+								boolean				timeout_occurred )
+							{
+								System.out.println( "az_get complete" );
+							}
+						});
 					
 				}else if ( cmd.equals( "ping_node" )){
 
