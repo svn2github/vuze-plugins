@@ -195,7 +195,7 @@ DHTTransportContactAZ
 	public boolean
 	isSleeping()
 	{
-		return(( transport.getGenericFlags() & DHTTransportUDP.GF_DHT_SLEEPING ) != 0 );
+		return( basis.isSleeping());
 	}
 	
 	public void
