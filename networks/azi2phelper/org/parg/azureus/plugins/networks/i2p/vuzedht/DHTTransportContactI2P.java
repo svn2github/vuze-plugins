@@ -41,6 +41,7 @@ import com.aelitis.azureus.core.dht.transport.DHTTransportException;
 import com.aelitis.azureus.core.dht.transport.DHTTransportFullStats;
 import com.aelitis.azureus.core.dht.transport.DHTTransportReplyHandler;
 import com.aelitis.azureus.core.dht.transport.DHTTransportValue;
+import com.aelitis.azureus.core.dht.transport.udp.DHTTransportUDP;
 
 public class 
 DHTTransportContactI2P 
@@ -155,12 +156,6 @@ DHTTransportContactI2P
 		return( skew );
 	}
 	
-	protected byte
-	getGenericFlags()
-	{
-		return( generic_flags );
-	}
-	
 	public int
 	getRandomIDType()
 	{
@@ -264,7 +259,7 @@ DHTTransportContactI2P
 	public boolean
 	isSleeping()
 	{
-		return( false );
+		return(( generic_flags & DHTTransportUDP.GF_DHT_SLEEPING ) != 0 );
 	}
 	
 	public void

@@ -37,7 +37,6 @@ import com.aelitis.azureus.core.dht.transport.DHTTransportException;
 import com.aelitis.azureus.core.dht.transport.DHTTransportFullStats;
 import com.aelitis.azureus.core.dht.transport.DHTTransportReplyHandler;
 import com.aelitis.azureus.core.dht.transport.DHTTransportValue;
-import com.aelitis.azureus.core.dht.transport.udp.DHTTransportUDP;
 
 public class 
 DHTTransportContactAZ
