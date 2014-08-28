@@ -910,7 +910,7 @@ I2PHelperRouter
 			throws Exception;
 	}
 	
-	protected class
+	public class
 	ServerInstance
 	{
 		private final String			server_id;
@@ -1133,6 +1133,18 @@ I2PHelperRouter
 					}
 				}
 			}			
+		}
+		
+		public I2PSession
+		getSession()
+		{
+			return( session );
+		}
+		
+		public boolean
+		isDestroyed()
+		{
+			return( server_destroyed );
 		}
 		
 		protected String

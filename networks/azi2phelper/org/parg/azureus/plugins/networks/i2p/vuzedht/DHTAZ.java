@@ -25,6 +25,8 @@ import java.io.File;
 import java.util.Properties;
 
 
+
+
 import org.gudy.azureus2.core3.util.ByteArrayHashMap;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.PluginInterface;
@@ -81,7 +83,15 @@ DHTAZ
 
 		base_transport = base.getTransport();
 		
-		transport = new DHTTransportAZ( this, base_transport );
+		transport = 
+			new DHTTransportAZ( 
+				new DHTTransportAZ.DHTTransportAZHelper() {
+					
+					@Override
+					public boolean isBaseContact(DHTTransportContactAZ contact) {
+						return( DHTAZ.this.isBaseContact(contact));
+					}
+				}, base_transport );
 		
 		Properties	props = new Properties();
 	

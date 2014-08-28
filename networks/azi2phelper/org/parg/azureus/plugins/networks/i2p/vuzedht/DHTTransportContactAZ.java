@@ -26,12 +26,9 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.List;
 
-import net.i2p.data.Base32;
 
-import org.gudy.azureus2.core3.util.ByteFormatter;
+
 import org.gudy.azureus2.core3.util.Debug;
-import org.gudy.azureus2.core3.util.SystemTime;
-import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 
 import com.aelitis.azureus.core.dht.netcoords.DHTNetworkPosition;
 import com.aelitis.azureus.core.dht.transport.DHTTransport;
@@ -47,7 +44,7 @@ DHTTransportContactAZ
 	implements DHTTransportContact
 {
 	private DHTTransportAZ			transport;
-	private DHTTransportContactI2P	basis;
+	private DHTTransportContactI2P	basis;	// DON'T use this for any transport operations as DHTAZClient relies on this NOT BEING DONE
 	
 	protected
 	DHTTransportContactAZ(
@@ -198,7 +195,7 @@ DHTTransportContactAZ
 	public boolean
 	isSleeping()
 	{
-		return(( basis.getGenericFlags() & DHTTransportUDP.GF_DHT_SLEEPING ) != 0 );
+		return(( transport.getGenericFlags() & DHTTransportUDP.GF_DHT_SLEEPING ) != 0 );
 	}
 	
 	public void

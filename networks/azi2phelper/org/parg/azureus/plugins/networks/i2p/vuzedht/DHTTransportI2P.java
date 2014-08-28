@@ -68,10 +68,12 @@ import com.aelitis.azureus.core.dht.transport.DHTTransportFindValueReply;
 import com.aelitis.azureus.core.dht.transport.DHTTransportFullStats;
 import com.aelitis.azureus.core.dht.transport.DHTTransportListener;
 import com.aelitis.azureus.core.dht.transport.DHTTransportProgressListener;
+import com.aelitis.azureus.core.dht.transport.DHTTransportQueryStoreReply;
 import com.aelitis.azureus.core.dht.transport.DHTTransportReplyHandler;
 import com.aelitis.azureus.core.dht.transport.DHTTransportReplyHandlerAdapter;
 import com.aelitis.azureus.core.dht.transport.DHTTransportRequestHandler;
 import com.aelitis.azureus.core.dht.transport.DHTTransportStats;
+import com.aelitis.azureus.core.dht.transport.DHTTransportStoreReply;
 import com.aelitis.azureus.core.dht.transport.DHTTransportTransferHandler;
 import com.aelitis.azureus.core.dht.transport.DHTTransportValue;
 import com.aelitis.azureus.core.dht.transport.udp.DHTTransportUDP;
@@ -83,7 +85,7 @@ public class
 DHTTransportI2P
 	implements DHTTransport, I2PSessionMuxedListener
 {
-	private static final boolean TRACE = false;
+	private boolean TRACE = false;
 	
 	private static final int NUM_WANT	= 16;
 	
@@ -171,6 +173,13 @@ DHTTransportI2P
 						}
 					});
 			
+	}
+	
+	protected void
+	setTraceOn(
+		boolean		b )
+	{
+		TRACE = b;
 	}
 	
 	protected DHTTransportContactI2P
@@ -445,7 +454,9 @@ DHTTransportI2P
 	setRequestHandler(
 		DHTTransportRequestHandler	_request_handler )
 	{
-		request_handler	= new DHTTransportRequestCounter( _request_handler, stats );
+		_request_handler	= new DHTTransportRequestCounter( _request_handler, stats );
+		
+		request_handler = _request_handler;
 	}
 	
 	public void
@@ -841,26 +852,29 @@ DHTTransportI2P
 
 		DHTTransportContact[] contacts = request_handler.findNodeRequest( originator, target );
 
-		Map<String, Object> map = new HashMap<String, Object>();
-		
-		Map<String, Object> resps = new HashMap<String, Object>();
-		
-		map.put( "r", resps);
-
-		// no token returned for find-node, just find-value
-		// byte[] token = originator.getRandomID2();				
-		// resps.put( "token", token );
-		
-        byte[] nodes = new byte[contacts.length * NodeInfo.LENGTH];
-        
-        for ( int i=0; i<contacts.length; i++ ){
-        	
-            System.arraycopy(((DHTTransportContactI2P)contacts[i]).getNode().getData(), 0, nodes, i * NodeInfo.LENGTH, NodeInfo.LENGTH);
-        }
-        
-		resps.put( "nodes", nodes );
-		
-		sendResponse( originator, message_id, map );
+		if ( contacts != null ){
+			
+			Map<String, Object> map = new HashMap<String, Object>();
+			
+			Map<String, Object> resps = new HashMap<String, Object>();
+			
+			map.put( "r", resps);
+	
+			// no token returned for find-node, just find-value
+			// byte[] token = originator.getRandomID2();				
+			// resps.put( "token", token );
+			
+	        byte[] nodes = new byte[contacts.length * NodeInfo.LENGTH];
+	        
+	        for ( int i=0; i<contacts.length; i++ ){
+	        	
+	            System.arraycopy(((DHTTransportContactI2P)contacts[i]).getNode().getData(), 0, nodes, i * NodeInfo.LENGTH, NodeInfo.LENGTH);
+	        }
+	        
+			resps.put( "nodes", nodes );
+			
+			sendResponse( originator, message_id, map );
+		}
 	}
 	
 	
@@ -1004,100 +1018,103 @@ DHTTransportI2P
 
 		DHTTransportFindValueReply reply = request_handler.findValueRequest( originator, hash, NUM_WANT, (byte)0 );
 
-		Map<String, Object> map = new HashMap<String, Object>();
-		
-		Map<String, Object> resps = new HashMap<String, Object>();
-		
-		map.put( "r", resps);
-
-		byte[] token = originator.getRandomID2();
-						
-		resps.put( "token", token );
-		
-		NodeInfo node = originator.getNode();
-		
-		synchronized( token_map ){
+		if ( reply != null ){
 			
-			token_map.put( new HashWrapper( token ), node );
-		}
-		
-		if ( reply.hit()){
+			Map<String, Object> map = new HashMap<String, Object>();
 			
-			DHTTransportValue[] values = reply.getValues();
+			Map<String, Object> resps = new HashMap<String, Object>();
 			
-			List<byte[]>	peers = new ArrayList<byte[]>( values.length );
-			
-			byte[]	caller_hash = originator.getNode().getHash().getData();
-
-			boolean	caller_non_vuze = originator.getProtocolVersion() == DHTUtilsI2P.PROTOCOL_VERSION_NON_VUZE;
-
-			if ( caller_non_vuze ){
-				
-
-					// Snark removes the peer itself from the list returned so a peer can't read its own
-					// values stored at a node. This in itself isn't so bad, but what is worse is that
-					// Snark will end up returning "nodes" if there was only the one value stored which
-					// results in an exhaustive search by the caller in the case where there is only
-					// one announcer.... I'm not going to do this
-								
-				for ( DHTTransportValue value: values ){
-					
-					if ( no_seed && ( value.getFlags() & DHT.FLAG_SEEDING ) != 0 ){
-						
-						continue;
-					}
-					
-					byte[]	peer_hash = value.getValue();
-					
-					if ( !Arrays.equals( caller_hash, peer_hash )){
-						
-						peers.add( value.getValue());
-					}
-				}
-			}else{
-				
-				byte[]	flags = new byte[(values.length+7)/8];
-				
-				int	pos = 0;
-				
-				for ( DHTTransportValue value: values ){
-					
-					boolean is_seed = ( value.getFlags() & DHT.FLAG_SEEDING ) != 0;
-
-						// for Vuze callers we don't remove the caller from the reply set
-											
-					peers.add( value.getValue());
-						
-					if ( is_seed ){
+			map.put( "r", resps);
+	
+			byte[] token = originator.getRandomID2();
 							
-						flags[pos/8] |= 1<<(7-(pos%8));
-					}
-						
-					pos++;
-				}
-								
-				resps.put( "flags", flags );
+			resps.put( "token", token );
+			
+			NodeInfo node = originator.getNode();
+			
+			synchronized( token_map ){
+				
+				token_map.put( new HashWrapper( token ), node );
 			}
 			
-			resps.put( "values", peers );
+			if ( reply.hit()){
+				
+				DHTTransportValue[] values = reply.getValues();
+				
+				List<byte[]>	peers = new ArrayList<byte[]>( values.length );
+				
+				byte[]	caller_hash = originator.getNode().getHash().getData();
+	
+				boolean	caller_non_vuze = originator.getProtocolVersion() == DHTUtilsI2P.PROTOCOL_VERSION_NON_VUZE;
+	
+				if ( caller_non_vuze ){
+					
+	
+						// Snark removes the peer itself from the list returned so a peer can't read its own
+						// values stored at a node. This in itself isn't so bad, but what is worse is that
+						// Snark will end up returning "nodes" if there was only the one value stored which
+						// results in an exhaustive search by the caller in the case where there is only
+						// one announcer.... I'm not going to do this
+									
+					for ( DHTTransportValue value: values ){
+						
+						if ( no_seed && ( value.getFlags() & DHT.FLAG_SEEDING ) != 0 ){
+							
+							continue;
+						}
+						
+						byte[]	peer_hash = value.getValue();
+						
+						if ( !Arrays.equals( caller_hash, peer_hash )){
+							
+							peers.add( value.getValue());
+						}
+					}
+				}else{
+					
+					byte[]	flags = new byte[(values.length+7)/8];
+					
+					int	pos = 0;
+					
+					for ( DHTTransportValue value: values ){
+						
+						boolean is_seed = ( value.getFlags() & DHT.FLAG_SEEDING ) != 0;
+	
+							// for Vuze callers we don't remove the caller from the reply set
+												
+						peers.add( value.getValue());
+							
+						if ( is_seed ){
+								
+							flags[pos/8] |= 1<<(7-(pos%8));
+						}
+							
+						pos++;
+					}
+									
+					resps.put( "flags", flags );
+				}
+				
+				resps.put( "values", peers );
+				
+			}else{
+				
+				DHTTransportContact[] contacts = reply.getContacts();
+				
+		        byte[] nodes = new byte[contacts.length * NodeInfo.LENGTH];
+		        
+		        for ( int i=0; i<contacts.length; i++ ){
+		        	
+		            System.arraycopy(((DHTTransportContactI2P)contacts[i]).getNode().getData(), 0, nodes, i * NodeInfo.LENGTH, NodeInfo.LENGTH);
+		        }
+		        
+				resps.put( "nodes", nodes );
+			}
 			
-		}else{
-			
-			DHTTransportContact[] contacts = reply.getContacts();
-			
-	        byte[] nodes = new byte[contacts.length * NodeInfo.LENGTH];
-	        
-	        for ( int i=0; i<contacts.length; i++ ){
-	        	
-	            System.arraycopy(((DHTTransportContactI2P)contacts[i]).getNode().getData(), 0, nodes, i * NodeInfo.LENGTH, NodeInfo.LENGTH);
-	        }
-	        
-			resps.put( "nodes", nodes );
+			if ( TRACE ) trace( "    findValue->" + map);
+	
+			sendResponse( originator, message_id, map );
 		}
-		
-		if ( TRACE ) trace( "    findValue->" + map);
-
-		sendResponse( originator, message_id, map );
 	}
 	
 	protected void

@@ -23,13 +23,11 @@ package org.parg.azureus.plugins.networks.i2p;
 
 import java.net.InetSocketAddress;
 
-import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTAZ;
-
 import com.aelitis.azureus.core.dht.*;
 import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
 import com.aelitis.azureus.core.dht.transport.DHTTransportValue;
 
-public class 
+public abstract class 
 I2PHelperAZDHT 
 {
 	public static final short		FLAG_NONE			= DHT.FLAG_NONE;			
@@ -37,14 +35,10 @@ I2PHelperAZDHT
 	public static final short		FLAG_ANON			= DHT.FLAG_ANON;			// getters don't get putters address
 	public static final short		FLAG_HIGH_PRIORITY	= 0x0200; // update to DHT.FLAG_HIGH_PRIORITY;	sometime		
 
-	private DHTAZ		dht;
+	public abstract DHT
+	getDHT()
 	
-	public
-	I2PHelperAZDHT(
-		DHTAZ			_d )
-	{
-		dht		= _d;
-	}
+		throws Exception;
 	
 	public void
 	put(
@@ -54,13 +48,15 @@ I2PHelperAZDHT
 		short						flags,
 		boolean						high_priority,
 		final OperationListener		listener)
+		
+		throws Exception
 	{
 		if ( high_priority ){
 			
 			flags |= FLAG_HIGH_PRIORITY;
 		}
 		
-		dht.getDHT().put(
+		getDHT().put(
 			key, 
 			description, 
 			value, 
@@ -140,6 +136,8 @@ I2PHelperAZDHT
 		long						timeout,
 		boolean						high_priority,
 		final OperationListener		listener)
+		
+		throws Exception
 	{
 		short flags = FLAG_NONE;
 		
@@ -148,7 +146,7 @@ I2PHelperAZDHT
 			flags |= FLAG_HIGH_PRIORITY;
 		}
 		
-		dht.getDHT().get(
+		getDHT().get(
 			key, 
 			description, 
 			flags, 
@@ -293,6 +291,12 @@ I2PHelperAZDHT
 		{
 			return( value.getValue());
 		}
+		
+		public DHTContact
+		getOriginator()
+		{
+			return( new DHTContactImpl( value.getOriginator()));
+		}
 	}
 	
 	public interface
@@ -325,6 +329,9 @@ I2PHelperAZDHT
 	{
 		public byte[]
 		getValue();
+		
+		public DHTContact
+		getOriginator();
 	}
 	
 	public interface 

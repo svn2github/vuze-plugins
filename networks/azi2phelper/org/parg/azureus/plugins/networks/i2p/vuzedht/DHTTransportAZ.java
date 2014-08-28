@@ -52,14 +52,14 @@ public class
 DHTTransportAZ
 	implements DHTTransport, DHTTransportI2P.AZRequestHandler
 {
-	private static final boolean TRACE = false;
+	private boolean TRACE = false;
 
 	private static final int	METHOD_PING			= 0;
 	private static final int	METHOD_FIND_NODE	= 1;
 	private static final int	METHOD_FIND_VALUE	= 2;
 	private static final int	METHOD_STORE		= 3;
 	
-	private DHTAZ						dht;
+	private DHTTransportAZHelper		helper;
 	
 	private DHTTransportI2P				base_transport;
 	
@@ -70,16 +70,14 @@ DHTTransportAZ
 	private DHTTransportRequestHandler	request_handler;
 	
 
-	
-
 	private volatile boolean			destroyed;
 	
 	protected
 	DHTTransportAZ(
-		DHTAZ				_dht,
-		DHTTransportI2P		_base_transport )
+		DHTTransportAZHelper	_helper,
+		DHTTransportI2P			_base_transport )
 	{
-		dht				= _dht;
+		helper			= _helper;
 		base_transport	= _base_transport;
 		
 		stats = new DHTTransportStatsI2P();
@@ -90,6 +88,12 @@ DHTTransportAZ
 		base_transport.setAZRequestHandler( this );
 	}
 	
+	protected void
+	setTraceOn(
+		boolean		b )
+	{
+		TRACE = b;
+	}
 
 	public byte
 	getProtocolVersion()
@@ -185,7 +189,6 @@ DHTTransportAZ
 		return( null );
 	}
 	
-
 	protected void
 	contactAlive(
 		DHTTransportContactI2P		i2p_contact )
@@ -221,7 +224,10 @@ DHTTransportAZ
 	setRequestHandler(
 		DHTTransportRequestHandler	_request_handler )
 	{
-		request_handler	= new DHTTransportRequestCounter( _request_handler, stats );
+		if ( request_handler == null ){
+		
+			request_handler	= new DHTTransportRequestCounter( _request_handler, stats );
+		}
 	}
 	
 	public DHTTransportStats
@@ -235,7 +241,7 @@ DHTTransportAZ
 		final DHTTransportReplyHandler		handler,
 		final DHTTransportContactAZ			contact )
 	{		
-		boolean known = dht.isBaseContact( contact );
+		boolean known = helper.isBaseContact( contact );
 		
 		if ( known ){
 			
@@ -284,7 +290,7 @@ DHTTransportAZ
 				false,
 				payload );
 			
-			if ( TRACE ) trace( "AZ: sendPing - " + contact.getString() + ", known=" + known + ", router=" + dht.getDHT().getRouter().getAllContacts().size());
+			if ( TRACE ) trace( "AZ: sendPing to " + contact.getString());
 		}
 	}
 	
@@ -855,6 +861,13 @@ DHTTransportAZ
 		boolean									priority,
 		Map<String,Object>						payload )
 	{
+		if ( contact.isSleeping()){
+			
+			reply_handler.failed( contact.getBasis(), new DHTTransportException( "Contact is sleeping, request denied: " + method + "/" + payload ));
+			
+			return;
+		}
+		
 		payload.put( "_m", method );
 
 		payload.put( "_i", getLocalContact().getInstanceID());
@@ -1174,5 +1187,11 @@ DHTTransportAZ
 		}
 	}
 	
-
+	public interface
+	DHTTransportAZHelper
+	{
+		public boolean
+		isBaseContact(
+			DHTTransportContactAZ		contact );
+	}
 }

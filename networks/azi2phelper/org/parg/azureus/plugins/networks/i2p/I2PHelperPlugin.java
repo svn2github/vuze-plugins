@@ -107,8 +107,10 @@ import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperAZDHT.DHTContact;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperAZDHT.DHTValue;
+import org.parg.azureus.plugins.networks.i2p.I2PHelperRouter.ServerInstance;
 import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
 import org.parg.azureus.plugins.networks.i2p.swt.I2PHelperView;
+import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTAZClient;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTTransportContactI2P;
 
 import com.aelitis.azureus.core.networkmanager.NetworkManager;
@@ -1031,6 +1033,29 @@ I2PHelperPlugin
 		return( router );
 	}
 	
+	private static Map<ServerInstance,DHTAZClient>	az_dht_client_map = new HashMap<ServerInstance, DHTAZClient>();
+	
+	private static DHTAZClient
+	getAZDHTClient(
+		I2PHelperDHT		dht,
+		ServerInstance		inst,
+		I2PHelperAdapter	adapter )
+	{
+		synchronized( az_dht_client_map ){
+		
+			DHTAZClient	client = az_dht_client_map.get( inst );
+			
+			if ( client == null ){
+				
+				client = new DHTAZClient( inst, dht.getHelperAZDHT(), adapter );
+				
+				az_dht_client_map.put( inst, client );
+			}
+			
+			return( client );
+		}
+	}
+	
 	public int
 	getDHTCount()
 	{
@@ -1271,8 +1296,17 @@ I2PHelperPlugin
 						throw( new Exception( "usage: az_get key"));
 					}
 					
-					byte[]	key = decodeHash( bits[1] ); 
-												
+					byte[]	key;
+					
+					if ( bits[1].equals( "az-chat-key" )){
+						
+						key = "az-chat-key".getBytes();
+						
+					}else{
+						
+						key = decodeHash( bits[1] ); 
+					}	
+					
 					dht.getHelperAZDHT().get(
 						key, "az_get", 16, 3*60*1000, true, 
 						new I2PHelperAZDHT.OperationAdapter() {
@@ -1285,7 +1319,7 @@ I2PHelperPlugin
 								DHTValue			value )
 							{
 								try{
-									System.out.println( "az_get: read from " + target.getAddress() + ", value=" + new String( value.getValue(), "UTF-8" ));
+									System.out.println( "az_get: read from " + target.getAddress() + ", value=" + new String( value.getValue(), "UTF-8" ) + ", orig=" + value.getOriginator().getAddress());
 									
 								}catch( Throwable e ){
 									
@@ -1303,6 +1337,54 @@ I2PHelperPlugin
 							}
 						});
 					
+				}else if ( cmd.equals( "az_chat" )){
+
+					ServerInstance inst = 
+						router.createServer( 
+							"chat2",
+							new I2PHelperRouter.ServerAdapter()
+							{							
+								@Override
+								public void incomingConnection(ServerInstance server, I2PSocket socket)
+										throws Exception {
+									System.out.println( "chat incoming, no way" );
+								}
+							});
+					
+					DHTAZClient client = getAZDHTClient( dht, inst, adapter ); 
+					
+					if ( client.isInitialised()){
+						
+						byte[] key 		= "az-chat-key".getBytes();
+						byte[] value 	= "I'm the man".getBytes();
+						
+						client.put(
+								key, "az_chat_put", value, I2PHelperAZDHT.FLAG_NON_ANON, true, 
+								new I2PHelperAZDHT.OperationAdapter() {
+									
+									@Override
+									public void
+									valueWritten(
+										byte[]				key,
+										DHTContact			target,
+										DHTValue			value )
+									{
+										System.out.println( "az_chat_put: write to " + target.getAddress());
+									}
+									
+									@Override
+									public void
+									complete(
+										byte[]				key,
+										boolean				timeout_occurred )
+									{
+										System.out.println( "az_chat_put complete" );
+									}
+								});
+					}else{
+						
+						System.out.println( "chat dht not init" );
+					}
 				}else if ( cmd.equals( "ping_node" )){
 
 					if ( bits.length != 2 ){

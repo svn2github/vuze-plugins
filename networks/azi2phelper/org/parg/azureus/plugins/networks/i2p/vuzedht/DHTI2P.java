@@ -167,7 +167,7 @@ DHTI2P
 		
 		az_dht = new DHTAZ( this, adapter );
 		
-		az_dht_helper = new I2PHelperAZDHT( az_dht );
+		az_dht_helper = new DHTAZFull( az_dht );
 		
 		storage_manager.importContacts( dht );
 		
