@@ -1337,11 +1337,18 @@ I2PHelperPlugin
 							}
 						});
 					
-				}else if ( cmd.equals( "az_chat" )){
+				}else if ( cmd.equals( "az_chat_put" )){
 
+					if ( bits.length != 2 ){
+						
+						throw( new Exception( "usage: az_chat_put <nick>"));
+					}
+					
+					String nick = bits[1];
+					
 					ServerInstance inst = 
 						router.createServer( 
-							"chat2",
+							"chat_" + nick,
 							new I2PHelperRouter.ServerAdapter()
 							{							
 								@Override
@@ -1353,9 +1360,9 @@ I2PHelperPlugin
 					
 					DHTAZClient client = getAZDHTClient( dht, inst, adapter ); 
 					
-					if ( client.isInitialised()){
+					if ( client.waitForInitialisation( 5000 )){
 						
-						byte[] key 		= "az-chat-key".getBytes();
+						byte[] key 		= ("az-chat-key:" + nick ).getBytes();
 						byte[] value 	= "I'm the man".getBytes();
 						
 						client.put(
@@ -1385,6 +1392,48 @@ I2PHelperPlugin
 						
 						System.out.println( "chat dht not init" );
 					}
+					
+				}else if ( cmd.equals( "az_chat_get" )){
+
+					if ( bits.length != 2 ){
+						
+						throw( new Exception( "usage: az_chat_get <nick>"));
+					}
+					
+					String nick = bits[1];
+
+					byte[] key 		= ("az-chat-key:" + nick ).getBytes();
+					
+					dht.getHelperAZDHT().get(
+							key, "az_get", 16, 3*60*1000, true, 
+							new I2PHelperAZDHT.OperationAdapter() {
+								
+								@Override
+								public void
+								valueRead(
+									byte[]				key,
+									DHTContact			target,
+									DHTValue			value )
+								{
+									try{
+										System.out.println( "az_chat_get: read from " + target.getAddress() + ", value=" + new String( value.getValue(), "UTF-8" ) + ", orig=" + value.getOriginator().getAddress());
+										
+										//value.getOriginator().getAddress()
+									}catch( Throwable e ){
+										
+										e.printStackTrace();
+									}
+								}
+								
+								@Override
+								public void
+								complete(
+									byte[]				key,
+									boolean				timeout_occurred )
+								{
+									System.out.println( "az_chat_get complete" );
+								}
+							});
 				}else if ( cmd.equals( "ping_node" )){
 
 					if ( bits.length != 2 ){

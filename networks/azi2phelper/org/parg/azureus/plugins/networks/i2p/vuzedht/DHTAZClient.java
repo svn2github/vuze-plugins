@@ -194,6 +194,13 @@ DHTAZClient
 		return( init_sem.isReleasedForever());
 	}
 	
+	public boolean
+	waitForInitialisation(
+		long	max_millis )
+	{
+		return( init_sem.reserve( max_millis ));
+	}
+	
 	public DHT
 	getDHT()
 		
