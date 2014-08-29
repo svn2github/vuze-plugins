@@ -1395,14 +1395,27 @@ I2PHelperPlugin
 					
 				}else if ( cmd.equals( "az_chat_get" )){
 
-					if ( bits.length != 2 ){
+					if ( bits.length != 3 ){
 						
-						throw( new Exception( "usage: az_chat_get <nick>"));
+						throw( new Exception( "usage: az_chat_get <my_nick> <their_nick>"));
 					}
 					
-					String nick = bits[1];
+					String my_nick 		= bits[1];
+					String their_nick 	= bits[2];
 
-					byte[] key 		= ("az-chat-key:" + nick ).getBytes();
+					final ServerInstance inst = 
+							router.createServer( 
+								"chat_" + my_nick,
+								new I2PHelperRouter.ServerAdapter()
+								{							
+									@Override
+									public void incomingConnection(ServerInstance server, I2PSocket socket)
+											throws Exception {
+										System.out.println( "chat incoming, no way" );
+									}
+								});
+					
+					byte[] key 		= ("az-chat-key:" + their_nick ).getBytes();
 					
 					dht.getHelperAZDHT().get(
 							key, "az_get", 16, 3*60*1000, true, 
@@ -1413,12 +1426,25 @@ I2PHelperPlugin
 								valueRead(
 									byte[]				key,
 									DHTContact			target,
-									DHTValue			value )
+									final DHTValue		value )
 								{
 									try{
 										System.out.println( "az_chat_get: read from " + target.getAddress() + ", value=" + new String( value.getValue(), "UTF-8" ) + ", orig=" + value.getOriginator().getAddress());
 										
-										//value.getOriginator().getAddress()
+										new AEThread2("")
+										{
+											public void
+											run()
+											{
+												try{
+													inst.connect( value.getOriginator().getAddress().getHostName(), 80, new HashMap<String,Object>());
+													
+												}catch( Throwable e ){
+													
+													e.printStackTrace();
+												}
+											}
+										}.start();
 									}catch( Throwable e ){
 										
 										e.printStackTrace();

@@ -34,6 +34,7 @@ import net.i2p.CoreVersion;
 import net.i2p.I2PAppContext;
 import net.i2p.client.I2PClientFactory;
 import net.i2p.client.I2PSession;
+import net.i2p.client.naming.NamingService;
 import net.i2p.client.streaming.I2PServerSocket;
 import net.i2p.client.streaming.I2PSocket;
 import net.i2p.client.streaming.I2PSocketManager;
@@ -1139,6 +1140,67 @@ I2PHelperRouter
 		getSession()
 		{
 			return( session );
+		}
+		
+		public I2PSocket
+		connect(
+			String					address,
+			int						port,
+			Map<String,Object>		options )
+			
+			throws Exception
+		{
+			if ( address.length() < 400 ){
+				
+				if ( !address.endsWith( ".i2p" )){
+				
+					address += ".i2p";
+				}
+			}
+			
+			Destination remote_dest;
+			
+			NamingService name_service = I2PAppContext.getGlobalContext().namingService();
+			
+			if ( name_service != null ){
+			
+				remote_dest = name_service.lookup( address );
+				
+			}else{
+				
+				remote_dest = new Destination();
+	       
+				try{
+					remote_dest.fromBase64( address );
+					
+				}catch( Throwable e ){
+					
+					remote_dest = null;
+				}
+			}
+			
+			if ( remote_dest == null ){
+				
+				if ( address.endsWith( ".b32.i2p" )){
+					
+					remote_dest = socket_manager.getSession().lookupDest( address, 30*1000 );
+				}
+			}
+			
+			if ( remote_dest == null ){
+				
+				throw( new Exception( "Failed to resolve address '" + address + "'" ));
+			}
+						
+			Properties overrides = new Properties();
+			
+            I2PSocketOptions socket_opts = socket_manager.buildOptions( overrides );
+            
+            socket_opts.setPort( port );
+     
+			I2PSocket socket = socket_manager.connect( remote_dest, socket_opts );
+			
+			return( socket );
 		}
 		
 		public boolean
