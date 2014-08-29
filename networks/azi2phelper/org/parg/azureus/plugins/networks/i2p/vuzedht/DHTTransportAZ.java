@@ -861,13 +861,6 @@ DHTTransportAZ
 		boolean									priority,
 		Map<String,Object>						payload )
 	{
-		if ( contact.isSleeping()){
-			
-			reply_handler.failed( contact.getBasis(), new DHTTransportException( "Contact is sleeping, request denied: " + method + "/" + payload ));
-			
-			return;
-		}
-		
 		payload.put( "_m", method );
 
 		payload.put( "_i", getLocalContact().getInstanceID());

@@ -1509,8 +1509,7 @@ DHTTransportI2P
 		}
 		
 		Map<String, Object>	payload_out = az_request_handler.receiveRequest( originator, payload_in );
-		
-		
+				
 			// dispatch reply
 		
 		Map<String, Object> map = new HashMap<String, Object>();
@@ -1571,6 +1570,11 @@ DHTTransportI2P
     	
     	throws Exception
     {
+		if ( contact.isSleeping()){
+			
+			throw( new DHTTransportException( "Contact is sleeping, request denied: " + map ));
+		}
+
 	   	NodeInfo node = contact.getNode();
 	   
 		sendQuery( handler, node, map, repliable, priority );
@@ -1895,12 +1899,18 @@ DHTTransportI2P
 	        	
 	            	// queries must be repliable
 	        	
-	            String method = MapUtils.getMapString( map, "q", "" );
+	        	if (( generic_flags & DHTTransportUDP.GF_DHT_SLEEPING ) == 0 ){
+	        		
+	        		String method = MapUtils.getMapString( map, "q", "" );
 	            
-	            Map args = (Map)map.get( "a" );
+	        		Map args = (Map)map.get( "a" );
 	            
-	            receiveQuery( msg_id, from_dest, from_port, raw_payload_length, method, args );
-	            
+	        		receiveQuery( msg_id, from_dest, from_port, raw_payload_length, method, args );
+	        		
+	        	}else{
+	        		
+	        		System.out.println( "Sleeping - ignoring request" );
+	        	}
 	        }else if ( type.equals("r") || type.equals("e")){
 	        	
 	        	Request request;
