@@ -40,8 +40,12 @@ import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.gudy.azureus2.core3.util.TimerEventPeriodic;
 import org.gudy.azureus2.plugins.ui.Graphic;
 import org.gudy.azureus2.plugins.ui.UIInstance;
+import org.gudy.azureus2.plugins.ui.config.BooleanParameter;
+import org.gudy.azureus2.plugins.ui.config.Parameter;
+import org.gudy.azureus2.plugins.ui.config.ParameterListener;
 import org.gudy.azureus2.plugins.ui.menus.MenuItem;
 import org.gudy.azureus2.plugins.ui.menus.MenuItemListener;
+import org.gudy.azureus2.plugins.ui.menus.MenuManager;
 import org.gudy.azureus2.ui.swt.Utils;
 import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 import org.gudy.azureus2.ui.swt.plugins.UISWTStatusEntry;
@@ -94,9 +98,10 @@ I2PHelperView
 	
 	public
 	I2PHelperView(
-		I2PHelperPlugin	_plugin,
-		UIInstance		_ui,
-		String			_view_id )
+		I2PHelperPlugin				_plugin,
+		UIInstance					_ui,
+		String						_view_id,
+		final BooleanParameter		icon_enable )
 	{
 		plugin	= _plugin;
 		ui 		= (UISWTInstance)_ui;
@@ -153,8 +158,54 @@ I2PHelperView
 						
 						status_icon.setImage( enabled?img_sb_enabled:img_sb_disabled);
 						
+						MenuManager menu_manager = plugin.getPluginInterface().getUIManager().getMenuManager();
+						
+						boolean	is_visible = icon_enable.getValue();
+						
+						status_icon.setVisible( is_visible );
+						
+						final MenuItem mi_show =
+								menu_manager.addMenuItem(
+									status_icon.getMenuContext(),
+									"azi2phelper.ui.show.icon" );
+							
+						mi_show.setStyle( MenuItem.STYLE_CHECK );
+						mi_show.setData( new Boolean( is_visible ));
+						
+						mi_show.addListener(
+								new MenuItemListener()
+								{
+									public void
+									selected(
+										MenuItem			menu,
+										Object 				target )
+									{
+										icon_enable.setValue( false );
+									}
+								});
+						
+						icon_enable.addListener(
+								new ParameterListener()
+								{
+									public void 
+									parameterChanged(
+										Parameter param )
+									{
+										boolean is_visible = icon_enable.getValue();
+										
+										status_icon.setVisible( is_visible );
+										
+										mi_show.setData( new Boolean( is_visible ));
+									}
+								});
+						
+						
+						MenuItem mi_sep = menu_manager.addMenuItem( status_icon.getMenuContext(), "" );
+
+						mi_sep.setStyle( MenuItem.STYLE_SEPARATOR );
+							
 						MenuItem mi_options =
-								plugin.getPluginInterface().getUIManager().getMenuManager().addMenuItem(
+								menu_manager.addMenuItem(
 										status_icon.getMenuContext(),
 										"MainWindow.menu.view.configuration" );
 

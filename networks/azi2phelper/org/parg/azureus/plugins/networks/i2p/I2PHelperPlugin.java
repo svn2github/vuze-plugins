@@ -497,6 +497,16 @@ I2PHelperPlugin
 					});
 			
 			
+				// UI
+			
+			final BooleanParameter icon_enable		= config_model.addBooleanParameter2( "azi2phelper.ui.icon.enable", "azi2phelper.ui.icon.enable", true );
+
+			config_model.createGroup( 
+					"azi2phelper.ui.group",
+					new Parameter[]{ 
+							icon_enable	
+					});
+			
 				// I2P Internals
 			
 			i2p_address_param 	= config_model.addInfoParameter2( "azi2phelper.i2p.address", getMessageText( "azi2phelper.i2p.address.pending" ));
@@ -720,6 +730,8 @@ I2PHelperPlugin
 							net_mix_incomp_num.setEnabled( plugin_enabled );
 							net_mix_comp_num.setEnabled( plugin_enabled );
 							
+							icon_enable.setEnabled( plugin_enabled );
+							
 							i2p_address_param.setEnabled( plugin_enabled );
 							new_id.setEnabled( plugin_enabled );
 							int_port_param.setEnabled( enabled_not_ext );
@@ -901,7 +913,12 @@ I2PHelperPlugin
 							{
 								if ( instance.getUIType() == UIInstance.UIT_SWT ){
 									
-									ui_view = new I2PHelperView( I2PHelperPlugin.this, instance, "azi2phelper.name" );
+									ui_view = 
+										new I2PHelperView( 
+											I2PHelperPlugin.this, 
+											instance, 
+											"azi2phelper.name",
+											icon_enable );
 								}
 							}
 

@@ -27,10 +27,13 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.NoRouteToHostException;
+import java.net.URL;
+import java.net.URLDecoder;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -54,6 +57,13 @@ import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.core3.util.ThreadPool;
+import org.gudy.azureus2.core3.util.TorrentUtils;
+import org.gudy.azureus2.core3.util.UrlUtils;
+import org.gudy.azureus2.plugins.PluginInterface;
+import org.gudy.azureus2.plugins.download.Download;
+import org.gudy.azureus2.plugins.torrent.Torrent;
+import org.gudy.azureus2.plugins.torrent.TorrentAnnounceURLListSet;
+import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 
 import com.aelitis.azureus.core.proxy.AEProxyConnection;
 import com.aelitis.azureus.core.proxy.AEProxyException;
@@ -411,6 +421,9 @@ I2PHelperSocksProxy
 		private AESocksProxyConnection		proxy_connection;
 		private Map<String,Object>			options;
 		
+		private String						original_unresolved;
+		private int							original_port;
+		
 		private proxyStateRelayData			relay_state;
 		
 		protected
@@ -463,6 +476,9 @@ I2PHelperSocksProxy
 					}
 				}
 			}
+			
+			original_unresolved	= unresolved;
+			original_port		= _address.getPort();
 			
 			trace( "connect request to " + unresolved + "/" + resolved + "/" + _address.getPort());
 					
@@ -949,6 +965,68 @@ I2PHelperSocksProxy
 																			sb.append( "&numwant=" + num_want );
 																		}else{
 																			//if ( event != null )
+																		}
+																		
+																			// lastly patch in any existing url params
+																		
+																		PluginInterface pi = adapter.getPluginInterface();
+																				
+																		if ( pi != null ){
+																			
+																			try{
+																				byte[] hash = URLDecoder.decode(arg_map.get( "info_hash" ), "ISO-8859-1").getBytes( "ISO-8859-1" );
+																				
+																				Download dl = pi.getDownloadManager().getDownload( hash );
+																				
+																				if ( dl != null ){
+																				
+																					Torrent t = dl.getTorrent();
+																					
+																					if ( t != null ){
+																					
+																						List<URL>	urls = new ArrayList<URL>();
+																					
+																						urls.add( t.getAnnounceURL());
+																					
+																						for ( TorrentAnnounceURLListSet set: t.getAnnounceURLList().getSets()){
+																							
+																							urls.addAll( Arrays.asList(set.getURLs()));
+																						}
+																						
+																						for ( URL u: urls ){
+																							
+																							if ( u == null ){
+																								
+																								continue;
+																							}
+																							
+																							if ( u.getHost().equals( original_unresolved )){
+																								
+																								int	u_port = u.getPort();
+																								
+																								if ( u_port == -1 ){
+																									
+																									u_port = 80;
+																								}
+																								
+																								if ( u_port == original_port || u_port == 80 && original_port == -1 ){
+																									
+																									String query = u.getQuery();
+																									
+																									if ( query != null && query.length() > 0 ){
+																										
+																										sb.append( "&" + query );
+																										
+																										break;
+																									}
+																								}
+																							}
+																						}
+																					}
+																				}																				
+																			}catch( Throwable e ){
+																				
+																			}
 																		}
 																		
 																		sb.append( line.substring( pos2 ));
