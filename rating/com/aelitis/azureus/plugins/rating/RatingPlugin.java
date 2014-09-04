@@ -34,15 +34,15 @@ import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.PluginListener;
 import org.gudy.azureus2.plugins.UnloadablePlugin;
+import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
+import org.gudy.azureus2.plugins.torrent.TorrentAttribute;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
 import org.gudy.azureus2.plugins.ui.config.Parameter;
 import org.gudy.azureus2.plugins.ui.config.ParameterListener;
 import org.gudy.azureus2.plugins.ui.config.StringParameter;
-
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
-
 
 import com.aelitis.azureus.plugins.rating.updater.CompletionListener;
 import com.aelitis.azureus.plugins.rating.updater.RatingData;
@@ -54,6 +54,8 @@ public class RatingPlugin implements UnloadablePlugin, PluginListener {
   
   private PluginInterface pluginInterface;
   
+  private TorrentAttribute ta_networks;
+
   private LoggerChannel     log;
   
   private UIManagerListener			ui_listener;
@@ -72,6 +74,8 @@ public class RatingPlugin implements UnloadablePlugin, PluginListener {
   {
     this.pluginInterface = _pluginInterface;
     
+	ta_networks 	= pluginInterface.getTorrentManager().getAttribute( TorrentAttribute.TA_NETWORKS );
+
     log = pluginInterface.getLogger().getChannel("Rating Plugin");
     
     addPluginConfig();
@@ -112,6 +116,42 @@ public class RatingPlugin implements UnloadablePlugin, PluginListener {
 	pluginInterface.addListener(this);
 	
     pluginInterface.getUIManager().addUIListener( ui_listener );
+  }
+  
+  public boolean
+  isRatingEnabled(
+	Download		download )
+  {
+	  if ( download.getTorrent() != null && !download.getFlag( Download.FLAG_METADATA_DOWNLOAD )){
+
+		  String[]	networks = download.getListAttribute( ta_networks );
+
+		  if ( networks != null ){
+
+			  boolean	public_net = false;
+
+			  for ( int i=0; i<networks.length; i++ ){
+
+				  if ( networks[i].equalsIgnoreCase( "Public" )){
+
+					  public_net	= true;
+
+					  break;
+				  }
+			  }
+
+			  if ( !public_net ){
+
+				  return( false );
+			  }
+		  }	 
+		  
+		  return( true );
+		  
+	  }else{
+		  
+		  return( false );
+	  }
   }
   
   public void closedownComplete() {

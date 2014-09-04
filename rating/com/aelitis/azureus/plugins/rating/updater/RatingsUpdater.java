@@ -30,7 +30,6 @@ import java.util.Map;
 
 import org.gudy.azureus2.core3.download.DownloadManagerState;
 import org.gudy.azureus2.core3.util.*;
-
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabase;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabaseEvent;
@@ -61,7 +60,7 @@ RatingsUpdater
     	
 	private RatingPlugin 			plugin;
 	private DistributedDatabase 	database;  
-  
+  	
 	private TorrentAttribute attributeRating;
 	private TorrentAttribute attributeComment;
 	private TorrentAttribute attributeGlobalRating;
@@ -85,7 +84,7 @@ RatingsUpdater
 		RatingPlugin _plugin ) 
 	{    
 		plugin = _plugin; 
-	    
+	   
 	    attributeRating  		= plugin.getPluginInterface().getTorrentManager().getPluginAttribute("rating");
 	    attributeComment		= plugin.getPluginInterface().getTorrentManager().getPluginAttribute("comment");    
 	    attributeGlobalRating  	= plugin.getPluginInterface().getTorrentManager().getPluginAttribute("globalRating");
@@ -153,7 +152,7 @@ RatingsUpdater
 			return;
 		}
 		
-		if ( download.getTorrent() != null && !download.getFlag( Download.FLAG_METADATA_DOWNLOAD )){
+		if ( plugin.isRatingEnabled(download)){
 			
 			if ( loadRatingsFromDownload( download ).needPublishing()){
 				

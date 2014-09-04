@@ -131,6 +131,10 @@ RatingSWTUI
 	            return;
 	          }
 	          
+	          if ( !plugin.isRatingEnabled(download)){
+	        	  return;
+	          }
+	          
 	          if (swt_ui != null)
 	          	new RatingWindow(plugin,swt_ui,download);
 	        }

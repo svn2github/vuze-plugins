@@ -57,6 +57,11 @@ public class RatingColumn implements TableCellRefreshListener,
         return; //opps something went wrong
     }        
     Download download = (Download) dataSource;
+    
+    if ( !plugin.isRatingEnabled(download)){
+		return;
+	}
+    
     if(updater == null)
       updater = plugin.getUpdater();
     
@@ -145,6 +150,11 @@ public class RatingColumn implements TableCellRefreshListener,
 			return;
 
 		Download download = (Download) dataSource;
+		
+		if ( !plugin.isRatingEnabled(download)){
+			return;
+		}
+		
 		// middle button
 		if (event.eventType == TableCellMouseEvent.EVENT_MOUSEDOWN
 				&& event.button == 2) {
