@@ -120,6 +120,7 @@ import com.aelitis.azureus.core.proxy.AEProxyFactory.PluginProxy;
 import com.aelitis.azureus.core.tracker.TrackerPeerSource;
 import com.aelitis.azureus.core.util.bloom.BloomFilter;
 import com.aelitis.azureus.core.util.bloom.BloomFilterFactory;
+import com.aelitis.azureus.plugins.dht.DHTPluginInterface;
 import com.aelitis.azureus.plugins.upnp.UPnPMapping;
 import com.aelitis.azureus.plugins.upnp.UPnPPlugin;
 import com.aelitis.net.magneturi.MagnetURIHandler;
@@ -2769,6 +2770,35 @@ I2PHelperPlugin
 					return( reply );
 				}
 			}
+		}catch( Throwable e ){
+			
+			throw( new IPCException( e ));
+		}
+	}
+	
+	public DHTPluginInterface
+	getProxyDHT(
+		String				reason,
+		Map<String,Object>	server_options )
+		
+		throws IPCException
+	{
+		if ( !plugin_enabled ){
+			
+			return( null );
+		}
+		
+		System.out.println( "getProxyDHT: " + server_options );
+		
+			// we hand this out then we have state that needs to persist as long
+			// as Vuze is up
+		
+		setUnloadable( false );
+		
+		try{
+			
+			return( null );
+			
 		}catch( Throwable e ){
 			
 			throw( new IPCException( e ));
