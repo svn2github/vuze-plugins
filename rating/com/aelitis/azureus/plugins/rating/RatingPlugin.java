@@ -24,6 +24,7 @@ package com.aelitis.azureus.plugins.rating;
 
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +35,7 @@ import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.PluginListener;
 import org.gudy.azureus2.plugins.UnloadablePlugin;
+import org.gudy.azureus2.plugins.ddb.DistributedDatabase;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.torrent.TorrentAttribute;
@@ -51,7 +53,8 @@ import com.aelitis.azureus.plugins.rating.updater.RatingsUpdater;
 
 public class RatingPlugin implements UnloadablePlugin, PluginListener {
   
-  
+  private static final Object	DDBS_KEY	= new Object();
+
   private PluginInterface pluginInterface;
   
   private TorrentAttribute ta_networks;
@@ -66,8 +69,7 @@ public class RatingPlugin implements UnloadablePlugin, PluginListener {
   private RatingsUpdater 	updater;
   
   private RatingUI			ui;
- 
-  
+   
   public void 
   initialize(
 		PluginInterface _pluginInterface) 
@@ -118,6 +120,29 @@ public class RatingPlugin implements UnloadablePlugin, PluginListener {
     pluginInterface.getUIManager().addUIListener( ui_listener );
   }
   
+  	private static List<DistributedDatabase> EMPTY_DDBS = Collections.emptyList();
+  	
+  	public List<DistributedDatabase>
+  	getDDBs(
+  		Download		download )
+	{	
+  		if ( download.getTorrent() != null && !download.getFlag( Download.FLAG_METADATA_DOWNLOAD )){
+  			
+  			List<DistributedDatabase> result = (List<DistributedDatabase>)download.getUserData( DDBS_KEY);
+  			
+  			if ( result == null ){
+  			
+  				result = download.getDistributedDatabases();
+  				
+  				download.setUserData( DDBS_KEY, result );
+  			}
+  			
+  			return( result );
+  		}
+  		
+  		return( EMPTY_DDBS );
+	}
+  
   public boolean
   isRatingEnabled(
 	Download		download )
@@ -128,26 +153,19 @@ public class RatingPlugin implements UnloadablePlugin, PluginListener {
 
 		  if ( networks != null ){
 
-			  boolean	public_net = false;
-
 			  for ( int i=0; i<networks.length; i++ ){
 
 				  if ( networks[i].equalsIgnoreCase( "Public" )){
 
-					  public_net	= true;
-
-					  break;
+					 return( true );
 				  }
 			  }
-
-			  if ( !public_net ){
-
-				  return( false );
-			  }
-		  }	 
+			  
+			  return( getDDBs( download ).size() > 0 );
+		  }
 		  
 		  return( true );
-		  
+		 
 	  }else{
 		  
 		  return( false );

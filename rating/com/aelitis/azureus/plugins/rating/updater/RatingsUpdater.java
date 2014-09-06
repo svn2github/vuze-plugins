@@ -59,7 +59,7 @@ RatingsUpdater
     
     	
 	private RatingPlugin 			plugin;
-	private DistributedDatabase 	database;  
+	private DistributedDatabase 	database_public;  
   	
 	private TorrentAttribute attributeRating;
 	private TorrentAttribute attributeComment;
@@ -102,22 +102,19 @@ RatingsUpdater
 					{
 						PluginInterface pluginInterface = plugin.getPluginInterface();
 
-						database = pluginInterface.getDistributedDatabase();
+						database_public = pluginInterface.getDistributedDatabase();
 
-						if ( database.isAvailable()){
-
-							if ( !destroyed ){
+						if ( !destroyed ){
+							
+							DownloadManager download_manager = pluginInterface.getDownloadManager();
+							
+							download_manager.addListener( RatingsUpdater.this, false );
+							
+							Download[] existing = download_manager.getDownloads();
+							
+							for ( Download d: existing ){
 								
-								DownloadManager download_manager = pluginInterface.getDownloadManager();
-								
-								download_manager.addListener( RatingsUpdater.this, false );
-								
-								Download[] existing = download_manager.getDownloads();
-								
-								for ( Download d: existing ){
-									
-									downloadAdded( d, false );
-								}
+								downloadAdded( d, false );
 							}
 						}
 					}
@@ -602,7 +599,7 @@ RatingsUpdater
 		final byte[]				hash,
 		final CompletionListener 	listener )
 	{	
-		if ( database == null || !database.isAvailable()){
+		if ( database_public == null || !database_public.isAvailable()){
 			
 			listener.operationComplete( null );
 			
@@ -614,9 +611,9 @@ RatingsUpdater
 		try{
 			log( hash_str + " : getting rating" );
 			
-			DistributedDatabaseKey ddKey = database.createKey(KeyGenUtils.buildRatingKey( hash ),"Ratings read: " + hash_str);
+			DistributedDatabaseKey ddKey = database_public.createKey(KeyGenUtils.buildRatingKey( hash ),"Ratings read: " + hash_str);
 			
-			database.read(
+			database_public.read(
 				new DistributedDatabaseListener() 
 				{
 					List<DistributedDatabaseValue> results = new ArrayList<DistributedDatabaseValue>();
@@ -680,11 +677,29 @@ RatingsUpdater
 		final Download 				download,
 		final CompletionListener 	listener )
 	{	
-		if ( database == null || !database.isAvailable()){
+		List<DistributedDatabase> ddbs = plugin.getDDBs( download );
+		
+		if ( ddbs.size() == 0 ){
 			
 			listener.operationComplete( null );
 			
 			return;
+		}
+		
+			// if public network is there then we always just read from that
+		
+		DistributedDatabase	database = ddbs.get(0);
+		
+		for ( int i=1;i<ddbs.size();i++){
+			
+			DistributedDatabase d = ddbs.get(i);
+			
+			if ( d.getNetwork() == AENetworkClassifier.AT_PUBLIC ){
+				
+				database = d;
+				
+				break;
+			}
 		}
 		
 		final String torrentName = download.getTorrent().getName();
@@ -773,11 +788,13 @@ RatingsUpdater
 	private void 
 	writeRating(      
 		final Download 				download,
-		final CompletionListener 	listener ) 
+		final CompletionListener 	_listener ) 
 	{
-		if ( database == null || !database.isAvailable()){
+		final List<DistributedDatabase> ddbs = plugin.getDDBs( download );
+
+		if ( ddbs.size() == 0 ){
 			
-			listener.operationComplete( null );
+			_listener.operationComplete( null );
 			
 			return;
 		}
@@ -791,62 +808,81 @@ RatingsUpdater
 		
 		if ( score == 0 ){
 			
-			listener.operationComplete( null );
+			_listener.operationComplete( null );
 			
 			return;
 		}
 		
-		try{
-			final String torrentName = download.getTorrent().getName();
-
-			byte[] value = data.encodes();
-
-			log( torrentName + " : publishing rating" );
-			
-			DistributedDatabaseKey ddKey = database.createKey(KeyGenUtils.buildRatingKey(download),"Ratings write: " + torrentName);
-			
-			DistributedDatabaseValue ddValue = database.createValue(value);
-
-			// handle missing method as new @4901_b08
-
-			try{
-				ddKey.setFlags( 0x00000001 );
+		final CompletionListener listener = 
+			new CompletionListener()
+			{
+				int	num_done = 0;
 				
-			}catch( Throwable e ){
-
-			}
-
-			database.write(
-				new DistributedDatabaseListener() 
-				{
-					public void 
-					event(
-						DistributedDatabaseEvent event) 
-					{
-						if( event.getType() == DistributedDatabaseEvent.ET_OPERATION_COMPLETE) {
+				public void operationComplete(RatingResults ratings) {
+				
+					synchronized( this ){
+						num_done++;
 						
-							log(torrentName + " : rating write ok");
+						if ( num_done < ddbs.size()){
 							
-							listener.operationComplete( null );
-							
-							addForLookup( download, true );
-													
-						}else if( event.getType() == DistributedDatabaseEvent.ET_OPERATION_TIMEOUT ){
-							
-							log( torrentName + " : rating write failed" );
-							
-							listener.operationComplete( null );
-							
-							addForLookup( download, true );
+							return;
 						}
 					}
-				}, ddKey, ddValue );
+					
+					addForLookup( download, true );
+				}
+			};
 			
-		}catch( Throwable e ){
+		for ( DistributedDatabase database: ddbs ){
 			
-			Debug.out( e );
-			
-			listener.operationComplete( null );
+			try{
+				final String torrentName = download.getTorrent().getName();
+	
+				byte[] value = data.encodes();
+	
+				log( torrentName + " : publishing rating" );
+				
+				DistributedDatabaseKey ddKey = database.createKey(KeyGenUtils.buildRatingKey(download),"Ratings write: " + torrentName);
+				
+				DistributedDatabaseValue ddValue = database.createValue(value);
+	
+				// handle missing method as new @4901_b08
+	
+				try{
+					ddKey.setFlags( 0x00000001 );
+					
+				}catch( Throwable e ){
+	
+				}
+	
+				database.write(
+					new DistributedDatabaseListener() 
+					{
+						public void 
+						event(
+							DistributedDatabaseEvent event) 
+						{
+							if( event.getType() == DistributedDatabaseEvent.ET_OPERATION_COMPLETE) {
+							
+								log(torrentName + " : rating write ok");
+								
+								listener.operationComplete( null );
+																						
+							}else if( event.getType() == DistributedDatabaseEvent.ET_OPERATION_TIMEOUT ){
+								
+								log( torrentName + " : rating write failed" );
+								
+								listener.operationComplete( null );								
+							}
+						}
+					}, ddKey, ddValue );
+				
+			}catch( Throwable e ){
+				
+				Debug.out( e );
+				
+				listener.operationComplete( null );
+			}
 		}
 	} 
 
