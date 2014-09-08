@@ -34,6 +34,8 @@ import java.util.List;
 import java.util.Map;
 
 
+
+
 import org.gudy.azureus2.core3.tracker.server.impl.tcp.TRTrackerServerTCP;
 import org.gudy.azureus2.core3.tracker.server.impl.tcp.nonblocking.TRNonBlockingServer;
 import org.gudy.azureus2.core3.tracker.server.impl.tcp.nonblocking.TRNonBlockingServerProcessor;
@@ -41,7 +43,8 @@ import org.gudy.azureus2.core3.tracker.server.impl.tcp.nonblocking.TRNonBlocking
 import org.gudy.azureus2.core3.util.AsyncController;
 import org.gudy.azureus2.core3.util.BEncoder;
 import org.gudy.azureus2.core3.util.Constants;
-import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
+import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouter;
+import org.parg.azureus.plugins.networks.i2p.snarkdht.NodeInfo;
 
 public class 
 I2PHelperBootstrapServer 

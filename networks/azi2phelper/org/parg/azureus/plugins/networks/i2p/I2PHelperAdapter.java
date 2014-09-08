@@ -22,6 +22,7 @@
 package org.parg.azureus.plugins.networks.i2p;
 
 import org.gudy.azureus2.plugins.PluginInterface;
+import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouterDHT;
 
 import net.i2p.client.streaming.I2PSocket;
 

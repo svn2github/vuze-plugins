@@ -28,7 +28,8 @@ import java.util.Map;
 import net.i2p.data.Destination;
 import net.i2p.data.Hash;
 
-import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
+import org.parg.azureus.plugins.networks.i2p.snarkdht.NodeInfo;
+import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT;
 
 public interface 
 I2PHelperDHT 
