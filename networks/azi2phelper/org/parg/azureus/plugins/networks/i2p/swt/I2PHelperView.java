@@ -58,7 +58,7 @@ import org.gudy.azureus2.ui.swt.views.stats.DHTView;
 import org.gudy.azureus2.ui.swt.views.stats.StatsView;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperDHT;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperPlugin;
-import org.parg.azureus.plugins.networks.i2p.I2PHelperRouter;
+import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouter;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTI2P;
 
 import com.aelitis.azureus.core.dht.DHT;
