@@ -32,11 +32,10 @@ import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.plugins.PluginInterface;
-import org.parg.azureus.plugins.networks.i2p.I2PHelperAZDHT;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperAdapter;
-import org.parg.azureus.plugins.networks.i2p.I2PHelperRouter;
-import org.parg.azureus.plugins.networks.i2p.dht.NID;
-import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
+import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouter;
+import org.parg.azureus.plugins.networks.i2p.snarkdht.NID;
+import org.parg.azureus.plugins.networks.i2p.snarkdht.NodeInfo;
 
 import com.aelitis.azureus.core.dht.DHT;
 import com.aelitis.azureus.core.dht.DHTFactory;

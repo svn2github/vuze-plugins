@@ -40,12 +40,11 @@ import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.gudy.azureus2.core3.util.TimerEventPeriodic;
 import org.gudy.azureus2.plugins.PluginInterface;
-import org.parg.azureus.plugins.networks.i2p.I2PHelperAZDHT;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperDHT;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperAdapter;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperDHTListener;
-import org.parg.azureus.plugins.networks.i2p.dht.NID;
-import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
+import org.parg.azureus.plugins.networks.i2p.snarkdht.NID;
+import org.parg.azureus.plugins.networks.i2p.snarkdht.NodeInfo;
 
 import com.aelitis.azureus.core.dht.DHT;
 import com.aelitis.azureus.core.dht.DHTFactory;

@@ -46,9 +46,8 @@ import org.gudy.azureus2.core3.util.ThreadPool;
 import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.gudy.azureus2.core3.util.TimerEventPeriodic;
-import org.parg.azureus.plugins.networks.i2p.I2PHelperAZDHT;
-import org.parg.azureus.plugins.networks.i2p.dht.NID;
-import org.parg.azureus.plugins.networks.i2p.dht.NodeInfo;
+import org.parg.azureus.plugins.networks.i2p.snarkdht.NID;
+import org.parg.azureus.plugins.networks.i2p.snarkdht.NodeInfo;
 
 import net.i2p.client.I2PSession;
 import net.i2p.client.I2PSessionMuxedListener;

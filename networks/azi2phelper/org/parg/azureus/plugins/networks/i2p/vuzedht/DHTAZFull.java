@@ -22,8 +22,6 @@
 
 package org.parg.azureus.plugins.networks.i2p.vuzedht;
 
-import org.parg.azureus.plugins.networks.i2p.I2PHelperAZDHT;
-
 import com.aelitis.azureus.core.dht.DHT;
 
 public class 
