@@ -105,6 +105,7 @@ import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
+import org.parg.azureus.plugins.networks.i2p.plugindht.I2PHelperDHTPluginInterface;
 import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouter;
 import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouterDHT;
 import org.parg.azureus.plugins.networks.i2p.router.I2PHelperSocksProxy;
@@ -127,6 +128,8 @@ import com.aelitis.azureus.core.tracker.TrackerPeerSource;
 import com.aelitis.azureus.core.util.bloom.BloomFilter;
 import com.aelitis.azureus.core.util.bloom.BloomFilterFactory;
 import com.aelitis.azureus.plugins.dht.DHTPluginInterface;
+import com.aelitis.azureus.plugins.dht.DHTPluginValue;
+import com.aelitis.azureus.plugins.dht.DHTPluginContact;
 import com.aelitis.azureus.plugins.upnp.UPnPMapping;
 import com.aelitis.azureus.plugins.upnp.UPnPPlugin;
 import com.aelitis.net.magneturi.MagnetURIHandler;
@@ -1296,9 +1299,8 @@ I2PHelperPlugin
 							@Override
 							public void
 							valueWritten(
-								byte[]				key,
-								DHTContact			target,
-								DHTValue			value )
+								DHTPluginContact		target,
+								DHTPluginValue			value )
 							{
 								System.out.println( "az_put: write to " + target.getAddress());
 							}
@@ -1332,18 +1334,17 @@ I2PHelperPlugin
 					}	
 					
 					dht.getHelperAZDHT().get(
-						key, "az_get", 16, 3*60*1000, true, 
+						key, "az_get", 16, 3*60*1000, false, true, 
 						new I2PHelperAZDHT.OperationAdapter() {
 							
 							@Override
 							public void
 							valueRead(
-								byte[]				key,
-								DHTContact			target,
-								DHTValue			value )
+								DHTPluginContact		target,
+								DHTPluginValue			value )
 							{
 								try{
-									System.out.println( "az_get: read from " + target.getAddress() + ", value=" + new String( value.getValue(), "UTF-8" ) + ", orig=" + value.getOriginator().getAddress());
+									System.out.println( "az_get: read from " + target.getAddress() + ", value=" + new String( value.getValue(), "UTF-8" ));
 									
 								}catch( Throwable e ){
 									
@@ -1396,9 +1397,8 @@ I2PHelperPlugin
 									@Override
 									public void
 									valueWritten(
-										byte[]				key,
-										DHTContact			target,
-										DHTValue			value )
+										DHTPluginContact		target,
+										DHTPluginValue			value )
 									{
 										System.out.println( "az_chat_put: write to " + target.getAddress());
 									}
@@ -1442,15 +1442,14 @@ I2PHelperPlugin
 					byte[] key 		= ("az-chat-key:" + their_nick ).getBytes();
 					
 					dht.getHelperAZDHT().get(
-							key, "az_get", 16, 3*60*1000, true, 
-							new I2PHelperAZDHT.OperationAdapter() {
+							key, "az_get", 16, 3*60*1000, false, true, 
+							new I2PHelperAZDHT.OperationAdapter(){
 								
 								@Override
 								public void
 								valueRead(
-									byte[]				key,
-									DHTContact			target,
-									final DHTValue		value )
+									DHTContact		target,
+									final DHTValue	value )
 								{
 									try{
 										System.out.println( "az_chat_get: read from " + target.getAddress() + ", value=" + new String( value.getValue(), "UTF-8" ) + ", orig=" + value.getOriginator().getAddress());
@@ -2782,6 +2781,8 @@ I2PHelperPlugin
 		}
 	}
 	
+	private Map<Integer,I2PHelperDHTPluginInterface>	dht_pi_map = new HashMap<Integer, I2PHelperDHTPluginInterface>();
+	
 	public DHTPluginInterface
 	getProxyDHT(
 		String				reason,
@@ -2793,9 +2794,7 @@ I2PHelperPlugin
 			
 			return( null );
 		}
-		
-		System.out.println( "getProxyDHT: " + server_options );
-		
+				
 			// we hand this out then we have state that needs to persist as long
 			// as Vuze is up
 		
@@ -2803,8 +2802,32 @@ I2PHelperPlugin
 		
 		try{
 			
-			return( null );
+			int		dht_index;
 			
+			Download download = (Download)server_options.get( "download" );
+			
+			if ( download == null ){
+			
+				dht_index =	I2PHelperRouter.DHT_MIX;
+				
+			}else{
+			
+				dht_index = I2PHelperRouter.selectDHTIndex( download );
+			}
+			
+			synchronized( dht_pi_map ){
+				
+				I2PHelperDHTPluginInterface pi = dht_pi_map.get( dht_index );
+				
+				if ( pi == null ){
+					
+					pi = new I2PHelperDHTPluginInterface( this, dht_index);
+					
+					dht_pi_map.put( dht_index, pi );
+				}
+				
+				return( pi );
+			}
 		}catch( Throwable e ){
 			
 			throw( new IPCException( e ));

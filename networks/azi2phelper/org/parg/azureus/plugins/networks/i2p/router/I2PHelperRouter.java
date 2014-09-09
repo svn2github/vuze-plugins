@@ -74,6 +74,9 @@ I2PHelperRouter
 	public static final String	PARAM_SHARE_PERCENT			= "azi2phelper.share.percent";
 	public static final int		PARAM_SHARE_PERCENT_DEFAULT	= 25;
 	
+	public static final int		DHT_MIX			= 0;
+	public static final int		DHT_NON_MIX		= 1;
+	
 	private static final boolean	FULL_STATS = false;
 
 	private final I2PHelperPlugin			plugin;
@@ -623,7 +626,9 @@ I2PHelperRouter
 	selectDHT(
 		int		index )
 	{
-		if ( dhts.length <= dhts.length ){
+		if ( index >= dhts.length ){
+			
+			Debug.out( "Invalid DHT index" );
 			
 			return( null );
 		}
@@ -640,6 +645,47 @@ I2PHelperRouter
 		}
 		
 		return( dht );
+	}
+	
+	public static int
+	selectDHTIndex(
+		Download	download )
+			
+	{ 
+		if ( download == null ){
+		
+			return(selectDHTIndex((String[])null));
+			
+		}else{
+			
+			return( selectDHTIndex( PluginCoreUtils.unwrap( download ).getDownloadState().getNetworks()));
+		}
+	}
+	
+	public static int
+	selectDHTIndex(
+		Map<String,Object>		options )
+	{
+		String[] peer_networks = options==null?null:(String[])options.get( "peer_networks" );
+		
+		return( selectDHTIndex( peer_networks ));
+	}
+	
+	public static int
+	selectDHTIndex(
+		String[]		peer_networks )
+	{
+		if ( peer_networks == null || peer_networks.length == 0 ){
+			
+			return( DHT_MIX );
+		}
+		
+		if ( peer_networks.length == 1 && peer_networks[0] == AENetworkClassifier.AT_I2P ){
+			
+			return( DHT_NON_MIX );
+		}
+		
+		return( DHT_MIX );
 	}
 	
 	public I2PHelperRouterDHT[]
