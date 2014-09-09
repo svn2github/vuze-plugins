@@ -40,7 +40,7 @@ I2PHelperAZDHT
 	public static final short		FLAG_NONE			= DHT.FLAG_NONE;			
 	public static final short		FLAG_NON_ANON		= DHT.FLAG_SINGLE_VALUE;	// getters will get putter's address
 	public static final short		FLAG_ANON			= DHT.FLAG_ANON;			// getters don't get putters address
-	public static final short		FLAG_HIGH_PRIORITY	= 0x0200; // update to DHT.FLAG_HIGH_PRIORITY;	sometime		
+	public static final short		FLAG_HIGH_PRIORITY	= DHT.FLAG_HIGH_PRIORITY;		
 
 	public abstract DHT
 	getDHT()
@@ -68,76 +68,13 @@ I2PHelperAZDHT
 				value, 
 				flags, 
 				high_priority,
-				new DHTOperationListener()
-				{
-					private boolean	started;
-					
-					public void
-					searching(
-						DHTTransportContact	contact,
-						int					level,
-						int					active_searches )
-					{
-						if ( listener != null ){
-							
-							synchronized( this ){
-								
-								if ( started ){
-									
-									return;
-								}
-								
-								started = true;
-							}
-							
-							listener.starts( key );
-						}
-					}
-					
-					public boolean
-					diversified(
-						String				desc )
-					{
-						return( listener.diversified());
-					}
-					
-					public void
-					found(
-						DHTTransportContact		contact,
-						boolean					is_closest )
-					{
-						// nada
-					}
-					
-					public void
-					read(
-						DHTTransportContact		contact,
-						DHTTransportValue		value )
-					{
-						listener.valueRead( new DHTContactImpl( contact ), new DHTValueImpl( value ));
-					}
-					
-					public void
-					wrote(
-						DHTTransportContact		contact,
-						DHTTransportValue		value )
-					{
-						listener.valueWritten( new DHTContactImpl( contact ), new DHTValueImpl( value ));
-					}
-					
-					public void
-					complete(
-						boolean					timeout )
-					{
-						listener.complete( key, timeout );
-					}
-				});
+				new ListenerWrapper( key, listener ));
 			
 		}catch( Throwable e ){
 			
 			Debug.out( e );
 			
-			listener.complete(key, false );
+			listener.complete( key, false );
 		}
 	}
 	
@@ -167,78 +104,115 @@ I2PHelperAZDHT
 				timeout,
 				exhaustive,
 				high_priority,
-				new DHTOperationListener()
-				{
-					private boolean	started;
-					
-					public void
-					searching(
-						DHTTransportContact	contact,
-						int					level,
-						int					active_searches )
-					{
-						if ( listener != null ){
-							
-							synchronized( this ){
-								
-								if ( started ){
-									
-									return;
-								}
-								
-								started = true;
-							}
-							
-							listener.starts( key );
-						}
-					}
-					
-					public boolean
-					diversified(
-						String				desc )
-					{
-						return( listener.diversified());
-					}
-					
-					public void
-					found(
-						DHTTransportContact		contact,
-						boolean					is_closest )
-					{
-						// nada
-					}
-					
-					public void
-					read(
-						DHTTransportContact		contact,
-						DHTTransportValue		value )
-					{
-						listener.valueRead( new DHTContactImpl( contact ), new DHTValueImpl( value ));
-					}
-					
-					public void
-					wrote(
-						DHTTransportContact		contact,
-						DHTTransportValue		value )
-					{
-						listener.valueWritten( new DHTContactImpl( contact ), new DHTValueImpl( value ));
-					}
-					
-					public void
-					complete(
-						boolean					timeout )
-					{
-						listener.complete( key, timeout );
-					}
-				});
+				new ListenerWrapper( key, listener ));
 			
 		}catch( Throwable e ){
 			
 			Debug.out( e );
 			
-			listener.complete(key, false );
+			listener.complete( key, false );
 		}
 	}
+	
+	public void
+	remove(
+		final byte[]						key,
+		String								description,
+		final DHTPluginOperationListener	listener)
+	{
+		try{
+			getDHT().remove(
+				key, 
+				description, 
+				new ListenerWrapper( key, listener ));
+			
+		}catch( Throwable e ){
+			
+			Debug.out( e );
+			
+			listener.complete( key, false );
+		}
+	}
+	
+	private class
+	ListenerWrapper
+		implements DHTOperationListener
+	{
+		private final byte[]							key;
+		private final DHTPluginOperationListener		listener;
+		
+		private boolean	started;
+		
+		private 
+		ListenerWrapper(
+			byte[]							_key,
+			DHTPluginOperationListener		_listener )
+		{
+			key			= _key;
+			listener 	= _listener;
+		}
+		
+		public void
+		searching(
+			DHTTransportContact	contact,
+			int					level,
+			int					active_searches )
+		{
+			if ( listener != null ){
+				
+				synchronized( this ){
+					
+					if ( started ){
+						
+						return;
+					}
+					
+					started = true;
+				}
+				
+				listener.starts( key );
+			}
+		}
+		
+		public boolean
+		diversified(
+			String				desc )
+		{
+			return( listener.diversified());
+		}
+		
+		public void
+		found(
+			DHTTransportContact		contact,
+			boolean					is_closest )
+		{
+			// nada
+		}
+		
+		public void
+		read(
+			DHTTransportContact		contact,
+			DHTTransportValue		value )
+		{
+			listener.valueRead( new DHTContactImpl( contact ), new DHTValueImpl( value ));
+		}
+		
+		public void
+		wrote(
+			DHTTransportContact		contact,
+			DHTTransportValue		value )
+		{
+			listener.valueWritten( new DHTContactImpl( contact ), new DHTValueImpl( value ));
+		}
+		
+		public void
+		complete(
+			boolean					timeout )
+		{
+			listener.complete( key, timeout );
+		}
+	};
+	
 	
 	private class
 	DHTContactImpl
@@ -358,31 +332,14 @@ I2PHelperAZDHT
 	
 	public interface
 	DHTContact
+		extends DHTPluginContact
 	{
-		public byte[]
-		getID();
-		
-		public String
-		getName();
-		
-		public InetSocketAddress
-		getAddress();
-		
-		public byte
-		getProtocolVersion();
-				
-		public boolean
-		isAlive(
-			long		timeout );
-		
 	}
 	
 	public interface 
 	DHTValue 
+		extends DHTPluginValue
 	{
-		public byte[]
-		getValue();
-		
 		public DHTContact
 		getOriginator();
 	}

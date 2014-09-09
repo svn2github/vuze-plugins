@@ -23,6 +23,7 @@
 package org.parg.azureus.plugins.networks.i2p.plugindht;
 
 import java.net.InetSocketAddress;
+import java.util.Map;
 
 import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.core3.util.AESemaphore;
@@ -43,6 +44,7 @@ import com.aelitis.azureus.plugins.dht.DHTPluginInterface;
 import com.aelitis.azureus.plugins.dht.DHTPluginKeyStats;
 import com.aelitis.azureus.plugins.dht.DHTPluginListener;
 import com.aelitis.azureus.plugins.dht.DHTPluginOperationListener;
+import com.aelitis.azureus.plugins.dht.DHTPluginProgressListener;
 import com.aelitis.azureus.plugins.dht.DHTPluginTransferHandler;
 import com.aelitis.azureus.plugins.dht.DHTPluginValue;
 
@@ -60,6 +62,8 @@ I2PHelperDHTPluginInterface
 	private AESemaphore			init_sem = new AESemaphore( "I2PHelperDHTPluginInterface" );
 	
 	private volatile TimerEventPeriodic	init_event;
+	
+	private DHTPluginContact	local_contact = new LocalContact();
 	
 	public 
 	I2PHelperDHTPluginInterface(
@@ -140,9 +144,7 @@ I2PHelperDHTPluginInterface
 	public DHTPluginContact
 	getLocalAddress()
 	{
-		Debug.out( "not imp" );
-		
-		return( null );
+		return( local_contact );
 	}
 	
 	public DHTPluginKeyStats
@@ -248,22 +250,100 @@ I2PHelperDHTPluginInterface
 	
 	public void
 	put(
-		byte[]						key,
-		String						description,
-		byte[]						value,
-		byte						flags,
-		DHTPluginOperationListener	listener)
+		final byte[]						key,
+		final String						description,
+		final byte[]						value,
+		final byte							flags,
+		final DHTPluginOperationListener	listener)
 	{
-		Debug.out( "not imp" );
+		if ( dht != null && dispatcher.getQueueSize() == 0 ){
+			
+			dht.put( key, description, value, (short)(flags&0x00ff), true, listener );
+		
+		}else{
+			
+			if ( dispatcher.getQueueSize() > 100 ){
+				
+				Debug.out( "Dispatch queue too large" );
+				
+				listener.complete( key, false );
+			}
+			
+			dispatcher.dispatch(
+				new AERunnable() {
+					
+					@Override
+					public void 
+					runSupport() 
+					{
+						I2PHelperAZDHT	dht_to_use = dht;
+						
+						if ( dht_to_use == null ){
+							
+							init_sem.reserve();
+							
+							dht_to_use = dht;
+						}
+						
+						if ( dht_to_use == null ){
+							
+							listener.complete( key, false );
+							
+						}else{
+							
+							dht.put( key, description, value, (short)(flags&0x00ff), true, listener );
+						}
+					}
+				});
+		};
 	}
 	
 	public void
 	remove(
-		byte[]						key,
-		String						description,
-		DHTPluginOperationListener	listener )
+		final byte[]						key,
+		final String						description,
+		final DHTPluginOperationListener	listener )
 	{
-		Debug.out( "not imp" );
+		if ( dht != null && dispatcher.getQueueSize() == 0 ){
+			
+			dht.remove( key, description, listener );
+		
+		}else{
+			
+			if ( dispatcher.getQueueSize() > 100 ){
+				
+				Debug.out( "Dispatch queue too large" );
+				
+				listener.complete( key, false );
+			}
+			
+			dispatcher.dispatch(
+				new AERunnable() {
+					
+					@Override
+					public void 
+					runSupport() 
+					{
+						I2PHelperAZDHT	dht_to_use = dht;
+						
+						if ( dht_to_use == null ){
+							
+							init_sem.reserve();
+							
+							dht_to_use = dht;
+						}
+						
+						if ( dht_to_use == null ){
+							
+							listener.complete( key, false );
+							
+						}else{
+							
+							dht.remove( key, description, listener );
+						}
+					}
+				});
+		};	
 	}
 	
 	public void
@@ -293,5 +373,91 @@ I2PHelperDHTPluginInterface
 		String	str )
 	{
 		plugin.log( str );
+	}
+	
+	private class
+	LocalContact
+		implements DHTPluginContact
+	{
+		public byte[]
+		getID()
+		{
+			Debug.out( "not imp" );
+			
+			return( null );
+		}
+		
+		public String
+		getName()
+		{
+			Debug.out( "not imp" );
+			
+			return( null );	
+		}
+		
+		public InetSocketAddress
+		getAddress()
+		{
+			Debug.out( "not imp" );
+			
+			return( null );		
+		}
+		
+		public byte
+		getProtocolVersion()
+		{
+			Debug.out( "not imp" );
+			
+			return( 0 );			
+		}
+		
+		public int
+		getNetwork()
+		{
+			Debug.out( "not imp" );
+			
+			return( 0 );			
+		}
+		
+		public boolean
+		isAlive(
+			long		timeout )
+		{
+			return( true );
+		}
+		
+		public void
+		isAlive(
+			long						timeout,
+			DHTPluginOperationListener	listener )
+		{
+			listener.complete( null, false );
+		}
+		
+		public boolean
+		isOrHasBeenLocal()
+		{
+			return( true );
+		}
+		
+		public Map
+		openTunnel()
+		{
+			Debug.out( "not imp" );
+			
+			return( null );		
+		}
+		
+		public byte[]
+		read(
+			final DHTPluginProgressListener	listener,
+			final byte[]					handler_key,
+			final byte[]					key,
+			final long						timeout )
+		{
+			Debug.out( "not imp" );
+
+			return( null );
+		}
 	}
 }
