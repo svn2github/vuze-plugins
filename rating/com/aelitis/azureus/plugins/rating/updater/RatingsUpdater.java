@@ -829,6 +829,8 @@ RatingsUpdater
 						}
 					}
 					
+					_listener.operationComplete( null );
+					
 					addForLookup( download, true );
 				}
 			};
