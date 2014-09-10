@@ -48,9 +48,12 @@ public class
 RatingsUpdater 	
 	implements DownloadManagerListener
 {
-	private static final int READ_TIMEOUT 			= 20*1000;
+	private static final int READ_PUBLIC_TIMEOUT 		= 20*1000;
+	private static final int READ_NON_PUBLIC_TIMEOUT 	= 80*1000;
+	
     private static final int WRITE_DELAY			= 10*1000;
     private static final int READ_DELAY				= 20*1000;
+    
     private static final int READ_BY_HASH_TIMEOUT	= 10*1000;
     
     private static final int COMPLETE_DOWNLOAD_LOOKUP_PERIOD 		= 8*60*60*1000;
@@ -774,7 +777,7 @@ RatingsUpdater
 							}
 						}
 				}
-			}, ddKey, READ_TIMEOUT );   
+			}, ddKey, database.getNetwork()==AENetworkClassifier.AT_PUBLIC?READ_PUBLIC_TIMEOUT:READ_NON_PUBLIC_TIMEOUT );   
 
 		}catch( Throwable e ){
 
@@ -848,14 +851,7 @@ RatingsUpdater
 				
 				DistributedDatabaseValue ddValue = database.createValue(value);
 	
-				// handle missing method as new @4901_b08
-	
-				try{
-					ddKey.setFlags( 0x00000001 );
-					
-				}catch( Throwable e ){
-	
-				}
+				ddKey.setFlags( DistributedDatabaseKey.FL_ANON );
 	
 				database.write(
 					new DistributedDatabaseListener() 

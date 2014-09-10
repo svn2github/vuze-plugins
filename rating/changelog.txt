@@ -1,3 +1,4 @@
+1.4.6: Fix to work with non-public network; required 5401_B08+
 1.4.5: Ignore downloads that don't use the public network
 1.4.2: Fixed middle-click rating setting in library views and noted this feature in tooltip for column
 1.4.1: DHT logic rewritten; made unloadable
