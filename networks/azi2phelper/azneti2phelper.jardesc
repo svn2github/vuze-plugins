@@ -12,9 +12,12 @@
     </manifest>
     <selectedElements exportClassFiles="true" exportJavaFiles="true" exportOutputFolder="false">
         <javaElement handleIdentifier="=azi2phelper/&lt;org.parg.azureus.plugins.networks.i2p.vuzedht"/>
-        <javaElement handleIdentifier="=azi2phelper/&lt;org.parg.azureus.plugins.networks.i2p"/>
+        <javaElement handleIdentifier="=azi2phelper/&lt;org.parg.azureus.plugins.networks.i2p.tracker"/>
+        <javaElement handleIdentifier="=azi2phelper/&lt;org.parg.azureus.plugins.networks.i2p.plugindht"/>
         <javaElement handleIdentifier="=azi2phelper/&lt;org.parg.azureus.plugins.networks.i2p.internat"/>
-        <javaElement handleIdentifier="=azi2phelper/&lt;org.parg.azureus.plugins.networks.i2p.dht"/>
+        <javaElement handleIdentifier="=azi2phelper/&lt;org.parg.azureus.plugins.networks.i2p.snarkdht"/>
+        <javaElement handleIdentifier="=azi2phelper/&lt;org.parg.azureus.plugins.networks.i2p"/>
+        <javaElement handleIdentifier="=azi2phelper/&lt;org.parg.azureus.plugins.networks.i2p.router"/>
         <javaElement handleIdentifier="=azi2phelper/&lt;org.parg.azureus.plugins.networks.i2p.swt"/>
     </selectedElements>
 </jardesc>
