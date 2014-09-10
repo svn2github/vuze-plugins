@@ -82,14 +82,13 @@ I2PHelperAZDHT
 	get(
 		final byte[]						key,
 		String								description,
+		short								flags,
 		int									max_values,
 		long								timeout,
 		boolean								exhaustive,
 		boolean								high_priority,
 		final DHTPluginOperationListener	listener)
-	{
-		short flags = FLAG_NONE;
-		
+	{		
 		if ( high_priority ){
 			
 			flags |= FLAG_HIGH_PRIORITY;
@@ -216,7 +215,7 @@ I2PHelperAZDHT
 	
 	private class
 	DHTContactImpl
-		implements DHTPluginContact
+		implements DHTContact
 	{
 		private DHTTransportContact		contact;
 		
@@ -293,7 +292,7 @@ I2PHelperAZDHT
 	
 	private class
 	DHTValueImpl
-		implements DHTPluginValue
+		implements DHTValue
 	{
 		private DHTTransportValue		value;
 		
@@ -327,6 +326,11 @@ I2PHelperAZDHT
 		@Override
 		public boolean isLocal() {
 			return( value.isLocal());
+		}
+		
+		@Override
+		public DHTContact getOriginator() {
+			return( new DHTContactImpl( value.getOriginator()));
 		}
 	}
 	

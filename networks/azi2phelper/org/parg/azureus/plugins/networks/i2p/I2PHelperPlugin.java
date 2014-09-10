@@ -693,6 +693,7 @@ I2PHelperPlugin
 										command_text_param.getValue(),
 										router,
 										tracker,
+										I2PHelperPlugin.this,
 										I2PHelperPlugin.this );
 									
 								}catch( Throwable e){
@@ -1128,7 +1129,8 @@ I2PHelperPlugin
 		String				cmd_str,
 		I2PHelperRouter		router,
 		I2PHelperTracker	tracker,
-		I2PHelperAdapter	adapter )
+		I2PHelperAdapter	adapter,
+		I2PHelperPlugin		plugin_maybe_null )
 		
 		throws Exception
 	{
@@ -1334,7 +1336,7 @@ I2PHelperPlugin
 					}	
 					
 					dht.getHelperAZDHT().get(
-						key, "az_get", 16, 3*60*1000, false, true, 
+						key, "az_get", I2PHelperAZDHT.FLAG_NONE, 16, 3*60*1000, false, true, 
 						new I2PHelperAZDHT.OperationAdapter() {
 							
 							@Override
@@ -1439,10 +1441,109 @@ I2PHelperPlugin
 									}
 								});
 					
-					byte[] key 		= ("az-chat-key:" + their_nick ).getBytes();
+					DHTAZClient client = getAZDHTClient( dht, inst, adapter ); 
 					
-					dht.getHelperAZDHT().get(
-							key, "az_get", 16, 3*60*1000, false, true, 
+					if ( client.waitForInitialisation( 5000 )){
+
+						byte[] key 		= ("az-chat-key:" + their_nick ).getBytes();
+						
+						client.get(
+								key, "az_chat_get", I2PHelperAZDHT.FLAG_NONE, 16, 3*60*1000, false, true, 
+								new I2PHelperAZDHT.OperationAdapter(){
+									
+									@Override
+									public void
+									valueRead(
+										DHTContact		target,
+										final DHTValue	value )
+									{
+										try{
+											System.out.println( "az_chat_get: read from " + target.getAddress() + ", value=" + new String( value.getValue(), "UTF-8" ) + ", orig=" + value.getOriginator().getAddress());
+											
+											new AEThread2("")
+											{
+												public void
+												run()
+												{
+													try{
+														inst.connect( value.getOriginator().getAddress().getHostName(), 80, new HashMap<String,Object>());
+														
+													}catch( Throwable e ){
+														
+														e.printStackTrace();
+													}
+												}
+											}.start();
+										}catch( Throwable e ){
+											
+											e.printStackTrace();
+										}
+									}
+									
+									@Override
+									public void
+									complete(
+										byte[]				key,
+										boolean				timeout_occurred )
+									{
+										System.out.println( "az_chat_get complete" );
+									}
+								});
+					}else{
+						
+						System.out.println( "chat dht not init" );
+					}
+					
+				}else if ( cmd.equals( "az_pi_put" )){
+
+					if ( bits.length != 2 ){
+						
+						throw( new Exception( "usage: az_pi_put <key>"));
+					}
+					
+					DHTPluginInterface client = plugin_maybe_null.getProxyDHT( "test", new HashMap<String,Object>());
+						
+					byte[] key 		= ("az-pi-key:" + bits[1] ).getBytes();
+					byte[] value 	= "I'm the pie".getBytes();
+					
+					client.put(
+							key, "az_pi_put: " + bits[1], value, (byte)I2PHelperAZDHT.FLAG_NON_ANON,
+							new I2PHelperAZDHT.OperationAdapter() {
+								
+								@Override
+								public void
+								valueWritten(
+									DHTPluginContact		target,
+									DHTPluginValue			value )
+								{
+									System.out.println( "az_pi_put: write to " + target.getAddress());
+								}
+								
+								@Override
+								public void
+								complete(
+									byte[]				key,
+									boolean				timeout_occurred )
+								{
+									System.out.println( "az_pi_put complete" );
+								}
+							});
+				
+					
+				}else if ( cmd.equals( "az_pi_get" )){
+
+					if ( bits.length != 2 ){
+						
+						throw( new Exception( "usage: az_pi_get <key>"));
+					}
+					
+					DHTPluginInterface client = plugin_maybe_null.getProxyDHT( "test", new HashMap<String,Object>());
+
+					byte[] key 		= ("az-pi-key:" + bits[1] ).getBytes();
+					
+					client.get(
+							key, "az_pi_get: " + bits[1], (byte)I2PHelperAZDHT.FLAG_NONE, 
+							16, 3*60*1000, false, true, 
 							new I2PHelperAZDHT.OperationAdapter(){
 								
 								@Override
@@ -1452,22 +1553,8 @@ I2PHelperPlugin
 									final DHTValue	value )
 								{
 									try{
-										System.out.println( "az_chat_get: read from " + target.getAddress() + ", value=" + new String( value.getValue(), "UTF-8" ) + ", orig=" + value.getOriginator().getAddress());
+										System.out.println( "az_pi_get: read from " + target.getAddress() + ", value=" + new String( value.getValue(), "UTF-8" ) + ", orig=" + value.getOriginator().getAddress());
 										
-										new AEThread2("")
-										{
-											public void
-											run()
-											{
-												try{
-													inst.connect( value.getOriginator().getAddress().getHostName(), 80, new HashMap<String,Object>());
-													
-												}catch( Throwable e ){
-													
-													e.printStackTrace();
-												}
-											}
-										}.start();
 									}catch( Throwable e ){
 										
 										e.printStackTrace();
@@ -1480,9 +1567,10 @@ I2PHelperPlugin
 									byte[]				key,
 									boolean				timeout_occurred )
 								{
-									System.out.println( "az_chat_get complete" );
+									System.out.println( "az_pi_get complete" );
 								}
 							});
+				
 				}else if ( cmd.equals( "ping_node" )){
 
 					if ( bits.length != 2 ){
@@ -3418,7 +3506,7 @@ I2PHelperPlugin
 
 					}else{
 						
-						executeCommand(line, router, tracker, adapter);
+						executeCommand( line, router, tracker, adapter, null );
 					}
 					
 					if ( bootstrap_server != null ){

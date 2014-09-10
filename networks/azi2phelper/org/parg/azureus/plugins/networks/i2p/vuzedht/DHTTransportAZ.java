@@ -312,6 +312,8 @@ DHTTransportAZ
 	{
 		boolean priority = (flags&I2PHelperAZDHT.FLAG_HIGH_PRIORITY) != 0;
 		
+		flags &= ~I2PHelperAZDHT.FLAG_HIGH_PRIORITY;
+		
 		if ( TRACE ) trace( "AZ: sendFindNode for " + ByteFormatter.encodeString( target ) + " to " + contact.getString());
 		
 		if ( contact.getProtocolVersion() < DHTUtilsI2P.PROTOCOL_VERSION_AZ_MSGS ){
@@ -398,7 +400,9 @@ DHTTransportAZ
 	{
 		boolean priority = (flags&I2PHelperAZDHT.FLAG_HIGH_PRIORITY) != 0;
 		
-		if ( TRACE ) trace( "AZ: sendFindValue" );
+		flags &= ~I2PHelperAZDHT.FLAG_HIGH_PRIORITY;
+		
+		if ( TRACE ) trace( "AZ: sendFindValue for " + ByteFormatter.encodeString( target ) + "/" + max_values + "/" + flags + " to " + contact.getString());
 		
 		if ( contact.getProtocolVersion() < DHTUtilsI2P.PROTOCOL_VERSION_AZ_MSGS ){
 			
@@ -428,6 +432,8 @@ DHTTransportAZ
 					
 					if ( map.containsKey( "b" )){
 						
+						if ( TRACE ) trace( "AZ: sendFindValue to " + contact.getString() + " OK - keyblock reply" );
+
 						byte[]	key = (byte[])map.get("k");
 						byte[]	sig = (byte[])map.get("s");
 						
@@ -437,6 +443,8 @@ DHTTransportAZ
 						
 					}else if ( map.containsKey( "c" )){
 					
+						if ( TRACE ) trace( "AZ: sendFindValue to " + contact.getString() + " OK - contacts reply" );
+
 						List<Map<String,Object>>	l_contacts = (List<Map<String,Object>>)map.get("c");
 					
 						DHTTransportContact[] contacts = decodeContacts( l_contacts );
@@ -447,6 +455,8 @@ DHTTransportAZ
 						
 					}else{
 						
+						if ( TRACE ) trace( "AZ: sendFindValue to " + contact.getString() + " OK - values reply" );
+
 						List<Map<String,Object>>	l_values = (List<Map<String,Object>>)map.get("v");
 						
 						DHTTransportValue[] values = decodeValues( l_values, 0 );
@@ -467,6 +477,8 @@ DHTTransportAZ
 					DHTTransportContactI2P 		basis, 
 					DHTTransportException 		error) 
 				{
+					if ( TRACE ) trace( "AZ: sendFindValue to " + contact.getString() + " failed" );
+
 					stats.findValueFailed();
 					
 					handler.failed( contact, error );
@@ -522,7 +534,16 @@ DHTTransportAZ
 		byte[][]						keys,
 		DHTTransportValue[][]			value_sets )
 	{
-		if ( TRACE ) trace( "AZ: sendStore" );
+		if ( TRACE ){
+			String keys_str = "";
+			
+			for ( byte[] key: keys ){
+				
+				keys_str += (keys_str.length()==0?"":",") + ByteFormatter.encodeString( key );
+			}
+			
+			trace( "AZ: sendStore for " + keys_str + " to " + contact.getString());
+		}
 
 		if ( contact.getProtocolVersion() < DHTUtilsI2P.PROTOCOL_VERSION_AZ_MSGS ){
 			
@@ -562,6 +583,8 @@ DHTTransportAZ
 					DHTTransportContactI2P 		basis,
 					Map							map )
 				{
+					if ( TRACE ) trace( "AZ: sendStore to " + contact.getString() + " OK" );
+
 					stats.storeOK();
 					
 					if ( map.containsKey( "b" )){
@@ -587,6 +610,8 @@ DHTTransportAZ
 					DHTTransportContactI2P 		basis, 
 					DHTTransportException 		error) 
 				{
+					if ( TRACE ) trace( "AZ: sendStore to " + contact.getString() + " failed" );
+
 					stats.storeFailed();
 					
 					handler.failed( contact, error );
@@ -678,16 +703,39 @@ DHTTransportAZ
 	encodeContact(
 		DHTTransportContact		c )
 	{
-		DHTTransportContactAZ	contact = (DHTTransportContactAZ)c;
-		
-		NodeInfo node_info = contact.getBasis().getNode();
-		
 		Map<String,Object>	result = new HashMap<String, Object>();
-		
-		result.put( "v", new Long(c.getProtocolVersion()&0xff));
-		result.put( "h", node_info.getHash().getData());
-		result.put( "p", node_info.getPort());
-		result.put( "i", node_info.getNID().getData());
+
+		if ( c instanceof DHTTransportContactAZ ){
+			
+			DHTTransportContactAZ	contact = (DHTTransportContactAZ)c;
+			
+			NodeInfo node_info = contact.getBasis().getNode();
+						
+			result.put( "v", new Long(c.getProtocolVersion()&0xff));
+			result.put( "h", node_info.getHash().getData());
+			result.put( "p", node_info.getPort());
+			result.put( "i", node_info.getNID().getData());
+			
+		}else{
+			
+				// encoding an 'anonymous contact' for an 'anonymous' value
+			
+			byte[]	hash 	= new byte[32];
+			int		p		= 1;
+			
+				// generate a nid that will at least verify as one (see NodeInfo)
+				// note that destination resolution shortcut-fails for this
+			
+			byte[] 	n = new byte[20];
+	       
+	        n[4] ^= (byte) (p >> 8);
+	        n[5] ^= (byte) p;
+	        
+			result.put( "v", 0 );
+			result.put( "h", hash );
+			result.put( "p",p );
+			result.put( "i", n );
+		}
 		
 		return( result );
 	}
@@ -770,7 +818,7 @@ DHTTransportAZ
 		
 		final DHTTransportContact	originator = decodeContact((Map<String,Object>)map.get("o"));
 		
-		final int	flags		= ((Number)map.get("f")).intValue();
+		final int	flags		= ((Number)map.get( "f" )).intValue();
 		final int 	life_hours 	= ((Number)map.get( "l" )).intValue();
 
 		
@@ -866,6 +914,8 @@ DHTTransportAZ
 		payload.put( "_t", SystemTime.getCurrentTime());
 		payload.put( "_f", (int)getGenericFlags());
 		
+		if ( TRACE ) System.out.println( "AZRequest to " + contact.getString() + ": " + payload );
+
 		base_transport.sendAZRequest(
 			new DHTTransportI2P.AZReplyHandler()
 			{
@@ -889,6 +939,8 @@ DHTTransportAZ
 					DHTTransportContactI2P		contact,
 					Map							payload )
 				{
+					if ( TRACE ) System.out.println( "AZReply from " + contact.getString() + ": " + payload );
+					
 					int		instance_id	= ((Number)payload.get( "_i" )).intValue();
 					int		flags		= ((Number)payload.get( "_f" )).intValue();
 					

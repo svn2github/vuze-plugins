@@ -67,12 +67,10 @@ import com.aelitis.azureus.core.dht.transport.DHTTransportFindValueReply;
 import com.aelitis.azureus.core.dht.transport.DHTTransportFullStats;
 import com.aelitis.azureus.core.dht.transport.DHTTransportListener;
 import com.aelitis.azureus.core.dht.transport.DHTTransportProgressListener;
-import com.aelitis.azureus.core.dht.transport.DHTTransportQueryStoreReply;
 import com.aelitis.azureus.core.dht.transport.DHTTransportReplyHandler;
 import com.aelitis.azureus.core.dht.transport.DHTTransportReplyHandlerAdapter;
 import com.aelitis.azureus.core.dht.transport.DHTTransportRequestHandler;
 import com.aelitis.azureus.core.dht.transport.DHTTransportStats;
-import com.aelitis.azureus.core.dht.transport.DHTTransportStoreReply;
 import com.aelitis.azureus.core.dht.transport.DHTTransportTransferHandler;
 import com.aelitis.azureus.core.dht.transport.DHTTransportValue;
 import com.aelitis.azureus.core.dht.transport.udp.DHTTransportUDP;
@@ -1597,6 +1595,27 @@ DHTTransportI2P
     	Destination	dest = node.getDestination();
     	
     	if ( dest == null ) {
+    		
+    			// shortcut 'anonymous' contacts (zero hash and port of 1)
+    		
+    		if ( node.getPort() == 1 ){
+    			
+    			boolean ok = false;
+    			
+    			byte[] hash = node.getHash().getData();
+    		
+    			for ( byte b: hash ){
+    				if ( b != 0 ){
+    					ok = true;
+    					break;
+    				}
+    			}
+    			
+    			if ( !ok ){
+    				
+    				throw( new DHTTransportException( "NodeInfo denotes 'anonymous' contact" ));
+    			}
+    		}
     		
     		ThreadPool pool = priority?destination_lookup_pool_hp:destination_lookup_pool_lp;
     		

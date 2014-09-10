@@ -205,10 +205,10 @@ I2PHelperDHTPluginInterface
 		final boolean							exhaustive,
 		final boolean							high_priority,
 		final DHTPluginOperationListener		listener )
-	{
+	{	
 		if ( dht != null && dispatcher.getQueueSize() == 0 ){
 			
-			dht.get( key, description, max_values, timeout, exhaustive, high_priority, listener );
+			dht.get( key, description, (short)(flags&0x00ff), max_values, timeout, exhaustive, high_priority, listener );
 		
 		}else{
 			
@@ -241,7 +241,7 @@ I2PHelperDHTPluginInterface
 							
 						}else{
 							
-							dht_to_use.get( key, description, max_values, timeout, exhaustive, high_priority, listener );
+							dht_to_use.get( key, description, (short)(flags&0x00ff), max_values, timeout, exhaustive, high_priority, listener );
 						}
 					}
 				});
@@ -255,7 +255,7 @@ I2PHelperDHTPluginInterface
 		final byte[]						value,
 		final byte							flags,
 		final DHTPluginOperationListener	listener)
-	{
+	{		
 		if ( dht != null && dispatcher.getQueueSize() == 0 ){
 			
 			dht.put( key, description, value, (short)(flags&0x00ff), true, listener );
