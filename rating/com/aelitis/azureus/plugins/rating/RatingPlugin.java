@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.PluginException;
@@ -272,32 +273,63 @@ public class RatingPlugin implements UnloadablePlugin, PluginListener {
     return updater;
   }
   
-  	// IPC method
+  	// IPC methods
   
   public Map
   lookupRatingByHash(
-		byte[]		hash )
+	 byte[]		hash )
+  {
+	  return( lookupRatingByHash( null, hash ));
+  }
+  
+  public Map
+  lookupRatingByHash(
+	String[]		networks,
+	byte[]			hash )
   {
 	  final RatingResults[]	f_result = { null };
 	  final AESemaphore	sem = new AESemaphore( "ratings_waiter" );
 	  
-	  updater.readRating(
-		hash,
-		new CompletionListener()
-		{
-			public void 
-			operationComplete(
-				RatingResults ratings ) 
+	  if ( networks == null ){
+		  updater.readRating(
+			hash,
+			new CompletionListener()
 			{
-				try{
-					f_result[0] = ratings;
-					
-				}finally{
-					
-					sem.release();
+				public void 
+				operationComplete(
+					RatingResults ratings ) 
+				{
+					try{
+						f_result[0] = ratings;
+						
+					}finally{
+						
+						sem.release();
+					}
 				}
-			}
-		});
+			});
+	  }else{
+		  List<DistributedDatabase> ddbs = pluginInterface.getUtilities().getDistributedDatabases( networks );
+		  
+		  updater.readRating(
+			ddbs,
+			hash,
+			new CompletionListener()
+			{
+				public void 
+				operationComplete(
+					RatingResults ratings ) 
+				{
+					try{
+						f_result[0] = ratings;
+						
+					}finally{
+						
+						sem.release();
+					}
+				}
+			}); 
+	  }
 	  
 	  sem.reserve();
 	  

@@ -63,7 +63,8 @@ ColumnRC_Rating
 {	
 	public static String COLUMN_ID = "rc_rating";
 	
-	private static IPCInterface			rating_ipc;
+	private static IPCInterface			rating_ipc1;
+	private static IPCInterface			rating_ipc2;
 	private static DHTPlugin			dht_plugin;
 	
 	static{
@@ -84,7 +85,12 @@ ColumnRC_Rating
 					
 					if ( ipc.canInvoke( "lookupRatingByHash", new Object[]{ new byte[0] })){
 						
-						rating_ipc = ipc;
+						rating_ipc1 = ipc;
+					}
+					
+					if ( ipc.canInvoke( "lookupRatingByHash", new Object[]{ new String[0], new byte[0] })){
+						
+						rating_ipc2 = ipc;
 					}
 				}
 			}
@@ -201,7 +207,8 @@ ColumnRC_Rating
 				if (event.eventType == TableCellMouseEvent.EVENT_MOUSEUP && event.button == 1) {
 					if (hitUrl.url.equals("click")) {
 						
-						final byte[] hash = rc.getHash();
+						final byte[] 	hash 		= rc.getHash();
+						final String[]	networks 	= rc.getNetworks();
 						
 						if ( !rating_lookups.containsKey( hash )){
 							
@@ -215,7 +222,16 @@ ColumnRC_Rating
 								run()
 								{
 									try{
-										Map result = (Map)rating_ipc.invoke( "lookupRatingByHash", new Object[]{ hash });
+										Map result;
+									
+										if ( rating_ipc2 != null ){
+											
+											 result = (Map)rating_ipc2.invoke( "lookupRatingByHash", new Object[]{ networks, hash });
+
+										}else{
+											
+											result = (Map)rating_ipc1.invoke( "lookupRatingByHash", new Object[]{ hash });
+										}
 										
 										res.setResult( result );
 										
@@ -263,7 +279,7 @@ ColumnRC_Rating
 			
 			text = "";
 			
-		}else if ( rating_ipc == null ){
+		}else if ( rating_ipc1 == null && rating_ipc2 == null ){
 			
 			text = MessageText.getString( "general.na.short" );
 			

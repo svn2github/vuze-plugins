@@ -602,7 +602,43 @@ RatingsUpdater
 		final byte[]				hash,
 		final CompletionListener 	listener )
 	{	
-		if ( database_public == null || !database_public.isAvailable()){
+		if ( database_public == null ){
+			
+			listener.operationComplete( null );
+			
+			return;
+		}
+		
+		List<DistributedDatabase>	ddbs = new ArrayList<DistributedDatabase>();
+		
+		ddbs.add( database_public );
+		
+		readRating( ddbs, hash, listener );
+	}
+	
+	public void 
+	readRating(
+		final List<DistributedDatabase>	ddbs,
+		final byte[]					hash,
+		final CompletionListener 		listener )
+	{	
+		DistributedDatabase ddb = null;
+		
+		for ( DistributedDatabase x: ddbs ){
+			
+			if ( x.getNetwork() == AENetworkClassifier.AT_PUBLIC ){
+				
+				ddb = x; 
+				
+				break;
+				
+			}else{
+				
+				ddb = x;
+			}
+		}
+		
+		if ( ddb == null || !ddb.isAvailable()){
 			
 			listener.operationComplete( null );
 			
@@ -614,9 +650,9 @@ RatingsUpdater
 		try{
 			log( hash_str + " : getting rating" );
 			
-			DistributedDatabaseKey ddKey = database_public.createKey(KeyGenUtils.buildRatingKey( hash ),"Ratings read: " + hash_str);
+			DistributedDatabaseKey ddKey = ddb.createKey(KeyGenUtils.buildRatingKey( hash ),"Ratings read: " + hash_str);
 			
-			database_public.read(
+			ddb.read(
 				new DistributedDatabaseListener() 
 				{
 					List<DistributedDatabaseValue> results = new ArrayList<DistributedDatabaseValue>();

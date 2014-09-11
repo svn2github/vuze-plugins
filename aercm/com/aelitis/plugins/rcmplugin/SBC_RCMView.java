@@ -757,9 +757,12 @@ SBC_RCMView
 					last_selected_content.add( rc );
 					
 					if ( rc.getHash() != null ){
+						
 						SelectedContent sc = new SelectedContent(Base32.encode(rc.getHash()), rc.getTitle());
+						
 						sc.setDownloadInfo(new DownloadUrlInfo(
-								UrlUtils.getMagnetURI(rc.getHash()) + "&dn=" + UrlUtils.encode( rc.getTitle())));
+								UrlUtils.getMagnetURI(rc.getHash(), rc.getTitle(), rc.getNetworks())));
+						
 						valid.add(sc);
 					}
 				}

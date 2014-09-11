@@ -212,7 +212,7 @@ public class ColumnRC_Actions
 							
 							rc.setUnread( false );
 							
-							TorrentOpener.openTorrent( UrlUtils.getMagnetURI( hash ) + "&dn=" + UrlUtils.encode( rc.getTitle()));
+							TorrentOpener.openTorrent( UrlUtils.getMagnetURI( hash, rc.getTitle(), rc.getNetworks()));
 						}
 						
 					} else if (hitUrl.url.equals("search")) {
