@@ -517,6 +517,14 @@ SBC_RCMView
 							new ColumnRC_Tags(column);
 						}
 					});
+		tableManager.registerColumn(
+				RelatedContent.class, 
+				ColumnRC_Networks.COLUMN_ID,
+					new TableColumnCreationListener() {
+						public void tableColumnCreated(TableColumn column) {
+							new ColumnRC_Networks(column);
+						}
+					});
 		
 		tableManager.registerColumn(
 				RelatedContent.class, 
@@ -1085,7 +1093,7 @@ SBC_RCMView
 								
 								for ( RelatedContent c: assoc_ok ){
 								
-									ui.addSearch( c.getHash(), c.getTitle());
+									ui.addSearch( c.getHash(), c.getNetworks(), c.getTitle());
 									
 									i++;
 									

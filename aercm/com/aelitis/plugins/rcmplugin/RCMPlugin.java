@@ -718,7 +718,7 @@ RCMPlugin
 							
 								current_ui.setUIEnabled( true );
 								
-								current_ui.addSearch( hash, name );
+								current_ui.addSearch( hash, new String[]{ AENetworkClassifier.AT_PUBLIC }, name );
 							}
 						}
 					}
@@ -727,7 +727,7 @@ RCMPlugin
 			
 			current_ui.setUIEnabled( true );
 			
-			current_ui.addSearch( hash, name );
+			current_ui.addSearch( hash, new String[]{ AENetworkClassifier.AT_PUBLIC }, name );
 		}
 	}
 }

@@ -47,6 +47,7 @@ RelatedContentUI
 	public void
 	addSearch(
 		byte[]			hash,
+		String[]		networks,
 		String			name );
 
 	public void

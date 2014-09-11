@@ -63,6 +63,7 @@ import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.tables.TableContextMenuItem;
 import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.plugins.ui.tables.TableRow;
+import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.gudy.azureus2.ui.swt.SimpleTextEntryWindow;
 import org.gudy.azureus2.ui.swt.Utils;
 import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
@@ -923,13 +924,17 @@ RelatedContentUISWT
 			
 			if ( related_mode && dl != null ){
 				
-				new_subview = new RCMItemSubView(dl.getTorrent().getHash());
+				String[] networks = PluginCoreUtils.unwrap( dl ).getDownloadState().getNetworks();
+				
+				new_subview = new RCMItemSubView(dl.getTorrent().getHash(), networks );
 								
 			}else if ( !related_mode && dl_file != null && dl != null ){
-										
+						
+				String[] networks = PluginCoreUtils.unwrap( dl ).getDownloadState().getNetworks();
+
 				long file_size = dl_file.getLength();
 											
-				new_subview = new RCMItemSubView(dl.getTorrent().getHash(), file_size );
+				new_subview = new RCMItemSubView(dl.getTorrent().getHash(), networks, file_size );
 												
 			}else{
 				
@@ -1562,7 +1567,7 @@ RelatedContentUISWT
 										}
 										if ( hash != null ){
 										
-											addSearch( hash, ByteFormatter.encodeString( hash ));
+											addSearch( hash, new String[]{ AENetworkClassifier.AT_PUBLIC }, ByteFormatter.encodeString( hash ));
 											
 											ok = true;
 										}
@@ -1728,14 +1733,17 @@ RelatedContentUISWT
 			return;
 		}
 		
-		final byte[] hash = torrent.getHash();
+		byte[] hash = torrent.getHash();
 		
-		addSearch( hash, download.getName());
+		String[] networks = PluginCoreUtils.unwrap( download ).getDownloadState().getNetworks();
+
+		addSearch( hash, networks, download.getName());
 	}
 	
 	public void
 	addSearch(
 		final byte[]		hash,
+		final String[]		networks,
 		final String		name )
 	{
 		synchronized( this ){
@@ -1744,7 +1752,7 @@ RelatedContentUISWT
 			
 			if (  existing_si == null ){
 	
-				final RCMItem new_si = new RCMItemContent( hash );
+				final RCMItem new_si = new RCMItemContent( hash, networks );
 				
 				rcm_item_map.put( hash, new_si );
 				
@@ -1823,7 +1831,7 @@ RelatedContentUISWT
 				
 				if (  existing_si == null ){
 		
-					final RCMItem new_si = new RCMItemContent( dummy_hash, file_size );
+					final RCMItem new_si = new RCMItemContent( dummy_hash, new String[]{ AENetworkClassifier.AT_PUBLIC }, file_size );
 					
 					rcm_item_map.put( dummy_hash, new_si );
 					
@@ -2133,6 +2141,7 @@ RelatedContentUISWT
 	{	
 		private byte[]				hash;
 		private long				file_size;
+		private String[]			networks;
 		
 		private RCMView				view;
 		private MdiEntry			sb_entry;
@@ -2151,17 +2160,21 @@ RelatedContentUISWT
 		
 		protected
 		RCMItemContent(
-			byte[]		_hash )
+			byte[]		_hash,
+			String[]	_networks )
 		{
 			hash		= _hash;
+			networks	= _networks;
 		}
 		
 		protected
 		RCMItemContent(
 			byte[]		_hash,
+			String[]	_networks,
 			long		_file_size )
 		{
 			hash		= _hash;
+			networks	= _networks;
 			file_size	= _file_size;
 		}
 		
@@ -2244,7 +2257,7 @@ RelatedContentUISWT
 					
 				if ( file_size == 0 ){
 				
-					manager.lookupContent( hash, listener );
+					manager.lookupContent( hash, networks, listener );
 					
 					SubscriptionManager subs_man = SubscriptionManagerFactory.getSingleton();
 					
@@ -2408,7 +2421,7 @@ RelatedContentUISWT
 					
 				}else{
 					
-					manager.lookupContent( file_size, listener );
+					manager.lookupContent( file_size, networks, listener );
 				}
 			}catch( Throwable e ){
 				
@@ -2611,17 +2624,19 @@ RelatedContentUISWT
 		
 		protected
 		RCMItemSubView(
-			byte[]		_hash )
+			byte[]		_hash,
+			String[]	_networks )
 		{
-			super( _hash );
+			super( _hash, _networks );
 		}
 		
 		protected
 		RCMItemSubView(
 			byte[]		_hash,
+			String[]	_networks,
 			long		_file_size )
 		{
-			super( _hash, _file_size );
+			super( _hash, _networks, _file_size );
 		}
 		
 		private void
@@ -2723,7 +2738,7 @@ RelatedContentUISWT
 		private
 		RCMItemSubViewEmpty()
 		{
-			super( new byte[0]);
+			super( new byte[0], new String[]{ AENetworkClassifier.AT_PUBLIC });
 		}
 		
 		public void
