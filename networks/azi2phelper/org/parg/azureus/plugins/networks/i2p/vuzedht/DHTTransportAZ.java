@@ -26,6 +26,7 @@ import java.util.*;
 
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.SystemTime;
 import org.parg.azureus.plugins.networks.i2p.snarkdht.NodeInfo;
 
@@ -57,6 +58,10 @@ DHTTransportAZ
 	private static final int	METHOD_FIND_NODE	= 1;
 	private static final int	METHOD_FIND_VALUE	= 2;
 	private static final int	METHOD_STORE		= 3;
+	
+		// skew our time randomly so that multiple transports don't show the same clock times in requests
+	
+	private final int	TIME_OFFSET = RandomUtils.SECURE_RANDOM.nextInt( 4*60*1000 ) - 2*60*1000;
 	
 	private DHTTransportAZHelper		helper;
 	
@@ -911,7 +916,7 @@ DHTTransportAZ
 		payload.put( "_m", method );
 
 		payload.put( "_i", getLocalContact().getInstanceID());
-		payload.put( "_t", SystemTime.getCurrentTime());
+		payload.put( "_t", SystemTime.getCurrentTime() + TIME_OFFSET );
 		payload.put( "_f", (int)getGenericFlags());
 		
 		if ( TRACE ) System.out.println( "AZRequest to " + contact.getString() + ": " + payload );
@@ -1000,6 +1005,8 @@ DHTTransportAZ
 		int		flags		= ((Number)payload_in.get( "_f" )).intValue();
 		
 		long skew = SystemTime.getCurrentTime() - time;
+		
+		stats.recordSkew( contact.getAddress(), skew );
 		
 		contact.setDetails( instance_id, skew, (byte)flags );
 		

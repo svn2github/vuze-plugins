@@ -2382,6 +2382,8 @@ DHTTransportI2P
 		private short					flags;
 		private byte[]					value_bytes;
 		
+		private final long				create_time = SystemTime.getCurrentTime();
+		
 		protected
 		DHTTransportValueImpl(
 			DHTTransportContact		_originator,
@@ -2402,7 +2404,7 @@ DHTTransportI2P
 		public long
 		getCreationTime()
 		{
-			return( SystemTime.getCurrentTime());
+			return( create_time );
 		}
 		
 		public byte[]

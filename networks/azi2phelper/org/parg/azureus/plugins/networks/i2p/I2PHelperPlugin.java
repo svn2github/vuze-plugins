@@ -2896,8 +2896,16 @@ I2PHelperPlugin
 			
 			if ( download == null ){
 			
-				dht_index =	I2PHelperRouter.DHT_MIX;
+				String[]	networks = (String[])server_options.get( "networks" );
 				
+				if ( networks != null ){
+					
+					dht_index = I2PHelperRouter.selectDHTIndex( networks );
+					
+				}else{
+				
+					dht_index =	I2PHelperRouter.DHT_MIX;
+				}
 			}else{
 			
 				dht_index = I2PHelperRouter.selectDHTIndex( download );

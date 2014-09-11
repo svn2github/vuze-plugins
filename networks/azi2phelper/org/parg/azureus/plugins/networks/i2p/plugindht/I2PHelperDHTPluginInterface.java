@@ -141,6 +141,20 @@ I2PHelperDHTPluginInterface
 		return( true );
 	}
 	
+	@Override
+	public boolean 
+	isInitialising() 
+	{
+		return( !init_sem.isReleasedForever());
+	}
+	
+	@Override
+	public boolean 
+	isSleeping() 
+	{
+		return( false );
+	}
+	
 	public DHTPluginContact
 	getLocalAddress()
 	{
