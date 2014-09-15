@@ -39,6 +39,8 @@ import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouter;
 import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouterDHT;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT;
 
+import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
+import com.aelitis.azureus.core.dht.transport.DHTTransportTransferHandler;
 import com.aelitis.azureus.plugins.dht.DHTPluginContact;
 import com.aelitis.azureus.plugins.dht.DHTPluginInterface;
 import com.aelitis.azureus.plugins.dht.DHTPluginKeyStats;
@@ -47,6 +49,8 @@ import com.aelitis.azureus.plugins.dht.DHTPluginOperationListener;
 import com.aelitis.azureus.plugins.dht.DHTPluginProgressListener;
 import com.aelitis.azureus.plugins.dht.DHTPluginTransferHandler;
 import com.aelitis.azureus.plugins.dht.DHTPluginValue;
+import com.aelitis.azureus.plugins.dht.impl.DHTPluginContactImpl;
+import com.aelitis.azureus.plugins.dht.impl.DHTPluginImpl;
 
 public class 
 I2PHelperDHTPluginInterface
@@ -172,12 +176,50 @@ I2PHelperDHTPluginInterface
 
 	public void
 	registerHandler(
-		byte[]							handler_key,
+		final byte[]					handler_key,
 		final DHTPluginTransferHandler	handler )
 	{
-		Debug.out( "not imp" );
+		if ( dht != null && dispatcher.getQueueSize() == 0 ){
+			
+			dht.registerHandler( handler_key, handler );
+		
+		}else{
+			
+			if ( dispatcher.getQueueSize() > 100 ){
+				
+				Debug.out( "Dispatch queue too large" );
+			}
+			
+			dispatcher.dispatch(
+				new AERunnable() {
+					
+					@Override
+					public void 
+					runSupport() 
+					{
+						I2PHelperAZDHT	dht_to_use = dht;
+						
+						if ( dht_to_use == null ){
+							
+							init_sem.reserve();
+							
+							dht_to_use = dht;
+						}
+						
+						if ( dht_to_use != null ){
+						
+							dht_to_use.registerHandler( handler_key, handler );
+							
+						}else{
+							
+							Debug.out( "Failed to initialise DHT" );
+						}
+					}
+				});
+		}	
 	}	
 	
+
 	public DHTPluginContact
 	importContact(
 		InetSocketAddress				address )

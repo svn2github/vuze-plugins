@@ -130,6 +130,12 @@ DHTAZClient
 								
 										return( false );
 									}
+									
+									@Override
+									public DHTLogger getLogger() {
+										
+										return( DHTAZClient.this );
+									}
 								}, base_transport );
 		
 						transport.setTraceOn( true );

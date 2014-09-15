@@ -28,10 +28,12 @@ import org.gudy.azureus2.core3.util.Debug;
 
 import com.aelitis.azureus.core.dht.*;
 import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
+import com.aelitis.azureus.core.dht.transport.DHTTransportTransferHandler;
 import com.aelitis.azureus.core.dht.transport.DHTTransportValue;
 import com.aelitis.azureus.plugins.dht.DHTPluginContact;
 import com.aelitis.azureus.plugins.dht.DHTPluginOperationListener;
 import com.aelitis.azureus.plugins.dht.DHTPluginProgressListener;
+import com.aelitis.azureus.plugins.dht.DHTPluginTransferHandler;
 import com.aelitis.azureus.plugins.dht.DHTPluginValue;
 
 public abstract class 
@@ -130,6 +132,47 @@ I2PHelperAZDHT
 			Debug.out( e );
 			
 			listener.complete( key, false );
+		}
+	}
+	
+	public void
+	registerHandler(
+		byte[]							handler_key,
+		final DHTPluginTransferHandler	handler )
+	{		
+		try{
+			getDHT().getTransport().registerTransferHandler( 
+				handler_key,
+				new DHTTransportTransferHandler()
+				{
+					public String
+					getName()
+					{
+						return( handler.getName());
+					}
+					
+					public byte[]
+					handleRead(
+						DHTTransportContact	originator,
+						byte[]				key )
+					{
+						return( handler.handleRead( new DHTContactImpl( originator ), key ));
+					}
+					
+					public byte[]
+					handleWrite(
+							DHTTransportContact	originator,
+						byte[]				key,
+						byte[]				value )
+					{
+						handler.handleWrite( new DHTContactImpl( originator ), key, value );
+						
+						return( null );
+					}
+				});
+		}catch( Throwable e ){
+			
+			Debug.out( e );
 		}
 	}
 	

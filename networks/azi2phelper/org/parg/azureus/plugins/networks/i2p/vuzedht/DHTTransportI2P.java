@@ -1388,6 +1388,7 @@ DHTTransportI2P
 	sendAZRequest(
 		final AZReplyHandler				handler,
 		final DHTTransportContactI2P		contact,
+		boolean								reply_expected,
 		boolean								priority,
 		Map<String, Object>					payload )	
 	{
@@ -1463,7 +1464,7 @@ DHTTransportI2P
 	        			handler.failed( contact, error );
 	        		}
 	        	}, 
-	        	contact, map, true, priority );
+	        	contact, map, reply_expected, priority );
 	        	        
 		}catch( Throwable e ){
 			
@@ -1507,29 +1508,32 @@ DHTTransportI2P
 		
 		Map<String, Object>	payload_out = az_request_handler.receiveRequest( originator, payload_in );
 				
-			// dispatch reply
-		
-		Map<String, Object> map = new HashMap<String, Object>();
-		
-		Map<String, Object> resps = new HashMap<String, Object>();
-		
-		map.put( "r", resps);
-				
-		byte[] token_out = (byte[])originator.getRandomID2();
-		
-		if ( token_out != null ){
+		if ( payload_out != null ){
 			
-			if ( token_in == null || !Arrays.equals( token_in, token_out )){
-		
-				resps.put( "token", token_out );
+				// dispatch reply
+			
+			Map<String, Object> map = new HashMap<String, Object>();
+			
+			Map<String, Object> resps = new HashMap<String, Object>();
+			
+			map.put( "r", resps);
+					
+			byte[] token_out = (byte[])originator.getRandomID2();
+			
+			if ( token_out != null ){
+				
+				if ( token_in == null || !Arrays.equals( token_in, token_out )){
+			
+					resps.put( "token", token_out );
+				}
 			}
+			
+			resps.put( "p", payload_out );
+			
+			int sent = sendResponse( originator, message_id, map );
+			
+			az_request_handler.packetSent( sent );
 		}
-		
-		resps.put( "p", payload_out );
-		
-		int sent = sendResponse( originator, message_id, map );
-		
-		az_request_handler.packetSent( sent );
 	}
 	
 		// -------------
@@ -1703,7 +1707,13 @@ DHTTransportI2P
     			throw( new DHTTransportException( "Transport destroyed" ));
     		}
     		
-    		requests.put( new HashWrapper( msg_id ), new Request( handler ));
+    		if ( repliable ){
+    		
+    			requests.put( new HashWrapper( msg_id ), new Request( handler ));
+    		}else{
+    			
+    			System.out.println( "Not repliable: " + map );
+    		}
 	    }
 	    
 	    boolean	ok = false;
@@ -1968,6 +1978,8 @@ DHTTransportI2P
 	        			reply_handler.handleError( new DHTTransportException( "Reply processing failed", e ));
 	        		}
 	        	}else{
+	        		
+	        		System.out.println( "req not found for " + map  );
 	        		
 	        		if ( TRACE ) trace( "Got reply to timed-out request" );
 	        	}

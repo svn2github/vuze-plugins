@@ -31,6 +31,7 @@ import org.gudy.azureus2.core3.util.SystemTime;
 import org.parg.azureus.plugins.networks.i2p.snarkdht.NodeInfo;
 
 import com.aelitis.azureus.core.dht.DHT;
+import com.aelitis.azureus.core.dht.DHTLogger;
 import com.aelitis.azureus.core.dht.impl.DHTLog;
 import com.aelitis.azureus.core.dht.transport.DHTTransport;
 import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
@@ -45,8 +46,10 @@ import com.aelitis.azureus.core.dht.transport.DHTTransportStats;
 import com.aelitis.azureus.core.dht.transport.DHTTransportStoreReply;
 import com.aelitis.azureus.core.dht.transport.DHTTransportTransferHandler;
 import com.aelitis.azureus.core.dht.transport.DHTTransportValue;
+import com.aelitis.azureus.core.dht.transport.util.DHTTransferHandler;
 import com.aelitis.azureus.core.dht.transport.util.DHTTransportRequestCounter;
 import com.aelitis.azureus.core.dht.transport.util.DHTTransportStatsImpl;
+import com.aelitis.azureus.core.dht.transport.util.DHTTransferHandler.Packet;
 
 public class 
 DHTTransportAZ
@@ -58,6 +61,9 @@ DHTTransportAZ
 	private static final int	METHOD_FIND_NODE	= 1;
 	private static final int	METHOD_FIND_VALUE	= 2;
 	private static final int	METHOD_STORE		= 3;
+	private static final int	METHOD_DATA			= 4;
+	
+	private static final int	MAX_DATA_SIZE	= 16*1024;
 	
 		// skew our time randomly so that multiple transports don't show the same clock times in requests
 	
@@ -73,6 +79,7 @@ DHTTransportAZ
 	
 	private DHTTransportRequestHandler	request_handler;
 	
+	private DHTTransferHandler 			xfer_handler;
 
 	private volatile boolean			destroyed;
 	
@@ -88,6 +95,27 @@ DHTTransportAZ
 				
 		local_contact = 
 			new DHTTransportContactAZ( this, (DHTTransportContactI2P)base_transport.getLocalContact());
+		
+		xfer_handler = 
+				new DHTTransferHandler(
+					new DHTTransferHandler.Adapter() {
+						
+						public void 
+						sendRequest(
+							DHTTransportContact 	contact, 
+							Packet 					packet	) 
+						{									
+							DHTTransportAZ.this.sendData( (DHTTransportContactAZ)contact, packet );
+						}
+						
+						public long 
+						getConnectionID() 
+						{
+							return( RandomUtils.SECURE_RANDOM.nextLong());
+						}
+					}, 
+					MAX_DATA_SIZE, 
+					helper.getLogger());
 		
 		base_transport.setAZRequestHandler( this );
 	}
@@ -291,6 +319,7 @@ DHTTransportAZ
 				},
 				contact,
 				METHOD_PING,
+				true,
 				false,
 				payload );
 			
@@ -373,6 +402,7 @@ DHTTransportAZ
 			},
 			contact,
 			METHOD_FIND_NODE,
+			true,
 			priority,
 			payload );
 	}
@@ -491,6 +521,7 @@ DHTTransportAZ
 			},
 			contact,
 			METHOD_FIND_VALUE,
+			true,
 			priority,
 			payload );
     }
@@ -624,6 +655,7 @@ DHTTransportAZ
 			},
 			contact,
 			METHOD_STORE,
+			true,
 			false,	// destination should be resolved already when storing so whatever 
 			payload );
 	}
@@ -667,6 +699,86 @@ DHTTransportAZ
 		}
 		
 		return( reply );
+	}
+
+	protected void
+	sendData(
+		final DHTTransportContactAZ		contact,
+		Packet							packet )
+	{
+		stats.dataSent( null );
+		
+		Map<String,Object>	payload = new HashMap<String, Object>();
+					
+		payload.put( "c", packet.getConnectionId());
+		payload.put( "p", packet.getPacketType());
+		payload.put( "z", packet.getTransferKey());
+		payload.put( "r", packet.getRequestKey());
+		payload.put( "d", packet.getData());
+		payload.put( "s", packet.getStartPosition());
+		payload.put( "l", packet.getLength());
+		payload.put( "t", packet.getTotalLength());
+		
+		DHTTransportAZ.this.sendRequest(
+			new AZReplyHandlerAdapter()
+			{	
+				@Override
+				public void
+				reply(
+					DHTTransportContactI2P 		basis,
+					Map							map )
+				{
+					if ( TRACE ) trace( "AZ: sendData to " + contact.getString() + " OK" );
+	
+					stats.dataOK();
+				}
+				
+				@Override
+				public void 
+				failed(
+					DHTTransportContactI2P 		basis, 
+					DHTTransportException 		error) 
+				{
+					if ( TRACE ) trace( "AZ: sendData to " + contact.getString() + " failed" );
+	
+					stats.dataFailed();							
+				}
+			},
+			contact,
+			METHOD_DATA,
+			false,		// no immediate reply expected
+			true,
+			payload );
+	}
+	
+	private Map<String,Object>
+	receiveData(
+		DHTTransportContactAZ		contact,
+		Map<String,Object>			payload )
+	{
+		long 	connection_id 	= ((Number)payload.get("c" )).longValue();
+		byte 	packet_type 	= ((Number)payload.get("p" )).byteValue();
+		byte[]	transfer_key	= (byte[])payload.get("z" );
+		byte[]	request_key		= (byte[])payload.get("r" );
+		byte[]	data			= (byte[])payload.get("d" );
+		int 	start_position 	= ((Number)payload.get("s" )).intValue();
+		int 	length 			= ((Number)payload.get("l" )).intValue();
+		int 	total_length 	= ((Number)payload.get("t " )).intValue();
+
+		Packet	packet =
+			new Packet(
+				connection_id,
+				packet_type,
+				transfer_key,
+				request_key,
+				data,
+				start_position,
+				length,
+				total_length );
+		
+		xfer_handler.receivePacket( contact, packet );
+		
+		return( null );
 	}
 	
 		// --------------
@@ -910,6 +1022,7 @@ DHTTransportAZ
 		final DHTTransportI2P.AZReplyHandler	reply_handler,
 		final DHTTransportContactAZ				contact,
 		int										method,
+		boolean									reply_expected,
 		boolean									priority,
 		Map<String,Object>						payload )
 	{
@@ -964,6 +1077,7 @@ DHTTransportAZ
 				}
 			},
 			contact.getBasis(),
+			reply_expected,
 			priority,
 			payload );
 	}
@@ -1033,6 +1147,10 @@ DHTTransportAZ
 				payload_out = receiveFindValue( az_contact, payload_in );
 				break;
 			}
+			case METHOD_DATA:{
+				payload_out = receiveData( az_contact, payload_in );
+				break;
+			}
 
 			default:{
 					
@@ -1040,8 +1158,11 @@ DHTTransportAZ
 			}
 		}
 		
-		payload_out.put( "_i", getLocalContact().getInstanceID());
-		payload_out.put( "_f", (int)getGenericFlags());
+		if ( payload_out != null ){
+			
+			payload_out.put( "_i", getLocalContact().getInstanceID());
+			payload_out.put( "_f", (int)getGenericFlags());
+		}
 		
 		return( payload_out );
 	}
@@ -1055,7 +1176,7 @@ DHTTransportAZ
 		byte[]						handler_key,
 		DHTTransportTransferHandler	handler )
 	{
-		throw( new RuntimeException( "Not Supported" ));
+		xfer_handler.registerTransferHandler(handler_key, handler);
 	}
 	
 	public byte[]
@@ -1068,7 +1189,7 @@ DHTTransportAZ
 	
 		throws DHTTransportException
 	{
-		throw( new RuntimeException( "Not Supported" ));
+		return( xfer_handler.readTransfer( listener, target, handler_key, key, timeout ));
 	}
 	
 	public void
@@ -1082,7 +1203,7 @@ DHTTransportAZ
 	
 		throws DHTTransportException
 	{
-		throw( new RuntimeException( "Not Supported" ));
+		xfer_handler.writeTransfer(listener, target, handler_key, key, data, timeout);
 	}
 	
 	public byte[]
@@ -1095,7 +1216,7 @@ DHTTransportAZ
 	
 		throws DHTTransportException
 	{
-		throw( new RuntimeException( "Not Supported" ));
+		return( xfer_handler.writeReadTransfer( listener, target, handler_key, data, timeout ));
 	}
 
 	public boolean
@@ -1244,5 +1365,8 @@ DHTTransportAZ
 		public boolean
 		isBaseContact(
 			DHTTransportContactAZ		contact );
+		
+		public DHTLogger
+		getLogger();
 	}
 }

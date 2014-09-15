@@ -91,6 +91,11 @@ DHTAZ
 					public boolean isBaseContact(DHTTransportContactAZ contact) {
 						return( DHTAZ.this.isBaseContact(contact));
 					}
+					
+					@Override
+					public DHTLogger getLogger() {
+						return( base );
+					}
 				}, base_transport );
 		
 		Properties	props = new Properties();

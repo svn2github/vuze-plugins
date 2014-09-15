@@ -33,6 +33,7 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.Socket;
@@ -84,6 +85,14 @@ import org.gudy.azureus2.plugins.PluginConfig;
 import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.UnloadablePlugin;
+import org.gudy.azureus2.plugins.ddb.DistributedDatabase;
+import org.gudy.azureus2.plugins.ddb.DistributedDatabaseContact;
+import org.gudy.azureus2.plugins.ddb.DistributedDatabaseException;
+import org.gudy.azureus2.plugins.ddb.DistributedDatabaseKey;
+import org.gudy.azureus2.plugins.ddb.DistributedDatabaseProgressListener;
+import org.gudy.azureus2.plugins.ddb.DistributedDatabaseTransferHandler;
+import org.gudy.azureus2.plugins.ddb.DistributedDatabaseTransferType;
+import org.gudy.azureus2.plugins.ddb.DistributedDatabaseValue;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.ipc.IPCException;
 import org.gudy.azureus2.plugins.ipc.IPCInterface;
@@ -285,6 +294,8 @@ I2PHelperPlugin
 		
 	private static final int NODES_FROM_PEERS_MAX	= 10;
 	private LinkedList<NodeInfo>	bootstrap_nodes_from_peers = new LinkedList<NodeInfo>();
+	
+	private static DDBTestXFer	test_xfer = new DDBTestXFer();
 	
 		
 	private volatile boolean	unloaded;
@@ -1570,7 +1581,97 @@ I2PHelperPlugin
 									System.out.println( "az_pi_get complete" );
 								}
 							});
-				
+					
+				}else if ( cmd.equals( "ddb_setup" )){
+
+
+					List<DistributedDatabase> ddbs = plugin_maybe_null.getPluginInterface().getUtilities().getDistributedDatabases(
+						new String[] {AENetworkClassifier.AT_I2P} );
+					
+					System.out.println( "DDBs=" + ddbs.size());
+					
+					for ( final DistributedDatabase ddb: ddbs ){
+						
+						System.out.println( "Adding handler for " + ddb );
+						
+						ddb.addTransferHandler(
+							test_xfer,
+							new DistributedDatabaseTransferHandler() {
+								
+								@Override
+								public void 
+								write(
+									DistributedDatabaseContact 			contact,
+									DistributedDatabaseTransferType 	type, 
+									DistributedDatabaseKey 				key,
+									DistributedDatabaseValue 			value ) 
+												
+									throws DistributedDatabaseException 
+								{
+									
+								}
+								
+								@Override
+								public DistributedDatabaseValue 
+								read(
+									DistributedDatabaseContact 			contact,
+									DistributedDatabaseTransferType 	type, 
+									DistributedDatabaseKey 				key )
+									
+									throws DistributedDatabaseException 
+								{
+									return( ddb.createValue( "you're a duck" ));
+								}
+							});
+					}
+
+				}else if ( cmd.equals( "ddb_get" )){
+
+					if ( bits.length != 3 ){
+						
+						throw( new Exception( "usage: az_chat_get <my_nick> <their_nick>"));
+					}
+					
+					String i2p_address 		= bits[1];
+					String i2p_port		 	= bits[2];
+					
+					List<DistributedDatabase> ddbs = plugin_maybe_null.getPluginInterface().getUtilities().getDistributedDatabases(
+						new String[] {AENetworkClassifier.AT_I2P} );
+					
+					for ( DistributedDatabase ddb: ddbs ){
+						
+						InetSocketAddress address = InetSocketAddress.createUnresolved( i2p_address, Integer.parseInt( i2p_port ));
+						
+						
+						DistributedDatabaseContact contact = ddb.importContact( address );
+						
+						DistributedDatabaseKey key = ddb.createKey( new byte[10], "quack" );
+						
+						DistributedDatabaseValue value = contact.read(
+							new DistributedDatabaseProgressListener() {
+								
+								@Override
+								public void reportSize(long size) {
+								
+								}
+								
+								@Override
+								public void reportCompleteness(int percent) {
+								
+								}
+								
+								@Override
+								public void reportActivity(String str) {
+								
+								}
+							},
+							test_xfer, 
+							key, 
+							60*1000 );
+						
+						System.out.println( "DDBValue=" + value );
+					}
+					
 				}else if ( cmd.equals( "ping_node" )){
 
 					if ( bits.length != 2 ){
@@ -3533,5 +3634,11 @@ I2PHelperPlugin
 			
 			e.printStackTrace();
 		}
+	}
+	
+	protected static class
+	DDBTestXFer
+		implements DistributedDatabaseTransferType
+	{	
 	}
 }
