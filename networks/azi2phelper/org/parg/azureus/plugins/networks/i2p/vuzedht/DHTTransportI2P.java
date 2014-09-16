@@ -86,6 +86,10 @@ DHTTransportI2P
 	
 	private static final int NUM_WANT	= 16;
 	
+	private static final int RPC_TYPE_TWO_WAY			= 1;
+	private static final int RPC_TYPE_ONE_WAY			= 2;
+	private static final int RPC_TYPE_UNREPLIABLE		= 3;
+
 	private I2PSession					session;
 	private NodeInfo					my_node;
 	private int							query_port;
@@ -536,7 +540,7 @@ DHTTransportI2P
 	        			sem.release();
 	        		}
 	        	}, 
-	        	node, map, true, false );
+	        	node, map, RPC_TYPE_TWO_WAY, false );
 	        
 	        if ( wait_for_reply ){
 	        
@@ -597,7 +601,7 @@ DHTTransportI2P
 	        			stats.pingFailed();
 	        		}
 	        	}, 
-	        	contact, map, true, false );
+	        	contact, map, RPC_TYPE_TWO_WAY, false );
 	        	        
 		}catch( Throwable e ){
 			
@@ -690,7 +694,7 @@ DHTTransportI2P
 	        			sem.release();
 	        		}
 	        	}, 
-	        	node, map, true, true );
+	        	node, map, RPC_TYPE_TWO_WAY, true );
 	        
 	        sem.reserve();
 	        
@@ -821,7 +825,7 @@ DHTTransportI2P
 		        			stats.findNodeFailed();
 		        		}
 		        	}, 
-		        	contact, map, true, priority );
+		        	contact, map, RPC_TYPE_TWO_WAY, priority );
 		        	        
 			}catch( Throwable e ){
 				
@@ -986,7 +990,7 @@ DHTTransportI2P
 	        			stats.findValueFailed();
 	        		}
 	        	}, 
-	        	contact, map, true, priority );
+	        	contact, map, RPC_TYPE_TWO_WAY, priority );
 	        	        
 		}catch( Throwable e ){
 			
@@ -1329,7 +1333,7 @@ DHTTransportI2P
 										}
 									}
 								}, 
-								contact, map, false, false );		// NOT repliable. Note however that we still get a reply as the target has (or should have) our dest cached against the token...
+								contact, map, RPC_TYPE_UNREPLIABLE, false );		// NOT repliable. Note however that we still get a reply as the target has (or should have) our dest cached against the token...
 	
 					}catch( Throwable e ){
 	
@@ -1464,7 +1468,7 @@ DHTTransportI2P
 	        			handler.failed( contact, error );
 	        		}
 	        	}, 
-	        	contact, map, reply_expected, priority );
+	        	contact, map, reply_expected?RPC_TYPE_TWO_WAY:RPC_TYPE_ONE_WAY, priority );
 	        	        
 		}catch( Throwable e ){
 			
@@ -1566,7 +1570,7 @@ DHTTransportI2P
     	ReplyHandler				handler,
     	DHTTransportContactI2P		contact,
     	Map					 		map, 
-    	boolean 					repliable,
+    	int		 					rpc_type,
     	boolean						priority ) 
     	
     	throws Exception
@@ -1578,7 +1582,7 @@ DHTTransportI2P
 
 	   	NodeInfo node = contact.getNode();
 	   
-		sendQuery( handler, node, map, repliable, priority );
+		sendQuery( handler, node, map, rpc_type, priority );
     }
    
     private void 
@@ -1586,7 +1590,7 @@ DHTTransportI2P
     	final ReplyHandler				handler,
     	final NodeInfo					node,
     	final Map				 		map, 
-    	final boolean 					repliable,
+    	final int	 					rpc_type,
     	final boolean					priority )
     	
     	throws Exception
@@ -1642,7 +1646,7 @@ DHTTransportI2P
 
 								node.setDestination( dest );
 								
-					    		sendQuery( handler, dest, node.getPort(), map, repliable );
+					    		sendQuery( handler, dest, node.getPort(), map, rpc_type );
 					    		
 							}else{
 								
@@ -1664,7 +1668,7 @@ DHTTransportI2P
     		    		
     	}else{
     		
-    		sendQuery( handler, dest, node.getPort(), map, repliable );
+    		sendQuery( handler, dest, node.getPort(), map, rpc_type );
     	}
     }
     
@@ -1674,7 +1678,7 @@ DHTTransportI2P
     	Destination					dest,
     	int							port,
     	Map				 			map, 
-    	boolean 					repliable ) 
+    	int		 					rpc_type ) 
     	
     	throws Exception
     {
@@ -1695,7 +1699,7 @@ DHTTransportI2P
 	    	 
 	    encodeVersion( args );
 	    
-	    if ( !repliable ){
+	    if ( rpc_type == RPC_TYPE_UNREPLIABLE ){
 	    	
 	    	port++;
 	    }
@@ -1706,20 +1710,20 @@ DHTTransportI2P
     			
     			throw( new DHTTransportException( "Transport destroyed" ));
     		}
+    		 
+    			// we treat unreliable as two way as for Vuze peers we will send a reply if we already have a resolved destination available (which we should do as 
+    			// we have got a token from them recently...)
     		
-    		if ( repliable ){
+    		if ( rpc_type != RPC_TYPE_ONE_WAY ){
     		
     			requests.put( new HashWrapper( msg_id ), new Request( handler ));
-    		}else{
-    			
-    			System.out.println( "Not repliable: " + map );
     		}
 	    }
 	    
 	    boolean	ok = false;
 	    
 	    try{
-	    	int res = sendMessage( dest, port, map, repliable );
+	    	int res = sendMessage( dest, port, map, rpc_type );
 	    	
 	    	ok	= true;
 	    	
@@ -1770,7 +1774,7 @@ DHTTransportI2P
         
         encodeVersion( resps );
         
-        return( sendMessage( dest, node.getPort() + 1, map, false ));
+        return( sendMessage( dest, node.getPort() + 1, map, RPC_TYPE_UNREPLIABLE ));
     }
     
     
@@ -1782,7 +1786,7 @@ DHTTransportI2P
     	Destination 			dest, 
     	int 					toPort, 
     	Map					 	map, 
-    	boolean 				repliable ) 
+    	int		 				rpc_type ) 
     	
     	throws Exception
     {
@@ -1793,7 +1797,7 @@ DHTTransportI2P
         
         int fromPort = query_port;
         
-        if ( repliable ){
+        if ( rpc_type != RPC_TYPE_UNREPLIABLE ){
         	
             I2PDatagramMaker dgMaker = new I2PDatagramMaker( session );
             
@@ -1813,7 +1817,7 @@ DHTTransportI2P
         
         opts.setTagThreshold(LOW_CRYPTO_TAGS);
         
-        if ( !repliable ){
+        if ( rpc_type == RPC_TYPE_UNREPLIABLE ){
         	
             opts.setSendLeaseSet( false );
         }
@@ -1826,7 +1830,7 @@ DHTTransportI2P
            		payload, 
            		0, 
            		payload.length,
-                repliable ? I2PSession.PROTO_DATAGRAM : I2PSession.PROTO_DATAGRAM_RAW,
+           		rpc_type != RPC_TYPE_UNREPLIABLE ? I2PSession.PROTO_DATAGRAM : I2PSession.PROTO_DATAGRAM_RAW,
                 fromPort, 
                 toPort, 
                 opts )){

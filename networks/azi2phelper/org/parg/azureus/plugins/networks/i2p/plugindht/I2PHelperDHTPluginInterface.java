@@ -39,8 +39,7 @@ import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouter;
 import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouterDHT;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT;
 
-import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
-import com.aelitis.azureus.core.dht.transport.DHTTransportTransferHandler;
+
 import com.aelitis.azureus.plugins.dht.DHTPluginContact;
 import com.aelitis.azureus.plugins.dht.DHTPluginInterface;
 import com.aelitis.azureus.plugins.dht.DHTPluginKeyStats;
@@ -49,8 +48,7 @@ import com.aelitis.azureus.plugins.dht.DHTPluginOperationListener;
 import com.aelitis.azureus.plugins.dht.DHTPluginProgressListener;
 import com.aelitis.azureus.plugins.dht.DHTPluginTransferHandler;
 import com.aelitis.azureus.plugins.dht.DHTPluginValue;
-import com.aelitis.azureus.plugins.dht.impl.DHTPluginContactImpl;
-import com.aelitis.azureus.plugins.dht.impl.DHTPluginImpl;
+
 
 public class 
 I2PHelperDHTPluginInterface
@@ -224,9 +222,14 @@ I2PHelperDHTPluginInterface
 	importContact(
 		InetSocketAddress				address )
 	{
-		Debug.out( "not imp" );
+		if ( dht == null ){
+			
+			Debug.out( "DHT not yet available" );
 		
-		return( null );
+			return( null );
+		}
+		
+		return( dht.importContact( address ));
 	}
 		
 	

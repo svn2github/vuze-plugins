@@ -22,7 +22,10 @@
 package org.parg.azureus.plugins.networks.i2p.vuzedht;
 
 import java.io.*;
+import java.net.InetSocketAddress;
 import java.util.*;
+
+import net.i2p.data.Base32;
 
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
@@ -711,7 +714,7 @@ DHTTransportAZ
 		Map<String,Object>	payload = new HashMap<String, Object>();
 					
 		payload.put( "c", packet.getConnectionId());
-		payload.put( "p", packet.getPacketType());
+		payload.put( "p", (int)packet.getPacketType());
 		payload.put( "z", packet.getTransferKey());
 		payload.put( "r", packet.getRequestKey());
 		payload.put( "d", packet.getData());
@@ -763,7 +766,7 @@ DHTTransportAZ
 		byte[]	data			= (byte[])payload.get("d" );
 		int 	start_position 	= ((Number)payload.get("s" )).intValue();
 		int 	length 			= ((Number)payload.get("l" )).intValue();
-		int 	total_length 	= ((Number)payload.get("t " )).intValue();
+		int 	total_length 	= ((Number)payload.get("t" )).intValue();
 
 		Packet	packet =
 			new Packet(
@@ -1168,6 +1171,24 @@ DHTTransportAZ
 	}
 
 
+	public DHTTransportContactAZ
+	importContact(
+		InetSocketAddress		address )
+	{
+			// NID is encoded into the address - <nid>.<dest>
+		
+		byte version = DHTUtilsI2P.PROTOCOL_VERSION;
+		
+		String host_name = address.getHostName();
+		
+		String[] bits = host_name.split( "\\." );
+		
+		byte[]	id = Base32.decode( bits[0] );
+		
+		byte[]	hash	= Base32.decode( bits[1] );
+		
+		return( new DHTTransportContactAZ( this, base_transport.importContact( hash, address.getPort(), id, version )));
+	}
     
 		// direct contact-contact communication
 	

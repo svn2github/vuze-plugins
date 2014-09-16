@@ -28,6 +28,8 @@ import org.gudy.azureus2.core3.util.Debug;
 
 import com.aelitis.azureus.core.dht.*;
 import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
+import com.aelitis.azureus.core.dht.transport.DHTTransportException;
+import com.aelitis.azureus.core.dht.transport.DHTTransportProgressListener;
 import com.aelitis.azureus.core.dht.transport.DHTTransportTransferHandler;
 import com.aelitis.azureus.core.dht.transport.DHTTransportValue;
 import com.aelitis.azureus.plugins.dht.DHTPluginContact;
@@ -35,6 +37,7 @@ import com.aelitis.azureus.plugins.dht.DHTPluginOperationListener;
 import com.aelitis.azureus.plugins.dht.DHTPluginProgressListener;
 import com.aelitis.azureus.plugins.dht.DHTPluginTransferHandler;
 import com.aelitis.azureus.plugins.dht.DHTPluginValue;
+import com.aelitis.azureus.plugins.dht.impl.DHTPluginContactImpl;
 
 public abstract class 
 I2PHelperAZDHT 
@@ -173,6 +176,21 @@ I2PHelperAZDHT
 		}catch( Throwable e ){
 			
 			Debug.out( e );
+		}
+	}
+	
+	public DHTPluginContact
+	importContact(
+		InetSocketAddress				address )
+	{
+		try{
+			return( new DHTContactImpl(((DHTTransportAZ)getDHT().getTransport()).importContact(address)));
+			
+		}catch( Throwable e ){
+			
+			Debug.out( e );
+			
+			return( null );
 		}
 	}
 	
@@ -326,10 +344,47 @@ I2PHelperAZDHT
 		}
 		
 		@Override
-		public byte[] read(DHTPluginProgressListener listener,
-				byte[] handler_key, byte[] key, long timeout) {
-			Debug.out( "not imp" );
-			return null;
+		public byte[] 
+		read(
+			final DHTPluginProgressListener 	listener,
+			byte[] 								handler_key, 
+			byte[] 								key, 
+			long 								timeout )
+		{
+			try{
+				return( getDHT().getTransport().readTransfer(
+							new DHTTransportProgressListener()
+							{
+								public void
+								reportSize(
+									long	size )
+								{
+									listener.reportSize( size );
+								}
+								
+								public void
+								reportActivity(
+									String	str )
+								{
+									listener.reportActivity( str );
+								}
+								
+								public void
+								reportCompleteness(
+									int		percent )
+								{
+									listener.reportCompleteness( percent );
+								}
+							},
+							contact, 
+							handler_key, 
+							key, 
+							timeout ));
+				
+			}catch( Throwable e ){
+				
+				throw( new RuntimeException( e ));
+			}
 		}
 	}
 	
