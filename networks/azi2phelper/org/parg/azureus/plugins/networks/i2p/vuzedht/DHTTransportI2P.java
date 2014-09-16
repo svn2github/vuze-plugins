@@ -1478,7 +1478,7 @@ DHTTransportI2P
 				
 			}else{
 				
-				handler.failed( contact, new DHTTransportException( "ping failed", e )) ;
+				handler.failed( contact, new DHTTransportException( "AZRequest failed", e )) ;
 			}
 		}
     }
