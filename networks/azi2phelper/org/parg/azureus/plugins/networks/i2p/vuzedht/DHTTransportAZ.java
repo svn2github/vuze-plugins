@@ -66,7 +66,7 @@ DHTTransportAZ
 	private static final int	METHOD_STORE		= 3;
 	private static final int	METHOD_DATA			= 4;
 	
-	private static final int	MAX_DATA_SIZE	= 16*1024;
+	private static final int	MAX_DATA_SIZE	= 10*1024;
 	
 		// skew our time randomly so that multiple transports don't show the same clock times in requests
 	
@@ -722,6 +722,8 @@ DHTTransportAZ
 		payload.put( "l", packet.getLength());
 		payload.put( "t", packet.getTotalLength());
 		
+		System.out.println( "Sending " + payload );
+		
 		DHTTransportAZ.this.sendRequest(
 			new AZReplyHandlerAdapter()
 			{	
@@ -759,6 +761,8 @@ DHTTransportAZ
 		DHTTransportContactAZ		contact,
 		Map<String,Object>			payload )
 	{
+		System.out.println( "Received " + payload );
+		
 		long 	connection_id 	= ((Number)payload.get("c" )).longValue();
 		byte 	packet_type 	= ((Number)payload.get("p" )).byteValue();
 		byte[]	transfer_key	= (byte[])payload.get("z" );

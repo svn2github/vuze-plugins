@@ -1652,24 +1652,24 @@ I2PHelperPlugin
 								
 								@Override
 								public void reportSize(long size) {
-								
+									System.out.println( "size=" + size );
 								}
 								
 								@Override
 								public void reportCompleteness(int percent) {
-								
+									System.out.println( "done=" + percent );
 								}
 								
 								@Override
 								public void reportActivity(String str) {
-								
+									System.out.println( "act=" + str );
 								}
 							},
 							test_xfer, 
 							key, 
 							60*1000 );
 						
-						System.out.println( "DDBValue=" + value );
+						System.out.println( "DDBValue=" + ( value == null?"null":((byte[])value.getValue(byte[].class )).length));
 					}
 					
 				}else if ( cmd.equals( "ping_node" )){
