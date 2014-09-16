@@ -1620,7 +1620,7 @@ I2PHelperPlugin
 									
 									throws DistributedDatabaseException 
 								{
-									return( ddb.createValue( "you're a duck" ));
+									return( ddb.createValue( new byte[40000] ));
 								}
 							});
 					}
