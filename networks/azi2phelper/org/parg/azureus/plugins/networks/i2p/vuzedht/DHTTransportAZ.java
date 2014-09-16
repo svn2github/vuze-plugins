@@ -712,14 +712,28 @@ DHTTransportAZ
 		stats.dataSent( null );
 		
 		Map<String,Object>	payload = new HashMap<String, Object>();
-					
+				
+		byte[]	data 	= packet.getData();
+		
+		int	start_pos 	= packet.getStartPosition();
+		int length		= packet.getLength();
+		
+		if ( start_pos != 0 || length != data.length ){
+			
+			byte[] temp = new byte[length];
+			
+			System.arraycopy( data, start_pos, temp, 0, length );
+			
+			data	= temp;
+		}
+		
 		payload.put( "c", packet.getConnectionId());
 		payload.put( "p", (int)packet.getPacketType());
 		payload.put( "z", packet.getTransferKey());
 		payload.put( "r", packet.getRequestKey());
-		payload.put( "d", packet.getData());
-		payload.put( "s", packet.getStartPosition());
-		payload.put( "l", packet.getLength());
+		payload.put( "d", data);
+		payload.put( "s", start_pos);
+		payload.put( "l", length );
 		payload.put( "t", packet.getTotalLength());
 		
 		System.out.println( "Sending " + payload );
