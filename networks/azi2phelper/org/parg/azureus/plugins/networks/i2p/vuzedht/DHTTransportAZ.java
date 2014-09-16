@@ -736,7 +736,7 @@ DHTTransportAZ
 		payload.put( "l", length );
 		payload.put( "t", packet.getTotalLength());
 		
-		System.out.println( "Sending " + payload );
+		// System.out.println( "Sending " + payload );
 		
 		DHTTransportAZ.this.sendRequest(
 			new AZReplyHandlerAdapter()
@@ -775,7 +775,7 @@ DHTTransportAZ
 		DHTTransportContactAZ		contact,
 		Map<String,Object>			payload )
 	{
-		System.out.println( "Received " + payload );
+		// System.out.println( "Received " + payload );
 		
 		long 	connection_id 	= ((Number)payload.get("c" )).longValue();
 		byte 	packet_type 	= ((Number)payload.get("p" )).byteValue();

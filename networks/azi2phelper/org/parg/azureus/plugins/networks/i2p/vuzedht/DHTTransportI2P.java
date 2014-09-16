@@ -1983,7 +1983,7 @@ DHTTransportI2P
 	        		}
 	        	}else{
 	        		
-	        		System.out.println( "req not found for " + map  );
+	        		// System.out.println( "req not found for " + map  );
 	        		
 	        		if ( TRACE ) trace( "Got reply to timed-out request" );
 	        	}
