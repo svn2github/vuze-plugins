@@ -26,6 +26,7 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.net.URL;
 import java.security.KeyFactory;
@@ -42,10 +43,14 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 
+import org.gudy.azureus2.core3.torrent.TOTorrent;
+import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.ByteFormatter;
+import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.core3.util.TorrentUtils;
 import org.gudy.azureus2.plugins.PluginConfig;
@@ -184,7 +189,8 @@ DHTFeedPluginPublisher
 	protected void
 	publish(
 		String	feed_name,
-		String	feed_location )
+		String	feed_location,
+		String	feed_network )
 	{
 		if ( feed_location.length() == 0 ){
 			
@@ -216,20 +222,20 @@ DHTFeedPluginPublisher
 				publishes_in_progress.put( feed_name, new Boolean( true ));
 			}
 			
-			addPublishRecord( feed_name, feed_location );
+			addPublishRecord( feed_name, feed_location, feed_network );
 			
 				// first verify that the publish-point torrent is available
 				// this contains the feed name and public key details necessary to locate feed content
 		
-			publishDescription( feed_name  );
+			publishDescription( feed_name, feed_network  );
 			
 				// sign the content torrent hash
 			
-			Torrent	content_torrent	= publishContent( feed_name, feed_location );
+			Torrent	content_torrent	= publishContent( feed_name, feed_location, feed_network );
 			
 			if ( content_torrent != null ){
 				
-				publishLink( feed_name, content_torrent );
+				publishLink( feed_name, feed_network, content_torrent );
 			}
 			
 		}finally{
@@ -388,7 +394,7 @@ DHTFeedPluginPublisher
 			try{
 				log.log( "Republish for '" + record.getString() + "'" );
 				
-				publish( record.getFeedName(), record.getFeedLocation());
+				publish( record.getFeedName(), record.getFeedLocation(), record.getFeedNetwork());
 				
 			}catch( Throwable e ){
 				
@@ -414,13 +420,15 @@ DHTFeedPluginPublisher
 	
 	protected Torrent
 	publishDescription(
-		String				feed_name )
+		String				feed_name,
+		String				feed_network )
 	{
 		String	desc_data = 
 			"<DDB_FEED>" + NL +
 				"\t<NAME>" + feed_name + "</NAME>" + NL +
-				"\t<VERSION>1.0</VERSION>" + NL +
+				"\t<VERSION>1.1</VERSION>" + NL +
 				"\t<DESC>To access this feed you need to run the Azureus 'DDB Feed' plugin</DESC>"+ NL +
+				"\t<NETWORKS>" + feed_network + "</NETWORKS>" + NL +
 				"\t<SIGNATURE>" + NL + 
 					"\t\t<ALGORITHM>RSAWithMD5</ALGORITHM>" + NL +
 					"\t\t<EXPONENT>" + publish_public_key.getPublicExponent().toString(32) + "</EXPONENT>" + NL +
@@ -431,7 +439,7 @@ DHTFeedPluginPublisher
 		InputStream	is = new ByteArrayInputStream( desc_data.getBytes());
 		
 		try{
-			return( publishStuff( "Publish", ta_publish_feed_desc, DHTFeedPlugin.CATEGORY_FEED_DESC, feed_name, is, "text/xml", "feed.publish.xml" ));
+			return( publishStuff( "Publish", ta_publish_feed_desc, DHTFeedPlugin.TAG_FEED_DESC, feed_name, feed_network, is, "text/xml", "feed.publish.xml" ));
 			
 		}finally{
 			
@@ -448,7 +456,8 @@ DHTFeedPluginPublisher
 	protected Torrent
 	publishContent(
 		String				feed_name,
-		String				feed_location )
+		String				feed_location,
+		String				feed_network )
 	{
 		try{
 			File	test_file = new File( feed_location );
@@ -491,7 +500,7 @@ DHTFeedPluginPublisher
 				
 				String	date_str = temp.format( date ) + "_" + tz_offset; 
 					
-				return( publishStuff( "Content", ta_publish_feed_content, DHTFeedPlugin.CATEGORY_FEED_CONTENT, feed_name, is, details.getContentType(), "feed." + date_str + ".content" ));
+				return( publishStuff( "Content", ta_publish_feed_content, DHTFeedPlugin.TAG_FEED_CONTENT, feed_name, feed_network, is, details.getContentType(), "feed." + date_str + ".content" ));
 				
 			}finally{
 				
@@ -525,6 +534,7 @@ DHTFeedPluginPublisher
 	protected void
 	publishLink(
 		String	feed_name,
+		String	feed_network,
 		Torrent	content_torrent )
 	{
 		try{	
@@ -560,29 +570,32 @@ DHTFeedPluginPublisher
 			
 			log.log( "Registering current content map in DDB (value length = " + content_dht_value.length + ")" );
 			
-			DistributedDatabase ddb = plugin_interface.getDistributedDatabase();
+			DistributedDatabase ddb = plugin.getDDB( feed_network );
 			
-			DistributedDatabaseKey 		k = ddb.createKey(content_dht_key, "DDB Feed registering current content for '" + feed_name + "'");
-			DistributedDatabaseValue 	v = ddb.createValue(content_dht_value);
-			
-			ddb.write(
-					new DistributedDatabaseListener()
-					{
-						public void
-						event(
-							DistributedDatabaseEvent		event )
-						{
-							if ( event.getType() == DistributedDatabaseEvent.ET_OPERATION_COMPLETE ){
-								
-								log.log( "Registration complete" );
-							}
-						}
-					},
-					k, v );
-			
-			synchronized( this ){
+			if ( ddb != null ){
 				
-				published_hashes.put( feed_name, content_hash );
+				DistributedDatabaseKey 		k = ddb.createKey(content_dht_key, "DDB Feed registering current content for '" + feed_name + "'");
+				DistributedDatabaseValue 	v = ddb.createValue(content_dht_value);
+				
+				ddb.write(
+						new DistributedDatabaseListener()
+						{
+							public void
+							event(
+								DistributedDatabaseEvent		event )
+							{
+								if ( event.getType() == DistributedDatabaseEvent.ET_OPERATION_COMPLETE ){
+									
+									log.log( "Registration complete" );
+								}
+							}
+						},
+						k, v );
+				
+				synchronized( this ){
+					
+					published_hashes.put( feed_name, content_hash );
+				}
 			}
 			
 		}catch( Throwable e ){
@@ -597,8 +610,9 @@ DHTFeedPluginPublisher
 	publishStuff(
 		String				type,
 		TorrentAttribute	torrent_attribute,
-		String				category,
+		String				tag_name,
 		String				feed_name,
+		String				feed_network,
 		InputStream			is,
 		String				content_type,
 		String				suffix )
@@ -734,9 +748,10 @@ DHTFeedPluginPublisher
 						});
 				}
 			}
-				
+							
 			TorrentUtils.setFlag( PluginCoreUtils.unwrap( t ), TorrentUtils.TORRENT_FLAG_LOW_NOISE, true );
 
+			
 				// gotta do this after setting the flag as it causes a copy of the torrent to be cached
 				// and re-read on addition and the flag has to be in the cache....
 			
@@ -756,7 +771,7 @@ DHTFeedPluginPublisher
 				log.log( "Failed to rename '" + file_tmp + "' to '" + file_act + "'" );
 			}
 			
-			Download d = download_manager.addDownload( t, torrent_file, publish_data_dir );
+			Download d = plugin.addDownload( t, torrent_file, publish_data_dir, feed_network );
 			
 			d.setFlag( Download.FLAG_DISABLE_AUTO_FILE_MOVE, true );
 			d.setFlag( Download.FLAG_LOW_NOISE, true );
@@ -765,7 +780,9 @@ DHTFeedPluginPublisher
 			
 			d.setAttribute( torrent_attribute, feed_name );
 			
-			d.setAttribute( plugin.getCategoryAttribute(), category );
+			//d.setAttribute( plugin.getCategoryAttribute(), category );
+			
+			plugin.assignTag( d, tag_name );
 			
 			log.log( "Torrent added for " + log_str );
 			
@@ -805,6 +822,8 @@ DHTFeedPluginPublisher
 			config.setPluginParameter( "modulus", 		(byte[])map.get( "modulus" ));
 			config.setPluginParameter( "public_exp", 	(byte[])map.get( "public_exp" ));
 			config.setPluginParameter( "private_exp", 	(byte[])map.get( "private_exp" ));
+			
+			config.save();
 			
 			publish_public_key	= (RSAPublicKey)details[1];
 			publish_private_key	= (RSAPrivateKey)details[2];
@@ -856,7 +875,7 @@ DHTFeedPluginPublisher
 
   		KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
   				
-  		keyGen.initialize( 1024 );	// TODO: change this
+  		keyGen.initialize( 2048 );
   				
   		KeyPair pair = keyGen.generateKeyPair();
   					
@@ -928,6 +947,8 @@ DHTFeedPluginPublisher
 
 		Iterator	it = publishes.keySet().iterator();
 		
+		boolean	failed = false;
+		
 		while( it.hasNext()){
 			
 			String	feed_name = (String)it.next();
@@ -935,7 +956,15 @@ DHTFeedPluginPublisher
 			try{
 				Map	map = (Map)publishes.get(feed_name);
 				
-				publishRecord	record = new publishRecord( feed_name, new String((byte[])map.get( "location" )));
+				byte[] b_network = (byte[])map.get( "network" );
+				
+				String 	feed_network = b_network==null?AENetworkClassifier.AT_PUBLIC:AENetworkClassifier.internalise( new String( b_network, "UTF-8" ));
+				
+				publishRecord	record = 
+					new publishRecord( 
+							feed_name, 
+							new String((byte[])map.get( "location" ), "UTF-8" ),
+							feed_network );
 				
 				publish_records.put( feed_name, record );
 				
@@ -943,36 +972,65 @@ DHTFeedPluginPublisher
 				
 			}catch( Throwable e ){
 				
+				failed = true;
+				
 				it.remove();
 				
 				log.log(e);
 			}
 		}
 		
-		config.setPluginMapParameter( "publishes", publishes );
+		if ( failed ){
+			
+			config.setPluginMapParameter( "publishes", publishes );
+			
+			try{
+				config.save();
+				
+			}catch( Throwable e ){
+				
+				Debug.out( e );
+			}
+		}
 	}
 	
 	protected synchronized void
 	addPublishRecord(
 		String			feed_name,
-		String			feed_location )
+		String			feed_location,
+		String			feed_network )
 	{
 		PluginConfig	config = plugin_interface.getPluginconfig();
 		
 		Map publishes = config.getPluginMapParameter( "publishes", new HashMap());
 		
 		Map	map = new HashMap();
-				
-		map.put( "name", feed_name.getBytes());
-		map.put( "location", feed_location.getBytes());
-
+			
+		try{
+			map.put( "name", feed_name.getBytes( "UTF-8" ));
+			map.put( "location", feed_location.getBytes( "UTF-8" ));
+			map.put( "network", feed_network.getBytes( "UTF-8" ));
+			
+		}catch( UnsupportedEncodingException e ){
+			
+			Debug.out(e);
+		}
+		
 		publishes.put( feed_name, map );
 		
-		publishRecord	record = new publishRecord( feed_name, feed_location );
+		publishRecord	record = new publishRecord( feed_name, feed_location, feed_network );
 		
 		publish_records.put( feed_name, record );
 
 		config.setPluginMapParameter( "publishes", publishes );
+		
+		try{
+			config.save();
+			
+		}catch( Throwable e ){
+			
+			Debug.out( e );
+		}
 	}
 	
 	protected synchronized publishRecord
@@ -989,6 +1047,14 @@ DHTFeedPluginPublisher
 		
 		config.setPluginMapParameter( "publishes", publishes );
 		
+		try{
+			config.save();
+			
+		}catch( Throwable e ){
+			
+			Debug.out( e );
+		}
+		
 		return( record );
 	}
 	
@@ -1004,14 +1070,17 @@ DHTFeedPluginPublisher
 	{
 		private String		feed_name;
 		private String		feed_location;
+		private String		feed_network;
 		
 		protected
 		publishRecord(
 			String	_feed_name,
-			String	_feed_location )
+			String	_feed_location,
+			String	_feed_network )
 		{
 			feed_name		= _feed_name;
 			feed_location	= _feed_location;
+			feed_network	= _feed_network;
 		}
 		
 		protected String
@@ -1027,9 +1096,15 @@ DHTFeedPluginPublisher
 		}
 		
 		protected String
+		getFeedNetwork()
+		{
+			return( feed_network );
+		}
+		
+		protected String
 		getString()
 		{
-			return( "name = " + feed_name + ", location = " + feed_location );
+			return( "name = " + feed_name + ", location = " + feed_location + ", network=" + feed_network );
 		}
 	}
 }

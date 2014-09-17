@@ -31,7 +31,9 @@ import java.security.interfaces.RSAPublicKey;
 import java.security.spec.RSAPublicKeySpec;
 import java.util.*;
 
+import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.Base32;
+import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.HashWrapper;
 import org.gudy.azureus2.core3.util.TorrentUtils;
 import org.gudy.azureus2.core3.util.UrlUtils;
@@ -281,6 +283,10 @@ DHTFeedPluginSubscriber
 		
 			final String	feed_name = doc.getChild( "NAME" ).getValue();
 			
+			SimpleXMLParserDocumentNode network_node = doc.getChild( "NETWORKS" );
+			
+			String feed_network = network_node==null?AENetworkClassifier.AT_PUBLIC:AENetworkClassifier.internalise( network_node.getValue().trim());
+			
 			SimpleXMLParserDocumentNode	sig = doc.getChild( "SIGNATURE" );
 			
 			BigInteger	mod = new BigInteger( sig.getChild( "MODULUS").getValue(), 32 );
@@ -289,13 +295,15 @@ DHTFeedPluginSubscriber
 			try{
 				RSAPublicKey	feed_key = recoverPublicKey( mod, exp );
 				
-				subscriptionRecord	record = addSubscriptionRecord( feed_name, feed_key );
+				subscriptionRecord	record = addSubscriptionRecord( feed_name, feed_key, feed_network );
 				
 				if ( download != null ){
 										
 					download.setAttribute( ta_subscribe_feed_desc, record.getContentKey());
 					
-					download.setAttribute( plugin.getCategoryAttribute(), DHTFeedPlugin.CATEGORY_FEED_DESC );
+					// download.setAttribute( plugin.getCategoryAttribute(), DHTFeedPlugin.CATEGORY_FEED_DESC );
+					
+					plugin.assignTag( download, DHTFeedPlugin.TAG_FEED_DESC );
 				}
 			
 				refresh( record );
@@ -403,96 +411,98 @@ DHTFeedPluginSubscriber
 			
 			log.log( "Looking up current content map for '" + record.getFeedName() + "'" );
 			
-			DistributedDatabase ddb = plugin_interface.getDistributedDatabase();
+			DistributedDatabase ddb = plugin.getDDB( record.getFeedNetwork());
 		
-			DistributedDatabaseKey 		k = ddb.createKey(content_dht_key, "DDB Feed looking up current content for '" + record.getFeedName() + "'" );
-			
-			ddb.read(
-					new DistributedDatabaseListener()
-					{
-						private int		bad;
-						private int		ok;
-						
-						private long	latest_time;
-						private byte[]	latest_hash;
-						private byte[]	latest_signed_value;
-						
-						public void
-						event(
-							DistributedDatabaseEvent		event )
-						{
-							int	type = event.getType();
-							
-							if ( type == DistributedDatabaseEvent.ET_OPERATION_COMPLETE ){
-								
-								log.log( "Lookup complete" );
-								
-								refresh( record, latest_time, latest_hash, latest_signed_value, ok );
-								
-							}else if ( type == DistributedDatabaseEvent.ET_OPERATION_TIMEOUT ){
-									
-								log.log( "Lookup timeout" );
-									
-								refresh( record, latest_time, latest_hash, latest_signed_value, ok );
+			if ( ddb != null ){
 
-							}else if ( type == DistributedDatabaseEvent.ET_VALUE_READ ){
+				DistributedDatabaseKey 		k = ddb.createKey(content_dht_key, "DDB Feed looking up current content for '" + record.getFeedName() + "'" );
+				
+				ddb.read(
+						new DistributedDatabaseListener()
+						{
+							private int		bad;
+							private int		ok;
+							
+							private long	latest_time;
+							private byte[]	latest_hash;
+							private byte[]	latest_signed_value;
+							
+							public void
+							event(
+								DistributedDatabaseEvent		event )
+							{
+								int	type = event.getType();
 								
-								try{
-									DistributedDatabaseValue	value = event.getValue();
+								if ( type == DistributedDatabaseEvent.ET_OPERATION_COMPLETE ){
 									
-									byte[] val = (byte[])value.getValue(byte[].class);
+									log.log( "Lookup complete" );
 									
-									if ( val.length > 20 ){
+									refresh( record, latest_time, latest_hash, latest_signed_value, ok );
 									
-										byte[]	hash 		= new byte[20];
-										byte[]	sig_read	= new byte[val.length-20];
+								}else if ( type == DistributedDatabaseEvent.ET_OPERATION_TIMEOUT ){
 										
-										System.arraycopy( val, 0, hash, 0, 20 );
-										System.arraycopy( val, 20, sig_read, 0, val.length - 20 );
+									log.log( "Lookup timeout" );
 										
-										Signature rsa_md5_signature = Signature.getInstance("MD5withRSA"); 
+									refresh( record, latest_time, latest_hash, latest_signed_value, ok );
+	
+								}else if ( type == DistributedDatabaseEvent.ET_VALUE_READ ){
+									
+									try{
+										DistributedDatabaseValue	value = event.getValue();
 										
-										rsa_md5_signature.initVerify( record.getFeedKey() );
-																							
-										rsa_md5_signature.update( hash );
+										byte[] val = (byte[])value.getValue(byte[].class);
+										
+										if ( val.length > 20 ){
+										
+											byte[]	hash 		= new byte[20];
+											byte[]	sig_read	= new byte[val.length-20];
 											
-										if ( rsa_md5_signature.verify( sig_read )){
-										
-											log.log( "Signature verify ok for read from " + value.getContact().getName());
+											System.arraycopy( val, 0, hash, 0, 20 );
+											System.arraycopy( val, 20, sig_read, 0, val.length - 20 );
 											
-											ok++;
+											Signature rsa_md5_signature = Signature.getInstance("MD5withRSA"); 
 											
-											if ( value.getCreationTime() > latest_time ){
+											rsa_md5_signature.initVerify( record.getFeedKey() );
+																								
+											rsa_md5_signature.update( hash );
 												
-												latest_time 		= value.getCreationTime();
+											if ( rsa_md5_signature.verify( sig_read )){
+											
+												log.log( "Signature verify ok for read from " + value.getContact().getName());
 												
-												latest_hash			= hash;
+												ok++;
 												
-												latest_signed_value	= val;
+												if ( value.getCreationTime() > latest_time ){
+													
+													latest_time 		= value.getCreationTime();
+													
+													latest_hash			= hash;
+													
+													latest_signed_value	= val;
+												}
+											}else{
+												
+												log.log( "Signature verify fails for read from " + value.getContact().getName());
+												
+												bad++;
 											}
+	
 										}else{
-											
-											log.log( "Signature verify fails for read from " + value.getContact().getName());
-											
+											log.log( "Bad data read from " + value.getContact().getName());
+	
 											bad++;
 										}
-
-									}else{
-										log.log( "Bad data read from " + value.getContact().getName());
-
+									}catch( Throwable e ){
+										
 										bad++;
+										
+										log.log(e);
 									}
-								}catch( Throwable e ){
-									
-									bad++;
-									
-									log.log(e);
 								}
 							}
-						}
-					},
-					k, 60*1000 );
-			
+						},
+						k, 60*1000 );
+			}
 		}catch( Throwable e ){
 			
 			log.log( "Failed to lookup current key", e );
@@ -566,27 +576,30 @@ DHTFeedPluginSubscriber
 					try{
 						byte[]	content_dht_key = plugin.getContentKeyBytes( record.getFeedName(), record.getFeedKey());
 
-						DistributedDatabase ddb = plugin_interface.getDistributedDatabase();
+						DistributedDatabase ddb = plugin.getDDB( record.getFeedNetwork());
 					
-						DistributedDatabaseKey 		k = ddb.createKey(content_dht_key, "DDB Feed looking up current content for '" + record.getFeedName() + "'" );
-						
-						ddb.write(
-								new DistributedDatabaseListener()
-								{
-									public void
-									event(
-										DistributedDatabaseEvent		event )
+						if ( ddb != null ){
+							
+							DistributedDatabaseKey 		k = ddb.createKey(content_dht_key, "DDB Feed looking up current content for '" + record.getFeedName() + "'" );
+							
+							ddb.write(
+									new DistributedDatabaseListener()
 									{
-										int	type = event.getType();
-										
-										if ( type == DistributedDatabaseEvent.ET_OPERATION_COMPLETE ){
+										public void
+										event(
+											DistributedDatabaseEvent		event )
+										{
+											int	type = event.getType();
 											
-											log.log( "Replication complete" );
+											if ( type == DistributedDatabaseEvent.ET_OPERATION_COMPLETE ){
+												
+												log.log( "Replication complete" );
+											}
 										}
-									}
-								},
-								k,
-								ddb.createValue( latest_signed_value ));
+									},
+									k,
+									ddb.createValue( latest_signed_value ));
+						}
 						
 					}catch( Throwable e ){
 						
@@ -648,9 +661,17 @@ DHTFeedPluginSubscriber
 		
 					// more recent content available
 		
-		URL	magnet_url = ((MagnetPlugin)plugin_interface.getPluginManager().getPluginInterfaceByClass( MagnetPlugin.class ).getPlugin()).getMagnetURL( hash );
-		
 		try{
+
+			URL	magnet_url = ((MagnetPlugin)plugin_interface.getPluginManager().getPluginInterfaceByClass( MagnetPlugin.class ).getPlugin()).getMagnetURL( hash );
+			
+			String network = record.getFeedNetwork();
+			
+			if ( network != AENetworkClassifier.AT_PUBLIC ){
+				
+				magnet_url = new URL( magnet_url.toExternalForm() + "&net=" + network );
+			}
+				
 			byte[]	data = plugin.inputStreamToByteArray( plugin.downloadResource( magnet_url.toString()).getInputStream());
 	
 			if ( data.length == 0 ){
@@ -669,7 +690,7 @@ DHTFeedPluginSubscriber
 			t.writeToFile( f );
 
 			try{
-				Download	d = plugin_interface.getDownloadManager().addDownload( t, f, subscribe_data_dir );
+				Download	d = plugin.addDownload( t, f, subscribe_data_dir, record.getFeedNetwork());
 				
 				d.setFlag( Download.FLAG_DISABLE_AUTO_FILE_MOVE, true );
 				d.setFlag( Download.FLAG_LOW_NOISE, true );
@@ -680,7 +701,9 @@ DHTFeedPluginSubscriber
 							
 				d.setAttribute( ta_subscribe_feed_content, content_key );
 				
-				d.setAttribute( plugin.getCategoryAttribute(), DHTFeedPlugin.CATEGORY_FEED_CONTENT );
+				plugin.assignTag( d, DHTFeedPlugin.TAG_FEED_CONTENT );
+				
+				// d.setAttribute( plugin.getCategoryAttribute(), DHTFeedPlugin.CATEGORY_FEED_CONTENT );
 								
 				d.addListener(
 					new DownloadListener()
@@ -888,7 +911,7 @@ DHTFeedPluginSubscriber
 	{
 		String	url	= request.getURL();
 				
-		log.log( request.getClientAddress() + " -> " + url );
+		//log.log( request.getClientAddress() + " -> " + url );
 	
 		if (subscribe_port_local.getValue()){
 			
@@ -1105,6 +1128,8 @@ DHTFeedPluginSubscriber
 
 		Iterator	it = subscriptions.values().iterator();
 		
+		boolean	failed = false;
+		
 		while( it.hasNext()){
 						
 			Map	map = (Map)it.next();
@@ -1117,6 +1142,8 @@ DHTFeedPluginSubscriber
 				log.log( "Loaded subscription: " + record.getString());
 				
 			}catch( Throwable e ){
+		
+				failed = true;
 				
 				it.remove();
 				
@@ -1124,7 +1151,18 @@ DHTFeedPluginSubscriber
 			}
 		}
 		
-		config.setPluginMapParameter( "subscriptions", subscriptions );
+		if ( failed ){
+			
+			config.setPluginMapParameter( "subscriptions", subscriptions );
+			
+			try{
+				config.save();
+				
+			}catch( Throwable e ){
+				
+				Debug.out( e );
+			}
+		}
 	}
 	
 	protected void
@@ -1138,18 +1176,27 @@ DHTFeedPluginSubscriber
 		subscriptions.put( record.getContentKey(), record.toMap());
 	
 		config.setPluginMapParameter( "subscriptions", subscriptions );
+		
+		try{
+			config.save();
+			
+		}catch( Throwable e ){
+			
+			Debug.out( e );
+		}
 	}
 	
 	protected synchronized subscriptionRecord
 	addSubscriptionRecord(
 		String			feed_name,
-		RSAPublicKey	feed_key )
+		RSAPublicKey	feed_key,
+		String			feed_network )
 	{
 		PluginConfig	config = plugin_interface.getPluginconfig();
 		
 		Map subscriptions = config.getPluginMapParameter( "subscriptions", new HashMap());
 						
-		subscriptionRecord	record = new subscriptionRecord( this, feed_name, feed_key, 0, null );
+		subscriptionRecord	record = new subscriptionRecord( this, feed_name, feed_key, feed_network, 0, null );
 			
 		String	content_key = record.getContentKey();
 		
@@ -1158,6 +1205,14 @@ DHTFeedPluginSubscriber
 		subscription_records.put( content_key, record );
 
 		config.setPluginMapParameter( "subscriptions", subscriptions );
+		
+		try{
+			config.save();
+			
+		}catch( Throwable e ){
+			
+			Debug.out( e );
+		}
 		
 		return( record );
 	}
@@ -1177,6 +1232,14 @@ DHTFeedPluginSubscriber
 		subscription_records.remove( content_key );
 		
 		config.setPluginMapParameter( "subscriptions", subscriptions );
+		
+		try{
+			config.save();
+			
+		}catch( Throwable e ){
+			
+			Debug.out( e );
+		}
 	}
 	
 	protected subscriptionRecord
@@ -1225,6 +1288,7 @@ DHTFeedPluginSubscriber
 		private DHTFeedPluginSubscriber		subscriber;
 		private String						feed_name;
 		private RSAPublicKey				feed_key;
+		private String 						feed_network;
 		private long						time;
 		private byte[]						signed_value;
 		
@@ -1233,12 +1297,14 @@ DHTFeedPluginSubscriber
 			DHTFeedPluginSubscriber		_subscriber,
 			String						_feed_name,
 			RSAPublicKey				_feed_key,
+			String						_feed_network,
 			long						_time,
 			byte[]						_signed_value )
 		{
 			subscriber		= _subscriber;
 			feed_name		= _feed_name;
 			feed_key		= _feed_key;
+			feed_network	= _feed_network;
 			time			= _time;
 			signed_value	= _signed_value;
 		}
@@ -1248,11 +1314,18 @@ DHTFeedPluginSubscriber
 		{
 			Map	map = new HashMap();
 			
-			map.put( "name", feed_name.getBytes());
-			map.put( "mod", feed_key.getModulus().toByteArray());
-			map.put( "exp", feed_key.getPublicExponent().toByteArray());
-			map.put( "time", new Long(0));
-			map.put( "sig", signed_value );
+			try{
+				map.put( "name", feed_name.getBytes( "UTF-8" ));
+				map.put( "mod", feed_key.getModulus().toByteArray());
+				map.put( "exp", feed_key.getPublicExponent().toByteArray());
+				map.put( "network", feed_network.getBytes( "UTF-8" ));
+				map.put( "time", new Long(0));
+				map.put( "sig", signed_value );
+				
+			}catch( Throwable e ){
+				
+				Debug.out( e );
+			}
 			
 			return( map );
 		}
@@ -1271,10 +1344,14 @@ DHTFeedPluginSubscriber
 			
 			RSAPublicKey feed_key = subscriber.recoverPublicKey( mod, exp );
 			
-			String	feed_name	= new String((byte[])map.get( "name" ));
+			String	feed_name	= new String((byte[])map.get( "name" ), "UTF-8" );
+			
+			byte[] b_network = (byte[])map.get( "network" );
+			
+			String 	feed_network = b_network==null?AENetworkClassifier.AT_PUBLIC:AENetworkClassifier.internalise( new String( b_network, "UTF-8" ));
 			
 			subscriptionRecord	record = 
-				new subscriptionRecord( subscriber, feed_name, feed_key, time==null?0:time.longValue(), sig );
+				new subscriptionRecord( subscriber, feed_name, feed_key, feed_network, time==null?0:time.longValue(), sig );
 
 			return( record );
 		}
@@ -1289,6 +1366,12 @@ DHTFeedPluginSubscriber
 		getFeedKey()
 		{
 			return( feed_key );
+		}
+		
+		protected String
+		getFeedNetwork()
+		{
+			return( feed_network );
 		}
 		
 		protected String

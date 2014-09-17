@@ -23,24 +23,35 @@
 package com.aelitis.azureus.plugins.azdhtfeed;
 
 import java.io.*;
-
 import java.net.URL;
 import java.net.URLEncoder;
 import java.security.interfaces.RSAPublicKey;
+import java.util.Arrays;
 import java.util.HashMap;
 
 
+
+
+
+
+import java.util.List;
+
+import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Base32;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.*;
+import org.gudy.azureus2.plugins.ddb.DistributedDatabase;
 import org.gudy.azureus2.plugins.disk.DiskManagerFileInfo;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.download.DownloadException;
+import org.gudy.azureus2.plugins.download.DownloadManager;
+import org.gudy.azureus2.plugins.download.DownloadWillBeAddedListener;
 import org.gudy.azureus2.plugins.ipc.IPCException;
 import org.gudy.azureus2.plugins.logging.*;
-import org.gudy.azureus2.plugins.torrent.*;
+import org.gudy.azureus2.plugins.torrent.Torrent;
 import org.gudy.azureus2.plugins.ui.*;
+import org.gudy.azureus2.plugins.ui.components.UITextArea;
 import org.gudy.azureus2.plugins.ui.config.*;
 import org.gudy.azureus2.plugins.ui.menus.MenuItem;
 import org.gudy.azureus2.plugins.ui.menus.MenuItemFillListener;
@@ -50,9 +61,14 @@ import org.gudy.azureus2.plugins.ui.tables.TableContextMenuItem;
 import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.plugins.ui.tables.TableRow;
 import org.gudy.azureus2.plugins.utils.resourcedownloader.*;
+import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 
 import com.aelitis.azureus.core.subs.Subscription;
 import com.aelitis.azureus.core.subs.SubscriptionManagerFactory;
+import com.aelitis.azureus.core.tag.Tag;
+import com.aelitis.azureus.core.tag.TagManager;
+import com.aelitis.azureus.core.tag.TagManagerFactory;
+import com.aelitis.azureus.core.tag.TagType;
 
 
 
@@ -68,15 +84,15 @@ DHTFeedPlugin
 	private final static int		AUTO_SUBSCRIBE_DEFAULT	= 60;
 	private final static int		AUTO_SUBSCRIBE_MIN		= 15;
 
-	protected final static String		CATEGORY_FEED_DESC		= "Feed Desc";
-	protected final static String		CATEGORY_FEED_CONTENT	= "Feed Content";
+	protected final static String		TAG_FEED_DESC		= "DDB Feed Description";
+	protected final static String		TAG_FEED_CONTENT	= "DDB Feed Content";
 	
 	protected final static String		TORRENT_CONTENT_TYPE_PROPERTY = "Content-Type";
 
 	private PluginInterface		plugin_interface;
 	private String				plugin_name; 
 
-	private TorrentAttribute	ta_category;
+	//private TorrentAttribute	ta_category;
 	
 	private DHTFeedPluginSubscriber 	subscriber;
 	private DHTFeedPluginPublisher		publisher;
@@ -95,7 +111,7 @@ DHTFeedPlugin
 		
 		plugin_name = plugin_interface.getUtilities().getLocaleUtilities().getLocalisedMessageText( "azdhtfeed.name" );
 		
-		ta_category		= plugin_interface.getTorrentManager().getAttribute( TorrentAttribute.TA_CATEGORY );
+		//ta_category		= plugin_interface.getTorrentManager().getAttribute( TorrentAttribute.TA_CATEGORY );
 		
 		final UIManager	ui_manager = plugin_interface.getUIManager();
 		
@@ -166,6 +182,8 @@ DHTFeedPlugin
 		
 		LabelParameter	publish_info = config_model.addLabelParameter2( "azdhtfeed.publish.info" );
 
+		final StringListParameter	publish_network	 = config_model.addStringListParameter2( "publish.network", "azdhtfeed.publish.network", new String[]{ AENetworkClassifier.AT_PUBLIC, AENetworkClassifier.AT_I2P }, AENetworkClassifier.AT_PUBLIC );
+
 		final StringParameter	publish_name		= config_model.addStringParameter2( "publish.name", "azdhtfeed.publish.name", "" );
 		
 		final StringParameter	publish_location	= config_model.addStringParameter2( "publish.location", "azdhtfeed.publish.location", "" );
@@ -220,6 +238,7 @@ DHTFeedPlugin
 				"azdhtfeed.publish.group", 
 				new Parameter[]{ 
 						publish_info,
+						publish_network,
 						publish_name, 
 						publish_location, 
 						publish_button,
@@ -230,6 +249,7 @@ DHTFeedPlugin
 						keyregen_button });
 
 		publish_enable.addEnabledOnSelection( publish_info );
+		publish_enable.addEnabledOnSelection( publish_network );
 		publish_enable.addEnabledOnSelection( publish_name );
 		publish_enable.addEnabledOnSelection( publish_location );
 		publish_enable.addEnabledOnSelection( publish_button );
@@ -244,6 +264,8 @@ DHTFeedPlugin
 		model.getActivity().setVisible( false );
 		model.getProgress().setVisible( false );
 
+		final UITextArea text_area = config_model.addTextArea( "azdhtfeed.statuslog");
+
 		log.addListener(
 				new LoggerChannelListener()
 				{
@@ -253,6 +275,8 @@ DHTFeedPlugin
 						String	message )
 					{
 						model.getLogArea().appendText( message+"\n");
+						
+						text_area.appendText( message+"\n");
 					}
 					
 					public void
@@ -260,10 +284,18 @@ DHTFeedPlugin
 						String		str,
 						Throwable	error )
 					{
+						String 	text = "";
+						
 						if  ( str != null && str.length() > 0 ){
+							
+							text = str;
 							
 							model.getLogArea().appendText( str +"\n");
 						}
+						
+						text += ": " + Debug.getNestedExceptionMessage( error );
+							
+						text_area.appendText( text+"\n");
 						
 						StringWriter	sw = new StringWriter();
 						PrintWriter		pw = new PrintWriter(sw);
@@ -422,11 +454,6 @@ DHTFeedPlugin
 							public void
 							run()
 							{		
-								if ( !checkDHTAvailable()){
-									
-									return;
-								}
-								
 								if ( subscribe_enable.getValue()){
 												
 									subscriber.initialise( 
@@ -547,11 +574,6 @@ DHTFeedPlugin
 								public void
 								run()
 								{						
-									if ( !checkDHTAvailable()){
-										
-										return;
-									}
-									
 									if ( publish_enable.getValue()){
 													
 										publisher.initialise( auto_republish.getValue());
@@ -584,7 +606,10 @@ DHTFeedPlugin
 															public void
 															run()
 															{
-																publisher.publish( publish_name.getValue().trim(), publish_location.getValue().trim());
+																publisher.publish( 
+																	publish_name.getValue().trim(), 
+																	publish_location.getValue().trim(), 
+																	AENetworkClassifier.internalise( publish_network.getValue()));
 															}
 														});
 												}
@@ -708,6 +733,79 @@ DHTFeedPlugin
 		return( getContentKey( feed_name, public_key )).getBytes( "ISO-8859-1" );
 	}
 	
+	protected DistributedDatabase
+	getDDB(
+		String		network )
+	{
+		List<DistributedDatabase> ddbs = plugin_interface.getUtilities().getDistributedDatabases( new String[]{ network });
+		
+		if ( ddbs.size() == 1 ){
+			
+			DistributedDatabase result = ddbs.get(0);
+			
+			if ( result.isAvailable()){
+				
+				return( result );
+				
+			}else{
+				
+				log.log( "DDB for network '" + network + "' is not yet available" );
+				
+				return( null );
+			}
+		}else{
+			
+			log.log( "DDB for network '" + network + "' is not available" );
+
+			return( null );
+		}
+	}
+	
+	protected Download
+	addDownload(
+		final Torrent			torrent,
+		File					torrent_file,
+		File					data_dir,
+		final String			network )
+		
+		throws DownloadException
+	{
+		DownloadManager download_manager = plugin_interface.getDownloadManager();
+		
+		DownloadWillBeAddedListener dwbal = null; 
+
+		if ( network != AENetworkClassifier.AT_PUBLIC ){
+			
+			dwbal = 
+				new DownloadWillBeAddedListener()
+				{		
+					public void 
+					initialised(
+						Download download )
+					{
+						if ( Arrays.equals( download.getTorrentHash(), torrent.getHash())){ 
+						
+							PluginCoreUtils.unwrap( download ).getDownloadState().setNetworks( new String[]{ network });
+						}
+					}
+				};
+		
+			download_manager.addDownloadWillBeAddedListener( dwbal );
+		}
+		
+		try{
+
+			return( download_manager.addDownload( torrent, torrent_file, data_dir ));
+		
+		}finally{
+			
+			if ( dwbal != null ){
+				
+				download_manager.removeDownloadWillBeAddedListener( dwbal );
+			}
+		}
+	}
+	
 	protected downloadDetails
 	downloadResource(
 		String	resource )
@@ -786,12 +884,38 @@ DHTFeedPlugin
 		}
 	}
 	
+	/*
 	protected TorrentAttribute
 	getCategoryAttribute()
 	{
 		return( ta_category );
 	}
+	*/
 	
+	protected void
+	assignTag(
+		Download		download,
+		String			tag_name )
+	{
+		try{
+			TagManager tag_manager = TagManagerFactory.getTagManager();
+			
+			TagType tag_type = tag_manager.getTagType( TagType.TT_DOWNLOAD_MANUAL );
+			
+			Tag tag = tag_type.getTag( tag_name, true );
+			
+			if ( tag == null ){
+				
+				tag = tag_type.createTag( tag_name, true );
+			}
+			
+			tag.addTaggable( PluginCoreUtils.unwrap( download ));
+			
+		}catch( Throwable e ){
+			
+			log.log( "Failed to assign tag", e );
+		}
+	}
 	protected LoggerChannel
 	getLog()
 	{
@@ -830,21 +954,6 @@ DHTFeedPlugin
 		String		feed_name )
 	{
 		return( publisher.getPublishContent( feed_name ));
-	}
-	
-	protected boolean
-	checkDHTAvailable()
-	{
-		if ( !plugin_interface.getDistributedDatabase().isAvailable()){
-			
-			log.logAlert( 
-					LoggerChannel.LT_ERROR,
-					plugin_name + " initialisation failed, Distributed Database unavailable" );
-			
-			return( false );
-		}
-		
-		return( true );
 	}
 	
 	protected class
