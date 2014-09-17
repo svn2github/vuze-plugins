@@ -742,14 +742,26 @@ DHTTransportAZ
 			new AZReplyHandlerAdapter()
 			{	
 				@Override
+				public void 
+				packetSent(
+					int length) 
+				{
+					super.packetSent( length );
+					
+						// no reply expected so treat this as a successful send
+					
+					if ( TRACE ) trace( "AZ: sendData to " + contact.getString() + " OK" );
+					
+					stats.dataOK();
+				}
+				
+				@Override
 				public void
 				reply(
 					DHTTransportContactI2P 		basis,
 					Map							map )
 				{
-					if ( TRACE ) trace( "AZ: sendData to " + contact.getString() + " OK" );
-	
-					stats.dataOK();
+					// see above
 				}
 				
 				@Override
