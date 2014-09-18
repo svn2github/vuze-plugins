@@ -75,6 +75,8 @@ I2PDHTTrackerPlugin
 	private static final int	ANNOUNCE_DERIVED_TIMEOUT	= 60*1000;	// spend less time on these
 	private static final int	SCRAPE_TIMEOUT				= 30*1000;
 	
+	private static final int	ANNOUNCE_METADATA_RETRY		= 1*60*1000;
+	
 	private static final int	ANNOUNCE_MIN_DEFAULT		= 2*60*1000;
 	private static final int	ANNOUNCE_MAX				= 45*60*1000;
 	private static final int	ANNOUNCE_MAX_DERIVED_ONLY	= 30*60*1000;
@@ -152,8 +154,6 @@ I2PDHTTrackerPlugin
 	private BooleanParameter	track_normal_when_offline;
 	private BooleanParameter	track_limited_when_online;
 		
-	private long				current_announce_interval = ANNOUNCE_MIN_DEFAULT;
-
 	private Map<Download,int[]>					scrape_injection_map = new WeakHashMap<Download,int[]>();
 	
 	private Random				random = new Random();
@@ -1319,22 +1319,30 @@ I2PDHTTrackerPlugin
 								
 								List<DownloadAnnounceResultPeer>	peers_for_announce = new ArrayList<DownloadAnnounceResultPeer>();
 								
-									// scale min and max based on number of active torrents
-									// we don't want more than a few announces a minute
+								final long	retry;
 								
-								int	announce_per_min = 4;
-								
-								int	num_active = query_map.size();
-								
-								int	announce_min = Math.max( ANNOUNCE_MIN_DEFAULT, ( num_active / announce_per_min )*60*1000 );
-								
-								int	announce_max = derived_only?ANNOUNCE_MAX_DERIVED_ONLY:ANNOUNCE_MAX;
-								
-								announce_min = Math.min( announce_min, announce_max );
+								if ( download.getFlag( Download.FLAG_METADATA_DOWNLOAD ) && peers_found < 5){
 									
-								current_announce_interval = announce_min;
-	
-								final long	retry = announce_min + peers_found*(long)(announce_max-announce_min)/NUM_WANT;
+									retry = ANNOUNCE_METADATA_RETRY;
+									
+								}else{
+									
+									
+										// scale min and max based on number of active torrents
+										// we don't want more than a few announces a minute
+									
+									int	announce_per_min = 4;
+									
+									int	num_active = query_map.size();
+									
+									int	announce_min = Math.max( ANNOUNCE_MIN_DEFAULT, ( num_active / announce_per_min )*60*1000 );
+									
+									int	announce_max = derived_only?ANNOUNCE_MAX_DERIVED_ONLY:ANNOUNCE_MAX;
+									
+									announce_min = Math.min( announce_min, announce_max );
+																				
+									retry = announce_min + peers_found*(long)(announce_max-announce_min)/NUM_WANT;
+								}
 								
 								int download_state = download.getState();
 								
