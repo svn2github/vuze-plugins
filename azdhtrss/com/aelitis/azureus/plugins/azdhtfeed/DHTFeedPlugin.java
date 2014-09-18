@@ -261,6 +261,8 @@ DHTFeedPlugin
 		final BasicPluginViewModel model = 
 			plugin_interface.getUIManager().createBasicPluginViewModel( "DDB Feed" );
 		
+		model.setConfigSectionID( "azdhtfeed.name" );
+
 		model.getActivity().setVisible( false );
 		model.getProgress().setVisible( false );
 
