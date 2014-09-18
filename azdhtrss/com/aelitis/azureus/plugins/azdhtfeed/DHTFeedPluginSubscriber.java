@@ -48,6 +48,7 @@ import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.download.DownloadListener;
 import org.gudy.azureus2.plugins.download.DownloadManager;
 import org.gudy.azureus2.plugins.download.DownloadManagerListener;
+import org.gudy.azureus2.plugins.download.DownloadWillBeAddedListener;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.torrent.Torrent;
 import org.gudy.azureus2.plugins.torrent.TorrentAttribute;
@@ -211,7 +212,10 @@ DHTFeedPluginSubscriber
 		}
 		
 		try{
-			byte[] data = plugin.inputStreamToByteArray( plugin.downloadResource( feed_location ).getInputStream());
+			
+			final DHTFeedPlugin.downloadDetails details = plugin.downloadResource( feed_location );
+			
+			byte[] data = plugin.inputStreamToByteArray( details.getInputStream());
 				
 			if ( data.length == 0 ){
 					
@@ -230,39 +234,40 @@ DHTFeedPluginSubscriber
 				
 				try{
 					DownloadManager	download_manager = plugin_interface.getDownloadManager();
-					
-					DownloadManagerListener	l = 
-						new DownloadManagerListener()
-						{
-							public void
-							downloadAdded(
-								Download	download )
-							{
-								Torrent x = download.getTorrent();
-								
-								if ( x != null && Arrays.equals( x.getHash(), t.getHash())){
-									
-									desc_download[0] = download;
-								}
-							}
-							
-							public void
-							downloadRemoved(
-								Download	download )
-							{
-							}
-						};
 						
 					ResourceDownloaderFactory rdf = plugin_interface.getUtilities().getResourceDownloaderFactory();
 					
+					DownloadWillBeAddedListener dwbal = 
+						new DownloadWillBeAddedListener()
+						{		
+							public void 
+							initialised(
+								Download download )
+							{
+								if ( Arrays.equals( download.getTorrentHash(), t.getHash())){ 
+								
+									desc_download[0] = download;
+									
+									String network = details.getNetwork();
+									
+									if ( network != null && network != AENetworkClassifier.AT_PUBLIC ){
+									
+										PluginCoreUtils.unwrap( download ).getDownloadState().setNetworks( new String[]{ network });
+									}
+									
+									plugin.assignTag( download, DHTFeedPlugin.TAG_FEED_DESC );
+								}
+							}
+						};
+				
 					try{
-						download_manager.addListener( l );
+						download_manager.addDownloadWillBeAddedListener( dwbal );
 					
 						data = plugin.inputStreamToByteArray( rdf.getTorrentDownloader( rdf.create( f ), true, subscribe_data_dir ).download());
 						
 					}finally{
 						
-						download_manager.removeListener( l );
+						download_manager.removeDownloadWillBeAddedListener( dwbal );
 					}
 				}finally{
 					

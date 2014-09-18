@@ -818,14 +818,19 @@ DHTFeedPlugin
 		
 		String	lc = resource.toLowerCase();
 		
+		String network;
+		
 		if ( lc.startsWith( "http:" ) || lc.startsWith( "https:" ) || lc.startsWith( "magnet:" )){
 			
 			rd = plugin_interface.getUtilities().getResourceDownloaderFactory().create( new URL( resource ));
 			
+			network = lc.contains( "&net=i2p" )?AENetworkClassifier.AT_I2P:AENetworkClassifier.AT_PUBLIC;
+			
 		}else{
 			
 			rd = plugin_interface.getUtilities().getResourceDownloaderFactory().create( new File( resource ));
-			
+		
+			network = null;
 		}
 		
 		rd.addListener(
@@ -843,7 +848,7 @@ DHTFeedPlugin
 	
 		InputStream	is = rd.download();
 				
-		downloadDetails result = new downloadDetails(is, (String)rd.getProperty( ResourceDownloader.PR_STRING_CONTENT_TYPE ));
+		downloadDetails result = new downloadDetails(is, (String)rd.getProperty( ResourceDownloader.PR_STRING_CONTENT_TYPE ), network );
 		
 		log.log( "Download of " + resource  + " completed" );
 		
@@ -961,14 +966,17 @@ DHTFeedPlugin
 	{
 		private InputStream			is;
 		private String				content_type;
+		private String				network;
 		
 		protected
 		downloadDetails(
 			InputStream	_is,
-			String		_content_type )
+			String		_content_type,
+			String		_network )
 		{
 			is				= _is;
 			content_type	= _content_type;
+			network			= _network;
 		}
 		
 		protected String
@@ -981,6 +989,12 @@ DHTFeedPlugin
 		getInputStream()
 		{
 			return( is );
+		}
+		
+		protected String 
+		getNetwork()
+		{
+			return( network );
 		}
 	}
 }
