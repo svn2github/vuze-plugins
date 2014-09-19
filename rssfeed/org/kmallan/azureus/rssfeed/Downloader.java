@@ -133,9 +133,14 @@ public class Downloader extends InputStream {
 */
   public void init(String urlStr, boolean forceNoProxy, String accept, String referer, String cookie, long lastModSince, String oldEtag) {
 
-    Pattern exprHost = Pattern.compile(".*(https?://.*?)", Pattern.CASE_INSENSITIVE);
-    Matcher m = exprHost.matcher(urlStr);
-    if(m.matches() && !m.group(1).equalsIgnoreCase(urlStr)) urlStr = m.group(1);
+	boolean is_magnet = urlStr.toLowerCase().startsWith( "magnet:" );
+	
+	if ( !is_magnet ){
+	    Pattern exprHost = Pattern.compile(".*(https?://.*?)", Pattern.CASE_INSENSITIVE);
+	    Matcher m = exprHost.matcher(urlStr);
+	    if(m.matches() && !m.group(1).equalsIgnoreCase(urlStr)) urlStr = m.group(1);
+	}
+	
     urlStr = urlStr.replaceAll(" ", "%20");
 
     try {
@@ -166,9 +171,11 @@ public class Downloader extends InputStream {
 	        con.setUseCaches(false);
 	
 	        if(con instanceof HttpURLConnection) {
-	          exprHost = Pattern.compile("https?://([^/]+@)?([^/@:]+)(:[0-9]+)?/.*");
-	          m = exprHost.matcher(urlStr.toLowerCase());
-	          if(m.matches()) con.setRequestProperty("Host", m.group(2)); // isn't this handled automatically? /bow
+	          if ( !is_magnet ){
+	        	  Pattern exprHost = Pattern.compile("https?://([^/]+@)?([^/@:]+)(:[0-9]+)?/.*");
+	        	  Matcher m = exprHost.matcher(urlStr.toLowerCase());
+	        	  if(m.matches()) con.setRequestProperty("Host", m.group(2)); // isn't this handled automatically? /bow
+	          }
 	          con.setRequestProperty("User-Agent", Plugin.PLUGIN_VERSION);
 	          if(referer != null && referer.length() > 0) con.setRequestProperty("Referer", referer);
 	          if(accept != null && accept.length() > 0) con.setRequestProperty("Accept", accept);
