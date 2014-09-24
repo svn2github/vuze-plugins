@@ -43,11 +43,9 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 
-import org.gudy.azureus2.core3.torrent.TOTorrent;
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
@@ -970,6 +968,8 @@ DHTFeedPluginPublisher
 				
 				log.log( "Loaded publish: " + record.getString());
 				
+				plugin.checkNetworkAvailable( record.getFeedNetwork());
+
 			}catch( Throwable e ){
 				
 				failed = true;
@@ -1031,6 +1031,8 @@ DHTFeedPluginPublisher
 			
 			Debug.out( e );
 		}
+		
+		plugin.checkNetworkAvailable( record.getFeedNetwork());
 	}
 	
 	protected synchronized publishRecord

@@ -97,6 +97,8 @@ DHTFeedPlugin
 	private DHTFeedPluginSubscriber 	subscriber;
 	private DHTFeedPluginPublisher		publisher;
 
+	private boolean				checked_i2p_network;
+	
 	private LoggerChannel		log;
 			
 	public void 
@@ -470,6 +472,8 @@ DHTFeedPlugin
 											parameterChanged(
 												Parameter	param )
 											{
+												subscribe_button.setEnabled( false );
+												
 												plugin_interface.getUtilities().createThread(
 														"Subscribe",
 														new Runnable()
@@ -502,6 +506,10 @@ DHTFeedPlugin
 																		}catch( Throwable e ){
 																			
 																			Debug.out( e);
+																			
+																		}finally{
+																			
+																			subscribe_button.setEnabled( true );
 																		}
 																	}
 																}.start();
@@ -518,8 +526,7 @@ DHTFeedPlugin
 																	ui_manager.showMessageBox(
 																			"azdhtfeed.msg.failed.title",
 																			"azdhtfeed.msg.failed.msg",
-																			UIManagerEvent.MT_OK );
-																	
+																			UIManagerEvent.MT_OK );	
 																}
 															}
 														});
@@ -733,6 +740,33 @@ DHTFeedPlugin
 		throws UnsupportedEncodingException
 	{
 		return( getContentKey( feed_name, public_key )).getBytes( "ISO-8859-1" );
+	}
+	
+	protected void
+	checkNetworkAvailable(
+		String		network )
+	{
+		if ( network == AENetworkClassifier.AT_I2P ){
+			
+			synchronized( this ){
+				
+				if ( checked_i2p_network ){
+				
+					return;
+				}
+				
+				checked_i2p_network = true;
+			}
+			
+			if ( plugin_interface.getPluginManager().getPluginInterfaceByID( "azneti2phelper" ) == null ){
+				
+				plugin_interface.getUIManager().showMessageBox(
+						"azdhtfeed.msg.needi2p.title",
+						"azdhtfeed.msg.needi2p.msg",
+						UIManagerEvent.MT_OK );
+
+			}
+		}
 	}
 	
 	protected DistributedDatabase

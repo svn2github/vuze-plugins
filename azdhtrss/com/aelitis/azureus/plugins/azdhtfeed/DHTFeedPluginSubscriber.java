@@ -32,6 +32,7 @@ import java.security.spec.RSAPublicKeySpec;
 import java.util.*;
 
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
+import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Base32;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.HashWrapper;
@@ -47,7 +48,6 @@ import org.gudy.azureus2.plugins.ddb.DistributedDatabaseValue;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.download.DownloadListener;
 import org.gudy.azureus2.plugins.download.DownloadManager;
-import org.gudy.azureus2.plugins.download.DownloadManagerListener;
 import org.gudy.azureus2.plugins.download.DownloadWillBeAddedListener;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.torrent.Torrent;
@@ -82,9 +82,9 @@ DHTFeedPluginSubscriber
 	private File	subscribe_data_dir;
 	private File	temp_data_dir;
 
-	private Map					subscription_records	= new HashMap();
+	private Map<String,subscriptionRecord>		subscription_records	= new HashMap<String,subscriptionRecord>();
 	
-	private Set					replicated_signed_data	= new HashSet();
+	private Set<HashWrapper>					replicated_signed_data	= new HashSet<HashWrapper>();
 	
 	private int					port;
 	private BooleanParameter 	subscribe_port_local;
@@ -394,16 +394,16 @@ DHTFeedPluginSubscriber
 	protected void
 	refresh()
 	{
-		Iterator	it;
+		Iterator<subscriptionRecord>	it;
 	
 		synchronized( this ){
 			
-			it = new ArrayList(subscription_records.values()).iterator();
+			it = new ArrayList<subscriptionRecord>(subscription_records.values()).iterator();
 		}
 		
 		while( it.hasNext()){
 			
-			refresh((subscriptionRecord)it.next());
+			refresh(it.next());
 		}
 	}
 	
@@ -629,7 +629,7 @@ DHTFeedPluginSubscriber
 		
 		Download[]	downloads = plugin_interface.getDownloadManager().getDownloads();
 		
-		final List	existing_content = new ArrayList();
+		final List<Download>	existing_content = new ArrayList<Download>();
 		
 		for (int i=0;i<downloads.length;i++){
 			
@@ -727,11 +727,21 @@ DHTFeedPluginSubscriber
 								
 								log.log( "Subscription for '" + feed_name + "': new content downloaded" );
 	
-								for (int i=0;i<existing_content.size();i++){
+								if ( existing_content.size() > 0 ){
 									
-									Download	existing = (Download)existing_content.get(i);
-									
-									plugin.removeDownload( existing, subscribe_data_dir, "old subscription content for '" + feed_name + "'" );
+									new AEThread2( "remover" )
+									{
+										public void
+										run()
+										{
+											for (int i=0;i<existing_content.size();i++){
+												
+												Download	existing = (Download)existing_content.get(i);
+												
+												plugin.removeDownload( existing, subscribe_data_dir, "old subscription content for '" + feed_name + "'" );
+											}
+										}
+									}.start();
 								}
 							}
 						}
@@ -748,9 +758,11 @@ DHTFeedPluginSubscriber
 				
 				f.delete();
 			}
-		}catch( Exception e ){
+		}catch( Throwable e ){
 			
-			log.log( "Subscription for '" + feed_name + "' content download failed", e );
+			log.log( 
+				LoggerChannel.LT_ERROR, 
+					"Subscription for '" + feed_name + "' content download failed: " + Debug.getNestedExceptionMessage(e));
 		}
 	}
 
@@ -759,7 +771,7 @@ DHTFeedPluginSubscriber
 	{
 		Download[]	downloads = plugin_interface.getDownloadManager().getDownloads();
 		
-		Map	most_recent	= new HashMap();
+		Map<String,Download>	most_recent	= new HashMap<String,Download>();
 		
 		for (int i=0;i<downloads.length;i++){
 			
@@ -789,7 +801,7 @@ DHTFeedPluginSubscriber
 					
 				}else{
 										
-					Download mr = (Download)most_recent.get( content_key );
+					Download mr = most_recent.get( content_key );
 					
 					if ( mr == null ){
 						
@@ -821,14 +833,20 @@ DHTFeedPluginSubscriber
 	{
 			// see if magnet URI : magnet:?xt=urn:btih:BR4I7URIV7SAYTLP4ZXANUGWVHFU2Z63
 		
-		int	pos = feed_location.indexOf( "btih:" );
+		int	pos1 = feed_location.indexOf( "btih:" );
 		
-		if ( pos == -1 ){
+		if ( pos1 == -1 ){
 			
 			throw( new Exception( "Magnet URL format error: " + feed_location ));
 		}
-			
-		byte[] hash = Base32.decode( feed_location.substring( pos+5));
+		
+		pos1 += 5;
+		
+		int	pos2 = feed_location.indexOf( '&', pos1 );
+		
+		String	hash_str = pos2==-1?feed_location.substring( pos1 ):feed_location.substring( pos1, pos2 );
+		
+		byte[] hash = Base32.decode( hash_str );
 
 		Download publish_download = plugin_interface.getDownloadManager().getDownload( hash );
 		
@@ -1146,6 +1164,8 @@ DHTFeedPluginSubscriber
 				
 				log.log( "Loaded subscription: " + record.getString());
 				
+				plugin.checkNetworkAvailable( record.getFeedNetwork());
+				
 			}catch( Throwable e ){
 		
 				failed = true;
@@ -1189,6 +1209,8 @@ DHTFeedPluginSubscriber
 			
 			Debug.out( e );
 		}
+		
+		plugin.checkNetworkAvailable( record.getFeedNetwork());
 	}
 	
 	protected synchronized subscriptionRecord
@@ -1218,6 +1240,8 @@ DHTFeedPluginSubscriber
 			
 			Debug.out( e );
 		}
+		
+		plugin.checkNetworkAvailable( record.getFeedNetwork());
 		
 		return( record );
 	}
