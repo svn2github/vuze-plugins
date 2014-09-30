@@ -956,22 +956,34 @@ TrackerWebDefaultTrackerPlugin
 				
 				URL	tracker_url	= defined_urls[0];
 
-				String	http_host = (String)request.getHeaders().get( "host" );
+				String	http_host_port = (String)request.getHeaders().get( "host" );
 				
-				if ( http_host == null ){
+				if ( http_host_port == null ){
 					
-					http_host = tracker_url.getHost();
+					http_host_port = tracker_url.getHost();
 					
 				}else{
 					
-					http_host = http_host.toLowerCase( Locale.US );
+					http_host_port = http_host_port.toLowerCase( Locale.US );
 				}
 								
 				String	tracker_url_string;
 				
+				int	pos = http_host_port.lastIndexOf(':');
+				
+				String	http_host;
+				String	http_port;
+				
+				if ( pos == -1 ){
+					http_host 	= http_host_port;
+					http_port	= "";
+				}else{
+					http_host 	= http_host_port.substring(0,pos);
+					http_port	= http_host_port.substring(pos);
+				}
 				if ( http_host.endsWith( ".i2p") || http_host.endsWith( ".onion" )){
 				
-					tracker_url_string = "http://" + http_host + "/";
+					tracker_url_string = tracker_url.getProtocol() + "://" + http_host + http_port + "/";
 					
 				}else{
 					
@@ -995,7 +1007,7 @@ TrackerWebDefaultTrackerPlugin
 				
 				pw.println( "<rss version=\"2.0\" xmlns:azureus=\"http://azureus.sourceforge.net/files/rss/\">");
 				pw.println(     "<channel>");
-				pw.println(         "<title>" + tracker_title + " on " + http_host + "</title>"); 
+				pw.println(         "<title>" + tracker_title + " on " + http_host_port + "</title>"); 
 				pw.println(	 		"<description>RSS Feed for " + tracker_title+ "</description>");
 													
 				pw.println(			"<link>" + tracker_url_string + "</link>" );
