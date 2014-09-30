@@ -3046,7 +3046,7 @@ TorPlugin
 
 		{
 			try{
-				local_address = InetAddress.getLocalHost();
+				local_address = InetAddress.getByName( "127.0.0.1" );
 				
 			}catch( Throwable e ){
 				
