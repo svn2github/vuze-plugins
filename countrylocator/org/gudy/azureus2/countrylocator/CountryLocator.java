@@ -50,6 +50,7 @@ import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.RGB;
 import org.eclipse.swt.widgets.ColorDialog;
 import org.eclipse.swt.widgets.Display;
+import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.plugins.PluginConfig;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.PluginListener;
@@ -703,6 +704,10 @@ public class CountryLocator
 		if (cl == null)
 			return null;
 
+		if ( AENetworkClassifier.categoriseAddress( ip ) != AENetworkClassifier.AT_PUBLIC ){
+			return( null );
+		}
+		
 		try {
 			ret = cl.getCountry(ip);
 		} catch (Exception e) {
