@@ -33,7 +33,6 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.Socket;
@@ -168,6 +167,8 @@ I2PHelperPlugin
         	}
         	
         CoreVersion: Added a getVersion method to avoid constant getting cached within Vuze when printing it
+        
+        UDPReceiver - hacked in a sleep(1000) after detection of exception on reading socket to avoid 100% CPU issue
 	*/
 	
 	private static final String	BOOTSTRAP_SERVER = "http://i2pboot.vuze.com:60000/?getNodes=true";
@@ -1890,6 +1891,7 @@ I2PHelperPlugin
 	selectDHTIndex(
 		String[]		peer_networks )
 	{
+		/*
 		String str = "";
 		
 		if ( peer_networks != null ){
@@ -1899,23 +1901,27 @@ I2PHelperPlugin
 				str += (str.length()==0?"":", ") + net;
 			}
 		}
-			
+		*/
+		
 		if ( dht_count < 2 ){
 			
-			return( 0 );
+			return( I2PHelperRouter.DHT_MIX );
 		}
 		
 		if ( peer_networks == null || peer_networks.length == 0 ){
 			
-			return( 0 );
+			return( I2PHelperRouter.DHT_MIX );
 		}
 		
-		if ( peer_networks.length == 1 && peer_networks[0] == AENetworkClassifier.AT_I2P ){
+		for ( String net: peer_networks ){
 			
-			return( 1 );
+			if ( net == AENetworkClassifier.AT_PUBLIC ){
+				
+				return( I2PHelperRouter.DHT_MIX );
+			}
 		}
-		
-		return( 0 );
+	
+		return( I2PHelperRouter.DHT_NON_MIX );
 	}
 	
 	public I2PHelperDHT

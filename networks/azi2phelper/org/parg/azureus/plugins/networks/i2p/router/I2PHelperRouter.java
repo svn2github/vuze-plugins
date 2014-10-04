@@ -59,6 +59,8 @@ import org.parg.azureus.plugins.networks.i2p.I2PHelperAdapter;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperDHT;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperPlugin;
 
+import com.aelitis.azureus.core.proxy.AEProxySelectorFactory;
+
 
 public class 
 I2PHelperRouter 
@@ -455,6 +457,7 @@ I2PHelperRouter
 			i2p_host	= i2p_separate_host;
 			i2p_port	= i2p_separate_port;
 					
+			AEProxySelectorFactory.getSelector().setProxy( new InetSocketAddress( i2p_host,i2p_port ), Proxy.NO_PROXY );
 			
 				// we need this so that the NameService picks up the hosts file in the plugin dir when using
 				// an external router (dunno how/if to delegate lookups to the external router's hosts...)
@@ -528,7 +531,7 @@ I2PHelperRouter
 	{
 			// second DHT is lazy initialised if/when selected
 		
-		dhts[0].initialiseDHT( i2p_host, i2p_port, sm_properties );
+		dhts[DHT_MIX].initialiseDHT( i2p_host, i2p_port, sm_properties );
 	}
 	
 	public I2PHelperRouterDHT
@@ -583,6 +586,7 @@ I2PHelperRouter
 	selectDHT(
 		String[]		peer_networks )
 	{
+		/*
 		String str = "";
 		
 		if ( peer_networks != null ){
@@ -592,34 +596,38 @@ I2PHelperRouter
 				str += (str.length()==0?"":", ") + net;
 			}
 		}
-			
+		*/
+		
 		if ( dhts.length < 2 ){
 			
-			return( dhts[0] );
+			return( dhts[DHT_MIX] );
 		}
 		
 		if ( peer_networks == null || peer_networks.length == 0 ){
 			
-			return( dhts[0] );
+			return( dhts[DHT_MIX] );
 		}
 		
-		if ( peer_networks.length == 1 && peer_networks[0] == AENetworkClassifier.AT_I2P ){
+		for ( String net: peer_networks ){
 			
-			I2PHelperRouterDHT dht = dhts[1];
-			
-			if ( !dht.isDHTInitialised()){
+			if ( net == AENetworkClassifier.AT_PUBLIC ){
 				
-				try{
-					dht.initialiseDHT( i2p_host, i2p_port, sm_properties );
-					
-				}catch( Throwable e ){
-				}
+				return( dhts[DHT_MIX] );
 			}
-			
-			return( dht );
 		}
-		
-		return( dhts[0] );
+				
+		I2PHelperRouterDHT dht = dhts[DHT_NON_MIX];
+			
+		if ( !dht.isDHTInitialised()){
+				
+			try{
+				dht.initialiseDHT( i2p_host, i2p_port, sm_properties );
+					
+			}catch( Throwable e ){
+			}
+		}
+			
+		return( dht );
 	}
 	
 	public I2PHelperRouterDHT
@@ -680,12 +688,15 @@ I2PHelperRouter
 			return( DHT_MIX );
 		}
 		
-		if ( peer_networks.length == 1 && peer_networks[0] == AENetworkClassifier.AT_I2P ){
+		for ( String net: peer_networks ){
 			
-			return( DHT_NON_MIX );
+			if ( net == AENetworkClassifier.AT_PUBLIC ){
+				
+				return( DHT_MIX );
+			}
 		}
-		
-		return( DHT_MIX );
+	
+		return( DHT_NON_MIX );
 	}
 	
 	public I2PHelperRouterDHT[]
@@ -700,7 +711,7 @@ I2PHelperRouter
 	
 		throws Exception
 	{
-		return( dhts[0].lookupDestination( hash ));
+		return( dhts[DHT_MIX].lookupDestination( hash ));
 	}
 	
 	public ServerInstance 
