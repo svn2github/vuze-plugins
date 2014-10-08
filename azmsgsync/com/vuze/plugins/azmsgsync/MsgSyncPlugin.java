@@ -25,9 +25,14 @@ package com.vuze.plugins.azmsgsync;
 
 import java.util.*;
 
+import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.SimpleTimer;
+import org.gudy.azureus2.core3.util.TimerEvent;
+import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.gudy.azureus2.plugins.*;
+import org.gudy.azureus2.plugins.ddb.DistributedDatabase;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
 import org.gudy.azureus2.plugins.ui.UIManager;
@@ -41,6 +46,7 @@ import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.gudy.azureus2.pluginsimpl.local.ddb.DDBaseImpl;
 
+import com.aelitis.azureus.core.util.CopyOnWriteList;
 import com.aelitis.azureus.plugins.dht.DHTPluginInterface;
 
 
@@ -55,7 +61,8 @@ MsgSyncPlugin
 	private BasicPluginViewModel	view_model;
 	private LocaleUtilities			loc_utils;
 
-	
+	private CopyOnWriteList<MsgSyncHandler>	sync_handlers = new CopyOnWriteList<MsgSyncHandler>();
+
 	public void 
 	initialize(
 		PluginInterface _plugin_interface )
@@ -146,6 +153,26 @@ MsgSyncPlugin
 						}
 					});
 
+			SimpleTimer.addPeriodicEvent(
+				"MsgSync:periodicSync",
+				2500,
+				new TimerEventPerformer() {
+					
+					@Override
+					public void 
+					perform(
+						TimerEvent event ) 
+					{
+						if ( sync_handlers.size() > 0 ){
+							
+							for ( MsgSyncHandler handler: sync_handlers ){
+								
+								handler.sync();
+							}
+						}
+					}
+				});
+			
 		}catch( Throwable e){
 			
 			throw( new PluginException( "Initialization failed", e ));
@@ -171,26 +198,43 @@ MsgSyncPlugin
 				
 				String c = bits[0].toLowerCase();
 				
-				if ( c.equals( "create" )){
+				if ( c.equals( "send" )){
 				
-					if ( bits.length != 3 ){
+					if ( bits.length != 4 ){
 						
-						throw( new Exception( "Usage: create <dht_id> <key>" ));
+						throw( new Exception( "Usage: create <dht_id> <key> <message>" ));
 					}
 					
 					String dht_id 	= bits[1];
 					String key		= bits[2];
+					String message	= bits[3];
+					
+					DHTPluginInterface dht;
 					
 					if ( dht_id.equals( "p" )){
 						
-						DHTPluginInterface dht = ((DDBaseImpl)plugin_interface.getDistributedDatabase()).getDHTPlugin();
+						dht = ((DDBaseImpl)plugin_interface.getDistributedDatabase()).getDHTPlugin();
 						
-						byte[]	key_bytes = key.getBytes( "UTF-8" );
+					}else{
+									
+						List<DistributedDatabase> ddbs = plugin_interface.getUtilities().getDistributedDatabases( new String[]{ AENetworkClassifier.AT_I2P });
 						
-						MsgSyncHandler handler = getSyncHandler( dht, key_bytes );
+						if ( ddbs.size() == 0 ){
+							
+							throw( new Exception( "No I2P DDB Available" ));
+						}
 						
-						log( "Got handler: " + handler.getString());
+						dht = ((DDBaseImpl)ddbs.get(0)).getDHTPlugin();
 					}
+					
+					byte[]	key_bytes = key.getBytes( "UTF-8" );
+						
+					MsgSyncHandler handler = getSyncHandler( dht, key_bytes );
+						
+					log( "Got handler: " + handler.getString());
+					
+					handler.sendMessage( message.getBytes( "UTF-8" ));
+					
 				}else{
 				
 					log( "Unrecognized command" );
@@ -232,9 +276,7 @@ MsgSyncPlugin
 			e.printStackTrace();
 		}
 	}
-	
-	private List<MsgSyncHandler>	sync_handlers = new ArrayList<MsgSyncHandler>();
-	
+		
 	private MsgSyncHandler
 	getSyncHandler(
 		DHTPluginInterface		dht,
@@ -250,11 +292,19 @@ MsgSyncPlugin
 				}
 			}
 			
-			MsgSyncHandler h = new MsgSyncHandler( dht, key );
-			
-			sync_handlers.add( h );
-			
-			return( h );
+			try{
+				MsgSyncHandler h = new MsgSyncHandler( this, dht, key );
+				
+				sync_handlers.add( h );
+				
+				return( h );
+				
+			}catch( Throwable e ){
+				
+				Debug.out( e );
+				
+				return( null );
+			}
 		}
 	}
 }

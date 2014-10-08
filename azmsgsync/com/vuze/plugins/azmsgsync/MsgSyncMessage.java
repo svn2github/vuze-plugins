@@ -22,30 +22,79 @@
 
 package com.vuze.plugins.azmsgsync;
 
-public interface 
+public class 
 MsgSyncMessage 
 {
 	public final int ST_PENDING		= 5;
 	
-	public MsgSyncNode
-	getNode();
+	private MsgSyncNode		node;
+	private byte[]			message_id;
+	private byte[]			content;
 	
+	private byte[]			signature;
+	
+	protected
+	MsgSyncMessage(
+		MsgSyncNode		_node,
+		byte[]			_message_id,
+		byte[]			_content,
+		byte[]			_signature )
+	{
+		node		= _node;
+		message_id	= _message_id;
+		content		= _content;
+		signature	= _signature;
+	}
+	
+	public MsgSyncNode
+	getNode()
+	{
+		return( node );
+	}
+	
+	/*
 	public byte[]
-	getShortID();
+	getShortID()
+	{
+		
+	}
 	
 	public int
-	getStatus();
+	getStatus()
+	{
+		
+	}
+	*/
 	
 	public byte[]
-	getContent();
+	getContent()
+	{
+		return( content );
+	}
 	
+	public byte[]
+	getSignature()
+	{
+		return( signature );
+	}
+	
+	/*
 	public long
-	getOriginatorTimestamp();
+	getOriginatorTimestamp()
+	{
+		
+	}
 	
 	public MsgSyncMessage
-	getPreviousMessage();
+	getPreviousMessage(){
+		
+		
+	}
 	
 	public MsgSyncMessage
-	getNextMessage();
-	
+	getNextMessage()
+	{
+		
+	}
+	*/
 }

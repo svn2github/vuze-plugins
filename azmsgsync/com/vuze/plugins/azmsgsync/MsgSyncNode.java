@@ -22,12 +22,39 @@
 
 package com.vuze.plugins.azmsgsync;
 
-public interface 
+import com.aelitis.azureus.plugins.dht.DHTPluginContact;
+
+public class 
 MsgSyncNode 
 {
+	private DHTPluginContact		contact;
+	private byte[]					uid;
+	
+	
+	protected
+	MsgSyncNode(
+		DHTPluginContact		_contact,
+		byte[]					_uid )
+	{
+		contact		= _contact;
+		uid			= _uid;
+	}
+	
 	public byte[]
-	getShortID();
+	getUID()
+	{
+		return( uid );
+	}
+	
+	public DHTPluginContact
+	getContact()
+	{
+		return( contact );
+	}
 	
 	public String
-	getName();
+	getName()
+	{
+		return( contact.toString());
+	}
 }

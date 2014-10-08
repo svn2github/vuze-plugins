@@ -22,16 +22,26 @@
 
 package com.vuze.plugins.azmsgsync;
 
+import java.net.InetSocketAddress;
+import java.security.KeyPair;
+import java.security.Signature;
 import java.util.*;
 
+import org.gudy.azureus2.core3.util.AEThread2;
+import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.BEncoder;
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.SHA1Simple;
 
+import com.aelitis.azureus.core.security.CryptoECCUtils;
+import com.aelitis.azureus.core.util.bloom.BloomFilter;
+import com.aelitis.azureus.core.util.bloom.BloomFilterFactory;
 import com.aelitis.azureus.plugins.dht.DHTPluginContact;
 import com.aelitis.azureus.plugins.dht.DHTPluginInterface;
 import com.aelitis.azureus.plugins.dht.DHTPluginOperationAdapter;
+import com.aelitis.azureus.plugins.dht.DHTPluginProgressListener;
 import com.aelitis.azureus.plugins.dht.DHTPluginTransferHandler;
 import com.aelitis.azureus.plugins.dht.DHTPluginValue;
 
@@ -55,18 +65,46 @@ MsgSyncHandler
 		HANDLER_BASE_KEY_BYTES = bytes;
 	}
 	
+	private final MsgSyncPlugin						plugin;
 	private final DHTPluginInterface				dht;
 	private final byte[]							user_key;
 	private final byte[]							dht_key;
 	
+	private KeyPair				ecc_keys;
+	
+	private byte[]				my_uid;
+	private MsgSyncNode			my_node;
+	
+	private Map<String,MsgSyncNode>		nodes = new HashMap<String, MsgSyncNode>();
+	
+		// this is linked to the bloom filter size which in turn is limited by the max transfer
+		// key size of 255 bytes....
+	
+	private static final int				MAX_MESSAGES	= 64;
+	
+	private LinkedList<MsgSyncMessage>		messages = new LinkedList<MsgSyncMessage>();
+	
 	protected
 	MsgSyncHandler(
+		MsgSyncPlugin			_plugin,
 		DHTPluginInterface		_dht,
 		byte[]					_key )
+		
+		throws Exception
 	{
+		plugin			= _plugin;
 		dht				= _dht;
 		user_key		= _key;
-						
+			
+		my_uid = new byte[8];
+		
+		my_node	= new MsgSyncNode( dht.getLocalAddress(), my_uid );
+		
+		RandomUtils.nextSecureBytes( my_uid );
+		
+		ecc_keys = CryptoECCUtils.createKeys();
+
+		
 		dht_key = new SHA1Simple().calculateHash( user_key );
 		
 		for ( int i=0;i<dht_key.length;i++){
@@ -76,6 +114,8 @@ MsgSyncHandler
 		
 		dht.registerHandler( dht_key, this );
 
+		log( "Checking for existing nodes" );
+		
 		dht.get(
 			dht_key,
 			"Message Sync lookup: " + getString(),
@@ -102,6 +142,15 @@ MsgSyncHandler
 					DHTPluginContact 	originator, 
 					DHTPluginValue 		value ) 
 				{
+					try{
+					
+						Map m = BDecoder.decode( value.getValue());
+					
+						addContact( originator, m );
+						
+					}catch( Throwable e ){
+						
+					}
 				}
 				
 				@Override
@@ -109,14 +158,21 @@ MsgSyncHandler
 				complete(
 					byte[] 		key, 
 					boolean 	timeout_occurred) 
-				{
-				
-					if ( !diversified ){
+				{			
+					if ( diversified ){
 						
-						Map	blah = new HashMap();
+						log( "Not registering as sufficient nodes located" );
+						
+					}else{
+						
+						log( "Registering node" );
+						
+						Map	map = new HashMap();
+						
+						map.put( "u", my_uid );
 						
 						try{
-							byte[] blah_bytes = BEncoder.encode( blah );
+							byte[] blah_bytes = BEncoder.encode( map );
 							
 							dht.put(
 									dht_key,
@@ -138,6 +194,7 @@ MsgSyncHandler
 											byte[] 		key, 
 											boolean 	timeout_occurred ) 
 										{
+											log( "Node registered" );
 										}
 									});
 							
@@ -147,10 +204,7 @@ MsgSyncHandler
 						}
 					}
 				}
-			});
-		
-
-			
+			});	
 	}
 	
 	protected DHTPluginInterface
@@ -164,12 +218,175 @@ MsgSyncHandler
 	{
 		return( user_key );
 	}
+
+	
+	private void
+	addContact(
+		final DHTPluginContact		contact,
+		Map						map )
+	{
+		System.out.println( "Add contact: " + contact.getName() + "/" + map );
+				
+		byte[] uid = (byte[])map.get( "u" );
+		
+		if ( uid == null || Arrays.equals( uid, my_uid )){
+			
+			return;
+		}
+		
+		synchronized( nodes ){
+			
+			InetSocketAddress address = contact.getAddress();
+			
+			String str = address.toString();
+			
+			if ( nodes.containsKey( str )){
+				
+				return;
+			}
+			
+			nodes.put( str, new MsgSyncNode( contact, uid ));
+			
+			System.out.println( "address=" + str );
+		}
+		
+		sync();	
+	}
+	
+	protected void
+	sync()
+	{
+		sync( false );
+	}
+	
+	protected void
+	sync(
+		boolean		prefer_live )
+	{
+		MsgSyncNode node;
+		
+		synchronized( nodes ){
+			
+			if ( nodes.size() > 0 ){
+				
+				Iterator<MsgSyncNode>	it = nodes.values().iterator();
+				
+				node = it.next();
+				
+			}else{
+				
+				node = null;
+			}
+		}
+		
+		if ( node != null ){
+			
+			sync(node );
+		}
+	}
+	
+	private void
+	sync(
+		MsgSyncNode		node )
+	{
+		BloomFilter	bloom = BloomFilterFactory.createAddOnly( MAX_MESSAGES * 10 );
+		
+			// mix in some random to move bloom clashes around
+		
+		byte[]	rand = new byte[8];
+		
+		RandomUtils.nextSecureBytes( rand );
+		
+		synchronized( messages ){
+			
+			for ( MsgSyncMessage msg: messages ){
+				
+				byte[]	sig = msg.getSignature().clone();	// clone as we mod it
+	
+				for ( int i=0;i<rand.length;i++){
+					
+					sig[i] ^= rand[i];
+				}
+				
+				bloom.add( sig );
+			}
+		}
+		
+		Map sync_map = new HashMap();
+		
+		sync_map.put( "b", bloom.serialiseToMap());
+		sync_map.put( "r", rand );
+		
+		try{
+			byte[]	sync_key = BEncoder.encode( sync_map);
+			
+			node.getContact().read(
+				new DHTPluginProgressListener() {
+					
+					@Override
+					public void reportSize(long size) {
+						// TODO Auto-generated method stub
+						
+					}
+					
+					@Override
+					public void reportCompleteness(int percent) {
+						// TODO Auto-generated method stub
+						
+					}
+					
+					@Override
+					public void reportActivity(String str) {
+						// TODO Auto-generated method stub
+						
+					}
+				},
+				dht_key,
+				sync_key, 
+				30*1000 );
+			
+		}catch( Throwable e ){
+			
+		}
+		
+	}
+	
 	
 	public void
 	sendMessage(
 		byte[]		content )
 	{
-		
+		try{
+			Signature sig = CryptoECCUtils.getSignature( ecc_keys.getPrivate());
+			
+			byte[]	message_id = new byte[8];
+			
+			RandomUtils.nextSecureBytes( message_id );
+			
+			sig.update( my_uid );
+			sig.update( message_id );
+			sig.update( content );
+			
+			byte[]	sig_bytes = sig.sign();
+			
+			MsgSyncMessage msg = new MsgSyncMessage( my_node, message_id, content, sig_bytes );
+			
+			synchronized( messages ){
+			
+				messages.add( msg );
+				
+				if ( messages.size() > MAX_MESSAGES ){
+					
+					messages.removeFirst();
+				}
+			}
+			
+			sync();
+			
+		}catch( Throwable e ){
+			
+			e.printStackTrace();
+		}
 	}
 	
 	public String
@@ -183,6 +400,39 @@ MsgSyncHandler
 		DHTPluginContact	originator,
 		byte[]				key )
 	{
+		System.out.println( "handle read" );
+		
+		try{
+			Map map = BDecoder.decode( key );
+						
+			BloomFilter bloom = BloomFilterFactory.deserialiseFromMap( (Map)map.get("b"));
+			
+			byte[]	rand = (byte[])map.get( "r" );
+			
+			synchronized( messages ){
+				
+				for ( MsgSyncMessage msg: messages ){
+					
+					byte[]	sig = msg.getSignature().clone();	// clone as we mod it
+		
+					for ( int i=0;i<rand.length;i++){
+						
+						sig[i] ^= rand[i];
+					}
+					
+					if ( bloom.contains( sig )){
+						
+						System.out.println( "msg found" );
+						
+					}else{
+						
+						System.out.println( "msg missing" );
+					}
+				}
+			}
+		}catch( Throwable e ){
+			
+		}
 		return( null );
 	}
 	
@@ -194,6 +444,15 @@ MsgSyncHandler
 	{
 		
 	}
+	
+	private void
+	log(
+		String	str )
+	{
+		plugin.log( str );
+	}
+	
+
 	
 	protected String
 	getString()
