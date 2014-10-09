@@ -42,6 +42,15 @@ MsgSyncNode
 		public_key	= _public_key;
 	}
 	
+	protected void
+	setDetails(
+		DHTPluginContact	_contact,
+		byte[]				_public_key )
+	{
+		contact			= _contact;
+		public_key		= _public_key;
+	}
+	
 	public byte[]
 	getUID()
 	{
@@ -63,6 +72,6 @@ MsgSyncNode
 	public String
 	getName()
 	{
-		return( contact.toString());
+		return( String.valueOf( contact.getAddress()));
 	}
 }
