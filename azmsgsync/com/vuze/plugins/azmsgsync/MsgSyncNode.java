@@ -29,21 +29,29 @@ MsgSyncNode
 {
 	private DHTPluginContact		contact;
 	private byte[]					uid;
-	
+	private byte[]					public_key;
 	
 	protected
 	MsgSyncNode(
 		DHTPluginContact		_contact,
-		byte[]					_uid )
+		byte[]					_uid,
+		byte[]					_public_key )
 	{
 		contact		= _contact;
 		uid			= _uid;
+		public_key	= _public_key;
 	}
 	
 	public byte[]
 	getUID()
 	{
 		return( uid );
+	}
+	
+	public byte[]
+	getPublicKey()
+	{
+		return( public_key );
 	}
 	
 	public DHTPluginContact

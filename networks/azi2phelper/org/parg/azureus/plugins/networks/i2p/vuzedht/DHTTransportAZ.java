@@ -1220,6 +1220,14 @@ DHTTransportAZ
 		return( new DHTTransportContactAZ( this, base_transport.importContact( hash, address.getPort(), id, version )));
 	}
     
+	public DHTTransportContactAZ
+	importContact(
+		Map<String,Object>		map )
+	{
+			// NID is encoded into the address - <nid>.<dest>
+		return( new DHTTransportContactAZ( this, base_transport.importContactFromMap(map)));
+	}
+	
 		// direct contact-contact communication
 	
 	public void

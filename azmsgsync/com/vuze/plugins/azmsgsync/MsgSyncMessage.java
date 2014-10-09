@@ -52,13 +52,13 @@ MsgSyncMessage
 		return( node );
 	}
 	
-	/*
 	public byte[]
-	getShortID()
+	getID()
 	{
-		
+		return( message_id );
 	}
 	
+	/*
 	public int
 	getStatus()
 	{

@@ -352,6 +352,74 @@ DHTTransportI2P
 		return( null );
 	}
 	
+	protected Map<String,Object>
+	exportContactToMap(
+		DHTTransportContactI2P		contact )
+	{
+		NodeInfo		node = contact.getNode();
+		
+		Map<String,Object>	map = new HashMap<String, Object>();
+		
+		map.put( "n", node.getNID().getData());
+				
+		map.put( "p", node.getPort());
+			
+		map.put( "h", node.getHash().getData());
+			
+		Destination dest = node.getDestination();
+				
+		if ( dest != null ){
+			
+			map.put( "d", dest.toByteArray());
+		}
+				
+		map.put( "v", contact.getProtocolVersion());
+		
+		return( map );
+	}
+
+	public DHTTransportContactI2P
+	importContactFromMap(
+		Map<String,Object>		map )
+	{		
+		byte[]	b_nid = (byte[])map.get( "n" );
+		
+		int port = ((Number)map.get("p")).intValue();
+		
+		byte[]	b_hash = (byte[])map.get( "h" );
+
+		byte[]	b_dest = (byte[])map.get( "d" );
+
+		NodeInfo node;
+		
+		if ( b_dest == null ){
+			
+			node = new NodeInfo( new NID(b_nid), new Hash( b_hash ), port );
+			
+		}else{
+			
+			Destination dest = new Destination();
+			
+			try{
+				dest.fromByteArray( b_dest );
+			
+				node = new NodeInfo( new NID(b_nid), dest, port );
+				
+			}catch( DataFormatException e ){
+
+				node = new NodeInfo( new NID(b_nid), new Hash( b_hash ), port );
+			}		
+		}
+		
+		int	contact_version = ((Number)map.get("v")).intValue();
+		
+		DHTTransportContactI2P contact = new DHTTransportContactI2P( this, node, (byte)contact_version, 0, 0, (byte)0 );
+		
+		request_handler.contactImported( contact, false );
+
+		return( contact );	
+	}
+	
 	protected void
 	exportContact(
 		DataOutputStream			os,
@@ -387,7 +455,7 @@ DHTTransportI2P
 		
 		os.writeInt( contact.getProtocolVersion());
 	}
-	
+		
 	public DHTTransportContact
 	importContact(
 		DataInputStream		is,

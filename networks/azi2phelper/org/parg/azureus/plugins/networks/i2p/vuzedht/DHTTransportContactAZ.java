@@ -28,6 +28,8 @@ import java.util.List;
 
 
 
+import java.util.Map;
+
 import org.gudy.azureus2.core3.util.Debug;
 
 import com.aelitis.azureus.core.dht.netcoords.DHTNetworkPosition;
@@ -287,6 +289,12 @@ DHTTransportContactAZ
 		throws IOException, DHTTransportException
 	{
 		basis.exportContact( os );
+	}
+	
+	public Map<String, Object> 
+	exportContactToMap()
+	{
+		return( basis.exportContactToMap());
 	}
 	
 	public void

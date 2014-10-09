@@ -28,7 +28,6 @@ import org.gudy.azureus2.core3.util.Debug;
 
 import com.aelitis.azureus.core.dht.*;
 import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
-import com.aelitis.azureus.core.dht.transport.DHTTransportException;
 import com.aelitis.azureus.core.dht.transport.DHTTransportProgressListener;
 import com.aelitis.azureus.core.dht.transport.DHTTransportTransferHandler;
 import com.aelitis.azureus.core.dht.transport.DHTTransportValue;
@@ -37,7 +36,6 @@ import com.aelitis.azureus.plugins.dht.DHTPluginOperationListener;
 import com.aelitis.azureus.plugins.dht.DHTPluginProgressListener;
 import com.aelitis.azureus.plugins.dht.DHTPluginTransferHandler;
 import com.aelitis.azureus.plugins.dht.DHTPluginValue;
-import com.aelitis.azureus.plugins.dht.impl.DHTPluginContactImpl;
 
 public abstract class 
 I2PHelperAZDHT 
@@ -194,6 +192,21 @@ I2PHelperAZDHT
 		}
 	}
 	
+	public DHTPluginContact
+	importContact(
+		Map<String,Object>				map )
+	{
+		try{
+			return( new DHTContactImpl(((DHTTransportAZ)getDHT().getTransport()).importContact(map)));
+			
+		}catch( Throwable e ){
+			
+			Debug.out( e );
+			
+			return( null );
+		}
+	}
+	
 	private class
 	ListenerWrapper
 		implements DHTOperationListener
@@ -319,6 +332,12 @@ I2PHelperAZDHT
 			return( contact.getProtocolVersion());
 		}
 		
+		public Map<String, Object> 
+		exportToMap()
+		{
+			return( contact.exportContactToMap());
+		}
+		
 		public boolean
 		isAlive(
 			long		timeout )
@@ -380,6 +399,96 @@ I2PHelperAZDHT
 							handler_key, 
 							key, 
 							timeout ));
+				
+			}catch( Throwable e ){
+				
+				throw( new RuntimeException( e ));
+			}
+		}
+		
+		@Override
+		public void
+		write(
+			final DHTPluginProgressListener 	listener,
+			byte[] 								handler_key, 
+			byte[] 								key, 
+			byte[]								data,
+			long 								timeout )
+		{
+			try{
+				 getDHT().getTransport().writeTransfer(
+						new DHTTransportProgressListener()
+						{
+							public void
+							reportSize(
+								long	size )
+							{
+								listener.reportSize( size );
+							}
+							
+							public void
+							reportActivity(
+								String	str )
+							{
+								listener.reportActivity( str );
+							}
+							
+							public void
+							reportCompleteness(
+								int		percent )
+							{
+								listener.reportCompleteness( percent );
+							}
+						},
+						contact, 
+						handler_key, 
+						key,
+						data,
+						timeout );
+				
+			}catch( Throwable e ){
+				
+				throw( new RuntimeException( e ));
+			}
+		}
+		
+		@Override
+		public byte[] 
+		call(
+			final DHTPluginProgressListener 	listener,
+			byte[] 								handler_key, 
+			byte[] 								data, 
+			long 								timeout )
+		{
+			try{
+				return( getDHT().getTransport().writeReadTransfer(
+						new DHTTransportProgressListener()
+						{
+							public void
+							reportSize(
+								long	size )
+							{
+								listener.reportSize( size );
+							}
+							
+							public void
+							reportActivity(
+								String	str )
+							{
+								listener.reportActivity( str );
+							}
+							
+							public void
+							reportCompleteness(
+								int		percent )
+							{
+								listener.reportCompleteness( percent );
+							}
+						},
+						contact, 
+						handler_key, 
+						data, 
+						timeout ));
 				
 			}catch( Throwable e ){
 				

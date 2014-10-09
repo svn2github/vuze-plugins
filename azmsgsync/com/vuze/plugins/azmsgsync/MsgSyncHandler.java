@@ -98,13 +98,13 @@ MsgSyncHandler
 			
 		my_uid = new byte[8];
 		
-		my_node	= new MsgSyncNode( dht.getLocalAddress(), my_uid );
-		
 		RandomUtils.nextSecureBytes( my_uid );
 		
 		ecc_keys = CryptoECCUtils.createKeys();
 
+		my_node	= new MsgSyncNode( dht.getLocalAddress(), my_uid, CryptoECCUtils.keyToRawdata( ecc_keys.getPublic()));
 		
+
 		dht_key = new SHA1Simple().calculateHash( user_key );
 		
 		for ( int i=0;i<dht_key.length;i++){
@@ -207,6 +207,12 @@ MsgSyncHandler
 			});	
 	}
 	
+	public String
+	getName()
+	{
+		return( "Message Sync: " + getString());
+	}
+
 	protected DHTPluginInterface
 	getDHT()
 	{
@@ -245,112 +251,13 @@ MsgSyncHandler
 				return;
 			}
 			
-			nodes.put( str, new MsgSyncNode( contact, uid ));
+			nodes.put( str, new MsgSyncNode( contact, uid, null ));
 			
 			System.out.println( "address=" + str );
 		}
 		
 		sync();	
 	}
-	
-	protected void
-	sync()
-	{
-		sync( false );
-	}
-	
-	protected void
-	sync(
-		boolean		prefer_live )
-	{
-		MsgSyncNode node;
-		
-		synchronized( nodes ){
-			
-			if ( nodes.size() > 0 ){
-				
-				Iterator<MsgSyncNode>	it = nodes.values().iterator();
-				
-				node = it.next();
-				
-			}else{
-				
-				node = null;
-			}
-		}
-		
-		if ( node != null ){
-			
-			sync(node );
-		}
-	}
-	
-	private void
-	sync(
-		MsgSyncNode		node )
-	{
-		BloomFilter	bloom = BloomFilterFactory.createAddOnly( MAX_MESSAGES * 10 );
-		
-			// mix in some random to move bloom clashes around
-		
-		byte[]	rand = new byte[8];
-		
-		RandomUtils.nextSecureBytes( rand );
-		
-		synchronized( messages ){
-			
-			for ( MsgSyncMessage msg: messages ){
-				
-				byte[]	sig = msg.getSignature().clone();	// clone as we mod it
-	
-				for ( int i=0;i<rand.length;i++){
-					
-					sig[i] ^= rand[i];
-				}
-				
-				bloom.add( sig );
-			}
-		}
-		
-		Map sync_map = new HashMap();
-		
-		sync_map.put( "b", bloom.serialiseToMap());
-		sync_map.put( "r", rand );
-		
-		try{
-			byte[]	sync_key = BEncoder.encode( sync_map);
-			
-			node.getContact().read(
-				new DHTPluginProgressListener() {
-					
-					@Override
-					public void reportSize(long size) {
-						// TODO Auto-generated method stub
-						
-					}
-					
-					@Override
-					public void reportCompleteness(int percent) {
-						// TODO Auto-generated method stub
-						
-					}
-					
-					@Override
-					public void reportActivity(String str) {
-						// TODO Auto-generated method stub
-						
-					}
-				},
-				dht_key,
-				sync_key, 
-				30*1000 );
-			
-		}catch( Throwable e ){
-			
-		}
-		
-	}
-	
 	
 	public void
 	sendMessage(
@@ -389,12 +296,153 @@ MsgSyncHandler
 		}
 	}
 	
-	public String
-	getName()
+	protected void
+	sync()
 	{
-		return( "Message Sync: " + getString());
+		sync( false );
 	}
 	
+	protected void
+	sync(
+		boolean		prefer_live )
+	{
+		MsgSyncNode node;
+		
+		synchronized( nodes ){
+			
+			if ( nodes.size() > 0 ){
+				
+				Iterator<MsgSyncNode>	it = nodes.values().iterator();
+				
+				node = it.next();
+				
+			}else{
+				
+				node = null;
+			}
+		}
+		
+		if ( node != null ){
+			
+			sync(node );
+		}
+	}
+	
+	private void
+	sync(
+		MsgSyncNode		node )
+	{
+		byte[]		rand 	= new byte[8];
+		BloomFilter	bloom	= null;
+		
+		synchronized( messages ){
+
+			for ( int i=0;i<32;i++){
+				
+				RandomUtils.nextSecureBytes( rand );
+				
+				List<byte[]>	bloom_keys = new ArrayList<byte[]>();
+				
+				Set<MsgSyncNode>	done_nodes = new HashSet<MsgSyncNode>();
+				
+				for ( MsgSyncMessage msg: messages ){
+					
+					MsgSyncNode n = msg.getNode();
+					
+					if ( !done_nodes.contains( n )){
+						
+						done_nodes.add( n );
+						
+						byte[] pub = node.getPublicKey().clone();
+						
+						if ( pub != null ){
+							
+							for ( int j=0;j<rand.length;j++){
+								
+								pub[j] ^= rand[j];
+							}
+							
+							bloom_keys.add( pub );
+						}
+					}
+					
+					byte[]	sig = msg.getSignature().clone();
+		
+					for ( int j=0;j<rand.length;j++){
+						
+						sig[j] ^= rand[j];
+					}
+					
+					bloom_keys.add( sig );
+				}
+				
+				bloom = BloomFilterFactory.createAddOnly( bloom_keys.size() * 10 );
+				
+				for ( byte[] k: bloom_keys ){
+					
+					if ( bloom.contains( k )){
+						
+						bloom = null;
+						
+						break;
+					}
+				}
+			}
+		}
+		
+		if ( bloom == null ){
+			
+			Debug.out( "Too many clashes, bailing" );
+			
+			return;
+		}
+		
+		Map sync_map = new HashMap();
+		
+		sync_map.put( "b", bloom.serialiseToMap());
+		sync_map.put( "r", rand );
+		
+		try{
+			byte[]	sync_key = BEncoder.encode( sync_map);
+			
+			byte[] reply_bytes = 
+				node.getContact().read(
+					new DHTPluginProgressListener() {
+						
+						@Override
+						public void reportSize(long size) {
+							// TODO Auto-generated method stub
+							
+						}
+						
+						@Override
+						public void reportCompleteness(int percent) {
+							// TODO Auto-generated method stub
+							
+						}
+						
+						@Override
+						public void reportActivity(String str) {
+							// TODO Auto-generated method stub
+							
+						}
+					},
+					dht_key,
+					sync_key, 
+					30*1000 );
+		
+			if ( reply_bytes != null ){
+				
+				Map reply_map = BDecoder.decode( reply_bytes );
+				
+				System.out.println( "reply: " + reply_map );
+			}
+		}catch( Throwable e ){
+			
+			e.printStackTrace();
+		}
+	}	
+
 	public byte[]
 	handleRead(
 		DHTPluginContact	originator,
@@ -403,11 +451,15 @@ MsgSyncHandler
 		System.out.println( "handle read" );
 		
 		try{
-			Map map = BDecoder.decode( key );
+			Map<String,Object> map = BDecoder.decode( key );
 						
-			BloomFilter bloom = BloomFilterFactory.deserialiseFromMap( (Map)map.get("b"));
+			BloomFilter bloom = BloomFilterFactory.deserialiseFromMap((Map<String,Object>)map.get("b"));
 			
 			byte[]	rand = (byte[])map.get( "r" );
+			
+			List<MsgSyncMessage>	missing = new ArrayList<MsgSyncMessage>();
+			
+			int	num_they_have_i_dont = bloom.getEntryCount();
 			
 			synchronized( messages ){
 				
@@ -420,19 +472,81 @@ MsgSyncHandler
 						sig[i] ^= rand[i];
 					}
 					
-					if ( bloom.contains( sig )){
+					if ( !bloom.contains( sig )){
+					
+							// I have it, they don't
 						
-						System.out.println( "msg found" );
+						missing.add( msg );
 						
 					}else{
 						
-						System.out.println( "msg missing" );
+						num_they_have_i_dont--;
 					}
 				}
 			}
+			
+			Map<String,Object> reply_map = new HashMap<String,Object>();
+			
+			if ( missing.size() > 0 ){
+				
+				Set<MsgSyncNode>	done_nodes = new HashSet<MsgSyncNode>();
+				
+				List<Map<String,Object>> l = new ArrayList<Map<String,Object>>();
+				
+				reply_map.put( "m", l );
+				
+				for ( MsgSyncMessage message: missing ){
+					
+					Map<String,Object> m = new HashMap<String,Object>();
+					
+					l.add( m );
+					
+					MsgSyncNode	n = message.getNode();
+					
+					m.put( "u", n.getUID());
+					m.put( "i", message.getID());
+					m.put( "c", message.getContent());
+					m.put( "s", message.getSignature());
+					
+					if ( !done_nodes.contains( n )){
+						
+						done_nodes.add( n );
+						
+						byte[]	pub = n.getPublicKey().clone();	
+						
+						if ( pub != null ){
+							
+							for ( int i=0;i<rand.length;i++){
+								
+								pub[i] ^= rand[i];
+							}
+							
+							if ( !bloom.contains( pub )){
+								
+								m.put( "p", n.getPublicKey());
+								
+								DHTPluginContact contact = n.getContact();
+								
+								m.put( "k", contact.exportToMap());
+							}
+						}
+					}
+				}
+			}
+			
+			if ( num_they_have_i_dont > 0 ){
+				
+				// TODO: prioritise us hitting them to get this based on num missing prolly
+				
+			}
+			
+			return( BEncoder.encode( reply_map ));
+			
 		}catch( Throwable e ){
 			
+			e.printStackTrace();
 		}
+		
 		return( null );
 	}
 	
@@ -442,7 +556,7 @@ MsgSyncHandler
 		byte[]				key,
 		byte[]				value )
 	{
-		
+		Debug.out( "eh?" );
 	}
 	
 	private void

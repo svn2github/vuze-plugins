@@ -25,6 +25,7 @@ package org.parg.azureus.plugins.networks.i2p.plugindht;
 import java.net.InetSocketAddress;
 import java.util.Map;
 
+import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.AEThread2;
@@ -38,6 +39,8 @@ import org.parg.azureus.plugins.networks.i2p.*;
 import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouter;
 import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouterDHT;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT;
+
+
 
 
 import com.aelitis.azureus.plugins.dht.DHTPluginContact;
@@ -157,6 +160,12 @@ I2PHelperDHTPluginInterface
 		return( false );
 	}
 	
+	public String
+	getNetwork()
+	{
+		return( AENetworkClassifier.AT_I2P );
+	}
+	
 	public DHTPluginContact
 	getLocalAddress()
 	{
@@ -232,6 +241,19 @@ I2PHelperDHTPluginInterface
 		return( dht.importContact( address ));
 	}
 		
+	public DHTPluginContact
+	importContact(
+		Map<String,Object>		map )
+	{
+		if ( dht == null ){
+			
+			Debug.out( "DHT not yet available" );
+		
+			return( null );
+		}
+		
+		return( dht.importContact( map ));
+	}
 	
 	public DHTPluginContact
 	importContact(
@@ -478,6 +500,14 @@ I2PHelperDHTPluginInterface
 			return( 0 );			
 		}
 		
+		@Override
+		public Map<String, Object> 
+		exportToMap()
+		{
+			Debug.out( "not imp" );
+			
+			return null;
+		}
 		public boolean
 		isAlive(
 			long		timeout )
@@ -509,13 +539,36 @@ I2PHelperDHTPluginInterface
 		
 		public byte[]
 		read(
-			final DHTPluginProgressListener	listener,
-			final byte[]					handler_key,
-			final byte[]					key,
-			final long						timeout )
+			DHTPluginProgressListener	listener,
+			byte[]						handler_key,
+			byte[]						key,
+			long						timeout )
 		{
 			Debug.out( "not imp" );
 
+			return( null );
+		}
+		
+		public void
+		write(
+			DHTPluginProgressListener	listener,
+			byte[]						handler_key,
+			byte[]						key,
+			byte[]						data,
+			long						timeout )
+		{
+			Debug.out( "not imp" );
+		}
+		
+		public byte[]
+		call(
+			DHTPluginProgressListener	listener,
+			byte[]						handler_key,
+			byte[]						data,
+			long						timeout )
+		{
+			Debug.out( "not imp" );
+			
 			return( null );
 		}
 	}

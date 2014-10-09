@@ -25,6 +25,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.List;
+import java.util.Map;
 
 import net.i2p.data.Base32;
 
@@ -353,6 +354,12 @@ DHTTransportContactI2P
 		throws IOException, DHTTransportException
 	{
 		transport.exportContact( os, this );
+	}
+	
+	public Map<String, Object> 
+	exportContactToMap()
+	{
+		return( transport.exportContactToMap( this ));
 	}
 	
 	public void
