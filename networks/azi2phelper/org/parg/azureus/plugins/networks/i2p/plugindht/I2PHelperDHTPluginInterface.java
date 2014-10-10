@@ -43,6 +43,8 @@ import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT;
 
 
 
+
+import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
 import com.aelitis.azureus.plugins.dht.DHTPluginContact;
 import com.aelitis.azureus.plugins.dht.DHTPluginInterface;
 import com.aelitis.azureus.plugins.dht.DHTPluginKeyStats;
@@ -446,7 +448,7 @@ I2PHelperDHTPluginInterface
 	public void
 	removeListener(
 		DHTPluginListener	l )
-	{	
+	{
 	}
 	
 	public void
@@ -460,54 +462,85 @@ I2PHelperDHTPluginInterface
 	LocalContact
 		implements DHTPluginContact
 	{
+		private volatile DHTTransportContact	delegate;
+		
+		private DHTTransportContact
+		fixup()
+		{
+			if ( delegate != null ){
+				
+				return( delegate );
+			}
+			
+			if ( !init_sem.reserve( 2*60*1000 )){
+				
+				Debug.out( "hmm" );
+				
+				return( null );
+			}
+
+			try{
+				delegate = dht.getDHT().getTransport().getLocalContact();
+			
+				return( delegate );
+				
+			}catch( Throwable e ){
+				
+				Debug.out( e );
+				
+				return( null );
+			}
+		}
+		
 		public byte[]
 		getID()
 		{
-			Debug.out( "not imp" );
+			DHTTransportContact contact = fixup();
 			
-			return( null );
+			return( contact.getID());
 		}
 		
 		public String
 		getName()
 		{
-			Debug.out( "not imp" );
+			DHTTransportContact contact = fixup();
 			
-			return( null );	
+			return( contact.getName());
 		}
 		
 		public InetSocketAddress
 		getAddress()
 		{
-			Debug.out( "not imp" );
+			DHTTransportContact contact = fixup();
 			
-			return( null );		
+			return( contact.getAddress());	
 		}
 		
 		public byte
 		getProtocolVersion()
 		{
-			Debug.out( "not imp" );
+			DHTTransportContact contact = fixup();
 			
-			return( 0 );			
+			return( contact.getProtocolVersion());			
 		}
 		
 		public int
 		getNetwork()
 		{
-			Debug.out( "not imp" );
+			DHTTransportContact contact = fixup();
 			
-			return( 0 );			
+			return( contact.getTransport().getNetwork());	
 		}
 		
 		@Override
 		public Map<String, Object> 
 		exportToMap()
 		{
-			Debug.out( "not imp" );
+			DHTTransportContact contact = fixup();
 			
-			return null;
+			return( contact.exportContactToMap());	
 		}
+		
 		public boolean
 		isAlive(
 			long		timeout )

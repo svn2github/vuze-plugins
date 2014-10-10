@@ -166,9 +166,7 @@ I2PHelperAZDHT
 						byte[]				key,
 						byte[]				value )
 					{
-						handler.handleWrite( new DHTContactImpl( originator ), key, value );
-						
-						return( null );
+						return( handler.handleWrite( new DHTContactImpl( originator ), key, value ));
 					}
 				});
 		}catch( Throwable e ){
