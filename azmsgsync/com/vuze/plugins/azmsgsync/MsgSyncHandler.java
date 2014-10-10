@@ -27,9 +27,7 @@ import java.security.KeyPair;
 import java.security.Signature;
 import java.util.*;
 
-import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.core3.util.AEThread2;
-import org.gudy.azureus2.core3.util.AsyncDispatcher;
 import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.BEncoder;
 import org.gudy.azureus2.core3.util.ByteArrayHashMap;
@@ -97,6 +95,9 @@ MsgSyncHandler
 	private static final int				MAX_OTHER_MESSAGES	= 64;
 	private static final int				MAX_MY_MESSAGES		= 16;
 	
+	private static final int				MAX_NODES			= 64;
+
+	
 		// TODO: figure this out - once messages start being removed we need to limit the
 		// time that we keep our own messages around so that recipients don't get replays
 		// remove messages only need to be remembered by their sigs
@@ -117,9 +118,7 @@ MsgSyncHandler
 		all_messages.add( my_messages );
 		all_messages.add( other_messages );
 	}
-	
-	private AsyncDispatcher		dispatcher = new AsyncDispatcher( "MsgSyncHandler" );
-		
+			
 	protected
 	MsgSyncHandler(
 		MsgSyncPlugin			_plugin,
@@ -300,7 +299,13 @@ MsgSyncHandler
 			int	live	= 0;
 			int	total	= 0;
 			
+			List<MsgSyncNode>	to_remove = new ArrayList<MsgSyncNode>();
+			
 			synchronized( node_uid_map ){
+				
+				List<MsgSyncNode>	living		 	= new ArrayList<MsgSyncNode>( MAX_NODES*2 );
+				List<MsgSyncNode>	not_failing	 	= new ArrayList<MsgSyncNode>( MAX_NODES*2 );
+				List<MsgSyncNode>	failing 		= new ArrayList<MsgSyncNode>( MAX_NODES*2 );
 				
 				for ( List<MsgSyncNode> nodes: node_uid_map.values()){
 					
@@ -312,15 +317,70 @@ MsgSyncHandler
 							
 							failed++;
 							
-						}else if ( node.getLastAlive() > 0 ){
+							if ( node.getFailCount() > 1 ){
+								
+								to_remove.add( node );
+								
+							}else{
+								
+								failing.add( node );
+							}
+						}else{
 							
-							live++;
+							if ( node.getLastAlive() > 0 ){
+												
+								live++;
+								
+								living.add( node );
+								
+							}else{
+								
+								not_failing.add( node );
+							}
+						}
+					}
+				}
+				
+				int	excess = total - to_remove.size() - MAX_NODES;
+				
+				if ( excess > 0 ){
+					
+					List<List<MsgSyncNode>>	lists = new ArrayList<List<MsgSyncNode>>();
+					
+					Collections.shuffle( living );
+					
+					lists.add( failing );
+					lists.add( not_failing );
+					lists.add( living );
+					
+					for ( List<MsgSyncNode> list: lists ){
+						
+						if ( excess == 0 ){
+							
+							break;
+						}
+						
+						for ( MsgSyncNode node: list ){
+							
+							to_remove.add( node );
+							
+							excess--;
+							
+							if ( excess == 0 ){
+								
+								break;
+							}
 						}
 					}
 				}
 			}
 			
-			log( "Node status: live=" + live + ", failed=" + failed + ", total=" + total );
+			log( "Node status: live=" + live + ", failed=" + failed + ", total=" + total + ", to_remove=" + to_remove.size());
+			
+			for ( MsgSyncNode node: to_remove ){
+				
+				removeNode( node, false );
+			}
 			
 			long	now = SystemTime.getMonotonousTime();
 			
@@ -424,7 +484,7 @@ MsgSyncHandler
 						node_uid_map.remove( node_id );
 					}
 					
-					System.out.println( "Remove node: " + node.getContact().getName() + ByteFormatter.encodeString( node_id ));
+					System.out.println( "Remove node: " + node.getContact().getName() + ByteFormatter.encodeString( node_id ) + ", loop=" + is_loopback );
 				}
 			}
 		}
@@ -553,39 +613,132 @@ MsgSyncHandler
 		sync( false );
 	}
 	
+	private static final int MAX_CONC_SYNC	= 5;
+	private static final int MAX_FAIL_SYNC	= 2;
+	
+	private Set<MsgSyncNode> active_syncs	 = new HashSet<MsgSyncNode>();
+	
+	private boolean	prefer_live_sync_outstanding;
+	
 	protected void
 	sync(
 		final boolean		prefer_live )
 	{
-		dispatcher.dispatch(
-			new AERunnable() {
+		MsgSyncNode	sync_node = null;
+		
+		synchronized( node_uid_map ){
+			
+			if ( prefer_live ){
 				
-				@Override
-				public void 
-				runSupport() 
-				{
-					MsgSyncNode node;
+				prefer_live_sync_outstanding = true;
+			}
+			
+			if ( active_syncs.size() > MAX_CONC_SYNC ){
+				
+				return;
+			}
+			
+			synchronized( node_uid_map ){
+				
+				List<MsgSyncNode>	not_failed 	= new ArrayList<MsgSyncNode>();
+				List<MsgSyncNode>	failed 		= new ArrayList<MsgSyncNode>();
+				List<MsgSyncNode>	live 		= new ArrayList<MsgSyncNode>();
+				
+				for ( List<MsgSyncNode> nodes: node_uid_map.values()){
 					
-					synchronized( node_uid_map ){
+					for ( MsgSyncNode node: nodes ){
 						
-						if ( node_uid_map.size() > 0 ){
+						if ( active_syncs.contains( node )){
 							
-							Iterator<List<MsgSyncNode>>	it = node_uid_map.values().iterator();
+							continue;
+						}
+						
+						if ( node.getFailCount() == 0 ){
 							
-							node = it.next().get(0);
+							not_failed.add( node );
 							
+							if ( node.getLastAlive() > 0 ){
+								
+								live.add( node );
+							}
 						}else{
 							
-							node = null;
+							failed.add( node );
+						}
+					}
+				}
+				
+				if ( prefer_live_sync_outstanding && live.size() > 0 ){
+					
+					prefer_live_sync_outstanding = false;
+					
+					sync_node = live.get( RandomUtils.nextInt( live.size()));
+					
+				}else{
+					
+					int	active_fails = 0;
+					
+					for ( MsgSyncNode node: active_syncs ){
+						
+						if ( node.getFailCount() > 0 ){
+							
+							active_fails++;
 						}
 					}
 					
-					if ( node != null ){
+					if ( active_fails >= MAX_FAIL_SYNC && not_failed.size() > 0 ){
 						
-						sync(node );
+						sync_node = not_failed.get( RandomUtils.nextInt( not_failed.size()));
+					}
+					
+					if ( sync_node == null ){
+						
+						int	num_not_failed = not_failed.size();
+						
+						int rem_size = num_not_failed + failed.size();
+							
+						if ( rem_size > 0 ){
+							
+							int	pos =  RandomUtils.nextInt( rem_size );
+							
+							if ( pos < num_not_failed ){
+								
+								sync_node = not_failed.get( pos );
+								
+							}else{
+								
+								sync_node = failed.get( pos - num_not_failed );
+							}
+						}
+						
 					}
 				}
-			});
+			}
+		}
+			
+		if ( sync_node != null ){
+			
+			final MsgSyncNode	f_sync_node = sync_node;
+			
+			new AEThread2( "MsgSyncHandler:sync"){
+				
+				@Override
+				public void run() {
+					try{
+						
+						sync( f_sync_node );
+						
+					}finally{
+							
+						synchronized( node_uid_map ){
+							
+							active_syncs.remove( f_sync_node );
+						}
+					}
+				}
+			}.start();
+	
+		}
 	}
 	
 	private void
