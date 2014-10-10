@@ -1600,7 +1600,7 @@ I2PHelperPlugin
 							new DistributedDatabaseTransferHandler() {
 								
 								@Override
-								public void 
+								public DistributedDatabaseValue 
 								write(
 									DistributedDatabaseContact 			contact,
 									DistributedDatabaseTransferType 	type, 
@@ -1609,7 +1609,7 @@ I2PHelperPlugin
 												
 									throws DistributedDatabaseException 
 								{
-									
+									return( null );
 								}
 								
 								@Override

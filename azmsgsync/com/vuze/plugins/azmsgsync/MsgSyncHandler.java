@@ -374,6 +374,9 @@ MsgSyncHandler
 	{
 		MsgSyncMessage msg = new MsgSyncMessage( node, message_id, content, signature );
 		
+			// TODO: keep my messages separate so that we retain last X regardless (or at least with a long timeout)
+			// this prevents high message throughput from losing them
+		
 		synchronized( messages ){
 		
 			messages.add( msg );
@@ -681,7 +684,7 @@ MsgSyncHandler
 			}
 		}catch( Throwable e ){
 			
-			e.printStackTrace();
+			// TODO: handle rpc fails
 		}
 	}	
 
@@ -809,13 +812,13 @@ MsgSyncHandler
 		return( null );
 	}
 	
-	public void
+	public byte[]
 	handleWrite(
 		DHTPluginContact	originator,
 		byte[]				key,
 		byte[]				value )
 	{
-		Debug.out( "eh?" );
+		return( handleRead(originator, value ));
 	}
 	
 	private void
