@@ -718,13 +718,16 @@ DHTTransportAZ
 		int	start_pos 	= packet.getStartPosition();
 		int length		= packet.getLength();
 		
-		if ( start_pos != 0 || length != data.length ){
+		if( data.length > 0 ){
 			
-			byte[] temp = new byte[length];
-			
-			System.arraycopy( data, start_pos, temp, 0, length );
-			
-			data	= temp;
+			if ( start_pos != 0 || length != data.length ){
+				
+				byte[] temp = new byte[length];
+				
+				System.arraycopy( data, start_pos, temp, 0, length );
+				
+				data	= temp;
+			}
 		}
 		
 		payload.put( "c", packet.getConnectionId());

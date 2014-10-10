@@ -54,6 +54,9 @@ public class
 MsgSyncPlugin
 	implements Plugin
 {
+	protected static final int	TIMER_PERIOD = 2500;
+	
+	
 	private PluginInterface			plugin_interface;
 	private PluginConfig			plugin_config;
 	private LoggerChannel 			log;
@@ -155,19 +158,23 @@ MsgSyncPlugin
 
 			SimpleTimer.addPeriodicEvent(
 				"MsgSync:periodicSync",
-				2500,
+				TIMER_PERIOD,
 				new TimerEventPerformer() {
+					
+					private int	count = 0;
 					
 					@Override
 					public void 
 					perform(
 						TimerEvent event ) 
 					{
+						count++;
+						
 						if ( sync_handlers.size() > 0 ){
 							
 							for ( MsgSyncHandler handler: sync_handlers ){
 								
-								handler.sync();
+								handler.timerTick( count );
 							}
 						}
 					}

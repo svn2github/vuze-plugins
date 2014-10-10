@@ -267,7 +267,7 @@ I2PHelperAZDHT
 			DHTTransportContact		contact,
 			DHTTransportValue		value )
 		{
-			listener.valueRead( new DHTContactImpl( contact ), new DHTValueImpl( value ));
+			listener.valueRead( new DHTContactImpl( value.getOriginator()), new DHTValueImpl( value ));
 		}
 		
 		public void

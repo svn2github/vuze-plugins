@@ -22,6 +22,8 @@
 
 package com.vuze.plugins.azmsgsync;
 
+import org.gudy.azureus2.core3.util.SystemTime;
+
 import com.aelitis.azureus.plugins.dht.DHTPluginContact;
 
 public class 
@@ -30,6 +32,9 @@ MsgSyncNode
 	private DHTPluginContact		contact;
 	private byte[]					uid;
 	private byte[]					public_key;
+	
+	private volatile long	last_alive;
+	private volatile int	fail_count;
 	
 	protected
 	MsgSyncNode(
@@ -49,6 +54,31 @@ MsgSyncNode
 	{
 		contact			= _contact;
 		public_key		= _public_key;
+	}
+	
+	protected void
+	ok()
+	{
+		last_alive 	= SystemTime.getMonotonousTime();
+		fail_count	= 0;
+	}
+	
+	protected long
+	getLastAlive()
+	{
+		return( last_alive );
+	}
+
+	protected void
+	failed()
+	{
+		fail_count++;
+	}
+
+	protected int
+	getFailCount()
+	{
+		return( fail_count );
 	}
 	
 	public byte[]
