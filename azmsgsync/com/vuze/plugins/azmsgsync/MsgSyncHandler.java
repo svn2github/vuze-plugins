@@ -687,10 +687,10 @@ MsgSyncHandler
 		DHTPluginContact	originator,
 		byte[]				key )
 	{
-		System.out.println( "handle read" );
-		
 		try{
 			Map<String,Object> request_map = BDecoder.decode( key );
+
+			System.out.println( "handle read: " + request_map );
 
 			Map<String,Object> reply_map = new HashMap<String,Object>();
 
