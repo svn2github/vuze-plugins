@@ -453,11 +453,14 @@ MsgSyncHandler
 		
 		synchronized( messages ){
 
-			for ( int i=0;i<32;i++){
+			for ( int i=0;i<64;i++){
 				
 				RandomUtils.nextSecureBytes( rand );
 				
-				List<byte[]>	bloom_keys = new ArrayList<byte[]>();
+					// slight chance of duplicate keys (maybe two nodes share a public key due to a restart)
+					// so just use distinct ones
+				
+				ByteArrayHashMap<String>	bloom_keys = new ByteArrayHashMap<String>();
 				
 				Set<MsgSyncNode>	done_nodes = new HashSet<MsgSyncNode>();
 				
@@ -480,7 +483,7 @@ MsgSyncHandler
 								pub[j] ^= rand[j];
 							}
 							
-							bloom_keys.add( pub );
+							bloom_keys.put( pub, "" );
 						}
 					}
 					
@@ -491,7 +494,7 @@ MsgSyncHandler
 						sig[j] ^= rand[j];
 					}
 					
-					bloom_keys.add( sig );
+					bloom_keys.put( sig, ""  );
 				}
 				
 					// in theory we could have 64 sigs + 64 pks -> 128 -> 1280 bits -> 160 bytes + overhead
@@ -505,7 +508,7 @@ MsgSyncHandler
 				
 				bloom = BloomFilterFactory.createAddOnly( bloom_bits );
 				
-				for ( byte[] k: bloom_keys ){
+				for ( byte[] k: bloom_keys.keys()){
 					
 					if ( bloom.contains( k )){
 						
@@ -523,7 +526,7 @@ MsgSyncHandler
 		
 		if ( bloom == null ){
 			
-			Debug.out( "Too many clashes, bailing" );
+				// clashed too many times, whatever, we'll try again soon
 			
 			return;
 		}
@@ -538,7 +541,7 @@ MsgSyncHandler
 			byte[]	sync_key = BEncoder.encode( sync_map);
 			
 			byte[] reply_bytes = 
-				sync_node.getContact().read(
+				sync_node.getContact().call(
 					new DHTPluginProgressListener() {
 						
 						@Override
