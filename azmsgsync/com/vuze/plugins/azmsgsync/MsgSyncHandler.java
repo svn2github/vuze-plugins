@@ -82,10 +82,7 @@ MsgSyncHandler
 	
 	private ByteArrayHashMap<List<MsgSyncNode>>		node_uid_map 	= new ByteArrayHashMap<List<MsgSyncNode>>();
 	
-		// this is linked to the bloom filter size which in turn is limited by the max transfer
-		// key size of 255 bytes....
-	
-	private static final int				MAX_BLOOM_BITS	= 200*8;
+
 	private static final int				MIN_BLOOM_BITS	= 64*8;
 	
 	private static final int				MAX_MESSAGES	= 64;
@@ -502,7 +499,7 @@ MsgSyncHandler
 				
 					// in theory we could have 64 sigs + 64 pks -> 128 -> 1280 bits -> 160 bytes + overhead
 				
-				int	bloom_bits = bloom_keys.size() * 10;
+				int	bloom_bits = bloom_keys.size() * 20;
 					
 				if ( bloom_bits < MIN_BLOOM_BITS ){
 				
@@ -534,14 +531,16 @@ MsgSyncHandler
 			return;
 		}
 		
-		Map sync_map = new HashMap();
+		Map request_map = new HashMap();
 		
-		sync_map.put( "u", my_uid );
-		sync_map.put( "b", bloom.serialiseToMap());
-		sync_map.put( "r", rand );
+		request_map.put( "t", 0 );		// type
 		
+		request_map.put( "u", my_uid );
+		request_map.put( "b", bloom.serialiseToMap());
+		request_map.put( "r", rand );
+				
 		try{
-			byte[]	sync_key = BEncoder.encode( sync_map);
+			byte[]	sync_data = BEncoder.encode( request_map );
 			
 			byte[] reply_bytes = 
 				sync_node.getContact().call(
@@ -549,74 +548,101 @@ MsgSyncHandler
 						
 						@Override
 						public void reportSize(long size) {
-							// TODO Auto-generated method stub
-							
 						}
 						
 						@Override
 						public void reportCompleteness(int percent) {
-							// TODO Auto-generated method stub
-							
 						}
 						
 						@Override
 						public void reportActivity(String str) {
-							// TODO Auto-generated method stub
-							
 						}
 					},
 					dht_key,
-					sync_key, 
+					sync_data, 
 					30*1000 );
 		
 			if ( reply_bytes != null ){
 
 				Map reply_map = BDecoder.decode( reply_bytes );
 
-				System.out.println( "reply: " + reply_map + " from " + sync_node.getName());
-				
-				int status = ((Number)reply_map.get( "s" )).intValue();
-				
-				if ( status == STATUS_LOOPBACK ){
+				int	type = reply_map.containsKey( "t" )?((Number)reply_map.get( "t" )).intValue():-1; 
+
+				if ( type != 1 ){
+					
+					// meh, issue with 'call' implementation when made to self - you end up getting the
+					// original request data back as the result :( Can't currently see how to easily fix
+					// this so handle it for the moment
+
 					
 					removeNode( sync_node );
 					
 				}else{
-					List<Map<String,Object>>	list = (List<Map<String,Object>>)reply_map.get( "m" );
+					System.out.println( "reply: " + reply_map + " from " + sync_node.getName());
 					
-					if ( list != null ){
+					int status = ((Number)reply_map.get( "s" )).intValue();
+					
+					if ( status == STATUS_LOOPBACK ){
 						
-						for ( Map<String,Object> m: list ){
+						removeNode( sync_node );
+						
+					}else{
+						
+						List<Map<String,Object>>	list = (List<Map<String,Object>>)reply_map.get( "m" );
+						
+						if ( list != null ){
 							
-							try{
-								byte[] node_uid		= (byte[])m.get( "u" );
-								byte[] message_id 	= (byte[])m.get( "i" );
-								byte[] content		= (byte[])m.get( "c" );
-								byte[] signature	= (byte[])m.get( "s" );
+							for ( Map<String,Object> m: list ){
 								
-									// these won't be present if remote believes we already have it (subject to occasional bloom false positives)
-								
-								byte[] 	public_key		= (byte[])m.get( "p" );
-								
-								Map<String,Object>		contact_map		= (Map<String,Object>)m.get( "k" );
-								
-								System.out.println( "Got " + ByteFormatter.encodeString( message_id ) + ": " + new String( content ));
-																
-								boolean handled = false;
-								
-									// see if we already have a node with the correct public key
-								
-								List<MsgSyncNode> nodes = getNodes( node_uid );
-								
-								if ( nodes != null ){
+								try{
+									byte[] node_uid		= (byte[])m.get( "u" );
+									byte[] message_id 	= (byte[])m.get( "i" );
+									byte[] content		= (byte[])m.get( "c" );
+									byte[] signature	= (byte[])m.get( "s" );
 									
-									for ( MsgSyncNode node: nodes ){
+										// these won't be present if remote believes we already have it (subject to occasional bloom false positives)
+									
+									byte[] 	public_key		= (byte[])m.get( "p" );
+									
+									Map<String,Object>		contact_map		= (Map<String,Object>)m.get( "k" );
+									
+									System.out.println( "Got " + ByteFormatter.encodeString( message_id ) + ": " + new String( content ));
+																	
+									boolean handled = false;
+									
+										// see if we already have a node with the correct public key
+									
+									List<MsgSyncNode> nodes = getNodes( node_uid );
+									
+									if ( nodes != null ){
 										
-										byte[] pk = node.getPublicKey();
-										
-										if ( pk != null ){
+										for ( MsgSyncNode node: nodes ){
 											
-											Signature sig = CryptoECCUtils.getSignature( CryptoECCUtils.rawdataToPubkey( pk ));
+											byte[] pk = node.getPublicKey();
+											
+											if ( pk != null ){
+												
+												Signature sig = CryptoECCUtils.getSignature( CryptoECCUtils.rawdataToPubkey( pk ));
+												
+												sig.update( node_uid );
+												sig.update( message_id );
+												sig.update( content );
+												
+												if ( sig.verify( signature )){
+													
+													addMessage( node, message_id, content, signature );
+													
+													handled = true;
+												}
+											}
+										}
+									}
+										
+									if ( !handled ){
+										
+										if ( public_key != null ){
+											
+											Signature sig = CryptoECCUtils.getSignature( CryptoECCUtils.rawdataToPubkey( public_key ));
 											
 											sig.update( node_uid );
 											sig.update( message_id );
@@ -624,59 +650,40 @@ MsgSyncHandler
 											
 											if ( sig.verify( signature )){
 												
-												addMessage( node, message_id, content, signature );
+												DHTPluginContact contact = dht.importContact( contact_map );
 												
-												handled = true;
-											}
-										}
-									}
-								}
-									
-								if ( !handled ){
-									
-									if ( public_key != null ){
-										
-										Signature sig = CryptoECCUtils.getSignature( CryptoECCUtils.rawdataToPubkey( public_key ));
-										
-										sig.update( node_uid );
-										sig.update( message_id );
-										sig.update( content );
-										
-										if ( sig.verify( signature )){
-											
-											DHTPluginContact contact = dht.importContact( contact_map );
-											
-											MsgSyncNode msg_node = null;
-											
-												// look for existing node without public key that we can use
-											
-											if ( nodes != null ){
+												MsgSyncNode msg_node = null;
 												
-												for ( MsgSyncNode node: nodes ){
+													// look for existing node without public key that we can use
+												
+												if ( nodes != null ){
 													
-													if ( node.getPublicKey() == null ){
+													for ( MsgSyncNode node: nodes ){
 														
-														node.setDetails( contact, public_key );
-														
-														msg_node = node;
+														if ( node.getPublicKey() == null ){
+															
+															node.setDetails( contact, public_key );
+															
+															msg_node = node;
+														}
 													}
 												}
-											}
-											if ( msg_node == null ){
-											
-												msg_node = addNode( contact, node_uid, public_key );
-											}
-											
-											if ( msg_node != null ){
+												if ( msg_node == null ){
 												
-												addMessage( msg_node, message_id, content, signature );
+													msg_node = addNode( contact, node_uid, public_key );
+												}
+												
+												if ( msg_node != null ){
+													
+													addMessage( msg_node, message_id, content, signature );
+												}
 											}
 										}
 									}
+								}catch( Throwable e ){
+									
+									Debug.out( e );
 								}
-							}catch( Throwable e ){
-								
-								Debug.out( e );
 							}
 						}
 					}
@@ -684,6 +691,7 @@ MsgSyncHandler
 			}
 		}catch( Throwable e ){
 			
+			e.printStackTrace();
 			// TODO: handle rpc fails
 		}
 	}	
@@ -696,7 +704,14 @@ MsgSyncHandler
 		try{
 			Map<String,Object> request_map = BDecoder.decode( key );
 
-			System.out.println( "handle read: " + request_map );
+			int	type = request_map.containsKey( "t" )?((Number)request_map.get( "t" )).intValue():-1; 
+
+			if ( type != 0 ){
+				
+				return( null );
+			}
+			
+			System.out.println( "request: " + request_map );
 
 			Map<String,Object> reply_map = new HashMap<String,Object>();
 
@@ -802,6 +817,8 @@ MsgSyncHandler
 			
 			reply_map.put( "s", status );
 			
+			reply_map.put( "t", 1 );		// type
+
 			return( BEncoder.encode( reply_map ));
 			
 		}catch( Throwable e ){
@@ -815,10 +832,13 @@ MsgSyncHandler
 	public byte[]
 	handleWrite(
 		DHTPluginContact	originator,
-		byte[]				key,
+		byte[]				call_key,
 		byte[]				value )
 	{
-		return( handleRead(originator, value ));
+			// switched to using 'call' to allow larger bloom sizes - in this case we come in
+			// here with a unique rcp key for the 'key and the value is the payload
+		
+		return( handleRead( originator, value ));
 	}
 	
 	private void
@@ -829,10 +849,9 @@ MsgSyncHandler
 	}
 	
 
-	
 	protected String
 	getString()
 	{
-		return( dht + "/" + ByteFormatter.encodeString( dht_key ) + "/" + new String( user_key ));
+		return( dht.getNetwork() + "/" + ByteFormatter.encodeString( dht_key ) + "/" + new String( user_key ));
 	}
 }
