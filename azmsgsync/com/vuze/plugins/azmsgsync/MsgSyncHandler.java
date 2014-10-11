@@ -88,14 +88,14 @@ MsgSyncHandler
 	private MsgSyncNode			my_node;
 	
 	private ByteArrayHashMap<List<MsgSyncNode>>		node_uid_map 		= new ByteArrayHashMap<List<MsgSyncNode>>();
-	private ByteArrayHashMap<String>				node_uid_loopbacks	= new ByteArrayHashMap<String>();
+	private ByteArrayHashMap<MsgSyncNode>			node_uid_loopbacks	= new ByteArrayHashMap<MsgSyncNode>();
 
 	private static final int				MIN_BLOOM_BITS	= 64*8;
 	
 	private static final int				MAX_OTHER_MESSAGES	= 64;
 	private static final int				MAX_MY_MESSAGES		= 16;
 	
-	private static final int				MAX_NODES			= 64;
+	private static final int				MAX_NODES			= 128;
 
 	
 		// TODO: figure this out - once messages start being removed we need to limit the
@@ -307,11 +307,28 @@ MsgSyncHandler
 				List<MsgSyncNode>	not_failing	 	= new ArrayList<MsgSyncNode>( MAX_NODES*2 );
 				List<MsgSyncNode>	failing 		= new ArrayList<MsgSyncNode>( MAX_NODES*2 );
 				
+				Map<String,List<MsgSyncNode>>	address_map = new HashMap<String, List<MsgSyncNode>>();
+				
+				System.out.println( "Current nodes: ");
+				
 				for ( List<MsgSyncNode> nodes: node_uid_map.values()){
 					
 					for ( MsgSyncNode node: nodes ){
 						
+						System.out.println( "    " + node.getContact().getAddress() + "/" + ByteFormatter.encodeString( node.getUID()));
+						
 						total++;
+						
+						String c_key = getString( node.getContact());
+						
+						List<MsgSyncNode> x = address_map.get( c_key );
+						
+						if ( x == null ){
+							
+							x = new ArrayList<MsgSyncNode>();
+							
+							address_map.put( c_key, x );
+						}
 						
 						if ( node.getFailCount() > 0 ){
 							
@@ -402,12 +419,15 @@ MsgSyncHandler
 	{				
 		byte[] uid = (byte[])map.get( "u" );
 				
-			// we have no verification as to validity of the contact/uid at this point - it'll get checked later
-			// if/when we obtain its public key
-		
-		if ( addNode( contact, uid, null ) != null ){
-		
-			sync();
+		if ( uid != null ){
+			
+				// we have no verification as to validity of the contact/uid at this point - it'll get checked later
+				// if/when we obtain its public key
+			
+			if ( addNode( contact, uid, null ) != my_node ){
+			
+				sync();
+			}
 		}
 	}
 	
@@ -417,16 +437,21 @@ MsgSyncHandler
 		byte[]					uid,
 		byte[]					public_key )
 	{
-		if ( uid == null || uid == my_uid ){
+			// we need to always return a node as it is required to create associated messages and we have to create each message otherwise
+			// we'll keep on getting it from other nodes
+		
+		if ( uid == my_uid ){
 			
-			return( null );
+			return( my_node );
 		}
 		
 		synchronized( node_uid_map ){
 			
-			if ( node_uid_loopbacks.containsKey( uid )){
+			MsgSyncNode loop = node_uid_loopbacks.get( uid );
 				
-				return( null );
+			if ( loop != null ){
+				
+				return( loop );
 			}
 			
 			List<MsgSyncNode> nodes = node_uid_map.get( uid );
@@ -470,7 +495,7 @@ MsgSyncHandler
 			
 			if ( is_loopback ){
 				
-				node_uid_loopbacks.put( node_id, "" );
+				node_uid_loopbacks.put( node_id, node );
 			}
 			
 			List<MsgSyncNode> nodes = node_uid_map.get( node_id );
@@ -504,6 +529,22 @@ MsgSyncHandler
 			}
 			
 			return( nodes );
+		}
+	}
+	
+	private String
+	getString(
+		DHTPluginContact		c )
+	{
+		InetSocketAddress a = c.getAddress();
+		
+		if ( a.isUnresolved()){
+			
+			return( a.getHostName() + ":" + a.getPort());
+			
+		}else{
+			
+			return( a.getAddress().getHostAddress() + ":" + a.getPort());
 		}
 	}
 	
@@ -638,107 +679,117 @@ MsgSyncHandler
 				return;
 			}
 			
-			synchronized( node_uid_map ){
+			Set<String>	active_addresses = new HashSet<String>();
+			
+			for ( MsgSyncNode n: active_syncs ){
 				
-				List<MsgSyncNode>	not_failed 	= new ArrayList<MsgSyncNode>();
-				List<MsgSyncNode>	failed 		= new ArrayList<MsgSyncNode>();
-				List<MsgSyncNode>	live 		= new ArrayList<MsgSyncNode>();
-				
-				for ( List<MsgSyncNode> nodes: node_uid_map.values()){
-					
-					for ( MsgSyncNode node: nodes ){
-						
-						if ( active_syncs.contains( node )){
+				active_addresses.add( getString( n.getContact()));
+			}
 							
+			List<MsgSyncNode>	not_failed 	= new ArrayList<MsgSyncNode>();
+			List<MsgSyncNode>	failed 		= new ArrayList<MsgSyncNode>();
+			List<MsgSyncNode>	live 		= new ArrayList<MsgSyncNode>();
+			
+			for ( List<MsgSyncNode> nodes: node_uid_map.values()){
+				
+				for ( MsgSyncNode node: nodes ){
+					
+					if ( active_syncs.size() > 0 ){
+					
+						if ( active_syncs.contains( node ) || active_addresses.contains( getString( node.getContact()))){
+						
 							continue;
 						}
-						
-						if ( node.getFailCount() == 0 ){
-							
-							not_failed.add( node );
-							
-							if ( node.getLastAlive() > 0 ){
-								
-								live.add( node );
-							}
-						}else{
-							
-							failed.add( node );
-						}
 					}
-				}
-				
-				if ( prefer_live_sync_outstanding && live.size() > 0 ){
-					
-					prefer_live_sync_outstanding = false;
-					
-					sync_node = live.get( RandomUtils.nextInt( live.size()));
-					
-				}else{
-					
-					int	active_fails = 0;
-					
-					for ( MsgSyncNode node: active_syncs ){
+										
+					if ( node.getFailCount() == 0 ){
 						
-						if ( node.getFailCount() > 0 ){
+						not_failed.add( node );
+						
+						if ( node.getLastAlive() > 0 ){
 							
-							active_fails++;
+							live.add( node );
 						}
-					}
-					
-					if ( active_fails >= MAX_FAIL_SYNC && not_failed.size() > 0 ){
+					}else{
 						
-						sync_node = not_failed.get( RandomUtils.nextInt( not_failed.size()));
-					}
-					
-					if ( sync_node == null ){
-						
-						int	num_not_failed = not_failed.size();
-						
-						int rem_size = num_not_failed + failed.size();
-							
-						if ( rem_size > 0 ){
-							
-							int	pos =  RandomUtils.nextInt( rem_size );
-							
-							if ( pos < num_not_failed ){
-								
-								sync_node = not_failed.get( pos );
-								
-							}else{
-								
-								sync_node = failed.get( pos - num_not_failed );
-							}
-						}
-						
+						failed.add( node );
 					}
 				}
 			}
-		}
 			
-		if ( sync_node != null ){
-			
-			final MsgSyncNode	f_sync_node = sync_node;
-			
-			new AEThread2( "MsgSyncHandler:sync"){
+			if ( prefer_live_sync_outstanding && live.size() > 0 ){
 				
-				@Override
-				public void run() {
-					try{
+				prefer_live_sync_outstanding = false;
+				
+				sync_node = live.get( RandomUtils.nextInt( live.size()));
+				
+			}else{
+				
+				int	active_fails = 0;
+				
+				for ( MsgSyncNode node: active_syncs ){
+					
+					if ( node.getFailCount() > 0 ){
 						
-						sync( f_sync_node );
-						
-					}finally{
-							
-						synchronized( node_uid_map ){
-							
-							active_syncs.remove( f_sync_node );
-						}
+						active_fails++;
 					}
 				}
-			}.start();
-	
+				
+				if ( active_fails >= MAX_FAIL_SYNC && not_failed.size() > 0 ){
+					
+					sync_node = not_failed.get( RandomUtils.nextInt( not_failed.size()));
+				}
+				
+				if ( sync_node == null ){
+					
+					int	num_not_failed = not_failed.size();
+					
+					int rem_size = num_not_failed + failed.size();
+						
+					if ( rem_size > 0 ){
+						
+						int	pos =  RandomUtils.nextInt( rem_size );
+						
+						if ( pos < num_not_failed ){
+							
+							sync_node = not_failed.get( pos );
+							
+						}else{
+							
+							sync_node = failed.get( pos - num_not_failed );
+						}
+					}
+					
+				}
+			}
+			
+			if ( sync_node == null ){
+				
+				return;
+			}
+			
+			active_syncs.add( sync_node );
 		}
+						
+		final MsgSyncNode	f_sync_node = sync_node;
+		
+		new AEThread2( "MsgSyncHandler:sync"){
+			
+			@Override
+			public void run() {
+				try{
+					
+					sync( f_sync_node );
+					
+				}finally{
+						
+					synchronized( node_uid_map ){
+						
+						active_syncs.remove( f_sync_node );
+					}
+				}
+			}
+		}.start();
 	}
 	
 	private void
@@ -978,11 +1029,8 @@ MsgSyncHandler
 											
 												msg_node = addNode( contact, node_uid, public_key );
 											}
-											
-											if ( msg_node != null ){
-												
-												addMessage( msg_node, message_id, content, signature );
-											}
+																						
+											addMessage( msg_node, message_id, content, signature );
 										}
 									}
 								}
