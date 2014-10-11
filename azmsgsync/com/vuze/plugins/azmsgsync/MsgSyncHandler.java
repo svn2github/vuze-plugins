@@ -407,6 +407,12 @@ MsgSyncHandler
 				
 				checkDHT( false );
 			}
+		
+			synchronized( message_lock ){
+	
+				log( "Message status: mine=" + my_messages.size() + ", other=" + other_messages.size());
+	
+			}
 		}
 		
 		sync();
@@ -674,6 +680,8 @@ MsgSyncHandler
 				prefer_live_sync_outstanding = true;
 			}
 			
+			System.out.println( "Sync: active=" + active_syncs );
+			
 			if ( active_syncs.size() > MAX_CONC_SYNC ){
 				
 				return;
@@ -762,6 +770,8 @@ MsgSyncHandler
 					
 				}
 			}
+			
+			System.out.println( "    selected " + (sync_node==null?"none":sync_node.getName()));
 			
 			if ( sync_node == null ){
 				
@@ -962,7 +972,7 @@ MsgSyncHandler
 								
 								Map<String,Object>		contact_map		= (Map<String,Object>)m.get( "k" );
 								
-								System.out.println( "Got " + ByteFormatter.encodeString( message_id ) + ": " + new String( content ));
+								log( "Message: " + ByteFormatter.encodeString( message_id ) + ": " + new String( content ));
 																
 								boolean handled = false;
 								
