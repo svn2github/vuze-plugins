@@ -22,6 +22,8 @@
 
 package com.vuze.plugins.azmsgsync;
 
+import org.gudy.azureus2.core3.util.SystemTime;
+
 public class 
 MsgSyncMessage 
 {
@@ -33,17 +35,24 @@ MsgSyncMessage
 	
 	private byte[]			signature;
 	
+	private int				age_when_received_secs;
+	private long			time_received;
+	
 	protected
 	MsgSyncMessage(
 		MsgSyncNode		_node,
 		byte[]			_message_id,
 		byte[]			_content,
-		byte[]			_signature )
+		byte[]			_signature,
+		int				_age_secs )
 	{
 		node		= _node;
 		message_id	= _message_id;
 		content		= _content;
 		signature	= _signature;
+		
+		age_when_received_secs	= _age_secs;
+		time_received			= SystemTime.getMonotonousTime();
 	}
 	
 	public MsgSyncNode
@@ -56,6 +65,12 @@ MsgSyncMessage
 	getID()
 	{
 		return( message_id );
+	}
+	
+	public int
+	getAgeSecs()
+	{
+		return((int)( age_when_received_secs + (( SystemTime.getMonotonousTime() - time_received )/1000)));
 	}
 	
 	/*

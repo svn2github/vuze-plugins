@@ -228,6 +228,45 @@ I2PHelperDHTPluginInterface
 		}	
 	}	
 	
+	public void
+	unregisterHandler(
+		final byte[]					handler_key,
+		final DHTPluginTransferHandler	handler )
+	{
+		if ( dht != null && dispatcher.getQueueSize() == 0 ){
+			
+			dht.unregisterHandler( handler_key, handler );
+		
+		}else{
+						
+			dispatcher.dispatch(
+				new AERunnable() {
+					
+					@Override
+					public void 
+					runSupport() 
+					{
+						I2PHelperAZDHT	dht_to_use = dht;
+						
+						if ( dht_to_use == null ){
+							
+							init_sem.reserve();
+							
+							dht_to_use = dht;
+						}
+						
+						if ( dht_to_use != null ){
+						
+							dht_to_use.unregisterHandler( handler_key, handler );
+							
+						}else{
+							
+							Debug.out( "Failed to initialise DHT" );
+						}
+					}
+				});
+		}	
+	}	
 
 	public DHTPluginContact
 	importContact(

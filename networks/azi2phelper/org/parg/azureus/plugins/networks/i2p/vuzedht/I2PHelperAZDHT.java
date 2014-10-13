@@ -22,6 +22,7 @@
 package org.parg.azureus.plugins.networks.i2p.vuzedht;
 
 import java.net.InetSocketAddress;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.gudy.azureus2.core3.util.Debug;
@@ -136,14 +137,15 @@ I2PHelperAZDHT
 		}
 	}
 	
+	private Map<DHTPluginTransferHandler,DHTTransportTransferHandler>	handler_map = new HashMap<DHTPluginTransferHandler, DHTTransportTransferHandler>();
+	
 	public void
 	registerHandler(
 		byte[]							handler_key,
 		final DHTPluginTransferHandler	handler )
 	{		
 		try{
-			getDHT().getTransport().registerTransferHandler( 
-				handler_key,
+			DHTTransportTransferHandler h =	
 				new DHTTransportTransferHandler()
 				{
 					public String
@@ -168,10 +170,52 @@ I2PHelperAZDHT
 					{
 						return( handler.handleWrite( new DHTContactImpl( originator ), key, value ));
 					}
-				});
+				};
+				
+			synchronized( handler_map ){
+				
+				if ( handler_map.containsKey( handler )){
+					
+					Debug.out( "Warning: handler already exists" );
+				}else{
+					
+					handler_map.put( handler, h );
+				}
+			}
+			
+			getDHT().getTransport().registerTransferHandler( handler_key, h );
+
 		}catch( Throwable e ){
 			
 			Debug.out( e );
+		}
+	}
+	
+	public void
+	unregisterHandler(
+		byte[]							handler_key,
+		final DHTPluginTransferHandler	handler )
+	{		
+		DHTTransportTransferHandler h;
+		
+		synchronized( handler_map ){
+		
+			h = handler_map.remove( handler );
+		}
+		
+		if ( h == null ){
+			
+			Debug.out( "Mapping not found for handler" );
+			
+		}else{
+			
+			try{
+				getDHT().getTransport().unregisterTransferHandler( handler_key, h );
+
+			}catch( Throwable e ){
+				
+				Debug.out( e );
+			}
 		}
 	}
 	

@@ -26,13 +26,16 @@ package com.vuze.plugins.azmsgsync;
 import java.util.*;
 
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
+import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.SimpleTimer;
 import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
+import org.gudy.azureus2.core3.util.TimerEventPeriodic;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabase;
+import org.gudy.azureus2.plugins.ipc.IPCException;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
 import org.gudy.azureus2.plugins.ui.UIManager;
@@ -52,13 +55,12 @@ import com.aelitis.azureus.plugins.dht.DHTPluginInterface;
 
 public class 
 MsgSyncPlugin
-	implements Plugin
+	implements UnloadablePlugin
 {
 	protected static final int	TIMER_PERIOD = 2500;
 	
 	
 	private PluginInterface			plugin_interface;
-	private PluginConfig			plugin_config;
 	private LoggerChannel 			log;
 	private BasicPluginConfigModel 	config_model;
 	private BasicPluginViewModel	view_model;
@@ -66,6 +68,13 @@ MsgSyncPlugin
 
 	private CopyOnWriteList<MsgSyncHandler>	sync_handlers = new CopyOnWriteList<MsgSyncHandler>();
 
+	private TimerEventPeriodic		timer;
+	
+	private volatile boolean		init_called;
+	private volatile boolean		destroyed;
+	
+	private AESemaphore				init_sem = new AESemaphore( "MsgSync:init" );
+	
 	public void 
 	initialize(
 		PluginInterface _plugin_interface )
@@ -73,119 +82,166 @@ MsgSyncPlugin
 		throws PluginException 
 	{
 		try{
-			plugin_interface	= _plugin_interface;
-			
-			loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
-			
-			log	= plugin_interface.getLogger().getTimeStampedChannel( "Message Sync");
-			
-			final UIManager	ui_manager = plugin_interface.getUIManager();
-
-			view_model = ui_manager.createBasicPluginViewModel( loc_utils.getLocalisedMessageText( "azmsgsync.name" ));
-
-			view_model.getActivity().setVisible( false );
-			view_model.getProgress().setVisible( false );
-			
-					
-			plugin_config = plugin_interface.getPluginconfig();
-						
-			config_model = ui_manager.createBasicPluginConfigModel( "plugins", "azmsgsync.name" );
-
-			view_model.setConfigSectionID( "azmsgsync.name" );
-			
-			final StringParameter 	command_text_param = config_model.addStringParameter2( "azmsgsync.cmd.text", "azi2phelper.cmd.text", "" );
-			final ActionParameter	command_exec_param = config_model.addActionParameter2( "azmsgsync.cmd.act1", "azi2phelper.cmd.act2" );
-			
-			final UITextArea text_area = config_model.addTextArea( "azmsgsync.statuslog");
-
-			command_exec_param.addListener(
-				new ParameterListener() 
-				{
-					public void 
-					parameterChanged(
-						Parameter param ) 
+			synchronized( this ){
+				
+				init_called = true;
+				
+				plugin_interface	= _plugin_interface;
+				
+				loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
+				
+				log	= plugin_interface.getLogger().getTimeStampedChannel( "Message Sync");
+				
+				final UIManager	ui_manager = plugin_interface.getUIManager();
+	
+				view_model = ui_manager.createBasicPluginViewModel( loc_utils.getLocalisedMessageText( "azmsgsync.name" ));
+	
+				view_model.getActivity().setVisible( false );
+				view_model.getProgress().setVisible( false );
+											
+				config_model = ui_manager.createBasicPluginConfigModel( "plugins", "azmsgsync.name" );
+	
+				view_model.setConfigSectionID( "azmsgsync.name" );
+				
+				final StringParameter 	command_text_param = config_model.addStringParameter2( "azmsgsync.cmd.text", "azi2phelper.cmd.text", "" );
+				final ActionParameter	command_exec_param = config_model.addActionParameter2( "azmsgsync.cmd.act1", "azi2phelper.cmd.act2" );
+				
+				final UITextArea text_area = config_model.addTextArea( "azmsgsync.statuslog");
+	
+				command_exec_param.addListener(
+					new ParameterListener() 
 					{
-						new AEThread2( "cmdrunner" )
+						public void 
+						parameterChanged(
+							Parameter param ) 
 						{
-							public void
-							run()
+							new AEThread2( "cmdrunner" )
 							{
-								try{
-									command_exec_param.setEnabled( false );
-
-									executeCommand(	command_text_param.getValue());
-																	
-								}catch( Throwable e){
-									
-									log( "Command failed: " + Debug.getNestedExceptionMessage( e ));
-									
-								}finally{
-									
-									command_exec_param.setEnabled( true );
+								public void
+								run()
+								{
+									try{
+										command_exec_param.setEnabled( false );
+	
+										executeCommand(	command_text_param.getValue());
+																		
+									}catch( Throwable e){
+										
+										log( "Command failed: " + Debug.getNestedExceptionMessage( e ));
+										
+									}finally{
+										
+										command_exec_param.setEnabled( true );
+									}
 								}
-							}
-						}.start();
-					}
-				});
-
-			log.addListener(
-					new LoggerChannelListener()
-					{
-						public void
-						messageLogged(
-							int		type,
-							String	content )
-						{
-							view_model.getLogArea().appendText( content + "\n" );
-							
-							text_area.appendText( content + "\n" );
-						}
-						
-						public void
-						messageLogged(
-							String		str,
-							Throwable	error )
-						{
-							view_model.getLogArea().appendText( str + "\n" );
-							view_model.getLogArea().appendText( error.toString() + "\n" );
-							
-							String text = str + ": " + Debug.getNestedExceptionMessage( error );
-							
-							text_area.appendText( text + "\n" );
-
+							}.start();
 						}
 					});
-
-			SimpleTimer.addPeriodicEvent(
-				"MsgSync:periodicSync",
-				TIMER_PERIOD,
-				new TimerEventPerformer() {
-					
-					private int	count = 0;
-					
-					@Override
-					public void 
-					perform(
-						TimerEvent event ) 
-					{
-						count++;
-						
-						if ( sync_handlers.size() > 0 ){
-							
-							for ( MsgSyncHandler handler: sync_handlers ){
+	
+				log.addListener(
+						new LoggerChannelListener()
+						{
+							public void
+							messageLogged(
+								int		type,
+								String	content )
+							{
+								view_model.getLogArea().appendText( content + "\n" );
 								
-								handler.timerTick( count );
+								text_area.appendText( content + "\n" );
+							}
+							
+							public void
+							messageLogged(
+								String		str,
+								Throwable	error )
+							{
+								view_model.getLogArea().appendText( str + "\n" );
+								view_model.getLogArea().appendText( error.toString() + "\n" );
+								
+								String text = str + ": " + Debug.getNestedExceptionMessage( error );
+								
+								text_area.appendText( text + "\n" );
+	
+							}
+						});
+	
+				timer = SimpleTimer.addPeriodicEvent(
+					"MsgSync:periodicSync",
+					TIMER_PERIOD,
+					new TimerEventPerformer() {
+						
+						private int	count = 0;
+						
+						@Override
+						public void 
+						perform(
+							TimerEvent event ) 
+						{
+							count++;
+							
+							if ( sync_handlers.size() > 0 ){
+								
+								for ( MsgSyncHandler handler: sync_handlers ){
+									
+									handler.timerTick( count );
+								}
 							}
 						}
-					}
-				});
-			
+					});
+			}	
 		}catch( Throwable e){
 			
 			throw( new PluginException( "Initialization failed", e ));
+			
+		}finally{
+			
+			init_sem.releaseForever();
+			
+			if ( destroyed ){
+				
+				unload();
+			}
 		}
 	}
 
+	public void
+	unload()
+	{
+		destroyed = true;
+		
+		synchronized( this ){
+			
+			if ( timer != null ){
+				
+				timer.cancel();
+				
+				timer = null;
+			}
+			
+			for ( MsgSyncHandler handler: sync_handlers ){
+				
+				handler.destroy();
+			}
+			
+			sync_handlers.clear();
+			
+			if ( view_model != null ){
+				
+				view_model.destroy();
+				
+				view_model = null;
+			}
+			
+			if ( config_model != null ){
+				
+				config_model.destroy();
+				
+				config_model = null;
+			}
+		}
+	}
+	
 	private void
 	executeCommand(
 		String		cmd_str )
@@ -253,6 +309,124 @@ MsgSyncPlugin
 		}
 	}
 	
+		// IPC start
+	
+	public Map<String,Object>
+	getMessageHandler(
+		Map<String,Object>		options )
+		
+		throws IPCException
+	{
+		synchronized( this ){
+			
+			if ( !init_called ){
+				
+				throw( new IPCException( "Not initialised" ));
+			}
+		}
+		
+		init_sem.reserve();
+		
+		Map<String,Object>	reply = new HashMap<String, Object>();
+		
+		String		network = (String)options.get( "network" );
+		byte[]		key		= (byte[])options.get( "key" );
+		
+		DHTPluginInterface dht;
+		
+		if ( network == null || network == AENetworkClassifier.AT_PUBLIC ){
+			
+			dht = ((DDBaseImpl)plugin_interface.getDistributedDatabase()).getDHTPlugin();
+
+		}else if ( network == AENetworkClassifier.AT_I2P ){
+			
+			List<DistributedDatabase> ddbs = plugin_interface.getUtilities().getDistributedDatabases( new String[]{ AENetworkClassifier.AT_I2P });
+			
+			if ( ddbs.size() == 0 ){
+				
+				throw( new IPCException( "No I2P DDB Available" ));
+			}
+			
+			dht = ((DDBaseImpl)ddbs.get(0)).getDHTPlugin();
+			
+		}else{
+			
+			throw( new IPCException( "Unsupported network: " + network ));
+		}
+				
+		MsgSyncHandler handler = getSyncHandler( dht, key );
+
+		Object listener = options.get( "listener" );
+		
+		if ( listener != null ){
+			
+			MsgSyncListener l = 
+				new MsgSyncListener()
+				{
+					@Override
+					public void 
+					messageReceived(
+						MsgSyncMessage message) 
+					{
+					
+					}
+				};
+				
+			handler.addListener( l ); 
+			
+			List<MsgSyncMessage> messages = handler.getMessages();
+			
+			for ( MsgSyncMessage msg: messages ){
+				
+				try{
+					l.messageReceived( msg );
+					
+				}catch( Throwable e ){
+					
+					Debug.out( e );
+				}
+			}
+		}
+		
+		reply.put( "handler", handler );
+		
+		synchronized( this ){
+			
+			if ( destroyed ){
+				
+				throw( new IPCException( "Plugin unloaded" ));
+			}
+		}
+		
+		return( reply );
+	}
+	
+	public Map<String,Object>
+	sendMessage(
+		Map<String,Object>		handler_map,
+		Map<String,Object>		message )
+		
+		throws IPCException
+	{
+		byte[]		content		= (byte[])message.get( "key" );
+
+		MsgSyncHandler handler = (MsgSyncHandler)handler_map.get( "handler" );
+		
+		if ( handler.getPlugin() != this ){
+			
+			throw( new IPCException( "Plugin has been unloaded" ));
+		}
+		
+		handler.sendMessage( content );
+		
+		Map<String,Object>	reply = new HashMap<String, Object>();
+
+		return( reply );
+	}
+	
+	
+		// IPC end
+	
 	public void
 	log(
 		String	str )
@@ -288,8 +462,15 @@ MsgSyncPlugin
 	getSyncHandler(
 		DHTPluginInterface		dht,
 		byte[]					key )
+		
+		throws IPCException
 	{
-		synchronized( sync_handlers ){
+		synchronized( this ){
+			
+			if ( destroyed ){
+				
+				throw( new IPCException( "Plugin unloaded" ));
+			}
 			
 			for ( MsgSyncHandler h: sync_handlers ){
 				
@@ -308,9 +489,7 @@ MsgSyncPlugin
 				
 			}catch( Throwable e ){
 				
-				Debug.out( e );
-				
-				return( null );
+				throw( new IPCException( "Failed to create message handler", e ));
 			}
 		}
 	}

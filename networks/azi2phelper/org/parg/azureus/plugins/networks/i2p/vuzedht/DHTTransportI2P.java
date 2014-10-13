@@ -2220,6 +2220,14 @@ DHTTransportI2P
 		throw( new RuntimeException( "Not Supported" ));
 	}
 	
+	public void
+	unregisterTransferHandler(
+		byte[]						handler_key,
+		DHTTransportTransferHandler	handler )
+	{
+		throw( new RuntimeException( "Not Supported" ));
+	}
+	
 	public byte[]
 	readTransfer(
 		DHTTransportProgressListener	listener,

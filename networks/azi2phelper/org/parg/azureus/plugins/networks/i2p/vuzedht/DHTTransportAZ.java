@@ -1241,6 +1241,14 @@ DHTTransportAZ
 		xfer_handler.registerTransferHandler(handler_key, handler);
 	}
 	
+	public void
+	unregisterTransferHandler(
+		byte[]						handler_key,
+		DHTTransportTransferHandler	handler )
+	{
+		xfer_handler.unregisterTransferHandler(handler_key, handler);
+	}
+	
 	public byte[]
 	readTransfer(
 		DHTTransportProgressListener	listener,

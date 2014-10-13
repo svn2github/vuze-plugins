@@ -38,6 +38,7 @@ import org.gudy.azureus2.core3.util.SHA1Simple;
 import org.gudy.azureus2.core3.util.SystemTime;
 
 import com.aelitis.azureus.core.security.CryptoECCUtils;
+import com.aelitis.azureus.core.util.CopyOnWriteList;
 import com.aelitis.azureus.core.util.bloom.BloomFilter;
 import com.aelitis.azureus.core.util.bloom.BloomFilterFactory;
 import com.aelitis.azureus.plugins.dht.DHTPluginContact;
@@ -118,7 +119,11 @@ MsgSyncHandler
 		all_messages.add( my_messages );
 		all_messages.add( other_messages );
 	}
-			
+		
+	private CopyOnWriteList<MsgSyncListener>		listeners = new CopyOnWriteList<MsgSyncListener>();
+	
+	private volatile boolean		destroyed;
+	
 	protected
 	MsgSyncHandler(
 		MsgSyncPlugin			_plugin,
@@ -151,12 +156,32 @@ MsgSyncHandler
 		checkDHT( true );
 	}
 	
+	protected MsgSyncPlugin
+	getPlugin()
+	{
+		return( plugin );
+	}
+	
 	public String
 	getName()
 	{
 		return( "Message Sync: " + getString());
 	}
 
+	public List<MsgSyncMessage>
+	getMessages()
+	{
+		synchronized( message_lock ){
+
+			List<MsgSyncMessage> result = new ArrayList<MsgSyncMessage>( my_messages.size() + other_messages.size());
+			
+			result.addAll( my_messages );
+			result.addAll( other_messages );
+			
+			return( result );
+		}
+	}
+	
 	protected DHTPluginInterface
 	getDHT()
 	{
@@ -174,6 +199,11 @@ MsgSyncHandler
 		final boolean	first_time )
 	{
 		synchronized( this ){
+			
+			if ( destroyed ){
+				
+				return;
+			}
 			
 			if ( checking_dht ){
 				
@@ -293,6 +323,11 @@ MsgSyncHandler
 	timerTick(
 		int		count )
 	{
+		if ( destroyed ){
+			
+			return;
+		}
+		
 		if ( count % NODE_STATUS_CHECK_TICKS == 0 ){
 			
 			int	failed	= 0;
@@ -587,9 +622,10 @@ MsgSyncHandler
 		MsgSyncNode		node,
 		byte[]			message_id,
 		byte[]			content,
-		byte[]			signature )
+		byte[]			signature,
+		int				age_secs )
 	{
-		MsgSyncMessage msg = new MsgSyncMessage( node, message_id, content, signature );
+		MsgSyncMessage msg = new MsgSyncMessage( node, message_id, content, signature, age_secs );
 		
 			// TODO: keep my messages separate so that we retain last X regardless (or at least with a long timeout)
 			// this prevents high message throughput from losing them
@@ -625,6 +661,17 @@ MsgSyncHandler
 				}
 			}
 		}
+		
+		for ( MsgSyncListener l: listeners ){
+			
+			try{
+				l.messageReceived( msg );
+				
+			}catch( Throwable e ){
+				
+				Debug.out( e );
+			}
+		}
 	}
 	
 	public void
@@ -644,7 +691,7 @@ MsgSyncHandler
 			
 			byte[]	sig_bytes = sig.sign();
 			
-			addMessage( my_node, message_id, content, sig_bytes );
+			addMessage( my_node, message_id, content, sig_bytes, 0 );
 			
 			sync();
 			
@@ -809,6 +856,8 @@ MsgSyncHandler
 		byte[]		rand 	= new byte[8];
 		BloomFilter	bloom	= null;
 		
+		ByteArrayHashMap<List<MsgSyncNode>>	msg_node_map = null;
+		
 		synchronized( message_lock ){
 
 			for ( int i=0;i<64;i++){
@@ -822,6 +871,8 @@ MsgSyncHandler
 				
 				Set<MsgSyncNode>	done_nodes = new HashSet<MsgSyncNode>();
 				
+				msg_node_map = new ByteArrayHashMap<List<MsgSyncNode>>();
+				
 				for ( List<MsgSyncMessage> msgs: all_messages ){
 					
 					for ( MsgSyncMessage msg: msgs ){
@@ -829,6 +880,19 @@ MsgSyncHandler
 						MsgSyncNode n = msg.getNode();
 						
 						if ( !done_nodes.contains( n )){
+							
+							byte[] nid = n.getUID();
+							
+							List<MsgSyncNode> list = msg_node_map.get( nid );
+							
+							if ( list == null ){
+								
+								list = new ArrayList<MsgSyncNode>();
+								
+								msg_node_map.put( nid, list );
+							}
+							
+							list.add( n );
 							
 							done_nodes.add( n );
 							
@@ -966,19 +1030,21 @@ MsgSyncHandler
 								byte[] content		= (byte[])m.get( "c" );
 								byte[] signature	= (byte[])m.get( "s" );
 								
+								int	age = ((Number)m.get( "a" )).intValue();
+										
 									// these won't be present if remote believes we already have it (subject to occasional bloom false positives)
 								
 								byte[] 	public_key		= (byte[])m.get( "p" );
 								
 								Map<String,Object>		contact_map		= (Map<String,Object>)m.get( "k" );
 								
-								log( "Message: " + ByteFormatter.encodeString( message_id ) + ": " + new String( content ));
+								log( "Message: " + ByteFormatter.encodeString( message_id ) + ": " + new String( content ) + ", age=" + age );
 																
 								boolean handled = false;
 								
 									// see if we already have a node with the correct public key
 								
-								List<MsgSyncNode> nodes = getNodes( node_uid );
+								List<MsgSyncNode> nodes = msg_node_map.get( node_uid );
 								
 								if ( nodes != null ){
 									
@@ -996,7 +1062,7 @@ MsgSyncHandler
 											
 											if ( sig.verify( signature )){
 												
-												addMessage( node, message_id, content, signature );
+												addMessage( node, message_id, content, signature, age );
 												
 												handled = true;
 											}
@@ -1040,7 +1106,7 @@ MsgSyncHandler
 												msg_node = addNode( contact, node_uid, public_key );
 											}
 																						
-											addMessage( msg_node, message_id, content, signature );
+											addMessage( msg_node, message_id, content, signature, age );
 										}
 									}
 								}
@@ -1063,6 +1129,11 @@ MsgSyncHandler
 		DHTPluginContact	originator,
 		byte[]				key )
 	{
+		if ( destroyed ){
+			
+			return( null );
+		}
+		
 		try{
 			Map<String,Object> request_map = BDecoder.decode( key );
 
@@ -1144,6 +1215,7 @@ MsgSyncHandler
 						m.put( "i", message.getID());
 						m.put( "c", message.getContent());
 						m.put( "s", message.getSignature());
+						m.put( "a", message.getAgeSecs());
 						
 						if ( !done_nodes.contains( n )){
 							
@@ -1204,6 +1276,28 @@ MsgSyncHandler
 			// here with a unique rcp key for the 'key and the value is the payload
 		
 		return( handleRead( originator, value ));
+	}
+	
+	public void
+	addListener(
+		MsgSyncListener		listener )
+	{
+		listeners.add( listener );
+	}
+	
+	public void
+	removeListener(
+		MsgSyncListener		listener )
+	{
+		listeners.remove( listener );
+	}
+	
+	protected void
+	destroy()
+	{
+		destroyed	= true;
+		
+		dht.unregisterHandler( dht_key, this );
 	}
 	
 	private void
