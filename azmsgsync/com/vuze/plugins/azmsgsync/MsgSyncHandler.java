@@ -57,6 +57,10 @@ MsgSyncHandler
 	private static final String	HANDLER_BASE_KEY = "com.vuze.plugins.azmsgsync.MsgSyncHandler";
 	private static final byte[]	HANDLER_BASE_KEY_BYTES;
 	
+	public static final int ST_INITIALISING		= 0;
+	public static final int ST_RUNNING			= 1;
+	public static final int ST_DESTROYED		= 2;
+	
 	static{
 		byte[]	 bytes = null;
 		
@@ -126,6 +130,9 @@ MsgSyncHandler
 	
 	private volatile boolean		destroyed;
 	
+	private volatile int 		status			= ST_INITIALISING;
+	private volatile int		last_dht_count	= -1;
+	
 	protected
 	MsgSyncHandler(
 		MsgSyncPlugin			_plugin,
@@ -170,6 +177,27 @@ MsgSyncHandler
 		return( "Message Sync: " + getString());
 	}
 
+	public int
+	getStatus()
+	{
+		return( status );
+	}
+	
+	public int
+	getDHTCount()
+	{
+		return( last_dht_count );
+	}
+	
+	public int
+	getNodeCount()
+	{
+		synchronized( node_uid_map ){
+		
+			return( node_uid_map.size());
+		}
+	}
+	
 	public List<MsgSyncMessage>
 	getMessages()
 	{
@@ -230,7 +258,9 @@ MsgSyncHandler
 			new DHTPluginOperationAdapter() 
 			{
 				private boolean diversified;
-								
+					
+				private int		dht_count = 0;
+				
 				public boolean 
 				diversified() 
 				{
@@ -251,6 +281,8 @@ MsgSyncHandler
 					
 						addDHTContact( originator, m );
 						
+						dht_count++;
+						
 					}catch( Throwable e ){
 						
 					}
@@ -262,12 +294,16 @@ MsgSyncHandler
 					byte[] 		key, 
 					boolean 	timeout_occurred) 
 				{	
+					last_dht_count = dht_count;
+					
 					try{
 						if ( first_time ){
 							
 							if ( diversified ){
 								
 								log( "Not registering as sufficient nodes located" );
+								
+								status = ST_RUNNING;
 								
 							}else{
 								
@@ -301,6 +337,8 @@ MsgSyncHandler
 													boolean 	timeout_occurred ) 
 												{
 													log( "Node registered" );
+													
+													status = ST_RUNNING;
 												}
 											});
 									
@@ -1324,6 +1362,8 @@ MsgSyncHandler
 	destroy()
 	{
 		destroyed	= true;
+		
+		status = ST_DESTROYED;
 		
 		dht.unregisterHandler( dht_key, this );
 	}

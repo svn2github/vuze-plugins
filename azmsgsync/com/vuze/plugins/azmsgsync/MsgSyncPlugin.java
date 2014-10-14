@@ -455,6 +455,28 @@ MsgSyncPlugin
 	}
 	
 	public Map<String,Object>
+	getStatus(
+		Map<String,Object>		options )
+		
+		throws IPCException
+	{
+		MsgSyncHandler handler = (MsgSyncHandler)options.get( "handler" );
+		
+		if ( handler.getPlugin() != this ){
+			
+			throw( new IPCException( "Plugin has been unloaded" ));
+		}
+				
+		Map<String,Object>	reply = new HashMap<String, Object>();
+
+		reply.put( "status", 		handler.getStatus());
+		reply.put( "dht_nodes", 	handler.getDHTCount());
+		reply.put( "local_nodes", 	handler.getDHTCount());
+
+		return( reply );
+	}
+	
+	public Map<String,Object>
 	removeMessageHandler(
 		Map<String,Object>		options )
 		
