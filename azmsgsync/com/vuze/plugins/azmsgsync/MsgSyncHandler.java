@@ -52,6 +52,8 @@ public class
 MsgSyncHandler 
 	implements DHTPluginTransferHandler
 {
+	private static final boolean TRACE = false;
+	
 	private static final String	HANDLER_BASE_KEY = "com.vuze.plugins.azmsgsync.MsgSyncHandler";
 	private static final byte[]	HANDLER_BASE_KEY_BYTES;
 	
@@ -344,13 +346,13 @@ MsgSyncHandler
 				
 				Map<String,List<MsgSyncNode>>	address_map = new HashMap<String, List<MsgSyncNode>>();
 				
-				System.out.println( "Current nodes: ");
+				if ( TRACE )System.out.println( "Current nodes: ");
 				
 				for ( List<MsgSyncNode> nodes: node_uid_map.values()){
 					
 					for ( MsgSyncNode node: nodes ){
 						
-						System.out.println( "    " + node.getContact().getAddress() + "/" + ByteFormatter.encodeString( node.getUID()));
+						if ( TRACE )System.out.println( "    " + node.getContact().getAddress() + "/" + ByteFormatter.encodeString( node.getUID()));
 						
 						total++;
 						
@@ -517,7 +519,7 @@ MsgSyncHandler
 			
 			MsgSyncNode node = new MsgSyncNode( contact, uid, public_key );
 				
-			System.out.println( "Add node: " + contact.getName() + ByteFormatter.encodeString( uid ) + "/" + (public_key==null?"no PK":"with PK" ));
+			if ( TRACE )System.out.println( "Add node: " + contact.getName() + ByteFormatter.encodeString( uid ) + "/" + (public_key==null?"no PK":"with PK" ));
 
 			nodes.add( node );		
 			
@@ -550,7 +552,7 @@ MsgSyncHandler
 						node_uid_map.remove( node_id );
 					}
 					
-					System.out.println( "Remove node: " + node.getContact().getName() + ByteFormatter.encodeString( node_id ) + ", loop=" + is_loopback );
+					if ( TRACE )System.out.println( "Remove node: " + node.getContact().getName() + ByteFormatter.encodeString( node_id ) + ", loop=" + is_loopback );
 				}
 			}
 		}
@@ -727,7 +729,7 @@ MsgSyncHandler
 				prefer_live_sync_outstanding = true;
 			}
 			
-			System.out.println( "Sync: active=" + active_syncs );
+			if ( TRACE )System.out.println( "Sync: active=" + active_syncs );
 			
 			if ( active_syncs.size() > MAX_CONC_SYNC ){
 				
@@ -818,7 +820,7 @@ MsgSyncHandler
 				}
 			}
 			
-			System.out.println( "    selected " + (sync_node==null?"none":sync_node.getName()));
+			if ( TRACE )System.out.println( "    selected " + (sync_node==null?"none":sync_node.getName()));
 			
 			if ( sync_node == null ){
 				
@@ -1006,7 +1008,7 @@ MsgSyncHandler
 				
 			}else{
 				
-				System.out.println( "reply: " + reply_map + " from " + sync_node.getName());
+				if ( TRACE )System.out.println( "reply: " + reply_map + " from " + sync_node.getName());
 				
 				int status = ((Number)reply_map.get( "s" )).intValue();
 				
@@ -1144,7 +1146,7 @@ MsgSyncHandler
 				return( null );
 			}
 			
-			System.out.println( "request: " + request_map );
+			if ( TRACE )System.out.println( "request: " + request_map );
 
 			Map<String,Object> reply_map = new HashMap<String,Object>();
 
