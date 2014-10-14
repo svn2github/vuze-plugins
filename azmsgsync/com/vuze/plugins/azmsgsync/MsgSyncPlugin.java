@@ -23,6 +23,7 @@ package com.vuze.plugins.azmsgsync;
 
 
 
+import java.lang.reflect.Method;
 import java.util.*;
 
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
@@ -356,35 +357,55 @@ MsgSyncPlugin
 				
 		MsgSyncHandler handler = getSyncHandler( dht, key );
 
-		Object listener = options.get( "listener" );
+		final Object listener = options.get( "listener" );
 		
 		if ( listener != null ){
 			
-			MsgSyncListener l = 
-				new MsgSyncListener()
-				{
-					@Override
-					public void 
-					messageReceived(
-						MsgSyncMessage message) 
+			try{
+				final Method callback = listener.getClass().getMethod( "messageReceived", Map.class );
+				
+				MsgSyncListener l = 
+					new MsgSyncListener()
 					{
+						@Override
+						public void 
+						messageReceived(
+							MsgSyncMessage message ) 
+						{
+							try{
+								Map<String,Object> map = new HashMap<String, Object>();
+								
+								map.put( "content", message.getContent());
+								map.put( "age", message.getAgeSecs());
+								map.put( "pk", message.getNode().getPublicKey());
+								map.put( "address", message.getNode().getContact().getAddress());
+								
+								callback.invoke( listener, map );
+								
+							}catch( Throwable e ){
+								
+								Debug.out( e );
+							}
+						}
+					};
 					
+				handler.addListener( l ); 
+				
+				List<MsgSyncMessage> messages = handler.getMessages();
+				
+				for ( MsgSyncMessage msg: messages ){
+					
+					try{
+						l.messageReceived( msg );
+						
+					}catch( Throwable e ){
+						
+						Debug.out( e );
 					}
-				};
-				
-			handler.addListener( l ); 
-			
-			List<MsgSyncMessage> messages = handler.getMessages();
-			
-			for ( MsgSyncMessage msg: messages ){
-				
-				try{
-					l.messageReceived( msg );
-					
-				}catch( Throwable e ){
-					
-					Debug.out( e );
 				}
+			}catch( Throwable e ){
+				
+				throw( new IPCException( "Failed to add listener", e ));
 			}
 		}
 		
@@ -403,14 +424,13 @@ MsgSyncPlugin
 	
 	public Map<String,Object>
 	sendMessage(
-		Map<String,Object>		handler_map,
-		Map<String,Object>		message )
+		Map<String,Object>		options )
 		
 		throws IPCException
 	{
-		byte[]		content		= (byte[])message.get( "key" );
+		byte[]		content		= (byte[])options.get( "content" );
 
-		MsgSyncHandler handler = (MsgSyncHandler)handler_map.get( "handler" );
+		MsgSyncHandler handler = (MsgSyncHandler)options.get( "handler" );
 		
 		if ( handler.getPlugin() != this ){
 			
@@ -424,6 +444,25 @@ MsgSyncPlugin
 		return( reply );
 	}
 	
+	public Map<String,Object>
+	removeMessageHandler(
+		Map<String,Object>		options )
+		
+		throws IPCException
+	{
+		MsgSyncHandler handler = (MsgSyncHandler)options.get( "handler" );
+		
+		if ( handler.getPlugin() != this ){
+			
+			throw( new IPCException( "Plugin has been unloaded" ));
+		}
+		
+		removeSyncHandler( handler );
+		
+		Map<String,Object>	reply = new HashMap<String, Object>();
+
+		return( reply );
+	}
 	
 		// IPC end
 	
@@ -492,5 +531,17 @@ MsgSyncPlugin
 				throw( new IPCException( "Failed to create message handler", e ));
 			}
 		}
+	}
+	
+	private void
+	removeSyncHandler(
+		MsgSyncHandler		handler )
+	{
+		synchronized( this ){
+
+			sync_handlers.remove( handler );
+		}
+		
+		handler.destroy();
 	}
 }

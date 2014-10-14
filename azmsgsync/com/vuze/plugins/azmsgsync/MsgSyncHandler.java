@@ -52,7 +52,7 @@ public class
 MsgSyncHandler 
 	implements DHTPluginTransferHandler
 {
-	private static final boolean TRACE = false;
+	private static final boolean TRACE = System.getProperty( "az.msgsync.trace.enable", "0" ).equals( "1" );
 	
 	private static final String	HANDLER_BASE_KEY = "com.vuze.plugins.azmsgsync.MsgSyncHandler";
 	private static final byte[]	HANDLER_BASE_KEY_BYTES;
@@ -93,7 +93,7 @@ MsgSyncHandler
 	private ByteArrayHashMap<List<MsgSyncNode>>		node_uid_map 		= new ByteArrayHashMap<List<MsgSyncNode>>();
 	private ByteArrayHashMap<MsgSyncNode>			node_uid_loopbacks	= new ByteArrayHashMap<MsgSyncNode>();
 
-	private static final int				MIN_BLOOM_BITS	= 64*8;
+	private static final int				MIN_BLOOM_BITS	= 8*8;
 	
 	private static final int				MAX_OTHER_MESSAGES	= 64;
 	private static final int				MAX_MY_MESSAGES		= 16;
@@ -230,7 +230,7 @@ MsgSyncHandler
 			new DHTPluginOperationAdapter() 
 			{
 				private boolean diversified;
-				
+								
 				public boolean 
 				diversified() 
 				{
@@ -249,7 +249,7 @@ MsgSyncHandler
 					
 						Map<String,Object> m = BDecoder.decode( value.getValue());
 					
-						addContact( originator, m );
+						addDHTContact( originator, m );
 						
 					}catch( Throwable e ){
 						
@@ -346,13 +346,13 @@ MsgSyncHandler
 				
 				Map<String,List<MsgSyncNode>>	address_map = new HashMap<String, List<MsgSyncNode>>();
 				
-				if ( TRACE )System.out.println( "Current nodes: ");
+				//if ( TRACE )System.out.println( "Current nodes: ");
 				
 				for ( List<MsgSyncNode> nodes: node_uid_map.values()){
 					
 					for ( MsgSyncNode node: nodes ){
 						
-						if ( TRACE )System.out.println( "    " + node.getContact().getAddress() + "/" + ByteFormatter.encodeString( node.getUID()));
+						//if ( TRACE )System.out.println( "    " + node.getContact().getAddress() + "/" + ByteFormatter.encodeString( node.getUID()));
 						
 						total++;
 						
@@ -455,8 +455,8 @@ MsgSyncHandler
 		sync();
 	}
 
-	private void
-	addContact(
+	private boolean
+	addDHTContact(
 		DHTPluginContact		contact,
 		Map<String,Object>		map )
 	{				
@@ -469,9 +469,11 @@ MsgSyncHandler
 			
 			if ( addNode( contact, uid, null ) != my_node ){
 			
-				sync();
+				return( true );
 			}
 		}
+		
+		return( false );
 	}
 	
 	private MsgSyncNode
@@ -519,9 +521,9 @@ MsgSyncHandler
 			
 			MsgSyncNode node = new MsgSyncNode( contact, uid, public_key );
 				
-			if ( TRACE )System.out.println( "Add node: " + contact.getName() + ByteFormatter.encodeString( uid ) + "/" + (public_key==null?"no PK":"with PK" ));
-
 			nodes.add( node );		
+
+			if ( TRACE )System.out.println( "Add node: " + contact.getName() + ByteFormatter.encodeString( uid ) + "/" + (public_key==null?"no PK":"with PK" ) + ", total uids=" + node_uid_map.size());
 			
 			return( node );
 		}	
@@ -552,7 +554,7 @@ MsgSyncHandler
 						node_uid_map.remove( node_id );
 					}
 					
-					if ( TRACE )System.out.println( "Remove node: " + node.getContact().getName() + ByteFormatter.encodeString( node_id ) + ", loop=" + is_loopback );
+					//if ( TRACE )System.out.println( "Remove node: " + node.getContact().getName() + ByteFormatter.encodeString( node_id ) + ", loop=" + is_loopback );
 				}
 			}
 		}
@@ -1146,7 +1148,7 @@ MsgSyncHandler
 				return( null );
 			}
 			
-			if ( TRACE )System.out.println( "request: " + request_map );
+			if ( TRACE )System.out.println( "request: " + request_map + " from " + getString( originator ));
 
 			Map<String,Object> reply_map = new HashMap<String,Object>();
 
@@ -1161,6 +1163,26 @@ MsgSyncHandler
 			}else{
 				
 				status = STATUS_OK;
+				
+				List<MsgSyncNode> caller_nodes = getNodes( uid );
+				
+				boolean found_originator = false;
+				
+				if ( caller_nodes != null ){
+					
+					for ( MsgSyncNode n: caller_nodes ){
+						
+						if ( sameContact( originator, n.getContact())){
+							
+							found_originator = true;
+						}
+					}
+				}
+				
+				if ( !found_originator ){
+					
+					addNode( originator, uid, null );
+				}
 				
 				BloomFilter bloom = BloomFilterFactory.deserialiseFromMap((Map<String,Object>)request_map.get("b"));
 				
@@ -1207,6 +1229,8 @@ MsgSyncHandler
 					
 					for ( MsgSyncMessage message: missing ){
 						
+						if ( TRACE )System.out.println( "    returning " + ByteFormatter.encodeString( message.getID()));
+						
 						Map<String,Object> m = new HashMap<String,Object>();
 						
 						l.add( m );
@@ -1235,6 +1259,8 @@ MsgSyncHandler
 								}
 								
 								if ( !bloom.contains( pub )){
+									
+									if ( TRACE )System.out.println( "    and pk" );
 									
 									m.put( "p", n.getPublicKey());
 									
