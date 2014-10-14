@@ -380,6 +380,16 @@ MsgSyncPlugin
 								map.put( "pk", message.getNode().getPublicKey());
 								map.put( "address", message.getNode().getContact().getAddress());
 								
+									// as a public ID we use teh start of the signature 
+								
+								byte[]	sig = message.getSignature();
+								
+								byte[] 	msg_id = new byte[12];
+								
+								System.arraycopy( sig, 0, msg_id, 0, msg_id.length );
+								
+								map.put( "id", msg_id );
+								
 								callback.invoke( listener, map );
 								
 							}catch( Throwable e ){
