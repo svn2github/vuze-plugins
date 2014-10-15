@@ -33,12 +33,15 @@ import org.gudy.azureus2.core3.util.BEncoder;
 import org.gudy.azureus2.core3.util.ByteArrayHashMap;
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.HashWrapper;
 import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.SHA1Simple;
 import org.gudy.azureus2.core3.util.SystemTime;
 
 import com.aelitis.azureus.core.security.CryptoECCUtils;
 import com.aelitis.azureus.core.util.CopyOnWriteList;
+import com.aelitis.azureus.core.util.average.Average;
+import com.aelitis.azureus.core.util.average.AverageFactory;
 import com.aelitis.azureus.core.util.bloom.BloomFilter;
 import com.aelitis.azureus.core.util.bloom.BloomFilterFactory;
 import com.aelitis.azureus.plugins.dht.DHTPluginContact;
@@ -52,6 +55,8 @@ public class
 MsgSyncHandler 
 	implements DHTPluginTransferHandler
 {
+	private static final int VERSION	= 1;
+	
 	private static final boolean TRACE = System.getProperty( "az.msgsync.trace.enable", "0" ).equals( "1" );
 	
 	private static final String	HANDLER_BASE_KEY = "com.vuze.plugins.azmsgsync.MsgSyncHandler";
@@ -126,12 +131,33 @@ MsgSyncHandler
 		all_messages.add( other_messages );
 	}
 		
+	private Map<HashWrapper,String>	request_id_history = 
+		new LinkedHashMap<HashWrapper,String>(512,0.75f,true)
+		{
+			protected boolean 
+			removeEldestEntry(
+		   		Map.Entry<HashWrapper,String> eldest) 
+			{
+				return size() > 512;
+			}
+		};
+			
 	private CopyOnWriteList<MsgSyncListener>		listeners = new CopyOnWriteList<MsgSyncListener>();
 	
 	private volatile boolean		destroyed;
 	
 	private volatile int 		status			= ST_INITIALISING;
 	private volatile int		last_dht_count	= -1;
+	
+	private volatile int		in_req;
+	private volatile int		out_req_ok;
+	private volatile int		out_req_fail;
+	
+	private int	last_in_req;
+	private int last_out_req;
+	
+	private Average		in_req_average 	= AverageFactory.MovingImmediateAverage( 30*1000/MsgSyncPlugin.TIMER_PERIOD );
+	private Average		out_req_average = AverageFactory.MovingImmediateAverage( 30*1000/MsgSyncPlugin.TIMER_PERIOD );
 	
 	protected
 	MsgSyncHandler(
@@ -189,13 +215,48 @@ MsgSyncHandler
 		return( last_dht_count );
 	}
 	
-	public int
-	getNodeCount()
+	public int[]
+	getNodeCounts()
 	{
+		int	total	= 0;
+		int	live	= 0;
+		int	dying	= 0;
+		
 		synchronized( node_uid_map ){
 		
-			return( node_uid_map.size());
+			for ( List<MsgSyncNode> nodes: node_uid_map.values()){
+				
+				for ( MsgSyncNode node: nodes ){
+					
+					total++;
+					
+					if ( node.getFailCount() == 0 ){
+						
+						if ( node.getLastAlive() > 0 ){
+							
+							live++;
+						}
+					}else{
+						
+						dying++;
+					}
+				}
+			}
 		}
+		
+		return( new int[]{ total, live, dying });
+	}
+	
+	public double[]
+	getRequestCounts()
+	{
+		return( 
+			new double[]{ 
+				in_req, 
+				in_req_average.getAverage()*1000/MsgSyncPlugin.TIMER_PERIOD, 
+				out_req_ok, 
+				out_req_fail, 
+				out_req_average.getAverage()*1000/MsgSyncPlugin.TIMER_PERIOD });
 	}
 	
 	public List<MsgSyncMessage>
@@ -368,6 +429,18 @@ MsgSyncHandler
 			return;
 		}
 		
+		int	in_req_diff 	= in_req - last_in_req;
+		int	out_req			= out_req_fail + out_req_ok;
+		int out_req_diff	= out_req	- last_out_req;
+		
+		in_req_average.update( in_req_diff );
+		out_req_average.update( out_req_diff );
+		
+		last_out_req	= out_req;
+		last_in_req		= in_req;
+		
+		//System.out.println( in_req_average.getAverage()*1000/MsgSyncPlugin.TIMER_PERIOD + "/" + out_req_average.getAverage()*1000/MsgSyncPlugin.TIMER_PERIOD);
+		
 		if ( count % NODE_STATUS_CHECK_TICKS == 0 ){
 			
 			int	failed	= 0;
@@ -381,9 +454,7 @@ MsgSyncHandler
 				List<MsgSyncNode>	living		 	= new ArrayList<MsgSyncNode>( MAX_NODES*2 );
 				List<MsgSyncNode>	not_failing	 	= new ArrayList<MsgSyncNode>( MAX_NODES*2 );
 				List<MsgSyncNode>	failing 		= new ArrayList<MsgSyncNode>( MAX_NODES*2 );
-				
-				Map<String,List<MsgSyncNode>>	address_map = new HashMap<String, List<MsgSyncNode>>();
-				
+								
 				//if ( TRACE )System.out.println( "Current nodes: ");
 				
 				for ( List<MsgSyncNode> nodes: node_uid_map.values()){
@@ -393,17 +464,6 @@ MsgSyncHandler
 						//if ( TRACE )System.out.println( "    " + node.getContact().getAddress() + "/" + ByteFormatter.encodeString( node.getUID()));
 						
 						total++;
-						
-						String c_key = getString( node.getContact());
-						
-						List<MsgSyncNode> x = address_map.get( c_key );
-						
-						if ( x == null ){
-							
-							x = new ArrayList<MsgSyncNode>();
-							
-							address_map.put( c_key, x );
-						}
 						
 						if ( node.getFailCount() > 0 ){
 							
@@ -634,7 +694,7 @@ MsgSyncHandler
 		}
 	}
 	
-	private String
+	protected static String
 	getString(
 		DHTPluginContact		c )
 	{
@@ -754,7 +814,7 @@ MsgSyncHandler
 			
 			addMessage( my_node, message_id, content, sig_bytes, 0 );
 			
-			sync();
+			sync( true );
 			
 		}catch( Throwable e ){
 			
@@ -799,12 +859,12 @@ MsgSyncHandler
 			
 			for ( MsgSyncNode n: active_syncs ){
 				
-				active_addresses.add( getString( n.getContact()));
+				active_addresses.add( n.getContactAddress());
 			}
 							
-			List<MsgSyncNode>	not_failed 	= new ArrayList<MsgSyncNode>();
-			List<MsgSyncNode>	failed 		= new ArrayList<MsgSyncNode>();
-			List<MsgSyncNode>	live 		= new ArrayList<MsgSyncNode>();
+			List<MsgSyncNode>	not_failed 	= new ArrayList<MsgSyncNode>( MAX_NODES*2 );
+			List<MsgSyncNode>	failed 		= new ArrayList<MsgSyncNode>( MAX_NODES*2 );
+			List<MsgSyncNode>	live 		= new ArrayList<MsgSyncNode>( MAX_NODES*2 );
 			
 			for ( List<MsgSyncNode> nodes: node_uid_map.values()){
 				
@@ -812,7 +872,7 @@ MsgSyncHandler
 					
 					if ( active_syncs.size() > 0 ){
 					
-						if ( active_syncs.contains( node ) || active_addresses.contains( getString( node.getContact()))){
+						if ( active_syncs.contains( node ) || active_addresses.contains( node.getContactAddress())){
 						
 							continue;
 						}
@@ -837,7 +897,7 @@ MsgSyncHandler
 				
 				prefer_live_sync_outstanding = false;
 				
-				sync_node = live.get( RandomUtils.nextInt( live.size()));
+				sync_node = getRandomSyncNode( live );
 				
 			}else{
 				
@@ -853,29 +913,12 @@ MsgSyncHandler
 				
 				if ( active_fails >= MAX_FAIL_SYNC && not_failed.size() > 0 ){
 					
-					sync_node = not_failed.get( RandomUtils.nextInt( not_failed.size()));
+					sync_node = getRandomSyncNode( not_failed );
 				}
 				
 				if ( sync_node == null ){
 					
-					int	num_not_failed = not_failed.size();
-					
-					int rem_size = num_not_failed + failed.size();
-						
-					if ( rem_size > 0 ){
-						
-						int	pos =  RandomUtils.nextInt( rem_size );
-						
-						if ( pos < num_not_failed ){
-							
-							sync_node = not_failed.get( pos );
-							
-						}else{
-							
-							sync_node = failed.get( pos - num_not_failed );
-						}
-					}
-					
+					sync_node = getRandomSyncNode( failed, not_failed );
 				}
 			}
 			
@@ -908,6 +951,86 @@ MsgSyncHandler
 				}
 			}
 		}.start();
+	}
+	
+	private MsgSyncNode
+	getRandomSyncNode(
+		List<MsgSyncNode>		nodes1,
+		List<MsgSyncNode>		nodes2 )
+	{
+		List<MsgSyncNode>	nodes = new ArrayList<MsgSyncNode>( nodes1.size() + nodes2.size());
+		
+		nodes.addAll( nodes1 );
+		nodes.addAll( nodes2 );
+		
+		return( getRandomSyncNode( nodes ));
+	}
+	
+	private MsgSyncNode
+	getRandomSyncNode(
+		List<MsgSyncNode>		nodes )
+	{
+		int	num = nodes.size();
+		
+		if ( num == 0 ){
+			
+			return( null );
+			
+		}else if ( num == 1 ){
+			
+			return( nodes.get(0));
+			
+		}else{
+			
+			Map<String,Object>	map = new HashMap<String, Object>(num*2);
+			
+			for ( MsgSyncNode node: nodes ){
+				
+				String str = node.getContactAddress();
+				
+				Object x = map.get( str );
+				
+				if ( x == null ){
+					
+					map.put( str, node );
+					
+				}else if ( x instanceof MsgSyncNode ){
+					
+					List<MsgSyncNode> list = new ArrayList<MsgSyncNode>(10);
+					
+					list.add((MsgSyncNode)x);
+					list.add( node );
+					
+					map.put( str, list );
+					
+				}else{
+					
+					((List<MsgSyncNode>)x).add( node );
+				}
+			}
+			
+			int	index = RandomUtils.nextInt( map.size());
+			
+			Iterator<Object>	it = map.values().iterator();
+			
+			for ( int i=0;i<index-1;i++){
+				
+				it.next();
+			}
+			
+			Object result = it.next();
+			
+			if ( result instanceof MsgSyncNode ){
+				
+				return((MsgSyncNode)result);
+				
+			}else{
+				
+				List<MsgSyncNode>	list = (List<MsgSyncNode>)result;
+				
+				return( list.get( RandomUtils.nextInt( list.size())));
+			}
+		}
 	}
 	
 	private void
@@ -1024,8 +1147,10 @@ MsgSyncHandler
 		
 		Map<String,Object> request_map = new HashMap<String,Object>();
 		
-		request_map.put( "t", 0 );		// type
+		request_map.put( "v", VERSION );
 		
+		request_map.put( "t", 0 );		// type
+
 		request_map.put( "u", my_uid );
 		request_map.put( "b", bloom.serialiseToMap());
 		request_map.put( "r", rand );
@@ -1053,6 +1178,8 @@ MsgSyncHandler
 					sync_data, 
 					30*1000 );
 		
+			out_req_ok++;
+			
 			if ( reply_bytes == null ){
 
 				throw( new Exception( "No reply" ));
@@ -1191,6 +1318,8 @@ MsgSyncHandler
 			}
 		}catch( Throwable e ){
 			
+			out_req_fail++;
+			
 			sync_node.failed();
 		}
 	}	
@@ -1214,9 +1343,27 @@ MsgSyncHandler
 				
 				return( null );
 			}
+
+			byte[]	rand = (byte[])request_map.get( "r" );
+
+			HashWrapper rand_wrapper = new HashWrapper( rand );
+			
+			synchronized( request_id_history ){
+				
+				if ( request_id_history.get( rand_wrapper ) != null ){
+				
+					if ( TRACE )System.out.println( "duplicate request: " + request_map + " from " + getString( originator ));
+					
+					return( null );
+				}
+				
+				request_id_history.put( rand_wrapper, "" );
+			}
 			
 			if ( TRACE )System.out.println( "request: " + request_map + " from " + getString( originator ));
 
+			in_req++;
+			
 			Map<String,Object> reply_map = new HashMap<String,Object>();
 
 			int		status;
@@ -1228,6 +1375,13 @@ MsgSyncHandler
 				status = STATUS_LOOPBACK;
 				
 			}else{
+				
+				/*
+				if ( originator.getAddress().isUnresolved()){
+					
+					System.out.println( "unresolved" );
+				}
+				*/
 				
 				status = STATUS_OK;
 				
@@ -1252,9 +1406,7 @@ MsgSyncHandler
 				}
 				
 				BloomFilter bloom = BloomFilterFactory.deserialiseFromMap((Map<String,Object>)request_map.get("b"));
-				
-				byte[]	rand = (byte[])request_map.get( "r" );
-				
+								
 				List<MsgSyncMessage>	missing = new ArrayList<MsgSyncMessage>();
 				
 				int	num_they_have_i_dont = bloom.getEntryCount();

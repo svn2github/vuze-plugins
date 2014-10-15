@@ -35,6 +35,8 @@ MsgSyncNode
 	private byte[]					uid;
 	private byte[]					public_key;
 	
+	private String			contact_str;
+	
 	private volatile long	last_alive;
 	private volatile int	fail_count;
 	
@@ -47,6 +49,8 @@ MsgSyncNode
 		contact		= _contact;
 		uid			= _uid;
 		public_key	= _public_key;
+		
+		contact_str = MsgSyncHandler.getString( contact );
 	}
 	
 	protected boolean
@@ -63,6 +67,8 @@ MsgSyncNode
 	
 			contact			= _contact;
 			public_key		= _public_key;
+			
+			contact_str = MsgSyncHandler.getString( contact );
 			
 			return( true );
 		}
@@ -112,8 +118,14 @@ MsgSyncNode
 	}
 	
 	public String
+	getContactAddress()
+	{
+		return( contact_str );
+	}
+	
+	public String
 	getName()
 	{
-		return( String.valueOf( contact.getAddress()));
+		return( contact_str );
 	}
 }

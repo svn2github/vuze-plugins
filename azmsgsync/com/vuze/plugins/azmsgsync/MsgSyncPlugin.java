@@ -71,6 +71,8 @@ MsgSyncPlugin
 
 	private TimerEventPeriodic		timer;
 	
+	private volatile boolean		unloadable		= true;
+	
 	private volatile boolean		init_called;
 	private volatile boolean		destroyed;
 	
@@ -88,6 +90,8 @@ MsgSyncPlugin
 				init_called = true;
 				
 				plugin_interface	= _plugin_interface;
+				
+				setUnloadable( true );
 				
 				loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
 				
@@ -240,6 +244,18 @@ MsgSyncPlugin
 				
 				config_model = null;
 			}
+		}
+	}
+	
+	private void
+	setUnloadable(
+		boolean	b )
+	{
+		PluginInterface pi = plugin_interface;
+		
+		if ( pi != null ){
+			
+			pi.getPluginProperties().put( "plugin.unload.disabled", String.valueOf( !b ));
 		}
 	}
 	
@@ -437,7 +453,12 @@ MsgSyncPlugin
 		Map<String,Object>		options )
 		
 		throws IPCException
-	{
+	{	
+			// safest bet is to prevent auto-unloading once a message has been sent as it'll get 
+			// lost if it doesn't get replicated
+		
+		setUnloadable( false );
+		
 		byte[]		content		= (byte[])options.get( "content" );
 
 		MsgSyncHandler handler = (MsgSyncHandler)options.get( "handler" );
@@ -471,7 +492,20 @@ MsgSyncPlugin
 
 		reply.put( "status", 		handler.getStatus());
 		reply.put( "dht_nodes", 	handler.getDHTCount());
-		reply.put( "local_nodes", 	handler.getDHTCount());
+		
+		int[] node_counts = handler.getNodeCounts();
+		
+		reply.put( "nodes_local", new Long(node_counts[0]));
+		reply.put( "nodes_live", new Long(node_counts[1]));
+		reply.put( "nodes_dying", new Long(node_counts[2]));
+		
+		double[] req_details = handler.getRequestCounts();
+
+		reply.put( "req_in", new Double(req_details[0]));
+		reply.put( "req_in_rate", new Double(req_details[1]));
+		reply.put( "req_out_ok", new Double(req_details[2]));
+		reply.put( "req_out_fail", new Double(req_details[3]));
+		reply.put( "req_out_rate", new Double(req_details[4]));
 
 		return( reply );
 	}
