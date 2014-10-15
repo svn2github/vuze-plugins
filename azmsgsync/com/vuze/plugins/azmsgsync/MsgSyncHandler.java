@@ -1007,6 +1007,11 @@ MsgSyncHandler
 						bloom.add( k );
 					}
 				}
+				
+				if ( bloom != null ){
+					
+					break;
+				}
 			}
 		}
 		
