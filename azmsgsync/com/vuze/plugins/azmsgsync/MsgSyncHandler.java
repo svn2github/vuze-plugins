@@ -520,6 +520,25 @@ MsgSyncHandler
 		byte[]					uid,
 		byte[]					public_key )
 	{
+		MsgSyncNode node = addNodeSupport( contact, uid, public_key );
+		
+		if ( public_key != null ){
+			
+			if ( !node.setDetails( contact, public_key)){
+								
+				node = new MsgSyncNode( contact, uid, public_key );
+			}
+		}
+		
+		return( node );
+	}
+	
+	private MsgSyncNode
+	addNodeSupport(
+		DHTPluginContact		contact,
+		byte[]					uid,
+		byte[]					public_key )
+	{
 			// we need to always return a node as it is required to create associated messages and we have to create each message otherwise
 			// we'll keep on getting it from other nodes
 		
@@ -1107,6 +1126,8 @@ MsgSyncHandler
 												addMessage( node, message_id, content, signature, age );
 												
 												handled = true;
+												
+												break;
 											}
 										}
 									}
@@ -1116,6 +1137,9 @@ MsgSyncHandler
 									
 									if ( public_key != null ){
 										
+											// no existing pk - we HAVE to record this message against
+											// ths supplied pk otherwise we can't replicate it later
+
 										Signature sig = CryptoECCUtils.getSignature( CryptoECCUtils.rawdataToPubkey( public_key ));
 										
 										sig.update( node_uid );
@@ -1134,11 +1158,11 @@ MsgSyncHandler
 												
 												for ( MsgSyncNode node: nodes ){
 													
-													if ( node.getPublicKey() == null ){
-														
-														node.setDetails( contact, public_key );
+													if ( node.setDetails( contact, public_key )){
 														
 														msg_node = node;
+														
+														break;
 													}
 												}
 											}

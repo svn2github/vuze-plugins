@@ -22,6 +22,8 @@
 
 package com.vuze.plugins.azmsgsync;
 
+import java.util.Arrays;
+
 import org.gudy.azureus2.core3.util.SystemTime;
 
 import com.aelitis.azureus.plugins.dht.DHTPluginContact;
@@ -47,13 +49,23 @@ MsgSyncNode
 		public_key	= _public_key;
 	}
 	
-	protected void
+	protected boolean
 	setDetails(
 		DHTPluginContact	_contact,
 		byte[]				_public_key )
 	{
-		contact			= _contact;
-		public_key		= _public_key;
+		synchronized( this ){
+			
+			if ( public_key != null ){
+				
+				return( Arrays.equals( public_key, _public_key ));
+			}
+	
+			contact			= _contact;
+			public_key		= _public_key;
+			
+			return( true );
+		}
 	}
 	
 	protected void
