@@ -366,11 +366,27 @@ TorBrowserPlugin
 				
 				if ( highest_version_data_file != null ){
 					
+					char slash = File.separatorChar;
+
+					// Version 4.0 - Data moved from /Data to [Browser|TorBrowser.app]/TorBrowser/Data
+					
+					String	top_level_folder = Constants.isOSX?"TorBrowser.app":"Browser";
+					
 					File	old_profile = new File( highest_version_data_file, "Data" );
+					
+					if ( !old_profile.exists()){
+						
+						old_profile = new File( highest_version_data_file, top_level_folder + slash + "TorBrowser" + slash + "Data" );
+					}
+					
 					File	new_profile = new File( temp_data, "Data" );
 					
-					copyProfile( old_profile, new_profile );
+					if ( !new_profile.exists()){
+						
+						new_profile = new File( temp_data, top_level_folder + slash + "TorBrowser" + slash + "Data" );
+					}
 					
+					copyProfile( old_profile, new_profile );		
 				}
 				
 				File target_data = new File( plugin_data_dir, "browser_" + highest_version_zip );
@@ -518,7 +534,14 @@ TorBrowserPlugin
 					
 					if ( !FileUtil.copyFile( from_file, to_file )){
 						
-						throw( new Exception( "Failed to copy file: " + from_file + " -> " + to_file ));
+						// changed to not be a terminal error as seen this occur for whatever reason :(
+						
+						String name = from_file.getName().toLowerCase( Locale.US );
+						
+						if ( !name.equals( ".ds_store" )){
+						
+							Debug.out( "Failed to copy file: " + from_file + " -> " + to_file );
+						}
 					}
 				}
 			}
@@ -581,6 +604,8 @@ TorBrowserPlugin
 		user_pref.put("browser.startup.homepage", HOME_PAGE );
 		user_pref.put("network.proxy.no_proxies_on", "127.0.0.1");
 		user_pref.put("network.proxy.socks_port", socks_port );
+		
+		user_pref.put("extensions.torbutton.lastUpdateCheck", "1999999999.000" );	// we handle this
 		user_pref.put("extensions.torbutton.updateNeeded", false );	// we handle this
 
 		Set<String>	user_pref_opt = new HashSet<String>();
@@ -609,14 +634,24 @@ TorBrowserPlugin
 		}
 		
 		char slash = File.separatorChar;
+
+		// Version 4.0 - Data moved from /Data to [Browser|TorBrowser.app]/TorBrowser/Data
 		
-		File	profile_dir = new File( root, "Data" + slash + "Browser" + slash + "profile.default" );
+		String	top_level_folder = Constants.isOSX?"TorBrowser.app":"Browser";
+
+		File	profile_dir = new File( root, top_level_folder + slash + "TorBrowser" + slash + "Data" + slash + "Browser" + slash + "profile.default" );
+		
+		profile_dir.mkdirs();
 		
 		File	user_prefs_file = new File( profile_dir, "prefs.js" );
 		
 		fixPrefs( user_prefs_file, "user_pref", user_pref, user_pref_opt );
 		
-		File	ext_prefs_file = new File( profile_dir, "preferences" + slash + "extension-overrides.js" );
+		File	ext_prefs_dir = new File( profile_dir, "preferences" );
+
+		ext_prefs_dir.mkdirs();
+		
+		File	ext_prefs_file = new File( ext_prefs_dir, "extension-overrides.js" );
 		
 		fixPrefs( ext_prefs_file, "pref", ext_pref, new HashSet<String>() );
 	}
@@ -887,6 +922,12 @@ TorBrowserPlugin
 			
 			String slash = File.separator;
 			
+			// Version 4.0 - Data moved from /Data to [Browser|TorBrowser.app]/TorBrowser/Data
+			
+			String	top_level_folder = Constants.isOSX?"TorBrowser.app":"Browser";
+			
+			String PROFILE_DIR = browser_root + slash + top_level_folder + slash + "TorBrowser" + slash + "Data" + slash + "Browser" + slash + "profile.default";
+			
 			boolean is_osx_open = false;
 			
 			if ( Constants.isWindows ){
@@ -895,7 +936,7 @@ TorBrowserPlugin
 				
 				cmd_list.add( "-profile" );
 				
-				cmd_list.add( browser_root + slash + "Data" + slash + "Browser" + slash + "profile.default" + slash );
+				cmd_list.add( PROFILE_DIR + slash );
 				
 			}else if ( Constants.isOSX ){
 								
@@ -905,7 +946,7 @@ TorBrowserPlugin
 					
 					cmd_list.add( "-profile" );
 					
-					cmd_list.add( browser_root + slash + "Data" + slash + "Browser" + slash + "profile.default" );
+					cmd_list.add( PROFILE_DIR );
 					
 				}else{
 					
@@ -948,7 +989,7 @@ TorBrowserPlugin
 				
 				cmd_list.add( "-profile" );
 				
-				cmd_list.add( browser_root + slash + "Data" + slash + "Browser" + slash + "profile.default" );
+				cmd_list.add( PROFILE_DIR );
 			}
 			
 			ProcessBuilder pb = GeneralUtils.createProcessBuilder( root, cmd_list.toArray(new String[cmd_list.size()]), null );

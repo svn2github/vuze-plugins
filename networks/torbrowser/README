@@ -1,5 +1,7 @@
 The 'Tor Browser' components included in this plugin are derived directly from the release version of the product with the following removed:
 
+-- versions 4.0 and higher
+
 Windows:
     .\Docs
     .\Tor
@@ -8,11 +10,28 @@ Windows:
     .\Data\Browser\profile.default\extensions\tor-launcher@torproject.org.xpi
 
 Mac:
+    .\TorBrowser\Docs
+    .\TorBrowser\Tor
+    .\TorBrowser\Data\Tor
+    .\TorBrowser\Data\Browser\profile.default\extensions\tor-launcher@torproject.org.xpi
+
+-- versions prior to 4.0
+
+Windows:
+    .\Start Tor Browser.exe
+    .\Browser\TorBrowser\Docs
+    .\Browser\TorBrowser\Tor
+    .\Browser\TorBrowser\Data\Tor
+    .\Browser\TorBrowser\Data\Browser\profile.default\extensions\tor-launcher@torproject.org.xpi
+
+Mac:
     .\Docs
     .\Tor
     .\Contents\MacOS\TorBrowser.app is moved to .\TorBrowser.app and everything else in '.\Contents deleted
     .\Data\Tor
     .\Data\Browser\profile.default\extensions\tor-launcher@torproject.org.xpi
+
+--
     
 There are no additions or changes beyond this to the 'Tor Browser' components.
 
