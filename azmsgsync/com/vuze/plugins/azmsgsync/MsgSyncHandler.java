@@ -110,7 +110,8 @@ MsgSyncHandler
 	private static final int				MAX_NODES				= 128;
 
 	protected static final int				MAX_MESSAGE_SIZE		= 350;
-	private static final int				MAX_MESSSAGE_IN_REPLY	= 32;
+	
+	private static final int				MAX_MESSSAGE_REPLY_SIZE	= 2*1024;
 	
 		
 	private Object							message_lock	= new Object();
@@ -753,8 +754,31 @@ MsgSyncHandler
 				}
 				
 				message_sigs.put( signature, "" );
-								
-				messages.add( msg );
+										
+				ListIterator<MsgSyncMessage> lit = messages.listIterator(messages.size());
+				
+				boolean added = false;
+				
+				while( lit.hasPrevious()){
+					
+					MsgSyncMessage prev  = lit.previous();
+					
+					if ( prev.getAgeSecs() > age_secs ){
+						
+						lit.next();
+						
+						lit.add( msg );
+						
+						added = true;
+						
+						break;
+					}
+				}
+				
+				if ( !added ){
+				
+					messages.add( msg );
+				}
 				
 				if ( messages.size() > MAX_MESSAGES ){
 						
@@ -1469,16 +1493,11 @@ MsgSyncHandler
 					
 					reply_map.put( "m", l );
 					
-					if ( missing.size() > MAX_MESSSAGE_IN_REPLY ){
-						
-						Collections.shuffle( missing );
-					}
-					
-					int	num_done = 0;
+					int	content_bytes = 0;
 					
 					for ( MsgSyncMessage message: missing ){
 						
-						if ( num_done++ == MAX_MESSSAGE_IN_REPLY ){
+						if ( content_bytes > MAX_MESSSAGE_REPLY_SIZE ){
 							
 							break;
 						}
@@ -1498,12 +1517,16 @@ MsgSyncHandler
 						
 						MsgSyncNode	n = message.getNode();
 						
+						byte[]	content = message.getContent();
+						
+						content_bytes += content.length;
+
 						m.put( "u", n.getUID());
 						m.put( "i", message.getID());
-						m.put( "c", message.getContent());
+						m.put( "c", content );
 						m.put( "s", message.getSignature());
 						m.put( "a", message.getAgeSecs());
-						
+												
 						if ( !done_nodes.contains( n )){
 							
 							done_nodes.add( n );
