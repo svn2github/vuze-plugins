@@ -104,32 +104,24 @@ MsgSyncHandler
 
 	private static final int				MIN_BLOOM_BITS	= 8*8;
 	
-	private static final int				MAX_OTHER_MESSAGES	= 64;
-	private static final int				MAX_MY_MESSAGES		= 16;
+	private static final int				MAX_MESSAGES			= 128;
+	private static final int				MAX_DELETED_MESSAGES	= 64;
 	
-	private static final int				MAX_NODES			= 128;
+	private static final int				MAX_NODES				= 128;
 
+	protected static final int				MAX_MESSAGE_SIZE		= 350;
+	private static final int				MAX_MESSSAGE_IN_REPLY	= 32;
 	
-		// TODO: figure this out - once messages start being removed we need to limit the
-		// time that we keep our own messages around so that recipients don't get replays
-		// remove messages only need to be remembered by their sigs
-	
-	private static final int				MY_MESSAGE_RETENTION		= 2*60*1000;
-	private static final int				REMOVED_MESSAGE_RETENTION	= 4*60*1000;
-	
+		
 	private Object							message_lock	= new Object();
 	
-	private LinkedList<MsgSyncMessage>		my_messages 	= new LinkedList<MsgSyncMessage>();
-	private LinkedList<MsgSyncMessage>		other_messages 	= new LinkedList<MsgSyncMessage>();
+	private LinkedList<MsgSyncMessage>		messages 	= new LinkedList<MsgSyncMessage>();
+	
+	private LinkedList<byte[]>				deleted_messages_sigs 	= new LinkedList<byte[]>();
+
 	
 	private ByteArrayHashMap<String>		message_sigs	= new ByteArrayHashMap<String>();
 	
-	private List<List<MsgSyncMessage>>		all_messages = new ArrayList<List<MsgSyncMessage>>();
-	
-	{
-		all_messages.add( my_messages );
-		all_messages.add( other_messages );
-	}
 		
 	private Map<HashWrapper,String>	request_id_history = 
 		new LinkedHashMap<HashWrapper,String>(512,0.75f,true)
@@ -264,10 +256,15 @@ MsgSyncHandler
 	{
 		synchronized( message_lock ){
 
-			List<MsgSyncMessage> result = new ArrayList<MsgSyncMessage>( my_messages.size() + other_messages.size());
-			
-			result.addAll( my_messages );
-			result.addAll( other_messages );
+			List<MsgSyncMessage> result = new ArrayList<MsgSyncMessage>( messages.size());
+
+			for ( MsgSyncMessage msg: messages ){
+				
+				if ( msg.getStatus() == MsgSyncMessage.ST_OK ){
+					
+					result.add( msg );
+				}
+			}
 			
 			return( result );
 		}
@@ -527,7 +524,7 @@ MsgSyncHandler
 				}
 			}
 			
-			log( "Node status: live=" + live + ", failed=" + failed + ", total=" + total + ", to_remove=" + to_remove.size());
+			log( "Node status: live=" + live + ", failed=" + failed + ", total=" + total + ", to_remove=" + to_remove.size() + "; messages=" + messages.size());
 			
 			for ( MsgSyncNode node: to_remove ){
 				
@@ -541,12 +538,6 @@ MsgSyncHandler
 					now - last_dht_check > live*60*1000 ){
 				
 				checkDHT( false );
-			}
-		
-			synchronized( message_lock ){
-	
-				log( "Message status: mine=" + my_messages.size() + ", other=" + other_messages.size());
-	
 			}
 		}
 		
@@ -744,53 +735,60 @@ MsgSyncHandler
 		byte[]			message_id,
 		byte[]			content,
 		byte[]			signature,
-		int				age_secs )
+		int				age_secs,
+		boolean			is_incoming )
 	{
 		MsgSyncMessage msg = new MsgSyncMessage( node, message_id, content, signature, age_secs );
-		
-			// TODO: keep my messages separate so that we retain last X regardless (or at least with a long timeout)
-			// this prevents high message throughput from losing them
-		
-		synchronized( message_lock ){
-		
-			if ( message_sigs.containsKey( signature )){
-				
-				return;
-			}
 			
-			message_sigs.put( signature, "" );
+		if ( msg.getStatus() == MsgSyncMessage.ST_OK || is_incoming ){
 			
-			if ( node == my_node ){
-				
-				my_messages.add( msg );
+				// remember message if is it valid or it is incoming - latter is to 
+				// prevent an invalid incoming message from being replayed over and over
 			
-				if ( my_messages.size() > MAX_MY_MESSAGES ){
+			synchronized( message_lock ){
+			
+				if ( message_sigs.containsKey( signature )){
 					
-					MsgSyncMessage removed = my_messages.removeFirst();
-					
-					message_sigs.remove( removed.getSignature());
+					return;
 				}
-			}else{
 				
-				other_messages.add( msg );
+				message_sigs.put( signature, "" );
+								
+				messages.add( msg );
 				
-				if ( other_messages.size() > MAX_OTHER_MESSAGES ){
+				if ( messages.size() > MAX_MESSAGES ){
+						
+					MsgSyncMessage removed = messages.removeFirst();
+						
+					byte[]	sig = removed.getSignature();
 					
-					MsgSyncMessage removed = other_messages.removeFirst();
+					message_sigs.remove( sig );
 					
-					message_sigs.remove( removed.getSignature());
+					deleted_messages_sigs.addLast( sig );
+					
+					if ( deleted_messages_sigs.size() > MAX_DELETED_MESSAGES ){
+						
+						deleted_messages_sigs.removeFirst();
+					}
 				}
 			}
 		}
 		
-		for ( MsgSyncListener l: listeners ){
+		if ( msg.getStatus() == MsgSyncMessage.ST_OK || !is_incoming ){
 			
-			try{
-				l.messageReceived( msg );
+				// we want to deliver any local error responses back to the caller but not
+				// incoming messages that are errors as these are maintained for house
+				// keeping purposes only
+			
+			for ( MsgSyncListener l: listeners ){
 				
-			}catch( Throwable e ){
-				
-				Debug.out( e );
+				try{
+					l.messageReceived( msg );
+					
+				}catch( Throwable e ){
+					
+					Debug.out( e );
+				}
 			}
 		}
 	}
@@ -799,6 +797,11 @@ MsgSyncHandler
 	sendMessage(
 		byte[]		content )
 	{
+		if ( content == null ){
+			
+			content = new byte[0];
+		}
+		
 		try{
 			Signature sig = CryptoECCUtils.getSignature( ecc_keys.getPrivate());
 			
@@ -812,7 +815,7 @@ MsgSyncHandler
 			
 			byte[]	sig_bytes = sig.sign();
 			
-			addMessage( my_node, message_id, content, sig_bytes, 0 );
+			addMessage( my_node, message_id, content, sig_bytes, 0, false );
 			
 			sync( true );
 			
@@ -1056,54 +1059,63 @@ MsgSyncHandler
 				Set<MsgSyncNode>	done_nodes = new HashSet<MsgSyncNode>();
 				
 				msg_node_map = new ByteArrayHashMap<List<MsgSyncNode>>();
-				
-				for ( List<MsgSyncMessage> msgs: all_messages ){
 					
-					for ( MsgSyncMessage msg: msgs ){
+				for ( MsgSyncMessage msg: messages ){
+					
+					MsgSyncNode n = msg.getNode();
+					
+					if ( !done_nodes.contains( n )){
 						
-						MsgSyncNode n = msg.getNode();
+						byte[] nid = n.getUID();
 						
-						if ( !done_nodes.contains( n )){
+						List<MsgSyncNode> list = msg_node_map.get( nid );
+						
+						if ( list == null ){
 							
-							byte[] nid = n.getUID();
+							list = new ArrayList<MsgSyncNode>();
 							
-							List<MsgSyncNode> list = msg_node_map.get( nid );
-							
-							if ( list == null ){
-								
-								list = new ArrayList<MsgSyncNode>();
-								
-								msg_node_map.put( nid, list );
-							}
-							
-							list.add( n );
-							
-							done_nodes.add( n );
-							
-							byte[] pub = n.getPublicKey();
-							
-							if ( pub != null ){
-							
-								pub = pub.clone();
-								
-								for ( int j=0;j<rand.length;j++){
-									
-									pub[j] ^= rand[j];
-								}
-								
-								bloom_keys.put( pub, "" );
-							}
+							msg_node_map.put( nid, list );
 						}
 						
-						byte[]	sig = msg.getSignature().clone();
-			
-						for ( int j=0;j<rand.length;j++){
-							
-							sig[j] ^= rand[j];
-						}
+						list.add( n );
 						
-						bloom_keys.put( sig, ""  );
+						done_nodes.add( n );
+						
+						byte[] pub = n.getPublicKey();
+						
+						if ( pub != null ){
+						
+							pub = pub.clone();
+							
+							for ( int j=0;j<rand.length;j++){
+								
+								pub[j] ^= rand[j];
+							}
+							
+							bloom_keys.put( pub, "" );
+						}
 					}
+					
+					byte[]	sig = msg.getSignature().clone();
+		
+					for ( int j=0;j<rand.length;j++){
+						
+						sig[j] ^= rand[j];
+					}
+					
+					bloom_keys.put( sig, ""  );
+				}
+				
+				for ( byte[] sig: deleted_messages_sigs ){
+				
+					sig = sig.clone();
+					
+					for ( int j=0;j<rand.length;j++){
+						
+						sig[j] ^= rand[j];
+					}
+					
+					bloom_keys.put( sig, ""  );
 				}
 				
 					// in theory we could have 64 sigs + 64 pks -> 128 -> 1280 bits -> 160 bytes + overhead
@@ -1255,7 +1267,7 @@ MsgSyncHandler
 											
 											if ( sig.verify( signature )){
 												
-												addMessage( node, message_id, content, signature, age );
+												addMessage( node, message_id, content, signature, age, true );
 												
 												handled = true;
 												
@@ -1304,7 +1316,7 @@ MsgSyncHandler
 												msg_node = addNode( contact, node_uid, public_key );
 											}
 																						
-											addMessage( msg_node, message_id, content, signature, age );
+											addMessage( msg_node, message_id, content, signature, age, true );
 										}
 									}
 								}
@@ -1413,27 +1425,24 @@ MsgSyncHandler
 				
 				synchronized( message_lock ){
 					
-					for ( List<MsgSyncMessage> msgs: all_messages ){
-
-						for ( MsgSyncMessage msg: msgs ){
+					for ( MsgSyncMessage msg: messages ){
+						
+						byte[]	sig = msg.getSignature().clone();	// clone as we mod it
+			
+						for ( int i=0;i<rand.length;i++){
 							
-							byte[]	sig = msg.getSignature().clone();	// clone as we mod it
-				
-							for ( int i=0;i<rand.length;i++){
-								
-								sig[i] ^= rand[i];
-							}
+							sig[i] ^= rand[i];
+						}
+						
+						if ( !bloom.contains( sig )){
+						
+								// I have it, they don't
 							
-							if ( !bloom.contains( sig )){
+							missing.add( msg );
 							
-									// I have it, they don't
-								
-								missing.add( msg );
-								
-							}else{
-								
-								num_they_have_i_dont--;
-							}
+						}else{
+							
+							num_they_have_i_dont--;
 						}
 					}
 				}
@@ -1446,7 +1455,26 @@ MsgSyncHandler
 					
 					reply_map.put( "m", l );
 					
+					if ( missing.size() > MAX_MESSSAGE_IN_REPLY ){
+						
+						Collections.shuffle( missing );
+					}
+					
+					int	num_done = 0;
+					
 					for ( MsgSyncMessage message: missing ){
+						
+						if ( num_done++ == MAX_MESSSAGE_IN_REPLY ){
+							
+							break;
+						}
+												
+						if ( message.getStatus() != MsgSyncMessage.ST_OK ){
+							
+								// invalid message, don't propagate
+							
+							continue;
+						}
 						
 						if ( TRACE )System.out.println( "    returning " + ByteFormatter.encodeString( message.getID()));
 						
@@ -1507,7 +1535,7 @@ MsgSyncHandler
 			
 		}catch( Throwable e ){
 			
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		
 		return( null );

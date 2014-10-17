@@ -27,7 +27,8 @@ import org.gudy.azureus2.core3.util.SystemTime;
 public class 
 MsgSyncMessage 
 {
-	public final int ST_PENDING		= 5;
+	public static final int ST_OK			= 1;
+	public static final int ST_ERROR		= 2;
 	
 	private MsgSyncNode		node;
 	private byte[]			message_id;
@@ -37,6 +38,8 @@ MsgSyncMessage
 	
 	private int				age_when_received_secs;
 	private long			time_received;
+	
+	private String			error;
 	
 	protected
 	MsgSyncMessage(
@@ -53,6 +56,36 @@ MsgSyncMessage
 		
 		age_when_received_secs	= _age_secs;
 		time_received			= SystemTime.getMonotonousTime();
+		
+		if ( content == null ){
+			content = new byte[0];
+		}
+		
+		if ( content.length > MsgSyncHandler.MAX_MESSAGE_SIZE ){
+			
+			content = new byte[0];
+			
+			setError( "Message rejected - too large (max bytes=" + MsgSyncHandler.MAX_MESSAGE_SIZE + ")" );
+		}
+	}
+	
+	public int
+	getStatus()
+	{
+		return( error==null?ST_OK:ST_ERROR );
+	}
+	
+	public String
+	getError()
+	{
+		return( error );
+	}
+	
+	protected void
+	setError(
+		String		_error )
+	{ 
+		error	= _error;
 	}
 	
 	public MsgSyncNode
@@ -73,14 +106,6 @@ MsgSyncMessage
 		return((int)( age_when_received_secs + (( SystemTime.getMonotonousTime() - time_received )/1000)));
 	}
 	
-	/*
-	public int
-	getStatus()
-	{
-		
-	}
-	*/
-	
 	public byte[]
 	getContent()
 	{
@@ -92,24 +117,4 @@ MsgSyncMessage
 	{
 		return( signature );
 	}
-	
-	/*
-	public long
-	getOriginatorTimestamp()
-	{
-		
-	}
-	
-	public MsgSyncMessage
-	getPreviousMessage(){
-		
-		
-	}
-	
-	public MsgSyncMessage
-	getNextMessage()
-	{
-		
-	}
-	*/
 }

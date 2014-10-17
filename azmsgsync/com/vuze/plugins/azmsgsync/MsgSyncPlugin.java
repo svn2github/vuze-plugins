@@ -396,7 +396,7 @@ MsgSyncPlugin
 								map.put( "pk", message.getNode().getPublicKey());
 								map.put( "address", message.getNode().getContact().getAddress());
 								
-									// as a public ID we use teh start of the signature 
+									// as a public ID we use the start of the signature 
 								
 								byte[]	sig = message.getSignature();
 								
@@ -405,6 +405,11 @@ MsgSyncPlugin
 								System.arraycopy( sig, 0, msg_id, 0, msg_id.length );
 								
 								map.put( "id", msg_id );
+								
+								if ( message.getStatus() != MsgSyncMessage.ST_OK ){
+									
+									map.put( "error", message.getError());
+								}
 								
 								callback.invoke( listener, map );
 								
