@@ -1314,6 +1314,20 @@ MsgSyncHandler
 											if ( msg_node == null ){
 											
 												msg_node = addNode( contact, node_uid, public_key );
+												
+													// save so local list so pk available to other messages
+													// in this loop
+												
+												List<MsgSyncNode> x = msg_node_map.get( node_uid );
+												
+												if ( x == null ){
+													
+													x = new ArrayList<MsgSyncNode>();
+													
+													msg_node_map.put( node_uid, x );
+												}
+												
+												x.add( msg_node );
 											}
 																						
 											addMessage( msg_node, message_id, content, signature, age, true );
