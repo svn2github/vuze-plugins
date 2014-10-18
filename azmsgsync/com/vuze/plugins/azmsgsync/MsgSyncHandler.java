@@ -111,7 +111,7 @@ MsgSyncHandler
 
 	protected static final int				MAX_MESSAGE_SIZE		= 350;
 	
-	private static final int				MAX_MESSSAGE_REPLY_SIZE	= 2*1024;
+	private static final int				MAX_MESSSAGE_REPLY_SIZE	= 4*1024;
 	
 		
 	private Object							message_lock	= new Object();
@@ -777,11 +777,13 @@ MsgSyncHandler
 				
 				if ( !added ){
 				
-					messages.add( msg );
+						// no older messages found, stick it at the front
+					
+					messages.addFirst( msg );
 				}
 				
 				if ( messages.size() > MAX_MESSAGES ){
-						
+											
 					MsgSyncMessage removed = messages.removeFirst();
 						
 					byte[]	sig = removed.getSignature();
@@ -1250,7 +1252,7 @@ MsgSyncHandler
 					List<Map<String,Object>>	list = (List<Map<String,Object>>)reply_map.get( "m" );
 					
 					if ( list != null ){
-						
+												
 						for ( Map<String,Object> m: list ){
 							
 							try{
