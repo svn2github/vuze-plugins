@@ -24,9 +24,12 @@ package com.vuze.plugins.azmsgsync;
 
 import java.net.InetSocketAddress;
 import java.security.KeyPair;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.Signature;
 import java.util.*;
 
+import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.BEncoder;
@@ -39,6 +42,7 @@ import org.gudy.azureus2.core3.util.SHA1Simple;
 import org.gudy.azureus2.core3.util.SystemTime;
 
 import com.aelitis.azureus.core.security.CryptoECCUtils;
+import com.aelitis.azureus.core.security.CryptoManager;
 import com.aelitis.azureus.core.util.CopyOnWriteList;
 import com.aelitis.azureus.core.util.average.Average;
 import com.aelitis.azureus.core.util.average.AverageFactory;
@@ -94,7 +98,8 @@ MsgSyncHandler
 	private boolean									checking_dht;
 	private long									last_dht_check;
 
-	private KeyPair				ecc_keys;
+	private PrivateKey			private_key;
+	private PublicKey			public_key;
 	
 	private byte[]				my_uid;
 	private MsgSyncNode			my_node;
@@ -164,13 +169,62 @@ MsgSyncHandler
 		dht				= _dht;
 		user_key		= _key;
 			
-		my_uid = new byte[8];
+		String	config_key = CryptoManager.CRYPTO_CONFIG_PREFIX + "msgsync." + dht.getNetwork() + "." + ByteFormatter.encodeString( user_key );
 		
-		RandomUtils.nextSecureBytes( my_uid );
+		boolean	config_updated = false;
 		
-		ecc_keys = CryptoECCUtils.createKeys();
+		Map map = COConfigurationManager.getMapParameter( config_key, new HashMap());
+		
+		my_uid = (byte[])map.get( "uid" );
+		
+		if ( my_uid == null || my_uid.length != 8 ){
+		
+			my_uid = new byte[8];
+		
+			RandomUtils.nextSecureBytes( my_uid );
+			
+			map.put( "uid", my_uid );
+			
+			config_updated = true;
+		}
+		
+		byte[]	public_key_bytes 	= (byte[])map.get( "pub" );
+		byte[]	private_key_bytes 	= (byte[])map.get( "pri" );
+		 
+		if ( public_key_bytes != null && private_key_bytes != null ){
+		
+			try{
+				public_key	= CryptoECCUtils.rawdataToPubkey( public_key_bytes );
+				private_key	= CryptoECCUtils.rawdataToPrivkey( private_key_bytes );
+				
+			}catch( Throwable e ){
+				
+				public_key	= null;
+				private_key	= null;
+			}
+		}
+		
+		if ( public_key == null || private_key == null ){
+			
+			KeyPair ecc_keys = CryptoECCUtils.createKeys();
 
-		my_node	= new MsgSyncNode( dht.getLocalAddress(), my_uid, CryptoECCUtils.keyToRawdata( ecc_keys.getPublic()));
+			public_key	= ecc_keys.getPublic();
+			private_key	= ecc_keys.getPrivate();
+			
+			map.put( "pub", CryptoECCUtils.keyToRawdata( public_key ));
+			map.put( "pri", CryptoECCUtils.keyToRawdata( private_key ));
+			
+			config_updated = true;
+		}
+		
+		if ( config_updated ){
+			
+			COConfigurationManager.setParameter( config_key, map );
+			
+			COConfigurationManager.setDirty();
+		}
+		
+		my_node	= new MsgSyncNode( dht.getLocalAddress(), my_uid, CryptoECCUtils.keyToRawdata( public_key ));
 		
 		dht_key = new SHA1Simple().calculateHash( user_key );
 		
@@ -829,7 +883,7 @@ MsgSyncHandler
 		}
 		
 		try{
-			Signature sig = CryptoECCUtils.getSignature( ecc_keys.getPrivate());
+			Signature sig = CryptoECCUtils.getSignature( private_key );
 			
 			byte[]	message_id = new byte[8];
 			
