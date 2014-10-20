@@ -30,7 +30,9 @@ import java.security.Signature;
 import java.util.*;
 
 import org.gudy.azureus2.core3.config.COConfigurationManager;
+import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.core3.util.AEThread2;
+import org.gudy.azureus2.core3.util.AsyncDispatcher;
 import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.BEncoder;
 import org.gudy.azureus2.core3.util.ByteArrayHashMap;
@@ -156,6 +158,9 @@ MsgSyncHandler
 	
 	private Average		in_req_average 	= AverageFactory.MovingImmediateAverage( 30*1000/MsgSyncPlugin.TIMER_PERIOD );
 	private Average		out_req_average = AverageFactory.MovingImmediateAverage( 30*1000/MsgSyncPlugin.TIMER_PERIOD );
+	
+	private Average		my_send_average = AverageFactory.MovingImmediateAverage( 30*1000/MsgSyncPlugin.TIMER_PERIOD );
+
 	
 	protected
 	MsgSyncHandler(
@@ -795,6 +800,8 @@ MsgSyncHandler
 	{
 		MsgSyncMessage msg = new MsgSyncMessage( node, message_id, content, signature, age_secs );
 			
+		
+		
 		if ( msg.getStatus() == MsgSyncMessage.ST_OK || is_incoming ){
 			
 				// remember message if is it valid or it is incoming - latter is to 
@@ -817,7 +824,7 @@ MsgSyncHandler
 					
 					MsgSyncMessage prev  = lit.previous();
 					
-					if ( prev.getAgeSecs() > age_secs ){
+					if ( prev.getAgeSecs() >= age_secs ){
 						
 						lit.next();
 						
@@ -872,9 +879,36 @@ MsgSyncHandler
 			}
 		}
 	}
+		
+	private volatile long send_last;
 	
 	public void
 	sendMessage(
+		final byte[]		content )
+	{
+		long now = SystemTime.getMonotonousTime();
+		
+		long time_since_last = now - send_last;
+		
+		long delay = 1000 - time_since_last;
+		
+		if ( delay > 0 ){
+			
+			try{
+				Thread.sleep( delay );
+				
+			}catch( Throwable e ){
+				
+			}
+		}
+		
+		send_last = SystemTime.getMonotonousTime();
+		
+		sendMessageSupport( content );
+	}
+	
+	private void
+	sendMessageSupport(
 		byte[]		content )
 	{
 		if ( content == null ){
