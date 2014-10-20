@@ -70,9 +70,7 @@ MsgSyncPlugin
 	private CopyOnWriteList<MsgSyncHandler>	sync_handlers = new CopyOnWriteList<MsgSyncHandler>();
 
 	private TimerEventPeriodic		timer;
-	
-	private volatile boolean		unloadable		= true;
-	
+		
 	private volatile boolean		init_called;
 	private volatile boolean		destroyed;
 	

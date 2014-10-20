@@ -1125,8 +1125,12 @@ MsgSyncHandler
 		
 		ByteArrayHashMap<List<MsgSyncNode>>	msg_node_map = null;
 		
+		int	message_count;
+		
 		synchronized( message_lock ){
 
+			message_count = messages.size();
+			
 			for ( int i=0;i<64;i++){
 				
 				RandomUtils.nextSecureBytes( rand );
@@ -1246,6 +1250,7 @@ MsgSyncHandler
 		request_map.put( "u", my_uid );
 		request_map.put( "b", bloom.serialiseToMap());
 		request_map.put( "r", rand );
+		request_map.put( "m", message_count );
 				
 		try{
 			byte[]	sync_data = BEncoder.encode( request_map );
@@ -1420,6 +1425,15 @@ MsgSyncHandler
 							}
 						}
 					}
+					
+					Number x_temp = (Number)reply_map.get( "x" );
+					
+					if ( x_temp != null ){
+						
+						int	more_to_come = x_temp.intValue();
+						
+						// TODO: bias us hitting them again?
+					}
 				}
 			}
 		}catch( Throwable e ){
@@ -1473,6 +1487,7 @@ MsgSyncHandler
 			Map<String,Object> reply_map = new HashMap<String,Object>();
 
 			int		status;
+			int		more_to_come = 0;
 
 			byte[]	uid = (byte[])request_map.get( "u" );
 
@@ -1490,6 +1505,10 @@ MsgSyncHandler
 				*/
 				
 				status = STATUS_OK;
+				
+				Number	m_temp = (Number)request_map.get( "m" );
+				
+				int	messages_they_have = m_temp==null?-1:m_temp.intValue();
 				
 				List<MsgSyncNode> caller_nodes = getNodes( uid );
 				
@@ -1515,7 +1534,7 @@ MsgSyncHandler
 								
 				List<MsgSyncMessage>	missing = new ArrayList<MsgSyncMessage>();
 				
-				int	num_they_have_i_dont = bloom.getEntryCount();
+				int	messages_we_both_have = 0;
 				
 				synchronized( message_lock ){
 					
@@ -1536,11 +1555,11 @@ MsgSyncHandler
 							
 						}else{
 							
-							num_they_have_i_dont--;
+							messages_we_both_have ++;
 						}
 					}
 				}
-								
+					
 				if ( missing.size() > 0 ){
 					
 					Set<MsgSyncNode>	done_nodes = new HashSet<MsgSyncNode>();
@@ -1550,21 +1569,23 @@ MsgSyncHandler
 					reply_map.put( "m", l );
 					
 					int	content_bytes = 0;
-					
+										
 					for ( MsgSyncMessage message: missing ){
-						
-						if ( content_bytes > MAX_MESSSAGE_REPLY_SIZE ){
-							
-							break;
-						}
-												
+
 						if ( message.getStatus() != MsgSyncMessage.ST_OK ){
 							
 								// invalid message, don't propagate
-							
+						
 							continue;
 						}
 						
+						if ( content_bytes > MAX_MESSSAGE_REPLY_SIZE ){
+							
+							more_to_come++;
+							
+							continue;
+						}
+																		
 						if ( TRACE )System.out.println( "    returning " + ByteFormatter.encodeString( message.getID()));
 						
 						Map<String,Object> m = new HashMap<String,Object>();
@@ -1608,14 +1629,17 @@ MsgSyncHandler
 									
 									m.put( "k", contact.exportToMap());
 								}
+							}else{
+								
+								Debug.out( "Should always have pk" );
 							}
 						}
 					}
 				}
 				
-				if ( num_they_have_i_dont > 0 ){
+				if ( messages_they_have > messages_we_both_have ){
 					
-					// TODO: prioritise us hitting them to get this based on num missing prolly
+					// TODO: prioritize us hitting them to get this based on num missing prolly?
 					
 				}
 			}
@@ -1624,6 +1648,11 @@ MsgSyncHandler
 			
 			reply_map.put( "t", 1 );		// type
 
+			if ( more_to_come > 0 ){
+				
+				reply_map.put( "x", more_to_come );
+			}
+			
 			return( BEncoder.encode( reply_map ));
 			
 		}catch( Throwable e ){
