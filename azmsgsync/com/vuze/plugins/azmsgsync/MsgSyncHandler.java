@@ -1238,7 +1238,7 @@ MsgSyncHandler
 				
 					// in theory we could have 64 sigs + 64 pks -> 128 -> 1280 bits -> 160 bytes + overhead
 				
-				int	bloom_bits = bloom_keys.size() * 20;
+				int	bloom_bits = bloom_keys.size() * 10;
 					
 				if ( bloom_bits < MIN_BLOOM_BITS ){
 				
