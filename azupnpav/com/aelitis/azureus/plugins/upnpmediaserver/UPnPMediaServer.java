@@ -1044,171 +1044,16 @@ UPnPMediaServer
 	{
 		TableManager tableManager = plugin_interface.getUIManager().getTableManager();
 
-		MenuItemFillListener	menu_fill_simple_listener = 
-			new MenuItemFillListener()
-			{
-				public void
-				menuWillBeShown(
-					MenuItem	menu,
-					Object		_target )
-				{
-					Object	obj = null;
-					
-					if ( _target instanceof TableRow ){
-						
-						obj = ((TableRow)_target).getDataSource();
-	
-					}else{
-						
-						TableRow[] rows = (TableRow[])_target;
-					     
-						if ( rows.length > 0 ){
-						
-							obj = rows[0].getDataSource();
-						}
-					}
-					
-					if ( obj == null ){
-						
-						menu.setEnabled( false );
-
-						return;
-					}
-					
-					Download				download;
-					DiskManagerFileInfo		file;
-					
-					if ( obj instanceof Download ){
-					
-						download = (Download)obj;
-
-						if ( DISABLE_MENUS_FOR_INCOMPLETE && !download.isComplete()){
-							
-							menu.setEnabled( false );
-
-							return;
-						}
-
-					}else{
-						
-						file = (DiskManagerFileInfo)obj;
-						
-						if ( DISABLE_MENUS_FOR_INCOMPLETE && file.getDownloaded() != file.getLength()){
-							
-							menu.setEnabled( false );
-
-							return;
-						}
-					}
-					
-					menu.setEnabled( true );
-				}
-			};
-		
 		{
-			// play
-		
-			MenuItemListener	menu_listener = 
-				new MenuItemListener()
-				{
-					public void
-					selected(
-						MenuItem		_menu,
-						Object			_target )
-					{
-						Object	obj = ((TableRow)_target).getDataSource();
-						
-						if ( obj == null ){
-							
-							return;
-						}
-						
-						Download				download;
-						DiskManagerFileInfo		file;
-						
-						if ( obj instanceof Download ){
-						
-							download = (Download)obj;
-		
-							file	= download.getDiskManagerFileInfo()[0];
-						
-						}else{
-							
-							file = (DiskManagerFileInfo)obj;
-							
-							try{
-								download	= file.getDownload();
-								
-							}catch( DownloadException e ){	
-								
-								Debug.printStackTrace(e);
-								
-								return;
-							}
-						}
-						
-						String	id = content_directory.createResourceID( download.getTorrent().getHash(), file );
-						
-						System.out.println( "play: " + id );
-	
-						UPnPMediaServerContentDirectory.contentItem item = content_directory.getContentFromResourceID( id );
-						
-						if ( item != null ){
-							
-							Iterator	it;
-							
-							synchronized( renderers ){
-								
-								it = new HashSet( renderers ).iterator();
-							}
-								
-							while( it.hasNext()){
-									
-								UPnPMediaRenderer	renderer = (UPnPMediaRenderer)it.next();
-								
-								if ( !renderer.isBusy()){
-									
-									int	stream_id;
-									
-									synchronized( UPnPMediaServer.this ){
-										
-										stream_id	= stream_id_next++;
-									}
-									
-									renderer.play( item, stream_id );
-								}
-							}
-						}
-					}
-				};
-				
-				MenuItemListener	menu_listener_play_external = 
-					new MenuItemListener()
-					{
-						public void
-						selected(
-							MenuItem		_menu,
-							Object			_target )
-						{
-							Object	obj = ((TableRow)_target).getDataSource();
-							
-							if ( obj == null ){
-								
-								return;
-							}
-							
-							try{
-								play(obj);
-								
-							}catch( IPCException e ){
-								
-								log( "Failed to play '" + obj + "'", e );
-							}
-							
-						}
-					};
 					
 				// top level menus
+					
+			MenuItemFillListener fillTopMenu = new MenuItemFillListener() {
+				public void menuWillBeShown(MenuItem menu, Object data) {
+					menu.removeAllChildItems();
+					fillSubMenu((TableContextMenuItem) menu);
+				}
+			};
 					
 			TableContextMenuItem menu_item_itorrents;
 			if ( DISABLE_MENUS_FOR_INCOMPLETE ){
@@ -1226,33 +1071,21 @@ UPnPMediaServer
 			
 			if ( menu_item_itorrents != null ){
 				menu_item_itorrents.setStyle(TableContextMenuItem.STYLE_MENU);
+				menu_item_itorrents.addFillListener(fillTopMenu);
 			}
 			menu_item_ctorrents.setStyle(TableContextMenuItem.STYLE_MENU);
+			menu_item_ctorrents.addFillListener(fillTopMenu);
 			menu_item_files.setStyle(TableContextMenuItem.STYLE_MENU);
+			menu_item_files.addFillListener(fillTopMenu);
 			
-				// create play-external items
 			
-			TableContextMenuItem menup1;
-			if ( DISABLE_MENUS_FOR_INCOMPLETE ){
-				menup1 = null;
-			}else{
-				menup1 = tableManager.addContextMenuItem(menu_item_itorrents, 	"upnpmediaserver.contextmenu.playExternal" );
-			}
-			TableContextMenuItem menup2 = tableManager.addContextMenuItem(menu_item_ctorrents, "upnpmediaserver.contextmenu.playExternal" );
-			TableContextMenuItem menup3 = tableManager.addContextMenuItem(menu_item_files, "upnpmediaserver.contextmenu.playExternal" );
+		}
+	}
 
-				// create play items
-			
-			TableContextMenuItem menu1;
-			if ( DISABLE_MENUS_FOR_INCOMPLETE ){
-				menu1 = null;
-			}else{
-				menu1 = tableManager.addContextMenuItem(menu_item_itorrents, 	"upnpmediaserver.contextmenu.play" );
-			}
-			TableContextMenuItem menu2 = tableManager.addContextMenuItem(menu_item_ctorrents, "upnpmediaserver.contextmenu.play" );
-			TableContextMenuItem menu3 = tableManager.addContextMenuItem(menu_item_files, "upnpmediaserver.contextmenu.play" );
-		
-			MenuItemFillListener	menu_fill_listener = 
+	protected void fillSubMenu(TableContextMenuItem parentMenu) {
+		TableManager tableManager = plugin_interface.getUIManager().getTableManager();
+
+		MenuItemFillListener	menu_fill_simple_listener = 
 				new MenuItemFillListener()
 				{
 					public void
@@ -1269,7 +1102,7 @@ UPnPMediaServer
 						}else{
 							
 							TableRow[] rows = (TableRow[])_target;
-							     
+						     
 							if ( rows.length > 0 ){
 							
 								obj = rows[0].getDataSource();
@@ -1309,52 +1142,87 @@ UPnPMediaServer
 							}
 						}
 						
-						synchronized( renderers ){
-							
-							boolean	enabled = false;
-							
-							Iterator	it = renderers.iterator();
-							
-							while( it.hasNext()){
-								
-								UPnPMediaRenderer	renderer = (UPnPMediaRenderer)it.next();
-								
-								if ( !renderer.isBusy()){
-									
-									enabled	= true;
-									break;
-								}
-							}
-							
-							menu.setEnabled( enabled );
-						}
+						menu.setEnabled( true );
 					}
 				};
 			
-			if ( menu1 != null ){
-				menu1.addListener( menu_listener );
-			}
-			menu2.addListener( menu_listener );
-			menu3.addListener( menu_listener );
-			
-			if ( menu1 != null ){
-				menu1.addFillListener( menu_fill_listener );
-			}
-			menu2.addFillListener( menu_fill_listener );
-			menu3.addFillListener( menu_fill_listener );
-			
-			if ( menup1 != null ){
-				menup1.addListener( menu_listener_play_external );
-			}
-			menup2.addListener( menu_listener_play_external );
-			menup3.addListener( menu_listener_play_external );
-			
-			menup2.addFillListener( menu_fill_simple_listener );
-			menup3.addFillListener( menu_fill_simple_listener );
+		// play
 		
-			// copy to clip
-		
-			menu_listener = 
+		MenuItemListener	menu_listener = 
+			new MenuItemListener()
+			{
+				public void
+				selected(
+					MenuItem		_menu,
+					Object			_target )
+				{
+					Object	obj = ((TableRow)_target).getDataSource();
+					
+					if ( obj == null ){
+						
+						return;
+					}
+					
+					Download				download;
+					DiskManagerFileInfo		file;
+					
+					if ( obj instanceof Download ){
+					
+						download = (Download)obj;
+	
+						file	= download.getDiskManagerFileInfo()[0];
+					
+					}else{
+						
+						file = (DiskManagerFileInfo)obj;
+						
+						try{
+							download	= file.getDownload();
+							
+						}catch( DownloadException e ){	
+							
+							Debug.printStackTrace(e);
+							
+							return;
+						}
+					}
+					
+					String	id = content_directory.createResourceID( download.getTorrent().getHash(), file );
+					
+					System.out.println( "play: " + id );
+
+					UPnPMediaServerContentDirectory.contentItem item = content_directory.getContentFromResourceID( id );
+					
+					if ( item != null ){
+						
+						Iterator	it;
+						
+						synchronized( renderers ){
+							
+							it = new HashSet( renderers ).iterator();
+						}
+							
+						while( it.hasNext()){
+								
+							UPnPMediaRenderer	renderer = (UPnPMediaRenderer)it.next();
+							
+							if ( !renderer.isBusy()){
+								
+								int	stream_id;
+								
+								synchronized( UPnPMediaServer.this ){
+									
+									stream_id	= stream_id_next++;
+								}
+								
+								renderer.play( item, stream_id );
+							}
+						}
+					}
+				}
+			};
+			
+			MenuItemListener	menu_listener_play_external = 
 				new MenuItemListener()
 				{
 					public void
@@ -1369,68 +1237,186 @@ UPnPMediaServer
 							return;
 						}
 						
-						Download				download;
-						DiskManagerFileInfo		file;
-						
-						if ( obj instanceof Download ){
-						
-							download = (Download)obj;
-		
-							file	= download.getDiskManagerFileInfo()[0];
-						
-						}else{
+						try{
+							play(obj);
 							
-							file = (DiskManagerFileInfo)obj;
+						}catch( IPCException e ){
 							
-							try{
-								download	= file.getDownload();
-								
-							}catch( DownloadException e ){	
-								
-								Debug.printStackTrace(e);
-								
-								return;
-							}
+							log( "Failed to play '" + obj + "'", e );
 						}
 						
-						String	id = content_directory.createResourceID( download.getTorrent().getHash(), file );
-							
-						UPnPMediaServerContentDirectory.contentItem item = content_directory.getContentFromResourceID( id );
-						
-						if ( item != null ){
-						
-							try{
-								plugin_interface.getUIManager().copyToClipBoard( item.getURI( getLocalIP(), -1 ));
-								
-							}catch( Throwable e ){
-								
-								log( "Failed to copy to clipboard", e);
-							}
-						}
 					}
 				};
-				
-			if ( DISABLE_MENUS_FOR_INCOMPLETE ){
-				menu1 = null;
-			}else{
-				menu1 = tableManager.addContextMenuItem(menu_item_itorrents, 	"upnpmediaserver.contextmenu.toclipboard" );
-			}
-			menu2 = tableManager.addContextMenuItem(menu_item_ctorrents, 	"upnpmediaserver.contextmenu.toclipboard" );
-			menu3 = tableManager.addContextMenuItem(menu_item_files, 			"upnpmediaserver.contextmenu.toclipboard" );
-			
-			if ( menu1 != null ){
-				menu1.addFillListener( menu_fill_simple_listener );
-			}
-			menu2.addFillListener( menu_fill_simple_listener );
-			menu3.addFillListener( menu_fill_simple_listener );
 
-			if ( menu1 != null ){
-				menu1.addListener( menu_listener );
-			}
-			menu2.addListener( menu_listener );
-			menu3.addListener( menu_listener );
+			// create play-external items
+		
+		TableContextMenuItem menup = tableManager.addContextMenuItem(parentMenu, "upnpmediaserver.contextmenu.playExternal" );
+
+			// create play items
+		
+		TableContextMenuItem menuPlay = tableManager.addContextMenuItem(parentMenu, "upnpmediaserver.contextmenu.play" );
+	
+		MenuItemFillListener	menu_fill_listener = 
+			new MenuItemFillListener()
+			{
+				public void
+				menuWillBeShown(
+					MenuItem	menu,
+					Object		_target )
+				{
+					Object	obj = null;
+					
+					if ( _target instanceof TableRow ){
+						
+						obj = ((TableRow)_target).getDataSource();
+	
+					}else{
+						
+						TableRow[] rows = (TableRow[])_target;
+						     
+						if ( rows.length > 0 ){
+						
+							obj = rows[0].getDataSource();
+						}
+					}
+					
+					if ( obj == null ){
+						
+						menu.setEnabled( false );
+
+						return;
+					}
+					
+					Download				download;
+					DiskManagerFileInfo		file;
+					
+					if ( obj instanceof Download ){
+					
+						download = (Download)obj;
+
+						if ( DISABLE_MENUS_FOR_INCOMPLETE && !download.isComplete()){
+							
+							menu.setEnabled( false );
+
+							return;
+						}
+
+					}else{
+						
+						file = (DiskManagerFileInfo)obj;
+						
+						if ( DISABLE_MENUS_FOR_INCOMPLETE && file.getDownloaded() != file.getLength()){
+							
+							menu.setEnabled( false );
+
+							return;
+						}
+					}
+					
+					synchronized( renderers ){
+						
+						boolean	enabled = false;
+						
+						Iterator	it = renderers.iterator();
+						
+						while( it.hasNext()){
+							
+							UPnPMediaRenderer	renderer = (UPnPMediaRenderer)it.next();
+							
+							if ( !renderer.isBusy()){
+								
+								enabled	= true;
+								break;
+							}
+						}
+						
+						menu.setEnabled( enabled );
+					}
+				}
+			};
+		
+		menuPlay.addListener( menu_listener );
+		menuPlay.addFillListener( menu_fill_listener );
+		
+		menup.addListener( menu_listener_play_external );
+		menup.addFillListener( menu_fill_simple_listener );
+	
+		// copy to clip
+	
+		menu_listener = 
+			new MenuItemListener()
+			{
+				public void
+				selected(
+					MenuItem		_menu,
+					Object			_target )
+				{
+					Object	obj = ((TableRow)_target).getDataSource();
+					
+					if ( obj == null ){
+						
+						return;
+					}
+					
+					Download				download;
+					DiskManagerFileInfo		file;
+					
+					if ( obj instanceof Download ){
+					
+						download = (Download)obj;
+	
+						file	= download.getDiskManagerFileInfo()[0];
+					
+					}else{
+						
+						file = (DiskManagerFileInfo)obj;
+						
+						try{
+							download	= file.getDownload();
+							
+						}catch( DownloadException e ){	
+							
+							Debug.printStackTrace(e);
+							
+							return;
+						}
+					}
+					
+					String	id = content_directory.createResourceID( download.getTorrent().getHash(), file );
+						
+					UPnPMediaServerContentDirectory.contentItem item = content_directory.getContentFromResourceID( id );
+					
+					if ( item != null ){
+					
+						try{
+						String ip = "Global".equals(_menu.getData())
+								? plugin_interface.getUtilities().getPublicAddress().getHostAddress()
+								: "Local".equals(_menu.getData())
+										? InetAddress.getLocalHost().getHostAddress() : getLocalIP();
+							plugin_interface.getUIManager().copyToClipBoard( item.getURI( ip, -1 ));
+							
+						}catch( Throwable e ){
+							
+							log( "Failed to copy to clipboard", e);
+						}
+					}
+				}
+			};
 			
-		}
+		TableContextMenuItem menuClip = tableManager.addContextMenuItem(parentMenu, 	"upnpmediaserver.contextmenu.toclipboard" );
+		menuClip.addFillListener( menu_fill_simple_listener );
+		menuClip.addListener( menu_listener );
+
+		TableContextMenuItem menuClipPublic = tableManager.addContextMenuItem(parentMenu, 	"upnpmediaserver.contextmenu.publictoclipboard" );
+		menuClipPublic.addFillListener( menu_fill_simple_listener );
+		menuClipPublic.addListener( menu_listener );
+		menuClipPublic.setData("Global");
+		
+		TableContextMenuItem menuClipLocal = tableManager.addContextMenuItem(parentMenu, 	"upnpmediaserver.contextmenu.localtoclipboard" );
+		menuClipLocal.addFillListener( menu_fill_simple_listener );
+		menuClipLocal.addListener( menu_listener );
+		menuClipLocal.setData("Local");
+		
 	}
 
 	public void
