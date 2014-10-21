@@ -55,7 +55,7 @@ MsgSyncMessage
 		signature	= _signature;
 		
 		age_when_received_secs	= _age_secs;
-		time_received			= SystemTime.getMonotonousTime();
+		time_received			= SystemTime.getCurrentTime();		// can't use monotime here as computer sleep suspends it :(
 		
 		if ( content == null ){
 			content = new byte[0];
@@ -103,7 +103,20 @@ MsgSyncMessage
 	public int
 	getAgeSecs()
 	{
-		return((int)( age_when_received_secs + (( SystemTime.getMonotonousTime() - time_received )/1000)));
+		long now	=  SystemTime.getCurrentTime();
+		
+		long elapsed = now - time_received;
+		
+		if ( elapsed < 0 ){
+			
+				// not much we can do apart from reset things
+			
+			time_received = now;
+			
+			return( age_when_received_secs );
+		}
+		
+		return((int)( age_when_received_secs + ( elapsed/1000 )));
 	}
 	
 	public byte[]
