@@ -1042,6 +1042,8 @@ UPnPMediaServer
 	private void 
 	buildMenu() 
 	{
+		TableManager tableManager = plugin_interface.getUIManager().getTableManager();
+
 		MenuItemFillListener	menu_fill_simple_listener = 
 			new MenuItemFillListener()
 			{
@@ -1212,12 +1214,12 @@ UPnPMediaServer
 			if ( DISABLE_MENUS_FOR_INCOMPLETE ){
 				menu_item_itorrents = null;
 			}else{
-				menu_item_itorrents = plugin_interface.getUIManager().getTableManager().addContextMenuItem(TableManager.TABLE_MYTORRENTS_INCOMPLETE, "upnpmediaserver.contextmenu");
+				menu_item_itorrents = tableManager.addContextMenuItem(TableManager.TABLE_MYTORRENTS_INCOMPLETE, "upnpmediaserver.contextmenu");
 				menus.add( menu_item_itorrents );
 			}
-			TableContextMenuItem menu_item_ctorrents 	= plugin_interface.getUIManager().getTableManager().addContextMenuItem(TableManager.TABLE_MYTORRENTS_COMPLETE, "upnpmediaserver.contextmenu");
+			TableContextMenuItem menu_item_ctorrents 	= tableManager.addContextMenuItem(TableManager.TABLE_MYTORRENTS_COMPLETE, "upnpmediaserver.contextmenu");
 			menus.add( menu_item_ctorrents );
-			TableContextMenuItem menu_item_files 		= plugin_interface.getUIManager().getTableManager().addContextMenuItem(TableManager.TABLE_TORRENT_FILES, "upnpmediaserver.contextmenu");
+			TableContextMenuItem menu_item_files 		= tableManager.addContextMenuItem(TableManager.TABLE_TORRENT_FILES, "upnpmediaserver.contextmenu");
 			menus.add( menu_item_files );
 			
 				// set menu style
@@ -1234,10 +1236,10 @@ UPnPMediaServer
 			if ( DISABLE_MENUS_FOR_INCOMPLETE ){
 				menup1 = null;
 			}else{
-				menup1 = plugin_interface.getUIManager().getTableManager().addContextMenuItem(menu_item_itorrents, 	"upnpmediaserver.contextmenu.playExternal" );
+				menup1 = tableManager.addContextMenuItem(menu_item_itorrents, 	"upnpmediaserver.contextmenu.playExternal" );
 			}
-			TableContextMenuItem menup2 = plugin_interface.getUIManager().getTableManager().addContextMenuItem(menu_item_ctorrents, "upnpmediaserver.contextmenu.playExternal" );
-			TableContextMenuItem menup3 = plugin_interface.getUIManager().getTableManager().addContextMenuItem(menu_item_files, "upnpmediaserver.contextmenu.playExternal" );
+			TableContextMenuItem menup2 = tableManager.addContextMenuItem(menu_item_ctorrents, "upnpmediaserver.contextmenu.playExternal" );
+			TableContextMenuItem menup3 = tableManager.addContextMenuItem(menu_item_files, "upnpmediaserver.contextmenu.playExternal" );
 
 				// create play items
 			
@@ -1245,10 +1247,10 @@ UPnPMediaServer
 			if ( DISABLE_MENUS_FOR_INCOMPLETE ){
 				menu1 = null;
 			}else{
-				menu1 = plugin_interface.getUIManager().getTableManager().addContextMenuItem(menu_item_itorrents, 	"upnpmediaserver.contextmenu.play" );
+				menu1 = tableManager.addContextMenuItem(menu_item_itorrents, 	"upnpmediaserver.contextmenu.play" );
 			}
-			TableContextMenuItem menu2 = plugin_interface.getUIManager().getTableManager().addContextMenuItem(menu_item_ctorrents, "upnpmediaserver.contextmenu.play" );
-			TableContextMenuItem menu3 = plugin_interface.getUIManager().getTableManager().addContextMenuItem(menu_item_files, "upnpmediaserver.contextmenu.play" );
+			TableContextMenuItem menu2 = tableManager.addContextMenuItem(menu_item_ctorrents, "upnpmediaserver.contextmenu.play" );
+			TableContextMenuItem menu3 = tableManager.addContextMenuItem(menu_item_files, "upnpmediaserver.contextmenu.play" );
 		
 			MenuItemFillListener	menu_fill_listener = 
 				new MenuItemFillListener()
@@ -1411,10 +1413,10 @@ UPnPMediaServer
 			if ( DISABLE_MENUS_FOR_INCOMPLETE ){
 				menu1 = null;
 			}else{
-				menu1 = plugin_interface.getUIManager().getTableManager().addContextMenuItem(menu_item_itorrents, 	"upnpmediaserver.contextmenu.toclipboard" );
+				menu1 = tableManager.addContextMenuItem(menu_item_itorrents, 	"upnpmediaserver.contextmenu.toclipboard" );
 			}
-			menu2 = plugin_interface.getUIManager().getTableManager().addContextMenuItem(menu_item_ctorrents, 	"upnpmediaserver.contextmenu.toclipboard" );
-			menu3 = plugin_interface.getUIManager().getTableManager().addContextMenuItem(menu_item_files, 			"upnpmediaserver.contextmenu.toclipboard" );
+			menu2 = tableManager.addContextMenuItem(menu_item_ctorrents, 	"upnpmediaserver.contextmenu.toclipboard" );
+			menu3 = tableManager.addContextMenuItem(menu_item_files, 			"upnpmediaserver.contextmenu.toclipboard" );
 			
 			if ( menu1 != null ){
 				menu1.addFillListener( menu_fill_simple_listener );
@@ -1427,6 +1429,7 @@ UPnPMediaServer
 			}
 			menu2.addListener( menu_listener );
 			menu3.addListener( menu_listener );
+			
 		}
 	}
 
