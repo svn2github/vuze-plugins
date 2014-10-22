@@ -54,16 +54,15 @@ import org.gudy.azureus2.core3.tracker.protocol.PRHelpers;
 import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.AEThread2;
+import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.core3.util.ThreadPool;
-import org.gudy.azureus2.core3.util.TorrentUtils;
-import org.gudy.azureus2.core3.util.UrlUtils;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.torrent.Torrent;
 import org.gudy.azureus2.plugins.torrent.TorrentAnnounceURLListSet;
-import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
+import org.omg.CORBA.portable.Delegate;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperAdapter;
 
 import com.aelitis.azureus.core.proxy.AEProxyConnection;
@@ -103,6 +102,7 @@ I2PHelperSocksProxy
 	}
 	
 	private I2PHelperRouter		router;
+	private boolean				allow_public_fallback;
 	private I2PHelperAdapter	adapter;
 	
 	private NamingService		name_service;
@@ -118,12 +118,14 @@ I2PHelperSocksProxy
 	I2PHelperSocksProxy(
 		I2PHelperRouter			_router,
 		int						_port,
+		boolean					_allow_public_fallback,
 		I2PHelperAdapter		_adapter )
 	
 		throws AEProxyException
 	{
-		router	= _router;
-		adapter = _adapter;
+		router					= _router;
+		allow_public_fallback	= _allow_public_fallback;
+		adapter 				= _adapter;
 				
 		name_service = I2PAppContext.getGlobalContext().namingService();
 				
@@ -488,6 +490,18 @@ I2PHelperSocksProxy
 			try{
 				if ( resolved != null ){
 						
+					if ( !allow_public_fallback ){
+													
+						String	msg = "Connection refused, not delegating public address " + resolved + ":" + original_port;
+						
+						if ( Constants.isCVSVersion()){
+							
+							System.err.println( "azneti2phelper: " + msg );
+						}
+						
+						throw( new IOException( msg ));
+					}
+					
 					trace( "    delegating resolved" );
 						
 					AESocksProxyPlugableConnection	delegate = proxy_connection.getProxy().getDefaultPlugableConnection( proxy_connection );
@@ -501,7 +515,19 @@ I2PHelperSocksProxy
 					final String	externalised_address = AEProxyFactory.getAddressMapper().externalise( unresolved );
 				
 					if ( !externalised_address.toLowerCase().endsWith(".i2p")){
-																
+								
+						if ( !allow_public_fallback ){
+							
+							String msg = "Connection refused, not delegating public address: " + externalised_address + ":" + original_port;
+							
+							if ( Constants.isCVSVersion()){
+								
+								System.err.println( "azneti2phelper: " + msg );
+							}
+							
+							throw( new IOException(  msg ));
+						}
+						
 						trace( "    delegating unresolved" );
 	
 						AESocksProxyPlugableConnection	delegate = proxy_connection.getProxy().getDefaultPlugableConnection( proxy_connection );

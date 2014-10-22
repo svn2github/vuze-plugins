@@ -187,6 +187,7 @@ I2PHelperPlugin
 	private IntParameter 			int_port_param;
 	private IntParameter 			ext_port_param;
 	private IntParameter 			socks_port_param;
+	private BooleanParameter 		socks_allow_public_param;
 	private InfoParameter 			port_info_param;
 	
 	private int						active_int_port;
@@ -603,6 +604,8 @@ I2PHelperPlugin
 			ext_port_param	 	= config_model.addIntParameter2( "azi2phelper.external.port", "azi2phelper.external.port", 0 );
 			socks_port_param 	= config_model.addIntParameter2( "azi2phelper.socks.port", "azi2phelper.socks.port", 0 );
 			
+			socks_allow_public_param = config_model.addBooleanParameter2( "azi2phelper.socks.allow.public", "azi2phelper.socks.allow.public", false );
+			
 			int	int_port = int_port_param.getValue();
 			
 			boolean port_changed = false;
@@ -679,7 +682,7 @@ I2PHelperPlugin
 			config_model.createGroup( 
 				"azi2phelper.internals.group",
 				new Parameter[]{ 
-						i2p_address_param, new_id, change_id, int_port_param, ext_port_param, socks_port_param,
+						i2p_address_param, new_id, change_id, int_port_param, ext_port_param, socks_port_param, socks_allow_public_param,
 						port_info_param, use_upnp, always_socks, ext_i2p_param, ext_i2p_host_param, ext_i2p_port_param });
 			
 			
@@ -1122,7 +1125,7 @@ I2PHelperPlugin
 				}
 				
 				try{
-					socks_proxy = new I2PHelperSocksProxy( router, socks_port_param.getValue(), I2PHelperPlugin.this );
+					socks_proxy = new I2PHelperSocksProxy( router, socks_port_param.getValue(), socks_allow_public_param.getValue(), I2PHelperPlugin.this );
 				
 					updatePortInfo();
 					
