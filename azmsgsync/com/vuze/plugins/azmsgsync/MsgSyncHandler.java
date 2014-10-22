@@ -586,7 +586,7 @@ MsgSyncHandler
 				
 				if ( parent_handler.destroyed ){
 					
-					System.out.println( "parent chat destroyed!" );
+					reportError( "Parent chat destroyed!" );
 				}
 				
 				synchronized(  MsgSyncHandler.this ){
