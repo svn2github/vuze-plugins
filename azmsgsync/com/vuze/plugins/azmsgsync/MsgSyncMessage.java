@@ -69,6 +69,24 @@ MsgSyncMessage
 		}
 	}
 	
+	protected
+	MsgSyncMessage(
+		MsgSyncNode		_node,
+		byte[]			_message_id,
+		byte[]			_signature,
+		String			_error )
+	{
+		node		= _node;
+		message_id	= _message_id;
+		content		= new byte[0];
+		signature	= _signature;
+		
+		age_when_received_secs	= 0;
+		time_received			= SystemTime.getCurrentTime();
+		
+		error	= _error;
+	}
+	
 	public int
 	getStatus()
 	{

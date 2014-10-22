@@ -85,6 +85,11 @@ MsgSyncHandler
 		HANDLER_BASE_KEY_BYTES = bytes;
 	}
 	
+	private static final int	RT_SYNC_REQUEST	= 0;
+	private static final int	RT_SYNC_REPLY	= 1;
+	private static final int	RT_DH_REQUEST	= 2;
+	private static final int	RT_DH_REPLY		= 3;
+
 	private int NODE_STATUS_CHECK_PERIOD			= 60*1000;
 	private int	NODE_STATUS_CHECK_TICKS				= NODE_STATUS_CHECK_PERIOD / MsgSyncPlugin.TIMER_PERIOD;
 	
@@ -100,11 +105,11 @@ MsgSyncHandler
 	private boolean									checking_dht;
 	private long									last_dht_check;
 
-	private PrivateKey			private_key;
-	private PublicKey			public_key;
+	private final PrivateKey			private_key;
+	private final PublicKey				public_key;
 	
-	private byte[]				my_uid;
-	private MsgSyncNode			my_node;
+	private final byte[]				my_uid;
+	private final MsgSyncNode			my_node;
 	
 	private ByteArrayHashMap<List<MsgSyncNode>>		node_uid_map 		= new ByteArrayHashMap<List<MsgSyncNode>>();
 	private ByteArrayHashMap<MsgSyncNode>			node_uid_loopbacks	= new ByteArrayHashMap<MsgSyncNode>();
@@ -159,8 +164,16 @@ MsgSyncHandler
 	private Average		in_req_average 	= AverageFactory.MovingImmediateAverage( 30*1000/MsgSyncPlugin.TIMER_PERIOD );
 	private Average		out_req_average = AverageFactory.MovingImmediateAverage( 30*1000/MsgSyncPlugin.TIMER_PERIOD );
 	
-	private Average		my_send_average = AverageFactory.MovingImmediateAverage( 30*1000/MsgSyncPlugin.TIMER_PERIOD );
-
+	
+		// for private message handler:
+	
+	private final MsgSyncHandler			parent_handler;
+	private final byte[]					target_pk;
+	private final Map<String,Object>		target_contact;
+	private final MsgSyncNode				target_node;
+	
+	private volatile byte[]					target_secret;
+	private boolean							target_secret_getting;
 	
 	protected
 	MsgSyncHandler(
@@ -174,53 +187,66 @@ MsgSyncHandler
 		dht				= _dht;
 		user_key		= _key;
 			
+		parent_handler		= null;
+		target_pk			= null;
+		target_contact		= null;
+		target_node			= null;
+		
 		String	config_key = CryptoManager.CRYPTO_CONFIG_PREFIX + "msgsync." + dht.getNetwork() + "." + ByteFormatter.encodeString( user_key );
 		
 		boolean	config_updated = false;
 		
 		Map map = COConfigurationManager.getMapParameter( config_key, new HashMap());
 		
-		my_uid = (byte[])map.get( "uid" );
+		byte[] _my_uid = (byte[])map.get( "uid" );
 		
-		if ( my_uid == null || my_uid.length != 8 ){
+		if ( _my_uid == null || _my_uid.length != 8 ){
 		
-			my_uid = new byte[8];
+			_my_uid = new byte[8];
 		
-			RandomUtils.nextSecureBytes( my_uid );
+			RandomUtils.nextSecureBytes( _my_uid );
 			
-			map.put( "uid", my_uid );
+			map.put( "uid", _my_uid );
 			
 			config_updated = true;
 		}
+		
+		my_uid = _my_uid;
 		
 		byte[]	public_key_bytes 	= (byte[])map.get( "pub" );
 		byte[]	private_key_bytes 	= (byte[])map.get( "pri" );
 		 
+		PrivateKey	_private_key 	= null;
+		PublicKey	_public_key		= null;
+		
 		if ( public_key_bytes != null && private_key_bytes != null ){
 		
 			try{
-				public_key	= CryptoECCUtils.rawdataToPubkey( public_key_bytes );
-				private_key	= CryptoECCUtils.rawdataToPrivkey( private_key_bytes );
+				_public_key	= CryptoECCUtils.rawdataToPubkey( public_key_bytes );
+				_private_key	= CryptoECCUtils.rawdataToPrivkey( private_key_bytes );
 				
 			}catch( Throwable e ){
 				
-				public_key	= null;
-				private_key	= null;
+				_public_key		= null;
+				_private_key	= null;
 			}
 		}
 		
-		if ( public_key == null || private_key == null ){
+		if ( _public_key == null || _private_key == null ){
 			
 			KeyPair ecc_keys = CryptoECCUtils.createKeys();
 
-			public_key	= ecc_keys.getPublic();
-			private_key	= ecc_keys.getPrivate();
+			_public_key	= ecc_keys.getPublic();
+			_private_key	= ecc_keys.getPrivate();
 			
-			map.put( "pub", CryptoECCUtils.keyToRawdata( public_key ));
-			map.put( "pri", CryptoECCUtils.keyToRawdata( private_key ));
+			map.put( "pub", CryptoECCUtils.keyToRawdata( _public_key ));
+			map.put( "pri", CryptoECCUtils.keyToRawdata( _private_key ));
 			
 			config_updated = true;
 		}
+		
+		public_key	= _public_key;
+		private_key	= _private_key;
 		
 		if ( config_updated ){
 			
@@ -243,6 +269,48 @@ MsgSyncHandler
 		checkDHT( true );
 	}
 	
+	protected
+	MsgSyncHandler(
+		MsgSyncPlugin			_plugin,
+		DHTPluginInterface		_dht,
+		MsgSyncHandler			_parent_handler,
+		byte[]					_target_pk,
+		Map<String,Object>		_target_contact )
+		
+				
+		throws Exception
+	{
+		plugin			= _plugin;
+		dht				= _dht;
+		
+		parent_handler	= _parent_handler;
+		target_pk		= _target_pk;
+		target_contact	= _target_contact;
+		
+		user_key		= new byte[16];
+
+		RandomUtils.nextSecureBytes( user_key );
+		
+			// inherit the identity of parent
+		
+		public_key	= parent_handler.public_key;
+		private_key	= parent_handler.private_key;	
+		my_uid		= parent_handler.my_uid;
+		
+		my_node	= new MsgSyncNode( dht.getLocalAddress(), my_uid, CryptoECCUtils.keyToRawdata( public_key ));
+		
+		dht_key = new SHA1Simple().calculateHash( user_key );
+		
+		for ( int i=0;i<dht_key.length;i++){
+			
+			dht_key[i] ^= HANDLER_BASE_KEY_BYTES[i];
+		}
+		
+		target_node = addNode( dht.importContact( target_contact ), new byte[0], target_pk );
+		
+		dht.registerHandler( dht_key, this );
+	}
+		
 	protected MsgSyncPlugin
 	getPlugin()
 	{
@@ -261,6 +329,25 @@ MsgSyncHandler
 		return( status );
 	}
 	
+	public byte[]
+	getNodeID()
+	{
+		return( my_uid );
+	}
+	
+	public byte[]
+	getPublicKey()
+	{
+		try{
+			return(CryptoECCUtils.keyToRawdata( public_key ));
+			
+		}catch( Throwable e ){
+			
+			Debug.out( e );
+			
+			return( null );
+		}
+	}
 	public int
 	getDHTCount()
 	{
@@ -346,6 +433,13 @@ MsgSyncHandler
 	checkDHT(
 		final boolean	first_time )
 	{
+		if ( parent_handler != null ){
+			
+				// no DHT activity for child handlers
+			
+			return;
+		}
+		
 		synchronized( this ){
 			
 			if ( destroyed ){
@@ -484,6 +578,43 @@ MsgSyncHandler
 		if ( destroyed ){
 			
 			return;
+		}
+		
+		if ( parent_handler != null ){
+			
+			if ( target_secret == null ){
+				
+				if ( parent_handler.destroyed ){
+					
+					System.out.println( "parent chat destroyed!" );
+				}
+				
+				synchronized(  MsgSyncHandler.this ){
+					
+					if ( !target_secret_getting ){
+				
+						target_secret_getting = true;
+						
+						new AEThread2( "MsgSyncHandler:getsecret"){
+							
+							@Override
+							public void run() {
+								try{
+									
+									target_secret = parent_handler.getSharedSecret( target_node );
+									
+								}finally{
+									
+									synchronized(  MsgSyncHandler.this ){
+										
+										target_secret_getting = false;
+									}
+								}
+							}
+						}.start();
+					}
+				}
+			}
 		}
 		
 		int	in_req_diff 	= in_req - last_in_req;
@@ -799,13 +930,22 @@ MsgSyncHandler
 		boolean			is_incoming )
 	{
 		MsgSyncMessage msg = new MsgSyncMessage( node, message_id, content, signature, age_secs );
-			
-		
-		
+
+		addMessage( msg, age_secs, is_incoming );
+	}
+	
+	private void
+	addMessage(
+		MsgSyncMessage		msg,
+		int					age_secs,
+		boolean				is_incoming )
+	{				
 		if ( msg.getStatus() == MsgSyncMessage.ST_OK || is_incoming ){
 			
 				// remember message if is it valid or it is incoming - latter is to 
 				// prevent an invalid incoming message from being replayed over and over
+			
+			byte[]	signature = msg.getSignature();
 			
 			synchronized( message_lock ){
 			
@@ -908,6 +1048,32 @@ MsgSyncHandler
 	}
 	
 	private void
+	reportError(
+		String		error )
+	{
+		try{
+			Signature sig = CryptoECCUtils.getSignature( private_key );
+
+			byte[]	message_id = new byte[8];
+			
+			RandomUtils.nextSecureBytes( message_id );
+			
+			sig.update( my_uid );
+			sig.update( message_id );
+			
+			byte[]	sig_bytes = sig.sign();
+			
+			MsgSyncMessage msg = new MsgSyncMessage( my_node, message_id, sig_bytes, error  );
+			
+			addMessage( msg, 0, false );
+			
+		}catch( Throwable e ){
+			
+			e.printStackTrace();
+		}
+	}
+	
+	private void
 	sendMessageSupport(
 		byte[]		content )
 	{
@@ -939,6 +1105,53 @@ MsgSyncHandler
 		}
 	}
 		
+	private byte[]
+	getSharedSecret(
+		MsgSyncNode		target_node )
+	{
+		try{
+			Map<String,Object>		request_map = new HashMap<String, Object>();
+			
+			request_map.put( "v", VERSION );
+			
+			request_map.put( "t", RT_DH_REQUEST );
+
+			byte[]	sync_data = BEncoder.encode( request_map );
+			
+			byte[] reply_bytes = 
+				target_node.getContact().call(
+					new DHTPluginProgressListener() {
+						
+						@Override
+						public void reportSize(long size) {
+						}
+						
+						@Override
+						public void reportCompleteness(int percent) {
+						}
+						
+						@Override
+						public void reportActivity(String str) {
+						}
+					},
+					dht_key,
+					sync_data, 
+					30*1000 );
+			
+			Map<String,Object> reply_map = BDecoder.decode( reply_bytes );
+
+			int	type = reply_map.containsKey( "t" )?((Number)reply_map.get( "t" )).intValue():-1; 
+
+			if ( type != RT_DH_REPLY ){
+				
+			}
+		}catch( Throwable e ){
+			
+		}
+		
+		return( null );
+	}
+	
 	protected void
 	sync()
 	{
@@ -959,6 +1172,16 @@ MsgSyncHandler
 		MsgSyncNode	sync_node = null;
 		
 		synchronized( node_uid_map ){
+			
+			if ( parent_handler != null ){
+				
+				if ( target_secret == null ){
+				
+					reportError( "No shared secret" );					
+				}
+				
+				return;
+			}
 			
 			if ( prefer_live ){
 				
@@ -1279,7 +1502,7 @@ MsgSyncHandler
 		
 		request_map.put( "v", VERSION );
 		
-		request_map.put( "t", 0 );		// type
+		request_map.put( "t", RT_SYNC_REQUEST );		// type
 
 		request_map.put( "u", my_uid );
 		request_map.put( "b", bloom.serialiseToMap());
@@ -1320,7 +1543,7 @@ MsgSyncHandler
 
 			int	type = reply_map.containsKey( "t" )?((Number)reply_map.get( "t" )).intValue():-1; 
 
-			if ( type != 1 ){
+			if ( type != RT_SYNC_REPLY ){
 				
 					// meh, issue with 'call' implementation when made to self - you end up getting the
 					// original request data back as the result :( Can't currently see how to easily fix
@@ -1493,7 +1716,7 @@ MsgSyncHandler
 
 			int	type = request_map.containsKey( "t" )?((Number)request_map.get( "t" )).intValue():-1; 
 
-			if ( type != 0 ){
+			if ( type != RT_SYNC_REQUEST ){
 				
 				return( null );
 			}
@@ -1680,7 +1903,7 @@ MsgSyncHandler
 			
 			reply_map.put( "s", status );
 			
-			reply_map.put( "t", 1 );		// type
+			reply_map.put( "t", RT_SYNC_REPLY );		// type
 
 			if ( more_to_come > 0 ){
 				

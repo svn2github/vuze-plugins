@@ -24,6 +24,7 @@ package com.vuze.plugins.azmsgsync;
 
 
 import java.lang.reflect.Method;
+import java.net.InetSocketAddress;
 import java.util.*;
 
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
@@ -369,8 +370,22 @@ MsgSyncPlugin
 			throw( new IPCException( "Unsupported network: " + network ));
 		}
 				
-		MsgSyncHandler handler = getSyncHandler( dht, key );
-
+		MsgSyncHandler	parent_handler = (MsgSyncHandler)options.get( "parent_handler" );
+		
+		MsgSyncHandler handler;
+		
+		if ( parent_handler != null ){
+			
+			byte[]				target_pk		= (byte[])options.get( "target_pk" );
+			Map<String,Object>	target_contact	= (Map<String,Object>)options.get( "target_contact" );
+			
+			handler = getSyncHandler( dht, key, parent_handler, target_pk, target_contact );
+			
+		}else{
+		
+			handler = getSyncHandler( dht, key );
+		}
+		
 		final Object listener = options.get( "listener" );
 		
 		if ( listener != null ){
@@ -393,6 +408,7 @@ MsgSyncPlugin
 								map.put( "age", message.getAgeSecs());
 								map.put( "pk", message.getNode().getPublicKey());
 								map.put( "address", message.getNode().getContact().getAddress());
+								map.put( "contact", message.getNode().getContact().exportToMap());
 								
 									// as a public ID we use the start of the signature 
 								
@@ -510,6 +526,10 @@ MsgSyncPlugin
 		reply.put( "req_out_fail", new Double(req_details[3]));
 		reply.put( "req_out_rate", new Double(req_details[4]));
 
+		reply.put( "nid", handler.getNodeID());
+		reply.put( "pk", handler.getPublicKey());
+		//reply.put( "address", )	// could block here so ignore for the moment 
+		
 		return( reply );
 	}
 	
@@ -590,6 +610,37 @@ MsgSyncPlugin
 			
 			try{
 				MsgSyncHandler h = new MsgSyncHandler( this, dht, key );
+				
+				sync_handlers.add( h );
+				
+				return( h );
+				
+			}catch( Throwable e ){
+				
+				throw( new IPCException( "Failed to create message handler", e ));
+			}
+		}
+	}
+	
+	private MsgSyncHandler
+	getSyncHandler(
+		DHTPluginInterface		dht,
+		byte[]					key,
+		MsgSyncHandler			parent_handler,
+		byte[]					target_pk,
+		Map<String,Object>		target_contact )
+		
+		throws IPCException
+	{
+		synchronized( this ){
+			
+			if ( destroyed ){
+				
+				throw( new IPCException( "Plugin unloaded" ));
+			}
+			
+			try{
+				MsgSyncHandler h = new MsgSyncHandler( this, dht, parent_handler, target_pk, target_contact );
 				
 				sync_handlers.add( h );
 				
