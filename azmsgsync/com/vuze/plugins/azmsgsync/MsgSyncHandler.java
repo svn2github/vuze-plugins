@@ -23,6 +23,7 @@
 package com.vuze.plugins.azmsgsync;
 
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -43,8 +44,10 @@ import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.SHA1Simple;
 import org.gudy.azureus2.core3.util.SystemTime;
 
+import com.aelitis.azureus.core.AzureusCoreFactory;
 import com.aelitis.azureus.core.security.CryptoECCUtils;
 import com.aelitis.azureus.core.security.CryptoManager;
+import com.aelitis.azureus.core.security.CryptoSTSEngine;
 import com.aelitis.azureus.core.util.CopyOnWriteList;
 import com.aelitis.azureus.core.util.average.Average;
 import com.aelitis.azureus.core.util.average.AverageFactory;
@@ -1034,6 +1037,11 @@ MsgSyncHandler
 		
 		if ( delay > 0 ){
 			
+			if ( delay > 1000 ){
+				
+				delay = 1000;
+			}
+			
 			try{
 				Thread.sleep( delay );
 				
@@ -1110,12 +1118,26 @@ MsgSyncHandler
 		MsgSyncNode		target_node )
 	{
 		try{
+			CryptoSTSEngine sts = AzureusCoreFactory.getSingleton().getCryptoManager().getECCHandler().getSTSEngine( public_key, private_key );
+			
 			Map<String,Object>		request_map = new HashMap<String, Object>();
 			
 			request_map.put( "v", VERSION );
 			
 			request_map.put( "t", RT_DH_REQUEST );
 
+			ByteBuffer buffer = ByteBuffer.allocate( 16*1024 );
+			
+			sts.getKeys( buffer );
+			
+			buffer.flip();
+			
+			byte[]	keys = new byte[ buffer.remaining()];
+			
+			buffer.get( keys );
+			
+			request_map.put( "k", keys );
+			
 			byte[]	sync_data = BEncoder.encode( request_map );
 			
 			byte[] reply_bytes = 
@@ -1353,7 +1375,7 @@ MsgSyncHandler
 			
 			Iterator<Object>	it = map.values().iterator();
 			
-			for ( int i=0;i<index-1;i++){
+			for ( int i=0;i<index;i++){
 				
 				it.next();
 			}
@@ -1701,6 +1723,16 @@ MsgSyncHandler
 		}
 	}	
 
+	private Map<String,Object>
+	handleDHRequest(
+		Map<String,Object>		request )
+	{
+		Map<String,Object>		reply = new HashMap<String, Object>();
+		
+		
+		return( reply );
+	}
+	
 	public byte[]
 	handleRead(
 		DHTPluginContact	originator,
@@ -1716,9 +1748,19 @@ MsgSyncHandler
 
 			int	type = request_map.containsKey( "t" )?((Number)request_map.get( "t" )).intValue():-1; 
 
+			if ( type == RT_DH_REQUEST ){
+				
+				Map<String,Object>	reply_map = handleDHRequest( request_map );
+				
+				reply_map.put( "s", status );
+				
+				reply_map.put( "t", RT_DH_REPLY );
+				
+				return( BEncoder.encode( reply_map ));
+			}
 			if ( type != RT_SYNC_REQUEST ){
 				
-				return( null );
+ 				return( null );
 			}
 
 			byte[]	rand = (byte[])request_map.get( "r" );
