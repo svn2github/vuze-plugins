@@ -1616,8 +1616,10 @@ MsgSyncHandler
 		
 		ByteArrayHashMap<List<MsgSyncNode>>	msg_node_map = null;
 		
+		List<MsgSyncNode>	all_public_keys = new ArrayList<MsgSyncNode>();
+
 		int	message_count;
-		
+				
 		synchronized( message_lock ){
 
 			message_count = messages.size();
@@ -1660,6 +1662,11 @@ MsgSyncHandler
 						
 						if ( pub != null ){
 						
+							if ( i == 0 ){
+								
+								all_public_keys.add( n );
+							}
+							
 							pub = pub.clone();
 							
 							for ( int j=0;j<rand.length;j++){
@@ -1806,6 +1813,8 @@ MsgSyncHandler
 						for ( Map<String,Object> m: list ){
 							
 							try{
+								Set<MsgSyncNode>		keys_to_try = null;
+								
 								byte[] node_uid		= (byte[])m.get( "u" );
 								byte[] message_id 	= (byte[])m.get( "i" );
 								byte[] content		= (byte[])m.get( "c" );
@@ -1835,6 +1844,13 @@ MsgSyncHandler
 										
 										if ( pk != null ){
 											
+											if ( keys_to_try == null ){
+												
+												keys_to_try = new HashSet<MsgSyncNode>( all_public_keys );
+											}
+											
+											keys_to_try.remove( node );
+											
 											Signature sig = CryptoECCUtils.getSignature( CryptoECCUtils.rawdataToPubkey( pk ));
 											
 											sig.update( node_uid );
@@ -1855,7 +1871,42 @@ MsgSyncHandler
 									
 								if ( !handled ){
 									
-									if ( public_key != null ){
+									if ( public_key == null ){
+										
+											// the required public key could be registered against another node-id
+											// in this case the other side won't have returned it to us but we won't
+											// find it under the existing set of keys associated with the node-id
+										
+										if ( keys_to_try == null ){
+											
+											keys_to_try = new HashSet<MsgSyncNode>( all_public_keys );
+										}
+										
+										for ( MsgSyncNode n: keys_to_try ){
+											
+											byte[] pk = n.getPublicKey();
+											
+											Signature sig = CryptoECCUtils.getSignature( CryptoECCUtils.rawdataToPubkey( pk));
+											
+											sig.update( node_uid );
+											sig.update( message_id );
+											sig.update( content );
+											
+											if ( sig.verify( signature )){
+												
+													// dunno if the contact has changed so all we can do is use the existing
+													// one associated with this key
+												
+												MsgSyncNode msg_node = addNode( n.getContact(), node_uid, pk );
+												
+												addMessage( msg_node, message_id, content, signature, age, true );
+												
+												handled = true;
+												
+												break;
+											}
+										}
+									}else{
 										
 											// no existing pk - we HAVE to record this message against
 											// ths supplied pk otherwise we can't replicate it later
