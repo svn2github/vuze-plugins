@@ -28,4 +28,9 @@ MsgSyncListener
 	public void
 	messageReceived(
 		MsgSyncMessage		message );
+	
+	public void
+	chatRequested(
+		byte[]				remote_pk,
+		MsgSyncHandler		handler );
 }

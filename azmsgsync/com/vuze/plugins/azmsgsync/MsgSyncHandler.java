@@ -31,9 +31,7 @@ import java.security.Signature;
 import java.util.*;
 
 import org.gudy.azureus2.core3.config.COConfigurationManager;
-import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.core3.util.AEThread2;
-import org.gudy.azureus2.core3.util.AsyncDispatcher;
 import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.BEncoder;
 import org.gudy.azureus2.core3.util.ByteArrayHashMap;
@@ -104,7 +102,8 @@ MsgSyncHandler
 	private final MsgSyncPlugin						plugin;
 	private final DHTPluginInterface				dht;
 	private final byte[]							user_key;
-	private final byte[]							dht_key;
+	private final byte[]							dht_listen_key;
+	private final byte[]							dht_call_key;
 	private boolean									checking_dht;
 	private long									last_dht_check;
 
@@ -260,14 +259,16 @@ MsgSyncHandler
 		
 		my_node	= new MsgSyncNode( dht.getLocalAddress(), my_uid, CryptoECCUtils.keyToRawdata( public_key ));
 		
-		dht_key = new SHA1Simple().calculateHash( user_key );
+		dht_listen_key = new SHA1Simple().calculateHash( user_key );
 		
-		for ( int i=0;i<dht_key.length;i++){
+		for ( int i=0;i<dht_listen_key.length;i++){
 			
-			dht_key[i] ^= HANDLER_BASE_KEY_BYTES[i];
+			dht_listen_key[i] ^= HANDLER_BASE_KEY_BYTES[i];
 		}
 		
-		dht.registerHandler( dht_key, this );
+		dht.registerHandler( dht_listen_key, this );
+		
+		dht_call_key = dht_listen_key;
 		
 		checkDHT( true );
 	}
@@ -278,8 +279,9 @@ MsgSyncHandler
 		DHTPluginInterface		_dht,
 		MsgSyncHandler			_parent_handler,
 		byte[]					_target_pk,
-		Map<String,Object>		_target_contact )
-		
+		Map<String,Object>		_target_contact,
+		byte[]					_user_key,
+		byte[]					_shared_secret )
 				
 		throws Exception
 	{
@@ -289,29 +291,53 @@ MsgSyncHandler
 		parent_handler	= _parent_handler;
 		target_pk		= _target_pk;
 		target_contact	= _target_contact;
+		target_secret	= _shared_secret;
 		
-		user_key		= new byte[16];
-
-		RandomUtils.nextSecureBytes( user_key );
-		
+		if ( _user_key == null ){
+			
+			user_key		= new byte[16];
+	
+			RandomUtils.nextSecureBytes( user_key );
+			
+		}else{
+			
+			user_key		= _user_key;
+		}
 			// inherit the identity of parent
 		
 		public_key	= parent_handler.public_key;
 		private_key	= parent_handler.private_key;	
-		my_uid		= parent_handler.my_uid;
+
+		my_uid = new byte[8];
 		
+		RandomUtils.nextSecureBytes( my_uid );
+
 		my_node	= new MsgSyncNode( dht.getLocalAddress(), my_uid, CryptoECCUtils.keyToRawdata( public_key ));
 		
-		dht_key = new SHA1Simple().calculateHash( user_key );
+		dht_listen_key = new SHA1Simple().calculateHash( user_key );
 		
-		for ( int i=0;i<dht_key.length;i++){
+		for ( int i=0;i<dht_listen_key.length;i++){
 			
-			dht_key[i] ^= HANDLER_BASE_KEY_BYTES[i];
+			dht_listen_key[i] ^= HANDLER_BASE_KEY_BYTES[i];
 		}
 		
 		target_node = addNode( dht.importContact( target_contact ), new byte[0], target_pk );
+				
+		dht_call_key = dht_listen_key.clone();
 		
-		dht.registerHandler( dht_key, this );
+			// for testing purposes in particular we use asymmetric keys for call/listen so things 
+			// work in a single instance
+		
+		if ( _user_key == null ){
+						
+			dht_listen_key[0] ^= 0x01;
+			
+		}else{
+			
+			dht_call_key[0] ^= 0x01;
+		}
+		
+		dht.registerHandler( dht_listen_key, this );
 	}
 		
 	protected MsgSyncPlugin
@@ -463,7 +489,7 @@ MsgSyncHandler
 		log( "Checking DHT for nodes" );
 		
 		dht.get(
-			dht_key,
+			dht_listen_key,
 			"Message Sync lookup: " + getString(),
 			DHTPluginInterface.FLAG_SINGLE_VALUE,
 			32,
@@ -532,7 +558,7 @@ MsgSyncHandler
 									byte[] blah_bytes = BEncoder.encode( map );
 									
 									dht.put(
-											dht_key,
+											dht_listen_key,
 											"Message Sync write: " + getString(),
 											blah_bytes,
 											DHTPluginInterface.FLAG_SINGLE_VALUE,
@@ -604,7 +630,7 @@ MsgSyncHandler
 							public void run() {
 								try{
 									
-									target_secret = parent_handler.getSharedSecret( target_node );
+									target_secret = parent_handler.getSharedSecret( target_node, target_pk, user_key );
 									
 								}finally{
 									
@@ -1115,17 +1141,27 @@ MsgSyncHandler
 		
 	private byte[]
 	getSharedSecret(
-		MsgSyncNode		target_node )
+		MsgSyncNode		target_node,
+		byte[]			target_pk,
+		byte[]			user_key )
 	{
 		try{
 			CryptoSTSEngine sts = AzureusCoreFactory.getSingleton().getCryptoManager().getECCHandler().getSTSEngine( public_key, private_key );
 			
 			Map<String,Object>		request_map = new HashMap<String, Object>();
 			
+			byte[] act_id = new byte[8];
+			
+			RandomUtils.nextSecureBytes( act_id );
+			
 			request_map.put( "v", VERSION );
 			
 			request_map.put( "t", RT_DH_REQUEST );
 
+			request_map.put( "i", act_id );
+			
+			request_map.put( "u", user_key );
+			
 			ByteBuffer buffer = ByteBuffer.allocate( 16*1024 );
 			
 			sts.getKeys( buffer );
@@ -1138,7 +1174,7 @@ MsgSyncHandler
 			
 			request_map.put( "k", keys );
 			
-			byte[]	sync_data = BEncoder.encode( request_map );
+			byte[]	request_data = BEncoder.encode( request_map );
 			
 			byte[] reply_bytes = 
 				target_node.getContact().call(
@@ -1156,23 +1192,199 @@ MsgSyncHandler
 						public void reportActivity(String str) {
 						}
 					},
-					dht_key,
-					sync_data, 
+					dht_call_key,
+					request_data, 
 					30*1000 );
 			
 			Map<String,Object> reply_map = BDecoder.decode( reply_bytes );
 
 			int	type = reply_map.containsKey( "t" )?((Number)reply_map.get( "t" )).intValue():-1; 
 
-			if ( type != RT_DH_REPLY ){
+			if ( type == RT_DH_REPLY ){
 				
+				request_map.remove( "k" );
+								
+				byte[]	their_keys = (byte[])reply_map.get( "k" );
+				
+				if ( their_keys == null ){
+					
+					throw( new Exception( "keys missing" ));
+				}
+
+				sts.putKeys( ByteBuffer.wrap( their_keys ));
+				
+				buffer.position( 0 );
+			
+				sts.getAuth( buffer );
+				
+				buffer.flip();
+				
+				byte[]	my_auth = new byte[ buffer.remaining()];
+				
+				buffer.get( my_auth );
+				
+				request_map.put( "a", my_auth );
+	
+				byte[]	their_auth = (byte[])reply_map.get( "a" );
+				
+				if ( their_auth == null ){
+					
+					throw( new Exception( "auth missing" ));
+				}
+
+				sts.putAuth( ByteBuffer.wrap( their_auth ));
+				
+				byte[] shared_secret = sts.getSharedSecret();
+				
+				byte[] rem_pk = sts.getRemotePublicKey();
+				
+				boolean pk_ok =  Arrays.equals( target_pk, rem_pk );
+				
+				System.out.println( "client secret: " + ByteFormatter.encodeString( shared_secret ) + ", ok=" + pk_ok );
+							
+				request_data = BEncoder.encode( request_map );
+
+				reply_bytes = 
+						target_node.getContact().call(
+							new DHTPluginProgressListener() {
+								
+								@Override
+								public void reportSize(long size) {
+								}
+								
+								@Override
+								public void reportCompleteness(int percent) {
+								}
+								
+								@Override
+								public void reportActivity(String str) {
+								}
+							},
+							dht_call_key,
+							request_data, 
+							30*1000 );
+				
+				return( shared_secret );
+
 			}
 		}catch( Throwable e ){
 			
+			Debug.out(e);
 		}
 		
 		return( null );
 	}
+	
+	private ByteArrayHashMap<CryptoSTSEngine>	secret_activities = new ByteArrayHashMap<CryptoSTSEngine>();
+	
+	
+	private Map<String,Object>
+	handleDHRequest(
+		DHTPluginContact		originator,
+		Map<String,Object>		request )
+	{
+		try{
+			Map<String,Object>		reply_map = new HashMap<String, Object>();
+				
+			byte[]	act_id	 = (byte[])request.get("i");
+			
+			byte[]	user_key = (byte[])request.get("u");
+	
+			CryptoSTSEngine	sts;
+			
+			synchronized( secret_activities ){
+				
+				System.out.println( "TODO: rate limit + tidy activities" );
+				
+				sts = secret_activities.get( act_id );
+				
+				if ( sts == null ){
+					
+					sts = AzureusCoreFactory.getSingleton().getCryptoManager().getECCHandler().getSTSEngine( public_key, private_key );
+	
+					secret_activities.put( act_id, sts );
+				}
+			}
+			
+			byte[]	their_keys = (byte[])request.get( "k" );
+			
+			if ( their_keys != null ){
+				
+				ByteBuffer buffer = ByteBuffer.allocate( 16*1024 );
+				
+				sts.getKeys( buffer );
+				
+				buffer.flip();
+				
+				byte[]	my_keys = new byte[ buffer.remaining()];
+				
+				buffer.get( my_keys );
+				
+				reply_map.put( "k", my_keys );
+				
+					// stuff in their keys
+				
+				sts.putKeys( ByteBuffer.wrap( their_keys ));
+				
+				buffer.position(0);
+				
+				sts.getAuth( buffer );
+				
+				buffer.flip();
+				
+				byte[]	auth = new byte[ buffer.remaining()];
+				
+				buffer.get( auth );
+				
+				reply_map.put( "a", auth );
+			
+			}else{
+				
+				byte[]	auth = (byte[])request.get( "a" );
+
+				if ( auth == null ){
+					
+					throw( new Exception( "auth missing" ));
+				}
+				
+				sts.putAuth( ByteBuffer.wrap( auth ));
+				
+				byte[] shared_secret = sts.getSharedSecret();
+				
+				byte[]	remote_pk = sts.getRemotePublicKey();
+				
+				synchronized( secret_activities ){
+					
+					sts = secret_activities.remove( act_id );
+				}
+				
+				System.out.println( "server secret: " + ByteFormatter.encodeString( shared_secret ));
+				
+				MsgSyncHandler chat_handler = plugin.getSyncHandler( dht, this, remote_pk, originator.exportToMap(), user_key, shared_secret );
+				
+				for ( MsgSyncListener l: listeners ){
+					
+					try{
+						l.chatRequested( remote_pk, chat_handler );
+						
+					}catch( Throwable e ){
+						
+						Debug.out( e );
+					}
+				}
+			}
+			
+			return( reply_map );
+			
+		}catch( Throwable e ){
+			
+			Debug.out( e );
+			
+			return( null );
+		}
+	}
+	
+	
 	
 	protected void
 	sync()
@@ -1200,9 +1412,9 @@ MsgSyncHandler
 				if ( target_secret == null ){
 				
 					reportError( "No shared secret" );					
-				}
 				
-				return;
+					return;
+				}
 			}
 			
 			if ( prefer_live ){
@@ -1550,7 +1762,7 @@ MsgSyncHandler
 						public void reportActivity(String str) {
 						}
 					},
-					dht_key,
+					dht_call_key,
 					sync_data, 
 					30*1000 );
 		
@@ -1723,16 +1935,6 @@ MsgSyncHandler
 		}
 	}	
 
-	private Map<String,Object>
-	handleDHRequest(
-		Map<String,Object>		request )
-	{
-		Map<String,Object>		reply = new HashMap<String, Object>();
-		
-		
-		return( reply );
-	}
-	
 	public byte[]
 	handleRead(
 		DHTPluginContact	originator,
@@ -1750,7 +1952,7 @@ MsgSyncHandler
 
 			if ( type == RT_DH_REQUEST ){
 				
-				Map<String,Object>	reply_map = handleDHRequest( request_map );
+				Map<String,Object>	reply_map = handleDHRequest( originator, request_map );
 				
 				reply_map.put( "s", status );
 				
@@ -1758,6 +1960,7 @@ MsgSyncHandler
 				
 				return( BEncoder.encode( reply_map ));
 			}
+			
 			if ( type != RT_SYNC_REQUEST ){
 				
  				return( null );
@@ -1995,7 +2198,7 @@ MsgSyncHandler
 		
 		status = ST_DESTROYED;
 		
-		dht.unregisterHandler( dht_key, this );
+		dht.unregisterHandler( dht_listen_key, this );
 	}
 	
 	private void
@@ -2009,6 +2212,6 @@ MsgSyncHandler
 	protected String
 	getString()
 	{
-		return( dht.getNetwork() + "/" + ByteFormatter.encodeString( dht_key ) + "/" + new String( user_key ));
+		return( dht.getNetwork() + "/" + ByteFormatter.encodeString( dht_listen_key ) + "/" + new String( user_key ));
 	}
 }

@@ -379,79 +379,18 @@ MsgSyncPlugin
 			byte[]				target_pk		= (byte[])options.get( "target_pk" );
 			Map<String,Object>	target_contact	= (Map<String,Object>)options.get( "target_contact" );
 			
-			handler = getSyncHandler( dht, key, parent_handler, target_pk, target_contact );
+			handler = getSyncHandler( dht, parent_handler, target_pk, target_contact, null, null );
 			
 		}else{
 		
 			handler = getSyncHandler( dht, key );
 		}
 		
-		final Object listener = options.get( "listener" );
+		Object listener = options.get( "listener" );
 		
 		if ( listener != null ){
 			
-			try{
-				final Method callback = listener.getClass().getMethod( "messageReceived", Map.class );
-				
-				MsgSyncListener l = 
-					new MsgSyncListener()
-					{
-						@Override
-						public void 
-						messageReceived(
-							MsgSyncMessage message ) 
-						{
-							try{
-								Map<String,Object> map = new HashMap<String, Object>();
-								
-								map.put( "content", message.getContent());
-								map.put( "age", message.getAgeSecs());
-								map.put( "pk", message.getNode().getPublicKey());
-								map.put( "address", message.getNode().getContact().getAddress());
-								map.put( "contact", message.getNode().getContact().exportToMap());
-								
-									// as a public ID we use the start of the signature 
-								
-								byte[]	sig = message.getSignature();
-								
-								byte[] 	msg_id = new byte[12];
-								
-								System.arraycopy( sig, 0, msg_id, 0, msg_id.length );
-								
-								map.put( "id", msg_id );
-								
-								if ( message.getStatus() != MsgSyncMessage.ST_OK ){
-									
-									map.put( "error", message.getError());
-								}
-								
-								callback.invoke( listener, map );
-								
-							}catch( Throwable e ){
-								
-								Debug.out( e );
-							}
-						}
-					};
-					
-				handler.addListener( l ); 
-				
-				List<MsgSyncMessage> messages = handler.getMessages();
-				
-				for ( MsgSyncMessage msg: messages ){
-					
-					try{
-						l.messageReceived( msg );
-						
-					}catch( Throwable e ){
-						
-						Debug.out( e );
-					}
-				}
-			}catch( Throwable e ){
-				
-				throw( new IPCException( "Failed to add listener", e ));
-			}
+			addListener( handler, listener );
 		}
 		
 		reply.put( "handler", handler );
@@ -465,6 +404,132 @@ MsgSyncPlugin
 		}
 		
 		return( reply );
+	}
+	
+	public Map<String,Object>
+	updateMessageHandler(
+		Map<String,Object>		options )
+		
+		throws IPCException
+	{
+		synchronized( this ){
+			
+			if ( !init_called ){
+				
+				throw( new IPCException( "Not initialised" ));
+			}
+		}
+		
+		init_sem.reserve();
+		
+		MsgSyncHandler handler = (MsgSyncHandler)options.get( "handler" );
+		
+		if ( handler.getPlugin() != this ){
+			
+			throw( new IPCException( "Plugin has been unloaded" ));
+		}
+		
+		Object listener = options.get( "addlistener" );
+		
+		if ( listener != null ){
+			
+			addListener( handler, listener );
+		}
+		
+		Map<String,Object>	reply = new HashMap<String, Object>();
+
+		return( reply );
+	}
+	
+	private void
+	addListener(
+		final MsgSyncHandler		handler,
+		final Object				listener )
+		
+		throws IPCException
+	{
+		try{
+			final Method mesasge_callback 	= listener.getClass().getMethod( "messageReceived", Map.class );
+			final Method chat_callback 		= listener.getClass().getMethod( "chatRequested", Map.class );
+			
+			MsgSyncListener l = 
+				new MsgSyncListener()
+				{
+					@Override
+					public void 
+					messageReceived(
+						MsgSyncMessage message ) 
+					{
+						try{
+							Map<String,Object> map = new HashMap<String, Object>();
+							
+							map.put( "content", message.getContent());
+							map.put( "age", message.getAgeSecs());
+							map.put( "pk", message.getNode().getPublicKey());
+							map.put( "address", message.getNode().getContact().getAddress());
+							map.put( "contact", message.getNode().getContact().exportToMap());
+							
+								// as a public ID we use the start of the signature 
+							
+							byte[]	sig = message.getSignature();
+							
+							byte[] 	msg_id = new byte[12];
+							
+							System.arraycopy( sig, 0, msg_id, 0, msg_id.length );
+							
+							map.put( "id", msg_id );
+							
+							if ( message.getStatus() != MsgSyncMessage.ST_OK ){
+								
+								map.put( "error", message.getError());
+							}
+							
+							mesasge_callback.invoke( listener, map );
+							
+						}catch( Throwable e ){
+							
+							Debug.out( e );
+						}
+					}
+					
+					public void
+					chatRequested(
+						byte[]				remote_pk,
+						MsgSyncHandler		handler )
+					{
+						try{
+							Map<String,Object> map = new HashMap<String, Object>();
+							
+							map.put( "handler", handler );
+							map.put( "pk", remote_pk );
+							
+							chat_callback.invoke( listener, map );
+							
+						}catch( Throwable e ){
+							
+							Debug.out( e );
+						}
+					}
+				};
+				
+			handler.addListener( l ); 
+			
+			List<MsgSyncMessage> messages = handler.getMessages();
+			
+			for ( MsgSyncMessage msg: messages ){
+				
+				try{
+					l.messageReceived( msg );
+					
+				}catch( Throwable e ){
+					
+					Debug.out( e );
+				}
+			}
+		}catch( Throwable e ){
+			
+			throw( new IPCException( "Failed to add listener", e ));
+		}
 	}
 	
 	public Map<String,Object>
@@ -622,13 +687,14 @@ MsgSyncPlugin
 		}
 	}
 	
-	private MsgSyncHandler
+	protected MsgSyncHandler
 	getSyncHandler(
 		DHTPluginInterface		dht,
-		byte[]					key,
 		MsgSyncHandler			parent_handler,
 		byte[]					target_pk,
-		Map<String,Object>		target_contact )
+		Map<String,Object>		target_contact,
+		byte[]					user_key,
+		byte[]					secret )
 		
 		throws IPCException
 	{
@@ -640,7 +706,7 @@ MsgSyncPlugin
 			}
 			
 			try{
-				MsgSyncHandler h = new MsgSyncHandler( this, dht, parent_handler, target_pk, target_contact );
+				MsgSyncHandler h = new MsgSyncHandler( this, dht, parent_handler, target_pk, target_contact, user_key, secret );
 				
 				sync_handlers.add( h );
 				
