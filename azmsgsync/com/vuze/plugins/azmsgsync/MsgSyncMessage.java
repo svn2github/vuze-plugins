@@ -118,6 +118,12 @@ MsgSyncMessage
 		return( message_id );
 	}
 	
+	public long
+	getTimestamp()
+	{
+		return( time_received - age_when_received_secs*1000 );
+	}
+	
 	public int
 	getAgeSecs()
 	{

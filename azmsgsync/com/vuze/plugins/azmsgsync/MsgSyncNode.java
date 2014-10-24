@@ -40,6 +40,8 @@ MsgSyncNode
 	private volatile long	last_alive;
 	private volatile int	fail_count;
 	
+	private long			last_message_timestamp;
+	
 	protected
 	MsgSyncNode(
 		DHTPluginContact		_contact,
@@ -71,6 +73,30 @@ MsgSyncNode
 			contact_str = MsgSyncHandler.getString( contact );
 			
 			return( true );
+		}
+	}
+	
+	protected void
+	setDetails(
+		DHTPluginContact	_contact,
+		long				_time )
+	{
+		synchronized( this ){
+			
+			contact			= _contact;
+			
+			contact_str 	= MsgSyncHandler.getString( contact );
+			
+			last_message_timestamp = _time;
+		}
+	}
+	
+	protected long
+	getLatestMessageTimestamp()
+	{
+		synchronized( this ){
+			
+			return( last_message_timestamp );
 		}
 	}
 	

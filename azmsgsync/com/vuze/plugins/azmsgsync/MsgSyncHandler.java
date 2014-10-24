@@ -968,15 +968,32 @@ MsgSyncHandler
 	
 	private void
 	addMessage(
-		MsgSyncNode		node,
-		byte[]			message_id,
-		byte[]			content,
-		byte[]			signature,
-		int				age_secs,
-		boolean			is_incoming )
+		MsgSyncNode				node,
+		byte[]					message_id,
+		byte[]					content,
+		byte[]					signature,
+		int						age_secs,
+		Map<String,Object>		opt_contact,
+		boolean					is_incoming )
 	{
 		MsgSyncMessage msg = new MsgSyncMessage( node, message_id, content, signature, age_secs );
 
+		if ( is_incoming && opt_contact != null ){
+			
+				// see if this is a more up-to-date contact address for the contact
+			
+			long last = node.getLatestMessageTimestamp();
+			
+			long current = msg.getTimestamp();
+			
+			if ( current > last ){
+				
+				DHTPluginContact new_contact = dht.importContact( opt_contact );
+								
+				node.setDetails( new_contact, current );
+			}
+		}
+		
 		addMessage( msg, age_secs, is_incoming );
 	}
 	
@@ -1160,7 +1177,7 @@ MsgSyncHandler
 			
 			byte[]	sig_bytes = sig.sign();
 			
-			addMessage( my_node, message_id, content, sig_bytes, 0, false );
+			addMessage( my_node, message_id, content, sig_bytes, 0, null, false );
 			
 			sync( true );
 			
@@ -1206,6 +1223,8 @@ MsgSyncHandler
 			request_map.put( "k", keys );
 			
 			byte[]	request_data = BEncoder.encode( request_map );
+			
+			System.out.println( target_node.getContact().getAddress());
 			
 			byte[] reply_bytes = 
 				target_node.getContact().call(
@@ -1698,14 +1717,25 @@ MsgSyncHandler
 								all_public_keys.add( n );
 							}
 							
-							pub = pub.clone();
-							
-							for ( int j=0;j<rand.length;j++){
+							try{
+								byte[] ad = n.getContactAddress().getBytes( "UTF-8" );
 								
-								pub[j] ^= rand[j];
+								byte[] pk_ad = new byte[pub.length + ad.length];
+								
+								System.arraycopy( pub, 0, pk_ad, 0, pub.length );
+								System.arraycopy( ad, 0, pk_ad, pub.length, ad.length );
+								
+								for ( int j=0;j<rand.length;j++){
+									
+									ad[j] ^= rand[j];
+								}
+								
+								bloom_keys.put( ad, "" );
+								
+							}catch( Throwable e ){
+								
+								Debug.out( e );
 							}
-							
-							bloom_keys.put( pub, "" );
 						}
 					}
 					
@@ -1858,7 +1888,7 @@ MsgSyncHandler
 								byte[] 	public_key		= (byte[])m.get( "p" );
 								
 								Map<String,Object>		contact_map		= (Map<String,Object>)m.get( "k" );
-								
+																
 								log( "Message: " + ByteFormatter.encodeString( message_id ) + ": " + new String( content ) + ", age=" + age );
 																
 								boolean handled = false;
@@ -1890,7 +1920,7 @@ MsgSyncHandler
 											
 											if ( sig.verify( signature )){
 												
-												addMessage( node, message_id, content, signature, age, true );
+												addMessage( node, message_id, content, signature, age, contact_map, true );
 												
 												handled = true;
 												
@@ -1930,7 +1960,7 @@ MsgSyncHandler
 												
 												MsgSyncNode msg_node = addNode( n.getContact(), node_uid, pk );
 												
-												addMessage( msg_node, message_id, content, signature, age, true );
+												addMessage( msg_node, message_id, content, signature, age, contact_map, true );
 												
 												handled = true;
 												
@@ -1988,7 +2018,7 @@ MsgSyncHandler
 												x.add( msg_node );
 											}
 																						
-											addMessage( msg_node, message_id, content, signature, age, true );
+											addMessage( msg_node, message_id, content, signature, age, contact_map, true );
 										}
 									}
 								}
@@ -2196,22 +2226,32 @@ MsgSyncHandler
 							
 							if ( pub != null ){
 							
-								pub = pub.clone();
-								
-								for ( int i=0;i<rand.length;i++){
+								try{
+									byte[] ad = n.getContactAddress().getBytes( "UTF-8" );
 									
-									pub[i] ^= rand[i];
-								}
-								
-								if ( !bloom.contains( pub )){
+									byte[] pk_ad = new byte[pub.length + ad.length];
 									
-									if ( TRACE )System.out.println( "    and pk" );
+									System.arraycopy( pub, 0, pk_ad, 0, pub.length );
+									System.arraycopy( ad, 0, pk_ad, pub.length, ad.length );
 									
-									m.put( "p", n.getPublicKey());
+									for ( int i=0;i<rand.length;i++){
+										
+										ad[i] ^= rand[i];
+									}
 									
-									DHTPluginContact contact = n.getContact();
+									if ( !bloom.contains( ad )){
+										
+										if ( TRACE )System.out.println( "    and pk" );
+										
+										m.put( "p", n.getPublicKey());
+										
+										DHTPluginContact contact = n.getContact();
+										
+										m.put( "k", contact.exportToMap());
+									}
+								}catch( Throwable e ){
 									
-									m.put( "k", contact.exportToMap());
+									Debug.out( e );
 								}
 							}else{
 								
