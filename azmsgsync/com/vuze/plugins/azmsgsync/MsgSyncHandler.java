@@ -325,9 +325,11 @@ MsgSyncHandler
 				
 		dht_call_key = dht_listen_key.clone();
 		
-			// for testing purposes in particular we use asymmetric keys for call/listen so things 
+			// for testing purposes we use asymmetric keys for call/listen so things 
 			// work in a single instance
+			// unfortunately this doesn't work otherwise as the assumption is that a 'call' request on xfer key X is replied to on the same key :(
 		
+		/*
 		if ( _user_key == null ){
 						
 			dht_listen_key[0] ^= 0x01;
@@ -336,6 +338,7 @@ MsgSyncHandler
 			
 			dht_call_key[0] ^= 0x01;
 		}
+		*/
 		
 		dht.registerHandler( dht_listen_key, this );
 	}
