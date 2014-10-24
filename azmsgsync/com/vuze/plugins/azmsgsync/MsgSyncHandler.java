@@ -24,16 +24,22 @@ package com.vuze.plugins.azmsgsync;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.security.AlgorithmParameters;
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.util.*;
 
+import javax.crypto.Cipher;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.BEncoder;
+import org.gudy.azureus2.core3.util.Base32;
 import org.gudy.azureus2.core3.util.ByteArrayHashMap;
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
@@ -186,6 +192,8 @@ MsgSyncHandler
 	
 	private volatile byte[]					target_secret;
 	private boolean							target_secret_getting;
+	private long							target_secret_getting_last;
+	private boolean							private_chat_fatal_error;
 	
 	protected
 	MsgSyncHandler(
@@ -627,16 +635,34 @@ MsgSyncHandler
 			
 			if ( target_secret == null ){
 				
+				if ( private_chat_fatal_error ){
+					
+					return;
+				}
+				
 				if ( parent_handler.destroyed ){
 					
 					reportError( "Parent chat destroyed!" );
+					
+					private_chat_fatal_error = true;
+					
+					return;
 				}
 				
 				synchronized(  MsgSyncHandler.this ){
 					
 					if ( !target_secret_getting ){
 				
+						long now = SystemTime.getMonotonousTime();
+						
+						if ( now - target_secret_getting_last < 10*1000 ){
+							
+							return;
+						}
+						
 						target_secret_getting = true;
+						
+						target_secret_getting_last	= now;
 						
 						reportInfo( "Connecting..." );
 						
@@ -645,14 +671,22 @@ MsgSyncHandler
 							@Override
 							public void run() {
 								try{
+									boolean[] fatal_error = { false };
+
 									try{
-										target_secret = parent_handler.getSharedSecret( target_node, target_pk, user_key );
+										
+										target_secret = parent_handler.getSharedSecret( target_node, target_pk, user_key, fatal_error );
 										
 										if ( target_secret != null ){
 											
 											reportInfo( "Private connection established" );	
 										}
 									}catch( IPCException e ){
+										
+										if ( fatal_error[0] ){
+											
+											private_chat_fatal_error = true;
+										}
 										
 										reportError( e.getMessage());
 									}
@@ -1198,7 +1232,8 @@ MsgSyncHandler
 	getSharedSecret(
 		MsgSyncNode		target_node,
 		byte[]			target_pk,
-		byte[]			user_key )
+		byte[]			user_key,
+		boolean[]		fatal_error )
 		
 		throws IPCException
 	{
@@ -1232,9 +1267,7 @@ MsgSyncHandler
 			request_map.put( "k", keys );
 			
 			byte[]	request_data = BEncoder.encode( request_map );
-			
-			System.out.println( target_node.getContact().getAddress());
-			
+						
 			byte[] reply_bytes = 
 				target_node.getContact().call(
 					new DHTPluginProgressListener() {
@@ -1298,14 +1331,19 @@ MsgSyncHandler
 
 				sts.putAuth( ByteBuffer.wrap( their_auth ));
 				
-				byte[] shared_secret = sts.getSharedSecret();
+				byte[] shared_secret = fixSecret( sts.getSharedSecret());
 				
 				byte[] rem_pk = sts.getRemotePublicKey();
 				
 				boolean pk_ok =  Arrays.equals( target_pk, rem_pk );
+								
+				if ( !pk_ok ){
+					
+					fatal_error[0] = true;
+					
+					throw( new IPCException( "Public key mismatch" ));
+				}
 				
-				System.out.println( "client secret: " + ByteFormatter.encodeString( shared_secret ) + ", ok=" + pk_ok );
-							
 				request_data = BEncoder.encode( request_map );
 
 				reply_bytes = 
@@ -1347,6 +1385,92 @@ MsgSyncHandler
 		}
 		
 		return( null );
+	}
+	
+	private byte[]
+	fixSecret(
+		byte[]	secret )
+	{
+		int	len = secret.length;
+		
+		if ( len == 16 ){
+			
+			return( secret );
+			
+		}else{
+			
+			byte[]	result = new byte[16];
+			
+			if ( len < 16 ){
+		
+				System.arraycopy( secret, 0, result, 0, len );
+			
+			}else{
+				
+				System.arraycopy( secret, len-16, result, 0, 16 );
+			}
+			
+			return( result );
+		}		
+	}
+	
+	private byte[]
+	encrypt(
+		byte[]	data )
+	{
+		try{
+			byte[] key = target_secret;
+			
+			SecretKeySpec secret = new SecretKeySpec( key, "AES");
+	
+			Cipher encipher = Cipher.getInstance ("AES/CBC/PKCS5Padding");
+				
+			encipher.init( Cipher.ENCRYPT_MODE, secret );
+				
+			AlgorithmParameters params = encipher.getParameters();
+				
+			byte[] IV = params.getParameterSpec(IvParameterSpec.class).getIV();
+				
+			byte[] enc = encipher.doFinal( data );
+	
+			byte[] rep_bytes = new byte[ IV.length + enc.length ];
+			
+			System.arraycopy( IV, 0, rep_bytes, 0, IV.length );
+			System.arraycopy( enc, 0, rep_bytes, IV.length, enc.length );
+			
+			return( rep_bytes );
+			
+		}catch( Throwable e ){
+			
+			Debug.out( e );
+			
+			return( null );
+		}
+	}
+	
+	private byte[]
+	decrypt(
+		byte[]	data )
+	{
+		try{
+			byte[] key = target_secret;
+			
+			SecretKeySpec secret = new SecretKeySpec( key, "AES");
+	
+			Cipher decipher = Cipher.getInstance ("AES/CBC/PKCS5Padding");
+				
+			decipher.init(Cipher.DECRYPT_MODE, secret, new IvParameterSpec( data, 0, 16 ));
+	
+			byte[] result = decipher.doFinal( data, 16, data.length-16 );
+			
+			return( result );
+			
+		}catch( Throwable e ){
+			
+			Debug.out( e );
+			
+			return( null );
+		}
 	}
 	
 	private ByteArrayHashMap<CryptoSTSEngine>	secret_activities = new ByteArrayHashMap<CryptoSTSEngine>();
@@ -1423,7 +1547,7 @@ MsgSyncHandler
 				
 				sts.putAuth( ByteBuffer.wrap( auth ));
 				
-				byte[] shared_secret = sts.getSharedSecret();
+				byte[] shared_secret = fixSecret( sts.getSharedSecret());
 				
 				byte[]	remote_pk = sts.getRemotePublicKey();
 				
@@ -1431,9 +1555,7 @@ MsgSyncHandler
 					
 					sts = secret_activities.remove( act_id );
 				}
-				
-				System.out.println( "server secret: " + ByteFormatter.encodeString( shared_secret ));
-				
+								
 				MsgSyncHandler chat_handler = plugin.getSyncHandler( dht, this, remote_pk, originator.exportToMap(), user_key, shared_secret );
 
 				boolean	accepted = false;
@@ -1851,6 +1973,11 @@ MsgSyncHandler
 		try{
 			byte[]	sync_data = BEncoder.encode( request_map );
 			
+			if ( target_secret != null ){
+				
+				sync_data = encrypt( sync_data );
+			}
+			
 			byte[] reply_bytes = 
 				sync_node.getContact().call(
 					new DHTPluginProgressListener() {
@@ -1871,6 +1998,11 @@ MsgSyncHandler
 					sync_data, 
 					30*1000 );
 		
+			if ( target_secret != null ){
+				
+				reply_bytes = decrypt( reply_bytes );
+			}
+			
 			out_req_ok++;
 			
 			if ( reply_bytes == null ){
@@ -2094,6 +2226,11 @@ MsgSyncHandler
 			return( null );
 		}
 		
+		if ( target_secret != null ){
+			
+			key = decrypt( key );
+		}
+		
 		try{
 			Map<String,Object> request_map = BDecoder.decode( key );
 
@@ -2314,7 +2451,14 @@ MsgSyncHandler
 				reply_map.put( "x", more_to_come );
 			}
 			
-			return( BEncoder.encode( reply_map ));
+			byte[] reply_data = BEncoder.encode( reply_map );
+			
+			if ( target_secret != null ){
+				
+				reply_data = encrypt( reply_data );
+			}
+			
+			return( reply_data );
 			
 		}catch( Throwable e ){
 			
