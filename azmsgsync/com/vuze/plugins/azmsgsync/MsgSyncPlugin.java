@@ -395,6 +395,8 @@ MsgSyncPlugin
 		
 		reply.put( "handler", handler );
 		
+		reply.put( "pk", handler.getPublicKey());
+
 		synchronized( this ){
 			
 			if ( destroyed ){
@@ -438,6 +440,8 @@ MsgSyncPlugin
 		
 		Map<String,Object>	reply = new HashMap<String, Object>();
 
+		reply.put( "pk", handler.getPublicKey());
+		
 		return( reply );
 	}
 	
