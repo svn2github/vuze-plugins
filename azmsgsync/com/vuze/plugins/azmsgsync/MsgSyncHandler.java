@@ -66,6 +66,15 @@ MsgSyncHandler
 	
 	private static final boolean TRACE = System.getProperty( "az.msgsync.trace.enable", "0" ).equals( "1" );
 	
+	private static final boolean TEST_LOOPBACK_CHAT = System.getProperty( "az.chat.loopback.enable", "0" ).equals( "1" );
+	
+	static{
+		if ( TEST_LOOPBACK_CHAT ){
+	
+			Debug.outNoStack( "Lookpach chate debug enabled, this BREAKS NON LOOPBACK CHAT!!!!");
+		}
+	}
+	
 	private static final String	HANDLER_BASE_KEY = "com.vuze.plugins.azmsgsync.MsgSyncHandler";
 	private static final byte[]	HANDLER_BASE_KEY_BYTES;
 	
@@ -326,19 +335,20 @@ MsgSyncHandler
 		dht_call_key = dht_listen_key.clone();
 		
 			// for testing purposes we use asymmetric keys for call/listen so things 
-			// work in a single instance
+			// work in a single instance due to shared call-rendezvouz
 			// unfortunately this doesn't work otherwise as the assumption is that a 'call' request on xfer key X is replied to on the same key :(
 		
-		/*
-		if ( _user_key == null ){
-						
-			dht_listen_key[0] ^= 0x01;
+		if ( TEST_LOOPBACK_CHAT ){
 			
-		}else{
-			
-			dht_call_key[0] ^= 0x01;
+			if ( _user_key == null ){
+							
+				dht_listen_key[0] ^= 0x01;
+				
+			}else{
+				
+				dht_call_key[0] ^= 0x01;
+			}
 		}
-		*/
 		
 		dht.registerHandler( dht_listen_key, this );
 	}
@@ -637,7 +647,7 @@ MsgSyncHandler
 									
 									if ( target_secret != null ){
 										
-										reportError( "OK, we have a shared secret!" );	
+										reportInfo( "OK, we have a shared secret!" );	
 									}
 								}finally{
 									
@@ -1089,7 +1099,21 @@ MsgSyncHandler
 	}
 	
 	private void
+	reportInfo(
+		String		error )
+	{
+		reportSupport( "i:" + error );
+	}
+	
+	private void
 	reportError(
+		String		error )
+	{
+		reportSupport( "e:" + error );
+	}
+	
+	private void
+	reportSupport(
 		String		error )
 	{
 		try{
