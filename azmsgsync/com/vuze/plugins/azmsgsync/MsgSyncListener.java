@@ -22,15 +22,21 @@
 
 package com.vuze.plugins.azmsgsync;
 
+import org.gudy.azureus2.plugins.ipc.IPCException;
+
 public interface 
 MsgSyncListener 
 {
 	public void
 	messageReceived(
-		MsgSyncMessage		message );
+		MsgSyncMessage		message )
+		
+		throws IPCException;
 	
-	public void
+	public String
 	chatRequested(
 		byte[]				remote_pk,
-		MsgSyncHandler		handler );
+		MsgSyncHandler		handler )
+		
+		throws IPCException;
 }

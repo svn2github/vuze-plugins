@@ -23,6 +23,7 @@ package com.vuze.plugins.azmsgsync;
 
 
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.util.*;
@@ -496,10 +497,12 @@ MsgSyncPlugin
 						}
 					}
 					
-					public void
+					public String
 					chatRequested(
 						byte[]				remote_pk,
 						MsgSyncHandler		handler )
+						
+						throws IPCException
 					{
 						try{
 							Map<String,Object> map = new HashMap<String, Object>();
@@ -507,11 +510,24 @@ MsgSyncPlugin
 							map.put( "handler", handler );
 							map.put( "pk", remote_pk );
 							
-							chat_callback.invoke( listener, map );
+							Map<String,Object> reply = (Map<String,Object>)chat_callback.invoke( listener, map );
+							
+							return((String)reply.get( "nickname" ));
+							
+						}catch( InvocationTargetException  e ){
+							
+							Throwable cause = ((InvocationTargetException)e).getCause();
+							
+							if ( cause instanceof IPCException ){
+								
+								throw((IPCException)cause);
+							}
+							
+							throw( new IPCException( cause ));
 							
 						}catch( Throwable e ){
 							
-							Debug.out( e );
+							throw( new IPCException( e ));
 						}
 					}
 				};

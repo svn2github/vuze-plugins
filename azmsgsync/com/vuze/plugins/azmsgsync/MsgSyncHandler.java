@@ -41,6 +41,7 @@ import org.gudy.azureus2.core3.util.HashWrapper;
 import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.SHA1Simple;
 import org.gudy.azureus2.core3.util.SystemTime;
+import org.gudy.azureus2.plugins.ipc.IPCException;
 
 import com.aelitis.azureus.core.AzureusCoreFactory;
 import com.aelitis.azureus.core.security.CryptoECCUtils;
@@ -637,17 +638,23 @@ MsgSyncHandler
 				
 						target_secret_getting = true;
 						
+						reportInfo( "Connecting..." );
+						
 						new AEThread2( "MsgSyncHandler:getsecret"){
 							
 							@Override
 							public void run() {
 								try{
-									
-									target_secret = parent_handler.getSharedSecret( target_node, target_pk, user_key );
-									
-									if ( target_secret != null ){
+									try{
+										target_secret = parent_handler.getSharedSecret( target_node, target_pk, user_key );
 										
-										reportInfo( "OK, we have a shared secret!" );	
+										if ( target_secret != null ){
+											
+											reportInfo( "Private connection established" );	
+										}
+									}catch( IPCException e ){
+										
+										reportError( e.getMessage());
 									}
 								}finally{
 									
@@ -1192,6 +1199,8 @@ MsgSyncHandler
 		MsgSyncNode		target_node,
 		byte[]			target_pk,
 		byte[]			user_key )
+		
+		throws IPCException
 	{
 		try{
 			CryptoSTSEngine sts = AzureusCoreFactory.getSingleton().getCryptoManager().getECCHandler().getSTSEngine( public_key, private_key );
@@ -1248,6 +1257,11 @@ MsgSyncHandler
 			
 			Map<String,Object> reply_map = BDecoder.decode( reply_bytes );
 
+			if ( reply_map.containsKey( "error" )){
+				
+				throw( new IPCException( new String((byte[])reply_map.get( "error" ), "UTF-8" )));
+			}
+			
 			int	type = reply_map.containsKey( "t" )?((Number)reply_map.get( "t" )).intValue():-1; 
 
 			if ( type == RT_DH_REPLY ){
@@ -1314,12 +1328,22 @@ MsgSyncHandler
 							request_data, 
 							30*1000 );
 				
+				reply_map = BDecoder.decode( reply_bytes );
+				
+				if ( reply_map.containsKey( "error" )){
+					
+					throw( new IPCException( new String((byte[])reply_map.get( "error" ), "UTF-8" )));
+				}
+				
 				return( shared_secret );
 
 			}
+		}catch( IPCException e ){
+			
+			throw( e );
+			
 		}catch( Throwable e ){
 			
-			Debug.out(e);
 		}
 		
 		return( null );
@@ -1333,9 +1357,9 @@ MsgSyncHandler
 		DHTPluginContact		originator,
 		Map<String,Object>		request )
 	{
-		try{
-			Map<String,Object>		reply_map = new HashMap<String, Object>();
-				
+		Map<String,Object>		reply_map = new HashMap<String, Object>();
+
+		try{				
 			byte[]	act_id	 = (byte[])request.get("i");
 			
 			byte[]	user_key = (byte[])request.get("u");
@@ -1411,27 +1435,42 @@ MsgSyncHandler
 				System.out.println( "server secret: " + ByteFormatter.encodeString( shared_secret ));
 				
 				MsgSyncHandler chat_handler = plugin.getSyncHandler( dht, this, remote_pk, originator.exportToMap(), user_key, shared_secret );
-				
-				for ( MsgSyncListener l: listeners ){
+
+				boolean	accepted = false;
+
+				try{					
+					for ( MsgSyncListener l: listeners ){
+						
+						String nick = l.chatRequested( remote_pk, chat_handler );
+							
+						if ( nick != null ){
+							
+							chat_handler.reportInfo( "Private connection established to '" + nick + "'" );
+						}
+						
+						accepted = true;
+					}
 					
-					try{
-						l.chatRequested( remote_pk, chat_handler );
+				}finally{
+					
+					if ( !accepted ){
 						
-					}catch( Throwable e ){
+						chat_handler.destroy();
 						
-						Debug.out( e );
+						throw( new IPCException( "Chat failed" ));
 					}
 				}
-			}
-			
-			return( reply_map );
+			}		
+		}catch( IPCException e ){
+						
+			reply_map.put( "error", e.getMessage());
 			
 		}catch( Throwable e ){
 			
-			Debug.out( e );
-			
-			return( null );
+			reply_map.put( "error", Debug.getNestedExceptionMessage( e ));
 		}
+		
+		return( reply_map );
 	}
 	
 	
@@ -1460,9 +1499,7 @@ MsgSyncHandler
 			if ( parent_handler != null ){
 				
 				if ( target_secret == null ){
-				
-					reportError( "No shared secret" );					
-				
+								
 					return;
 				}
 			}
