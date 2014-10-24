@@ -635,6 +635,10 @@ MsgSyncHandler
 									
 									target_secret = parent_handler.getSharedSecret( target_node, target_pk, user_key );
 									
+									if ( target_secret != null ){
+										
+										reportError( "OK, we have a shared secret!" );	
+									}
 								}finally{
 									
 									synchronized(  MsgSyncHandler.this ){
