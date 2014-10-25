@@ -494,7 +494,9 @@ I2PHelperSocksProxy
 													
 						String	msg = "Connection refused, not delegating public address " + resolved + ":" + original_port;
 						
-						if ( Constants.isCVSVersion()){
+							// filter out re-use of expired intermediate host address from logging
+						
+						if ( Constants.isCVSVersion() && !resolved.getHostAddress().startsWith( "10." )){
 							
 							System.err.println( "azneti2phelper: " + msg );
 						}

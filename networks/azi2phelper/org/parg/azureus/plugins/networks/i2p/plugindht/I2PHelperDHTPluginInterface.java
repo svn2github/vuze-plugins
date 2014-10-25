@@ -38,13 +38,17 @@ import org.gudy.azureus2.core3.util.TimerEventPeriodic;
 import org.parg.azureus.plugins.networks.i2p.*;
 import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouter;
 import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouterDHT;
+import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTTransportContactAZ;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT;
 
 
 
 
 
+
+
 import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
+import com.aelitis.azureus.core.dht.transport.DHTTransportProgressListener;
 import com.aelitis.azureus.plugins.dht.DHTPluginContact;
 import com.aelitis.azureus.plugins.dht.DHTPluginInterface;
 import com.aelitis.azureus.plugins.dht.DHTPluginKeyStats;
@@ -634,14 +638,47 @@ I2PHelperDHTPluginInterface
 		
 		public byte[]
 		call(
-			DHTPluginProgressListener	listener,
-			byte[]						handler_key,
-			byte[]						data,
-			long						timeout )
+			final DHTPluginProgressListener		listener,
+			byte[]								handler_key,
+			byte[]								data,
+			long								timeout )
 		{
-			Debug.out( "not imp" );
+			DHTTransportContact contact = fixup();
 			
-			return( null );
+			try{
+				return( contact.getTransport().writeReadTransfer(
+						new DHTTransportProgressListener()
+						{
+							public void
+							reportSize(
+								long	size )
+							{
+								listener.reportSize( size );
+							}
+							
+							public void
+							reportActivity(
+								String	str )
+							{
+								listener.reportActivity( str );
+							}
+							
+							public void
+							reportCompleteness(
+								int		percent )
+							{
+								listener.reportCompleteness( percent );
+							}
+						},
+						contact, 
+						handler_key, 
+						data, 
+						timeout ));
+				
+			}catch( Throwable e ){
+				
+				throw( new RuntimeException( e ));
+			}
 		}
 	}
 }
