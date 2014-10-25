@@ -39,6 +39,8 @@ MsgSyncMessage
 	private int				age_when_received_secs;
 	private long			time_received;
 	
+	private int				delivery_count;
+	
 	private String			error;
 	
 	protected
@@ -141,6 +143,24 @@ MsgSyncMessage
 		}
 		
 		return((int)( age_when_received_secs + ( elapsed/1000 )));
+	}
+	
+	protected int
+	getDeliveryCount()
+	{
+		synchronized( this ){
+		
+			return( delivery_count );
+		}
+	}
+	
+	protected void
+	delivered()
+	{
+		synchronized( this ){
+		
+			delivery_count++;
+		}
 	}
 	
 	public byte[]

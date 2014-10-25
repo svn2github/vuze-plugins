@@ -110,7 +110,9 @@ MsgSyncHandler
 	private int NODE_STATUS_CHECK_PERIOD			= 60*1000;
 	private int	NODE_STATUS_CHECK_TICKS				= NODE_STATUS_CHECK_PERIOD / MsgSyncPlugin.TIMER_PERIOD;
 	
-	
+	private int MSG_STATUS_CHECK_PERIOD				= 15*1000;
+	private int	MSG_STATUS_CHECK_TICKS				= MSG_STATUS_CHECK_PERIOD / MsgSyncPlugin.TIMER_PERIOD;
+
 	private static final int STATUS_OK			= 1;
 	private static final int STATUS_LOOPBACK	= 2;
 	
@@ -181,6 +183,10 @@ MsgSyncHandler
 	
 	private Average		in_req_average 	= AverageFactory.MovingImmediateAverage( 30*1000/MsgSyncPlugin.TIMER_PERIOD );
 	private Average		out_req_average = AverageFactory.MovingImmediateAverage( 30*1000/MsgSyncPlugin.TIMER_PERIOD );
+	
+	private volatile long send_last;
+	
+	private long	last_not_delivered_reported;
 	
 	
 		// for private message handler:
@@ -716,6 +722,54 @@ MsgSyncHandler
 		
 		//System.out.println( in_req_average.getAverage()*1000/MsgSyncPlugin.TIMER_PERIOD + "/" + out_req_average.getAverage()*1000/MsgSyncPlugin.TIMER_PERIOD);
 		
+		
+		if ( count % MSG_STATUS_CHECK_TICKS == 0 ){
+			
+			if ( send_last > 0 ){
+				
+				long now = SystemTime.getCurrentTime();
+				
+				synchronized( message_lock ){
+
+					int	not_delivered = 0;
+					
+					boolean	have_old_ones	= false;
+					
+					for ( MsgSyncMessage msg: messages ){
+						
+						if ( msg.getNode() == my_node ){
+							
+							if ( now - msg.getTimestamp() > MSG_STATUS_CHECK_PERIOD ){
+							
+								have_old_ones = true;
+							}
+							
+							if ( msg.getDeliveryCount() == 0 ){
+								
+								not_delivered++;
+							}
+						}
+					}
+					
+					if ( not_delivered > 0 && have_old_ones && last_not_delivered_reported != not_delivered ){
+						
+						last_not_delivered_reported = not_delivered;
+						
+						reportInfo( not_delivered + " messages not delivered yet" );
+						
+					}else{
+						
+						if ( last_not_delivered_reported > 0 && not_delivered == 0 ){
+							
+							last_not_delivered_reported = 0;
+							
+							reportInfo( "All messages delivered" );
+						}
+					}
+				}
+			}
+		}
+		
 		if ( count % NODE_STATUS_CHECK_TICKS == 0 ){
 			
 			int	failed	= 0;
@@ -1123,9 +1177,7 @@ MsgSyncHandler
 			}
 		}
 	}
-		
-	private volatile long send_last;
-	
+			
 	public void
 	sendMessage(
 		final byte[]		content )
@@ -2391,7 +2443,9 @@ MsgSyncHandler
 						m.put( "c", content );
 						m.put( "s", message.getSignature());
 						m.put( "a", message.getAgeSecs());
-												
+							
+						message.delivered();
+						
 						if ( !done_nodes.contains( n )){
 							
 							done_nodes.add( n );
