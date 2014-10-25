@@ -46,6 +46,13 @@ I2PHelperAZDHT
 	public static final short		FLAG_ANON			= DHT.FLAG_ANON;			// getters don't get putters address
 	public static final short		FLAG_HIGH_PRIORITY	= DHT.FLAG_HIGH_PRIORITY;		
 
+	public abstract boolean
+	isInitialised();
+	
+	public abstract boolean
+	waitForInitialisation(
+		long	max_millis );
+	
 	public abstract DHT
 	getDHT()
 	

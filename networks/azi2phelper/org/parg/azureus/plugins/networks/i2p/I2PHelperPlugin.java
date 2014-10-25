@@ -2920,11 +2920,18 @@ I2PHelperPlugin
 			
 			int	target_port = (Integer)server_options.get( "port" );
 			
+			long	start = SystemTime.getMonotonousTime();
+			
 			while( true ){
 				
 				if ( unloaded ){
 					
 					return( null );
+				}
+				
+				if ( SystemTime.getMonotonousTime() - start > 2*60*1000 ){
+					
+					throw( new IPCException( "Timeout waiting for router startup" ));
 				}
 				
 				I2PHelperRouter current_router = router;
@@ -2979,7 +2986,8 @@ I2PHelperPlugin
 		}
 	}
 	
-	private Map<Integer,I2PHelperDHTPluginInterface>	dht_pi_map = new HashMap<Integer, I2PHelperDHTPluginInterface>();
+	private Map<Integer,I2PHelperDHTPluginInterface>	dht_pi_map 		= new HashMap<Integer, I2PHelperDHTPluginInterface>();
+	private Map<String,I2PHelperDHTPluginInterface>		dht_client_map 	= new HashMap<String, I2PHelperDHTPluginInterface>();
 	
 	public DHTPluginInterface
 	getProxyDHT(
@@ -2998,8 +3006,7 @@ I2PHelperPlugin
 		
 		setUnloadable( false );
 		
-		try{
-			
+		try{		
 			int		dht_index;
 			
 			Download download = (Download)server_options.get( "download" );
@@ -3014,6 +3021,98 @@ I2PHelperPlugin
 					
 				}else{
 				
+					String server_id = (String)server_options.get( "server_id");
+					
+					if ( server_id != null ){
+						
+						long	start = SystemTime.getMonotonousTime();
+
+						while( true ){
+							
+							if ( unloaded ){
+								
+								return( null );
+							}
+							
+							if ( SystemTime.getMonotonousTime() - start > 2*60*1000 ){
+								
+								throw( new IPCException( "Timeout waiting for router startup" ));
+							}
+							
+							I2PHelperRouter current_router = router;
+							
+							if ( current_router == null ){
+								
+								try{
+									Thread.sleep(1000);									
+									
+								}catch( Throwable e ){
+								
+									Debug.out( e );
+									
+									return( null );
+								}
+							}else{
+								
+								I2PHelperRouter.ServerInstance server = 
+									current_router.createServer(
+										server_id, 
+										new I2PHelperRouter.ServerAdapter() 
+										{			
+											@Override
+											public void 
+											incomingConnection(
+												I2PHelperRouter.ServerInstance		server,
+												I2PSocket 							i2p_socket )
+														
+												throws Exception 
+											{	
+												i2p_socket.close();
+											}
+										});
+								
+								dht_index = I2PHelperRouter.DHT_NON_MIX;
+								
+								I2PHelperDHTPluginInterface pi;
+								
+								synchronized( dht_pi_map ){
+									
+									pi = dht_pi_map.get( dht_index );
+									
+									if ( pi == null ){
+										
+										pi = new I2PHelperDHTPluginInterface( this, dht_index );
+										
+										dht_pi_map.put( dht_index, pi );
+									}
+								}
+								
+								I2PHelperAZDHT dht = pi.getDHT( 2*60*1000 );
+								
+								if ( dht == null ){
+									
+									throw( new IPCException( "Timeout waiting for DHT initialisation" ));
+								}
+								
+								synchronized( dht_client_map ){
+									
+									I2PHelperDHTPluginInterface client_pi = dht_client_map.get( server_id );
+									
+									if ( client_pi == null ){
+										
+										DHTAZClient client = new DHTAZClient( server, dht, I2PHelperPlugin.this );
+										
+										client_pi = new I2PHelperDHTPluginInterface( this, client );
+
+										dht_client_map.put( server_id, client_pi );
+									}
+									
+									return( client_pi );
+								}
+							}
+						}
+					}
+					
 					dht_index =	I2PHelperRouter.DHT_MIX;
 				}
 			}else{
@@ -3034,6 +3133,11 @@ I2PHelperPlugin
 				
 				return( pi );
 			}
+			
+		}catch( IPCException e ){
+			
+			throw( e );
+			
 		}catch( Throwable e ){
 			
 			throw( new IPCException( e ));

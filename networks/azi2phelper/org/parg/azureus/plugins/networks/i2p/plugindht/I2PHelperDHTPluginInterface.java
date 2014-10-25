@@ -64,7 +64,6 @@ I2PHelperDHTPluginInterface
 	implements DHTPluginInterface
 {
 	private I2PHelperPlugin		plugin;
-	private int					dht_index;
 	
 	private volatile I2PHelperAZDHT		dht;
 	
@@ -79,10 +78,46 @@ I2PHelperDHTPluginInterface
 	public 
 	I2PHelperDHTPluginInterface(
 		I2PHelperPlugin		_plugin,
+		I2PHelperAZDHT		_dht )
+	{
+		plugin	= _plugin;
+		dht		= _dht;
+		
+		init_event = SimpleTimer.addPeriodicEvent(
+				"I2PHelperDHTPluginInterface",
+				1000,
+				new TimerEventPerformer() {
+					
+					@Override
+					public void 
+					perform(
+						TimerEvent event )
+					{
+						if ( init_event == null ){
+							
+							return;
+						}
+		
+						if ( dht.isInitialised()){
+							
+							init_event.cancel();
+							
+							init_event = null;
+							
+							init_sem.releaseForever();
+						}
+					}
+				});	
+	}
+	
+	public 
+	I2PHelperDHTPluginInterface(
+		I2PHelperPlugin		_plugin,
 		int					_dht_index )
 	{
 		plugin			= _plugin;
-		dht_index		= _dht_index;
+		
+		final int dht_index = _dht_index;
 		
 		init_event = SimpleTimer.addPeriodicEvent(
 			"I2PHelperDHTPluginInterface",
@@ -157,6 +192,15 @@ I2PHelperDHTPluginInterface
 	isInitialising() 
 	{
 		return( !init_sem.isReleasedForever());
+	}
+	
+	public I2PHelperAZDHT
+	getDHT(
+		int		max_wait )
+	{
+		init_sem.reserve( max_wait );
+		
+		return( dht );
 	}
 	
 	@Override
@@ -523,6 +567,7 @@ I2PHelperDHTPluginInterface
 			}
 
 			try{
+				
 				delegate = dht.getDHT().getTransport().getLocalContact();
 			
 				return( delegate );

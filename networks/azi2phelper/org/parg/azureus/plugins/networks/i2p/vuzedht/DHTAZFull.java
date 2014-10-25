@@ -37,6 +37,19 @@ DHTAZFull
 		dht		= _d;
 	}
 	
+	public boolean
+	isInitialised()
+	{
+		return( true );
+	}
+	
+	public boolean
+	waitForInitialisation(
+		long	max_millis )
+	{
+		return( true );
+	}
+	
 	public DHTAZ
 	getAZDHT()
 	{

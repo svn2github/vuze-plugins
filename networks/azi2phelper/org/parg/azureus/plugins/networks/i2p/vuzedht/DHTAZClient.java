@@ -138,7 +138,7 @@ DHTAZClient
 									}
 								}, base_transport );
 		
-						transport.setTraceOn( true );
+						//transport.setTraceOn( true );
 						
 						transport.setRequestHandler( new BogusRequestHandler());
 						

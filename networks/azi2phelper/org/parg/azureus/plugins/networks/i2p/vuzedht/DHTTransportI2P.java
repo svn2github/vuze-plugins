@@ -669,7 +669,7 @@ DHTTransportI2P
 	        			stats.pingFailed();
 	        		}
 	        	}, 
-	        	contact, map, RPC_TYPE_TWO_WAY, false );
+	        	contact, map, RPC_TYPE_TWO_WAY, false, false );
 	        	        
 		}catch( Throwable e ){
 			
@@ -893,7 +893,7 @@ DHTTransportI2P
 		        			stats.findNodeFailed();
 		        		}
 		        	}, 
-		        	contact, map, RPC_TYPE_TWO_WAY, priority );
+		        	contact, map, RPC_TYPE_TWO_WAY, priority, false );
 		        	        
 			}catch( Throwable e ){
 				
@@ -1058,7 +1058,7 @@ DHTTransportI2P
 	        			stats.findValueFailed();
 	        		}
 	        	}, 
-	        	contact, map, RPC_TYPE_TWO_WAY, priority );
+	        	contact, map, RPC_TYPE_TWO_WAY, priority, false );
 	        	        
 		}catch( Throwable e ){
 			
@@ -1401,7 +1401,7 @@ DHTTransportI2P
 										}
 									}
 								}, 
-								contact, map, RPC_TYPE_UNREPLIABLE, false );		// NOT repliable. Note however that we still get a reply as the target has (or should have) our dest cached against the token...
+								contact, map, RPC_TYPE_UNREPLIABLE, false, false );		// NOT repliable. Note however that we still get a reply as the target has (or should have) our dest cached against the token...
 	
 					}catch( Throwable e ){
 	
@@ -1462,7 +1462,8 @@ DHTTransportI2P
 		final DHTTransportContactI2P		contact,
 		boolean								reply_expected,
 		boolean								priority,
-		Map<String, Object>					payload )	
+		Map<String, Object>					payload,
+		boolean								override_sleeping )
 	{
 		if ( TRACE ) trace( "sendAZRequest: " + payload );
 		
@@ -1536,7 +1537,7 @@ DHTTransportI2P
 	        			handler.failed( contact, error );
 	        		}
 	        	}, 
-	        	contact, map, reply_expected?RPC_TYPE_TWO_WAY:RPC_TYPE_ONE_WAY, priority );
+	        	contact, map, reply_expected?RPC_TYPE_TWO_WAY:RPC_TYPE_ONE_WAY, priority, override_sleeping );
 	        	        
 		}catch( Throwable e ){
 			
@@ -1639,11 +1640,12 @@ DHTTransportI2P
     	DHTTransportContactI2P		contact,
     	Map					 		map, 
     	int		 					rpc_type,
-    	boolean						priority ) 
+    	boolean						priority ,
+    	boolean						override_sleeping )
     	
     	throws Exception
     {
-		if ( contact.isSleeping()){
+		if ((!override_sleeping) && contact.isSleeping()){
 			
 			throw( new DHTTransportException( "Contact is sleeping, request denied: " + map ));
 		}

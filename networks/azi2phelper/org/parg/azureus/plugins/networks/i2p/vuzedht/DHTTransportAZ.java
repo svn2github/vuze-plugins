@@ -792,6 +792,8 @@ DHTTransportAZ
 	{
 		// System.out.println( "Received " + payload );
 		
+		if ( TRACE ) trace( "AZ: receiveData from " + contact.getString());
+
 		long 	connection_id 	= ((Number)payload.get("c" )).longValue();
 		byte 	packet_type 	= ((Number)payload.get("p" )).byteValue();
 		byte[]	transfer_key	= (byte[])payload.get("z" );
@@ -1115,7 +1117,8 @@ DHTTransportAZ
 			contact.getBasis(),
 			reply_expected,
 			priority,
-			payload );
+			payload,
+			method == METHOD_DATA );	// allow data requests/replies to/from sleeping nodes to support msg-sync
 	}
 	
 	@Override

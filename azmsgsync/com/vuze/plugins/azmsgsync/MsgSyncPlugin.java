@@ -25,7 +25,6 @@ package com.vuze.plugins.azmsgsync;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.net.InetSocketAddress;
 import java.util.*;
 
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
@@ -357,15 +356,27 @@ MsgSyncPlugin
 
 		}else if ( network == AENetworkClassifier.AT_I2P ){
 			
-			List<DistributedDatabase> ddbs = plugin_interface.getUtilities().getDistributedDatabases( new String[]{ AENetworkClassifier.AT_I2P });
-			
-			if ( ddbs.size() == 0 ){
+			if ( options.containsKey( "fark" )){
 				
-				throw( new IPCException( "No I2P DDB Available" ));
+				List<DistributedDatabase> ddbs = plugin_interface.getUtilities().getDistributedDatabases( new String[]{ AENetworkClassifier.AT_I2P });
+				
+				if ( ddbs.size() == 0 ){
+					
+					throw( new IPCException( "No I2P DDB Available" ));
+				}
+				
+				dht = ((DDBaseImpl)ddbs.get(0)).getDHTPlugin();
+				
+			}else{
+				
+				PluginInterface pi = plugin_interface.getPluginManager().getPluginInterfaceByID( "azneti2phelper" );
+				
+				Map<String,Object>	ipc_options = new HashMap<String, Object>();
+				
+				ipc_options.put( "server_id", "dchat" );
+				
+				dht = (DHTPluginInterface)pi.getIPC().invoke( "getProxyDHT", new Object[]{ "msg_sync_chat", ipc_options });
 			}
-			
-			dht = ((DDBaseImpl)ddbs.get(0)).getDHTPlugin();
-			
 		}else{
 			
 			throw( new IPCException( "Unsupported network: " + network ));
