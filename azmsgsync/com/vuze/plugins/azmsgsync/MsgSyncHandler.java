@@ -35,11 +35,16 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.crypto.engines.AESFastEngine;
+import org.bouncycastle.crypto.modes.CBCBlockCipher;
+import org.bouncycastle.crypto.paddings.PaddedBufferedBlockCipher;
+import org.bouncycastle.crypto.params.KeyParameter;
+import org.bouncycastle.crypto.params.ParametersWithIV;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.BEncoder;
-import org.gudy.azureus2.core3.util.Base32;
 import org.gudy.azureus2.core3.util.ByteArrayHashMap;
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
@@ -1439,27 +1444,29 @@ MsgSyncHandler
 		return( null );
 	}
 	
+	private static final int AES_BYTES = 24;
+	
 	private byte[]
 	fixSecret(
 		byte[]	secret )
 	{
 		int	len = secret.length;
 		
-		if ( len == 16 ){
+		if ( len == AES_BYTES ){
 			
 			return( secret );
 			
 		}else{
 			
-			byte[]	result = new byte[16];
+			byte[]	result = new byte[AES_BYTES];
 			
-			if ( len < 16 ){
+			if ( len < AES_BYTES ){
 		
 				System.arraycopy( secret, 0, result, 0, len );
 			
 			}else{
 				
-				System.arraycopy( secret, len-16, result, 0, 16 );
+				System.arraycopy( secret, len-AES_BYTES, result, 0, AES_BYTES );
 			}
 			
 			return( result );
@@ -1473,25 +1480,54 @@ MsgSyncHandler
 		try{
 			byte[] key = target_secret;
 			
-			SecretKeySpec secret = new SecretKeySpec( key, "AES");
-	
-			Cipher encipher = Cipher.getInstance ("AES/CBC/PKCS5Padding");
+			if ( AES_BYTES == 16 ){
 				
-			encipher.init( Cipher.ENCRYPT_MODE, secret );
+				SecretKeySpec secret = new SecretKeySpec( key, "AES");
+		
+				Cipher encipher = Cipher.getInstance("AES/CBC/PKCS5Padding" );
+					
+				encipher.init( Cipher.ENCRYPT_MODE, secret );
+					
+				AlgorithmParameters params = encipher.getParameters();
+					
+				byte[] IV = params.getParameterSpec(IvParameterSpec.class).getIV();
+					
+				byte[] enc = encipher.doFinal( data );
+		
+				byte[] rep_bytes = new byte[ IV.length + enc.length ];
 				
-			AlgorithmParameters params = encipher.getParameters();
+				System.arraycopy( IV, 0, rep_bytes, 0, IV.length );
+				System.arraycopy( enc, 0, rep_bytes, IV.length, enc.length );
 				
-			byte[] IV = params.getParameterSpec(IvParameterSpec.class).getIV();
+				return( rep_bytes );
 				
-			byte[] enc = encipher.doFinal( data );
-	
-			byte[] rep_bytes = new byte[ IV.length + enc.length ];
-			
-			System.arraycopy( IV, 0, rep_bytes, 0, IV.length );
-			System.arraycopy( enc, 0, rep_bytes, IV.length, enc.length );
-			
-			return( rep_bytes );
-			
+			}else{
+				
+				AESFastEngine aes = new AESFastEngine();
+				
+				CBCBlockCipher cbc=new CBCBlockCipher(aes);
+				
+				PaddedBufferedBlockCipher s = new PaddedBufferedBlockCipher(cbc);
+				
+				byte[]  IV		= new byte[16];
+				
+				RandomUtils.nextSecureBytes( IV );
+				
+				s.init( true, new ParametersWithIV( new KeyParameter(key), IV ));
+				
+				byte[] enc = new byte[data.length+64];	// add some extra space for padding if needed
+				
+				int done = s.processBytes(data, 0, data.length, enc, 0);
+
+				done += s.doFinal( enc, done);
+
+				byte[] rep_bytes = new byte[ IV.length + done ];
+				
+				System.arraycopy( IV, 0, rep_bytes, 0, IV.length );
+				System.arraycopy( enc, 0, rep_bytes, IV.length, done );
+				
+				return( rep_bytes );
+			}	
 		}catch( Throwable e ){
 			
 			Debug.out( e );
@@ -1506,17 +1542,45 @@ MsgSyncHandler
 	{
 		try{
 			byte[] key = target_secret;
-			
-			SecretKeySpec secret = new SecretKeySpec( key, "AES");
-	
-			Cipher decipher = Cipher.getInstance ("AES/CBC/PKCS5Padding");
+
+			if ( AES_BYTES == 16 ){
+								
+				SecretKeySpec secret = new SecretKeySpec( key, "AES");
+		
+				Cipher decipher = Cipher.getInstance ("AES/CBC/PKCS5Padding" );
+					
+				decipher.init(Cipher.DECRYPT_MODE, secret, new IvParameterSpec( data, 0, AES_BYTES ));
+		
+				byte[] result = decipher.doFinal( data, AES_BYTES, data.length-AES_BYTES );
 				
-			decipher.init(Cipher.DECRYPT_MODE, secret, new IvParameterSpec( data, 0, 16 ));
-	
-			byte[] result = decipher.doFinal( data, 16, data.length-16 );
+				return( result );
 			
-			return( result );
-			
+			}else{
+				
+				AESFastEngine aes = new AESFastEngine();
+				
+				CBCBlockCipher cbc=new CBCBlockCipher(aes);
+				
+				PaddedBufferedBlockCipher s = new PaddedBufferedBlockCipher(cbc);
+				
+				byte[]  IV		= new byte[16];
+				
+				System.arraycopy( data, 0, IV, 0, 16 );
+				
+				s.init( false, new ParametersWithIV( new KeyParameter(key), IV ));
+				
+				byte[] dec = new byte[data.length];
+				
+				int done = s.processBytes( data, 16, data.length-16, dec, 0);
+
+				done += s.doFinal( dec, done);
+				
+				byte[] result = new byte[done];
+				
+				System.arraycopy( dec, 0, result, 0, done );
+				
+				return( result );
+			}
 		}catch( Throwable e ){
 			
 			Debug.out( e );
