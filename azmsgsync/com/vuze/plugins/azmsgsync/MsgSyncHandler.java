@@ -744,23 +744,23 @@ MsgSyncHandler
 						
 						if ( msg.getNode() == my_node ){
 							
-							if ( now - msg.getTimestamp() > MSG_STATUS_CHECK_PERIOD ){
-							
-								have_old_ones = true;
-							}
-							
 							if ( msg.getDeliveryCount() == 0 ){
 								
+								if ( now - msg.getTimestamp() > MSG_STATUS_CHECK_PERIOD ){
+								
+									have_old_ones = true;
+								}
+														
 								not_delivered++;
 							}
 						}
 					}
 					
-					if ( not_delivered > 0 && have_old_ones && last_not_delivered_reported != not_delivered ){
+					if ( have_old_ones && last_not_delivered_reported != not_delivered ){
 						
 						last_not_delivered_reported = not_delivered;
 						
-						reportInfo( not_delivered + " messages not delivered yet" );
+						reportInfo( not_delivered + " message(s) not delivered yet" );
 						
 					}else{
 						
