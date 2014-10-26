@@ -2018,7 +2018,7 @@ DHTTransportI2P
 	        		
 	        	}else{
 	        		
-	        		System.out.println( "Sleeping - ignoring request" );
+	        		// System.out.println( "Sleeping - ignoring request" );
 	        	}
 	        }else if ( type.equals("r") || type.equals("e")){
 	        	
