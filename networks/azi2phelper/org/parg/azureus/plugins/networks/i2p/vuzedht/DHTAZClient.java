@@ -117,7 +117,7 @@ DHTAZClient
 		
 						DHTTransportI2P base_transport = new DHTTransportI2P( session, my_node, DHTUtilsI2P.REQUEST_TIMEOUT );
 							
-						base_transport.setTraceOn( true );
+						//base_transport.setTraceOn( true );
 						
 						base_transport.setRequestHandler( new BogusRequestHandler());
 						
