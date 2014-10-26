@@ -608,7 +608,7 @@ DHTTransportI2P
 	        			sem.release();
 	        		}
 	        	}, 
-	        	node, map, RPC_TYPE_TWO_WAY, false );
+	        	node, map, RPC_TYPE_TWO_WAY, false, false );
 	        
 	        if ( wait_for_reply ){
 	        
@@ -762,7 +762,7 @@ DHTTransportI2P
 	        			sem.release();
 	        		}
 	        	}, 
-	        	node, map, RPC_TYPE_TWO_WAY, true );
+	        	node, map, RPC_TYPE_TWO_WAY, true, false );
 	        
 	        sem.reserve();
 	        
@@ -1652,7 +1652,7 @@ DHTTransportI2P
 
 	   	NodeInfo node = contact.getNode();
 	   
-		sendQuery( handler, node, map, rpc_type, priority );
+		sendQuery( handler, node, map, rpc_type, priority, override_sleeping );
     }
    
     private void 
@@ -1661,7 +1661,8 @@ DHTTransportI2P
     	final NodeInfo					node,
     	final Map				 		map, 
     	final int	 					rpc_type,
-    	final boolean					priority )
+    	final boolean					priority,
+    	final boolean					override_sleeping )
     	
     	throws Exception
     {
@@ -1716,7 +1717,7 @@ DHTTransportI2P
 
 								node.setDestination( dest );
 								
-					    		sendQuery( handler, dest, node.getPort(), map, rpc_type );
+					    		sendQuery( handler, dest, node.getPort(), map, rpc_type, override_sleeping );
 					    		
 							}else{
 								
@@ -1738,7 +1739,7 @@ DHTTransportI2P
     		    		
     	}else{
     		
-    		sendQuery( handler, dest, node.getPort(), map, rpc_type );
+    		sendQuery( handler, dest, node.getPort(), map, rpc_type, override_sleeping );
     	}
     }
     
@@ -1748,7 +1749,8 @@ DHTTransportI2P
     	Destination					dest,
     	int							port,
     	Map				 			map, 
-    	int		 					rpc_type ) 
+    	int		 					rpc_type,
+    	boolean						override_sleeping )
     	
     	throws Exception
     {
@@ -1763,6 +1765,11 @@ DHTTransportI2P
 	
 	    map.put("t", msg_id );
 	
+	    if ( override_sleeping ){
+	    	
+	    	map.put( "z", 0 );
+	    }
+	    
 	    Map<String, Object> args = (Map<String, Object>) map.get("a");
 	
 	    args.put("id", my_nid.getData());
@@ -2001,7 +2008,7 @@ DHTTransportI2P
 	        	
 	            	// queries must be repliable
 	        	
-	        	if (( generic_flags & DHTTransportUDP.GF_DHT_SLEEPING ) == 0 ){
+	        	if (( generic_flags & DHTTransportUDP.GF_DHT_SLEEPING ) == 0 || map.containsKey( "z" )){
 	        		
 	        		String method = MapUtils.getMapString( map, "q", "" );
 	            
