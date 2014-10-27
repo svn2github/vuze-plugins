@@ -118,6 +118,10 @@ MsgSyncHandler
 	private int MSG_STATUS_CHECK_PERIOD				= 15*1000;
 	private int	MSG_STATUS_CHECK_TICKS				= MSG_STATUS_CHECK_PERIOD / MsgSyncPlugin.TIMER_PERIOD;
 
+	private int SECRET_TIDY_PERIOD					= 60*1000;
+	private int	SECRET_TIDY_TICKS					= SECRET_TIDY_PERIOD / MsgSyncPlugin.TIMER_PERIOD;
+
+	
 	private static final int STATUS_OK			= 1;
 	private static final int STATUS_LOOPBACK	= 2;
 	
@@ -214,6 +218,11 @@ MsgSyncHandler
 	private boolean							target_secret_getting;
 	private long							target_secret_getting_last;
 	private boolean							private_chat_fatal_error;
+	
+	private Map<HashWrapper,Object[]>	secret_activities = new HashMap<HashWrapper,Object[]>();
+	
+	private BloomFilter					secret_activities_bloom = BloomFilterFactory.createAddRemove4Bit( 1024 );
+
 	
 	protected
 	MsgSyncHandler(
@@ -649,6 +658,28 @@ MsgSyncHandler
 		if ( destroyed ){
 			
 			return;
+		}
+		
+		if ( count % MSG_STATUS_CHECK_TICKS == 0 ){
+
+			synchronized( secret_activities ){
+				
+				secret_activities_bloom.clear();
+				
+				Iterator<Object[]>	it = secret_activities.values().iterator();
+				
+				long	now = SystemTime.getMonotonousTime();
+						
+				while( it.hasNext()){
+					
+					long	time = (Long)it.next()[0];
+					
+					if ( now - time > 60*1000 ){
+						
+						it.remove();
+					}
+				}
+			}
 		}
 		
 		if ( parent_handler != null ){
@@ -1624,10 +1655,7 @@ MsgSyncHandler
 			return( null );
 		}
 	}
-	
-	private ByteArrayHashMap<CryptoSTSEngine>	secret_activities = new ByteArrayHashMap<CryptoSTSEngine>();
-	
-	
+		
 	private Map<String,Object>
 	handleDHRequest(
 		DHTPluginContact		originator,
@@ -1636,28 +1664,51 @@ MsgSyncHandler
 		Map<String,Object>		reply_map = new HashMap<String, Object>();
 
 		try{				
-			byte[]	act_id	 = (byte[])request.get("i");
+			byte[]	act_id	 	= (byte[])request.get("i");
 			
-			byte[]	user_key = (byte[])request.get("u");
+			byte[]	user_key 	= (byte[])request.get("u");
 	
+			byte[]	their_keys	= (byte[])request.get( "k" );
+
+			HashWrapper act_id_wrapper = new HashWrapper( act_id );
+			
 			CryptoSTSEngine	sts;
 			
 			synchronized( secret_activities ){
 				
-				System.out.println( "TODO: rate limit + tidy activities" );
+				InetSocketAddress address = originator.getAddress();
 				
-				sts = secret_activities.get( act_id );
+				byte[] bloom_key = ( address.isUnresolved()?address.getHostName():address.getAddress().getHostAddress()).getBytes( "UTF-8" );
 				
-				if ( sts == null ){
+				if ( secret_activities_bloom.add( bloom_key ) > 8 ){
+					
+					throw( new IPCException( "Connection refused - address overloaded" ));
+				}
+				
+				Object[] existing = secret_activities.get( act_id_wrapper );
+				
+				if ( existing == null ){
+					
+					if ( their_keys == null ){
+						
+						throw( new IPCException( "Connection expired" ));
+					}
+					
+					if ( secret_activities.size() > 16 ){
+						
+						throw( new IPCException( "Connection refused - peer overloaded" ));
+					}
 					
 					sts = AzureusCoreFactory.getSingleton().getCryptoManager().getECCHandler().getSTSEngine( public_key, private_key );
 	
-					secret_activities.put( act_id, sts );
+					secret_activities.put( act_id_wrapper, new Object[]{ SystemTime.getMonotonousTime(), sts });
+					
+				}else{
+					
+					sts = (CryptoSTSEngine)existing[1];
 				}
 			}
-			
-			byte[]	their_keys = (byte[])request.get( "k" );
-			
+						
 			if ( their_keys != null ){
 				
 				ByteBuffer buffer = ByteBuffer.allocate( 16*1024 );
@@ -1705,7 +1756,7 @@ MsgSyncHandler
 				
 				synchronized( secret_activities ){
 					
-					sts = secret_activities.remove( act_id );
+					secret_activities.remove( act_id_wrapper );
 				}
 								
 				MsgSyncHandler chat_handler = plugin.getSyncHandler( dht, this, remote_pk, originator.exportToMap(), user_key, shared_secret );
@@ -1729,10 +1780,13 @@ MsgSyncHandler
 					
 					if ( !accepted ){
 						
-						chat_handler.destroy();
-						
-						throw( new IPCException( "Chat failed" ));
+						chat_handler.destroy();						
 					}
+				}
+				
+				if ( !accepted ){
+					
+					throw( new IPCException( "Connection not accepted" ));
 				}
 			}		
 		}catch( IPCException e ){
