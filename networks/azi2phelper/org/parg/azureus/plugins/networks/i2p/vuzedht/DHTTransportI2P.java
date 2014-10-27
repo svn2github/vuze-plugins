@@ -27,10 +27,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.core3.util.AESemaphore;
@@ -54,6 +56,7 @@ import net.i2p.client.I2PSessionMuxedListener;
 import net.i2p.client.SendMessageOptions;
 import net.i2p.client.datagram.I2PDatagramDissector;
 import net.i2p.client.datagram.I2PDatagramMaker;
+import net.i2p.data.Base32;
 import net.i2p.data.DataFormatException;
 import net.i2p.data.Destination;
 import net.i2p.data.Hash;
@@ -81,8 +84,45 @@ import com.aelitis.azureus.util.MapUtils;
 public class 
 DHTTransportI2P
 	implements DHTTransport, I2PSessionMuxedListener
-{
+{	
+	private static final Set<String>	trace_addresses;
+	
+	static{
+		Set<String>		addresses = null;
+		
+		try{
+			String str = System.getProperty( "az.i2phelper.trace.addresses", "" );
+			
+			if ( str.length() > 0 ){
+				
+				addresses = new HashSet<String>();
+				
+				String[] bits = str.split(",");
+				
+				for ( String s: bits ){
+					
+					s = s.trim();
+					
+					if ( !s.endsWith( ".b32.i2p" )){
+						
+						s += ".b32.i2p";
+					}
+					
+					addresses.add( s );
+				}
+				
+				System.err.println( "Tracing addresses: " + addresses );
+			}
+		}catch( Throwable e ){
+			
+			e.printStackTrace();
+		}
+		
+		trace_addresses = addresses;
+	}
+
 	private boolean TRACE = false;
+
 	
 	private static final int NUM_WANT	= 16;
 	
@@ -1793,7 +1833,7 @@ DHTTransportI2P
     		
     		if ( rpc_type != RPC_TYPE_ONE_WAY ){
     		
-    			requests.put( new HashWrapper( msg_id ), new Request( handler ));
+    			requests.put( new HashWrapper( msg_id ), new Request( dest, handler ));
     		}
 	    }
 	    
@@ -1854,6 +1894,21 @@ DHTTransportI2P
         return( sendMessage( dest, node.getPort() + 1, map, RPC_TYPE_UNREPLIABLE ));
     }
     
+    private void
+    trace(
+    	Destination		dest,
+    	String			str )
+    {
+    	if ( trace_addresses != null && dest != null){
+    	
+    		String address = Base32.encode( dest.calculateHash().getData()) + ".b32.i2p";
+    	
+    		if ( trace_addresses.contains( address)){
+    			
+    			System.out.println( address + " - " + str );
+    		}
+    	}
+    }
     
     private static final int SEND_CRYPTO_TAGS 	= 8;
     private static final int LOW_CRYPTO_TAGS 	= 4;
@@ -1912,9 +1967,13 @@ DHTTransportI2P
                 toPort, 
                 opts )){
         	
+        	trace( dest, "send ok" );
+        	
         	return( payload.length );
         	
         }else{
+        	
+        	trace( dest, "send failed" );
         	
         	throw( new DHTTransportException( "sendMessage failed" ));
         }
@@ -2006,6 +2065,8 @@ DHTTransportI2P
 	        
 	        if ( type.equals("q")){
 	        	
+	        	trace( from_dest, "received" );
+	        	
 	            	// queries must be repliable
 	        	
 	        	if (( generic_flags & DHTTransportUDP.GF_DHT_SLEEPING ) == 0 || map.containsKey( "z" )){
@@ -2021,7 +2082,7 @@ DHTTransportI2P
 	        		// System.out.println( "Sleeping - ignoring request" );
 	        	}
 	        }else if ( type.equals("r") || type.equals("e")){
-	        	
+	        	  
 	        	Request request;
 	        	
 	        	synchronized( requests ){
@@ -2030,6 +2091,8 @@ DHTTransportI2P
 	        	}
 	        	
 	        	if ( request != null ){
+	        		
+	        		trace( request.getDestination(), "received (2)" );
 	        		
 	        		long elapsed = SystemTime.getMonotonousTime() - request.getStartTime();
 	        		
@@ -2389,15 +2452,24 @@ DHTTransportI2P
 	private class
 	Request
 	{
+		private Destination					dest;
 		private ReplyHandler				handler;
     	
     	private long	start_time = SystemTime.getMonotonousTime();
     	
     	private
     	Request(
+    		Destination					_dest,
     		ReplyHandler				_handler )
     	{
+    		dest		= _dest;
     		handler		= _handler;
+    	}
+    	
+    	private Destination
+    	getDestination()
+    	{
+    		return( dest );
     	}
     	
     	private ReplyHandler
