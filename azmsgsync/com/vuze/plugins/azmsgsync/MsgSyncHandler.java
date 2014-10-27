@@ -145,6 +145,7 @@ MsgSyncHandler
 	private static final int				MAX_DELETED_MESSAGES	= 64;
 	
 	private static final int				MAX_NODES				= 128;
+	private static final int				MIN_NODES				= 3;
 
 	protected static final int				MAX_MESSAGE_SIZE		= 350;
 	
@@ -172,6 +173,14 @@ MsgSyncHandler
 			}
 		};
 			
+	private static final int MAX_CONC_SYNC	= 5;
+	private static final int MAX_FAIL_SYNC	= 2;
+		
+	private Set<MsgSyncNode> active_syncs	 = new HashSet<MsgSyncNode>();
+		
+	private boolean	prefer_live_sync_outstanding;
+
+		
 	private CopyOnWriteList<MsgSyncListener>		listeners = new CopyOnWriteList<MsgSyncListener>();
 	
 	private volatile boolean		destroyed;
@@ -858,12 +867,39 @@ MsgSyncHandler
 							}
 						}
 					}
+				}else{
+					
+						// make sure we don't throw away too many nodes and end up with nothing
+					
+					int rem = total - to_remove.size();
+					
+					if ( rem < MIN_NODES ){
+						
+						int	retain = MIN_NODES - rem;
+						
+						for ( int i=0;i<retain;i++){
+							
+							if ( to_remove.size() == 0 ){
+								
+								break;
+							}
+							
+							to_remove.remove( RandomUtils.nextInt( to_remove.size()));
+						}
+					}
 				}
 			}
 			
 			log( "Node status: live=" + live + ", failed=" + failed + ", total=" + total + ", to_remove=" + to_remove.size() + "; messages=" + messages.size());
 			
 			for ( MsgSyncNode node: to_remove ){
+				
+					// don't remove private chat node
+				
+				if ( node == target_node ){
+					
+					continue;
+				}
 				
 				removeNode( node, false );
 			}
@@ -1718,14 +1754,7 @@ MsgSyncHandler
 	{
 		sync( false );
 	}
-	
-	private static final int MAX_CONC_SYNC	= 5;
-	private static final int MAX_FAIL_SYNC	= 2;
-	
-	private Set<MsgSyncNode> active_syncs	 = new HashSet<MsgSyncNode>();
-	
-	private boolean	prefer_live_sync_outstanding;
-	
+		
 	protected void
 	sync(
 		final boolean		prefer_live )

@@ -29,7 +29,6 @@ import java.util.Properties;
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
-import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperAdapter;
 import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouter;
@@ -107,7 +106,12 @@ DHTAZClient
 							continue;
 						}
 						
-						int dht_port = 10000 + RandomUtils.nextInt( 65535 - 10000 );
+						// actually we don't want to randomise the port as we want a destination to be valid for
+						// as long as its .i2p address is, not change every startup
+						
+						int dht_port = 10000;
+						
+						// int dht_port = 10000 + RandomUtils.nextInt( 65535 - 10000 );
 						
 						Destination my_dest = session.getMyDestination();
 						
