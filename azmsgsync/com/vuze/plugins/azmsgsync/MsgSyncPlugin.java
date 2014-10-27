@@ -355,8 +355,8 @@ MsgSyncPlugin
 			dht = ((DDBaseImpl)plugin_interface.getDistributedDatabase()).getDHTPlugin();
 
 		}else if ( network == AENetworkClassifier.AT_I2P ){
-			
-			if ( options.containsKey( "fark" )){
+						
+			/*
 				
 				List<DistributedDatabase> ddbs = plugin_interface.getUtilities().getDistributedDatabases( new String[]{ AENetworkClassifier.AT_I2P });
 				
@@ -367,16 +367,28 @@ MsgSyncPlugin
 				
 				dht = ((DDBaseImpl)ddbs.get(0)).getDHTPlugin();
 				
-			}else{
+			*/
+			
+			String server_id = (String)options.get( "server_id" );
+
+			if ( server_id == null ){
 				
-				PluginInterface pi = plugin_interface.getPluginManager().getPluginInterfaceByID( "azneti2phelper" );
-				
-				Map<String,Object>	ipc_options = new HashMap<String, Object>();
-				
-				ipc_options.put( "server_id", "dchat" );
-				
-				dht = (DHTPluginInterface)pi.getIPC().invoke( "getProxyDHT", new Object[]{ "msg_sync_chat", ipc_options });
+				server_id = "dchat";
 			}
+			
+			PluginInterface pi = plugin_interface.getPluginManager().getPluginInterfaceByID( "azneti2phelper" );
+				
+			if ( pi == null ){
+				
+				throw( new IPCException( "No I2P DDB Available" ));
+			}
+			
+			Map<String,Object>	ipc_options = new HashMap<String, Object>();
+				
+			ipc_options.put( "server_id", server_id );
+				
+			dht = (DHTPluginInterface)pi.getIPC().invoke( "getProxyDHT", new Object[]{ "msg_sync_chat", ipc_options });
+		
 		}else{
 			
 			throw( new IPCException( "Unsupported network: " + network ));
