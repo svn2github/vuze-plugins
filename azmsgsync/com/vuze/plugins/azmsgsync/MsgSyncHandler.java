@@ -660,7 +660,7 @@ MsgSyncHandler
 			return;
 		}
 		
-		if ( count % MSG_STATUS_CHECK_TICKS == 0 ){
+		if ( count % SECRET_TIDY_TICKS == 0 ){
 
 			synchronized( secret_activities ){
 				
