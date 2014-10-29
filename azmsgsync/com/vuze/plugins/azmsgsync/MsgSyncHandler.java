@@ -158,6 +158,11 @@ MsgSyncHandler
 	
 	private static final int				MAX_MESSSAGE_REPLY_SIZE	= 4*1024;
 	
+
+	private static final int					ANON_DEST_USE_MIN_TIME	= 4500;
+	
+	private static WeakHashMap<String, Long>	anon_dest_use_map = new WeakHashMap<String, Long>();
+
 		
 	private Object							message_lock	= new Object();
 	
@@ -225,7 +230,6 @@ MsgSyncHandler
 	private Map<HashWrapper,Object[]>	secret_activities = new HashMap<HashWrapper,Object[]>();
 	
 	private BloomFilter					secret_activities_bloom = BloomFilterFactory.createAddRemove4Bit( 1024 );
-
 	
 	protected
 	MsgSyncHandler(
@@ -1976,6 +1980,8 @@ MsgSyncHandler
 					
 		}else{
 			
+			long	now = SystemTime.getMonotonousTime();
+			
 			Map<String,Object>	map = new HashMap<String, Object>(num*2);
 			
 			for ( MsgSyncNode node: nodes ){
@@ -1987,7 +1993,15 @@ MsgSyncHandler
 					// rate limit these addresses globally to reduce tunnel load, especially
 					// when running private chats on an already small chat.
 				
-					System.out.println( str );
+					synchronized( anon_dest_use_map ){
+						
+						Long	last = anon_dest_use_map.get( str );
+						
+						if ( last != null && now - last < ANON_DEST_USE_MIN_TIME ){
+												
+							continue;
+						}						
+					}
 				}
 				
 				Object x = map.get( str );
@@ -2011,6 +2025,11 @@ MsgSyncHandler
 				}
 			}
 			
+			if ( map.size() == 0 ){
+				
+				return( null );
+			}
+			
 			int	index = RandomUtils.nextInt( map.size());
 			
 			Iterator<Object>	it = map.values().iterator();
@@ -2022,16 +2041,30 @@ MsgSyncHandler
 			
 			Object result = it.next();
 			
+			MsgSyncNode sync_node;
+			
 			if ( result instanceof MsgSyncNode ){
 				
-				return((MsgSyncNode)result);
+				sync_node = (MsgSyncNode)result;
 				
 			}else{
 				
 				List<MsgSyncNode>	list = (List<MsgSyncNode>)result;
 				
-				return( list.get( RandomUtils.nextInt( list.size())));
+				sync_node = list.get( RandomUtils.nextInt( list.size()));
 			}
+			
+			if ( is_anonymous_chat ){
+				
+				synchronized( anon_dest_use_map ){
+				
+					String str = sync_node.getContactAddress();
+										
+					anon_dest_use_map.put( str, now );
+				}
+			}
+			
+			return( sync_node );
 		}
 	}
 	
