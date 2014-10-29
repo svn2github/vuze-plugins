@@ -1945,9 +1945,9 @@ DHTTransportI2P
         
         opts.setDate( SystemTime.getCurrentTime() + 60*1000);
         
-        opts.setTagsToSend(SEND_CRYPTO_TAGS);
-        
-        opts.setTagThreshold(LOW_CRYPTO_TAGS);
+        // advised to just use defaults
+        //opts.setTagsToSend(SEND_CRYPTO_TAGS);       
+        //opts.setTagThreshold(LOW_CRYPTO_TAGS);
         
         if ( rpc_type == RPC_TYPE_UNREPLIABLE ){
         	

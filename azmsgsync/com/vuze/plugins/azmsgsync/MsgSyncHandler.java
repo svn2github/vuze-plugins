@@ -40,7 +40,6 @@ import org.bouncycastle.crypto.modes.CBCBlockCipher;
 import org.bouncycastle.crypto.paddings.PaddedBufferedBlockCipher;
 import org.bouncycastle.crypto.params.KeyParameter;
 import org.bouncycastle.crypto.params.ParametersWithIV;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.AEThread2;
@@ -159,10 +158,11 @@ MsgSyncHandler
 	private static final int				MAX_MESSSAGE_REPLY_SIZE	= 4*1024;
 	
 
+	/*
 	private static final int					ANON_DEST_USE_MIN_TIME	= 4500;
 	
 	private static WeakHashMap<String, Long>	anon_dest_use_map = new WeakHashMap<String, Long>();
-
+	*/
 		
 	private Object							message_lock	= new Object();
 	
@@ -802,7 +802,14 @@ MsgSyncHandler
 							
 							if ( not_delivered || not_seen ){
 								
-								if ( now - msg.getTimestamp() > (not_delivered?MSG_STATUS_CHECK_PERIOD:2*MSG_STATUS_CHECK_PERIOD )){
+								long period = not_delivered?MSG_STATUS_CHECK_PERIOD:2*MSG_STATUS_CHECK_PERIOD;
+								
+								if ( is_anonymous_chat ){
+									
+									period *= 2;
+								}
+								
+								if ( now - msg.getTimestamp() > period ){
 								
 									have_old_ones = true;
 								}
@@ -961,7 +968,12 @@ MsgSyncHandler
 			}
 		}
 		
-		sync();
+			// slower sync rate for anonymous, higher latency/cost 
+		
+		if ( count % ( is_anonymous_chat?2:1)  == 0 ){
+
+			sync();
+		}
 	}
 
 	private boolean
@@ -1988,6 +2000,7 @@ MsgSyncHandler
 				
 				String str = node.getContactAddress();
 				
+				/* removed as didn't help the unreliability situation
 				if ( is_anonymous_chat ){
 					
 					// rate limit these addresses globally to reduce tunnel load, especially
@@ -2003,6 +2016,7 @@ MsgSyncHandler
 						}						
 					}
 				}
+				*/
 				
 				Object x = map.get( str );
 				
@@ -2054,6 +2068,7 @@ MsgSyncHandler
 				sync_node = list.get( RandomUtils.nextInt( list.size()));
 			}
 			
+			/*
 			if ( is_anonymous_chat ){
 				
 				synchronized( anon_dest_use_map ){
@@ -2063,6 +2078,7 @@ MsgSyncHandler
 					anon_dest_use_map.put( str, now );
 				}
 			}
+			*/
 			
 			return( sync_node );
 		}
@@ -2595,7 +2611,14 @@ MsgSyncHandler
 							
 						}else{
 							
-							msg.seen();
+							if ( messages_they_have >= messages.size()){
+							
+									// just in case we have a bloom clash and they don't really have
+									// the message, double check that they have at least as many
+									// messages as us
+								
+								msg.seen();
+							}
 							
 							messages_we_both_have ++;
 						}
