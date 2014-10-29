@@ -42,6 +42,7 @@ import org.bouncycastle.crypto.params.KeyParameter;
 import org.bouncycastle.crypto.params.ParametersWithIV;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.gudy.azureus2.core3.config.COConfigurationManager;
+import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.BEncoder;
@@ -134,6 +135,8 @@ MsgSyncHandler
 	private boolean									checking_dht;
 	private long									last_dht_check;
 
+	private final boolean				is_anonymous_chat;
+	
 	private final PrivateKey			private_key;
 	private final PublicKey				public_key;
 	
@@ -236,6 +239,8 @@ MsgSyncHandler
 		dht				= _dht;
 		user_key		= _key;
 			
+		is_anonymous_chat	= dht.getNetwork() != AENetworkClassifier.AT_PUBLIC;
+		
 		parent_handler		= null;
 		target_pk			= null;
 		target_contact		= null;
@@ -335,6 +340,8 @@ MsgSyncHandler
 		plugin			= _plugin;
 		dht				= _dht;
 		
+		is_anonymous_chat	= dht.getNetwork() != AENetworkClassifier.AT_PUBLIC;
+
 		parent_handler	= _parent_handler;
 		target_pk		= _target_pk;
 		target_contact	= _target_contact;
@@ -706,7 +713,7 @@ MsgSyncHandler
 				
 						long now = SystemTime.getMonotonousTime();
 						
-						if ( now - target_secret_getting_last < 10*1000 ){
+						if ( now - target_secret_getting_last < 20*1000 ){
 							
 							return;
 						}
@@ -776,7 +783,7 @@ MsgSyncHandler
 				
 				synchronized( message_lock ){
 
-					int	not_delivered = 0;
+					int	not_delivered_count = 0;
 					
 					boolean	have_old_ones	= false;
 					
@@ -784,27 +791,32 @@ MsgSyncHandler
 						
 						if ( msg.getNode() == my_node ){
 							
-							if ( msg.getDeliveryCount() == 0 ){
+								// delivery isn't sufficient as the reply might not get through :(
+							
+							boolean	not_delivered 	= msg.getDeliveryCount() == 0;
+							boolean	not_seen 		= msg.getSeenCount() == 0;
+							
+							if ( not_delivered || not_seen ){
 								
-								if ( now - msg.getTimestamp() > MSG_STATUS_CHECK_PERIOD ){
+								if ( now - msg.getTimestamp() > (not_delivered?MSG_STATUS_CHECK_PERIOD:2*MSG_STATUS_CHECK_PERIOD )){
 								
 									have_old_ones = true;
 								}
 														
-								not_delivered++;
+								not_delivered_count++;
 							}
 						}
 					}
 					
-					if ( have_old_ones && last_not_delivered_reported != not_delivered ){
+					if ( have_old_ones && last_not_delivered_reported != not_delivered_count ){
 						
-						last_not_delivered_reported = not_delivered;
+						last_not_delivered_reported = not_delivered_count;
 						
-						reportInfo( not_delivered + " message(s) not delivered yet" );
+						reportInfo( not_delivered_count + " message(s) not delivered yet" );
 						
 					}else{
 						
-						if ( last_not_delivered_reported > 0 && not_delivered == 0 ){
+						if ( last_not_delivered_reported > 0 && not_delivered_count == 0 ){
 							
 							last_not_delivered_reported = 0;
 							
@@ -1876,12 +1888,16 @@ MsgSyncHandler
 			}
 			
 			if ( prefer_live_sync_outstanding && live.size() > 0 ){
-				
-				prefer_live_sync_outstanding = false;
-				
+								
 				sync_node = getRandomSyncNode( live );
 				
-			}else{
+				if ( sync_node != null ){
+					
+					prefer_live_sync_outstanding = false;
+				}
+			}
+			
+			if ( sync_node == null ){
 				
 				int	active_fails = 0;
 				
@@ -1957,11 +1973,7 @@ MsgSyncHandler
 		if ( num == 0 ){
 			
 			return( null );
-			
-		}else if ( num == 1 ){
-			
-			return( nodes.get(0));
-			
+					
 		}else{
 			
 			Map<String,Object>	map = new HashMap<String, Object>(num*2);
@@ -1969,6 +1981,14 @@ MsgSyncHandler
 			for ( MsgSyncNode node: nodes ){
 				
 				String str = node.getContactAddress();
+				
+				if ( is_anonymous_chat ){
+					
+					// rate limit these addresses globally to reduce tunnel load, especially
+					// when running private chats on an already small chat.
+				
+					System.out.println( str );
+				}
 				
 				Object x = map.get( str );
 				
@@ -2217,7 +2237,7 @@ MsgSyncHandler
 				
 					// meh, issue with 'call' implementation when made to self - you end up getting the
 					// original request data back as the result :( Can't currently see how to easily fix
-					// this so handle it for the moment
+					// this so handle it for the moment. update - fixed so shouldn't be seeing this issue now
 				
 				removeNode( sync_node, true );
 				
@@ -2542,6 +2562,8 @@ MsgSyncHandler
 							
 						}else{
 							
+							msg.seen();
+							
 							messages_we_both_have ++;
 						}
 					}
@@ -2639,6 +2661,11 @@ MsgSyncHandler
 				if ( messages_they_have > messages_we_both_have ){
 					
 					// TODO: prioritize us hitting them to get this based on num missing prolly?
+					
+					// actually we should return our bloom to them, they can cache the bloom and if
+					// they find themselves hitting us withing (say) 60 seconds of receiving the bloom
+					// they can push some messages to us (helps deal with the case where they can talk
+					// to us but for some reason we can't talk to them
 					
 				}
 			}

@@ -40,6 +40,7 @@ MsgSyncMessage
 	private long			time_received;
 	
 	private int				delivery_count;
+	private int				seen_count;
 	
 	private String			error;
 	
@@ -160,6 +161,24 @@ MsgSyncMessage
 		synchronized( this ){
 		
 			delivery_count++;
+		}
+	}
+	
+	protected int
+	getSeenCount()
+	{
+		synchronized( this ){
+		
+			return( seen_count );
+		}
+	}
+	
+	protected void
+	seen()
+	{
+		synchronized( this ){
+		
+			seen_count++;
 		}
 	}
 	
