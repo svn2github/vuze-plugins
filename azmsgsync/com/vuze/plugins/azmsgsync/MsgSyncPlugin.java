@@ -225,7 +225,7 @@ MsgSyncPlugin
 			
 			for ( MsgSyncHandler handler: sync_handlers ){
 				
-				handler.destroy();
+				handler.destroy( true );
 			}
 			
 			sync_handlers.clear();
@@ -771,6 +771,6 @@ MsgSyncPlugin
 			sync_handlers.remove( handler );
 		}
 		
-		handler.destroy();
+		handler.destroy( false );
 	}
 }

@@ -51,7 +51,11 @@ import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.HashWrapper;
 import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.SHA1Simple;
+import org.gudy.azureus2.core3.util.SimpleTimer;
 import org.gudy.azureus2.core3.util.SystemTime;
+import org.gudy.azureus2.core3.util.TimerEvent;
+import org.gudy.azureus2.core3.util.TimerEventPerformer;
+import org.gudy.azureus2.core3.util.TimerEventPeriodic;
 import org.gudy.azureus2.plugins.ipc.IPCException;
 
 import com.aelitis.azureus.core.AzureusCoreFactory;
@@ -134,6 +138,7 @@ MsgSyncHandler
 	private boolean									checking_dht;
 	private long									last_dht_check;
 
+	private final boolean				is_private_chat;
 	private final boolean				is_anonymous_chat;
 	
 	private final PrivateKey			private_key;
@@ -243,6 +248,7 @@ MsgSyncHandler
 		dht				= _dht;
 		user_key		= _key;
 			
+		is_private_chat		= false;
 		is_anonymous_chat	= dht.getNetwork() != AENetworkClassifier.AT_PUBLIC;
 		
 		parent_handler		= null;
@@ -344,6 +350,7 @@ MsgSyncHandler
 		plugin			= _plugin;
 		dht				= _dht;
 		
+		is_private_chat		= true;
 		is_anonymous_chat	= dht.getNetwork() != AENetworkClassifier.AT_PUBLIC;
 
 		parent_handler	= _parent_handler;
@@ -1808,7 +1815,7 @@ MsgSyncHandler
 					
 					if ( !accepted ){
 						
-						chat_handler.destroy();						
+						chat_handler.destroy( true );						
 					}
 				}
 				
@@ -2778,14 +2785,78 @@ MsgSyncHandler
 		listeners.remove( listener );
 	}
 	
-	protected void
-	destroy()
+	private boolean
+	hasUndeliveredMessages()
 	{
-		destroyed	= true;
+		synchronized( message_lock ){
+			
+			for ( MsgSyncMessage msg: messages ){
+
+				if ( msg.getNode() == my_node && msg.getSeenCount() == 0 ){
+					
+					return( true );
+				}
+			}
+		}
 		
-		status = ST_DESTROYED;
+		return( false );
+	}
+	
+	protected void
+	destroy(
+		boolean	force_immediate )
+	{
+		boolean linger = is_private_chat && !force_immediate;
 		
-		dht.unregisterHandler( dht_listen_key, this );
+		if ( linger ){
+			
+			linger = hasUndeliveredMessages();
+		}
+		
+		if ( linger ){
+			
+			final long start = SystemTime.getMonotonousTime();
+			
+			final TimerEventPeriodic[] temp = { null };
+			
+			synchronized( temp ){
+				
+				temp[0] = 
+					SimpleTimer.addPeriodicEvent(
+						"mh:linger",
+						5*1000,
+						new TimerEventPerformer()
+						{	
+							@Override
+							public void 
+							perform(
+								TimerEvent event) 
+							{	
+								if ( SystemTime.getMonotonousTime() - start < 60*1000 ){
+									
+									if ( hasUndeliveredMessages()){
+										
+										return;
+									}
+								}
+								
+								synchronized( temp ){
+									
+									temp[0].cancel();
+								}
+								
+								destroy( true );
+							}
+						});
+			}
+		}else{
+			
+			destroyed	= true;
+			
+			status = ST_DESTROYED;
+			
+			dht.unregisterHandler( dht_listen_key, this );
+		}
 	}
 	
 	private void
