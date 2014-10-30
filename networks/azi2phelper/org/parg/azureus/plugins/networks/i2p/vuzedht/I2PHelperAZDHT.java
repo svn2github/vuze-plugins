@@ -149,7 +149,8 @@ I2PHelperAZDHT
 	public void
 	registerHandler(
 		byte[]							handler_key,
-		final DHTPluginTransferHandler	handler )
+		final DHTPluginTransferHandler	handler,
+		final Map<String,Object>		options )
 	{		
 		try{
 			DHTTransportTransferHandler h =	
@@ -190,7 +191,7 @@ I2PHelperAZDHT
 				}
 			}
 			
-			getDHT().getTransport().registerTransferHandler( handler_key, h );
+			getDHT().getTransport().registerTransferHandler( handler_key, h, options );
 
 		}catch( Throwable e ){
 			

@@ -129,6 +129,11 @@ MsgSyncHandler
 	private static final int STATUS_OK			= 1;
 	private static final int STATUS_LOOPBACK	= 2;
 	
+	private static final Map<String,Object>		xfer_options = new HashMap<String, Object>();
+	
+	static{
+		xfer_options.put( "disable_call_acks", true );
+	}
 	
 	private final MsgSyncPlugin						plugin;
 	private final DHTPluginInterface				dht;
@@ -328,7 +333,7 @@ MsgSyncHandler
 			dht_listen_key[i] ^= HANDLER_BASE_KEY_BYTES[i];
 		}
 		
-		dht.registerHandler( dht_listen_key, this );
+		dht.registerHandler( dht_listen_key, this, xfer_options );
 		
 		dht_call_key = dht_listen_key;
 		
@@ -406,7 +411,7 @@ MsgSyncHandler
 			}
 		}
 		
-		dht.registerHandler( dht_listen_key, this );
+		dht.registerHandler( dht_listen_key, this, xfer_options );
 	}
 		
 	protected MsgSyncPlugin

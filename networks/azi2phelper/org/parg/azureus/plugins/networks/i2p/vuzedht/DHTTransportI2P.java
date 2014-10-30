@@ -2289,6 +2289,14 @@ DHTTransportI2P
 		byte[]						handler_key,
 		DHTTransportTransferHandler	handler )
 	{
+	}
+	
+	public void
+	registerTransferHandler(
+		byte[]						handler_key,
+		DHTTransportTransferHandler	handler,
+		Map<String,Object>			options )
+	{
 		throw( new RuntimeException( "Not Supported" ));
 	}
 	

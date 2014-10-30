@@ -234,11 +234,12 @@ I2PHelperDHTPluginInterface
 	public void
 	registerHandler(
 		final byte[]					handler_key,
-		final DHTPluginTransferHandler	handler )
+		final DHTPluginTransferHandler	handler,
+		final Map<String,Object>		options )
 	{
 		if ( dht != null && dispatcher.getQueueSize() == 0 ){
 			
-			dht.registerHandler( handler_key, handler );
+			dht.registerHandler( handler_key, handler, options );
 		
 		}else{
 			
@@ -265,7 +266,7 @@ I2PHelperDHTPluginInterface
 						
 						if ( dht_to_use != null ){
 						
-							dht_to_use.registerHandler( handler_key, handler );
+							dht_to_use.registerHandler( handler_key, handler, options );
 							
 						}else{
 							

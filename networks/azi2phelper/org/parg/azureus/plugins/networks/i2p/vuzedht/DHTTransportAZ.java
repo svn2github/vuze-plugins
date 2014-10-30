@@ -1241,7 +1241,16 @@ DHTTransportAZ
 		byte[]						handler_key,
 		DHTTransportTransferHandler	handler )
 	{
-		xfer_handler.registerTransferHandler(handler_key, handler);
+		xfer_handler.registerTransferHandler( handler_key, handler );
+	}
+	
+	public void
+	registerTransferHandler(
+		byte[]						handler_key,
+		DHTTransportTransferHandler	handler,
+		Map<String,Object>			options )
+	{
+		xfer_handler.registerTransferHandler( handler_key, handler, options);
 	}
 	
 	public void
