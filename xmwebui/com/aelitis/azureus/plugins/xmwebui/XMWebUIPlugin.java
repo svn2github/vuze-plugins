@@ -3869,7 +3869,7 @@ XMWebUIPlugin
 				// magnetLink                  | number                      | n/a
 				// NOTE: I assume spec is wrong and it's a string..
 
-				value = UrlUtils.getMagnetURI(download.getName(), t);
+				value = UrlUtils.getMagnetURI(download);
 
 			} else if (field.equals("manualAnnounceTime")) {
 				// manualAnnounceTime          | number                      | tr_stat
