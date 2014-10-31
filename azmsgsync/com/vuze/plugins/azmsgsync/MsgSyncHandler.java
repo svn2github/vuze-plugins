@@ -111,6 +111,8 @@ MsgSyncHandler
 		HANDLER_BASE_KEY_BYTES = bytes;
 	}
 	
+	private static final byte[]	GENERAL_SECRET_RAND = {(byte)0x77,(byte)0x9a,(byte)0xb8,(byte)0xfd,(byte)0xe4,(byte)0x40,(byte)0x93,(byte)0x8d,(byte)0x58,(byte)0xad,(byte)0xf5,(byte)0xd4,(byte)0xa1,(byte)0x1b,(byte)0xe1,(byte)0xa8 };
+	
 	private static final int	RT_SYNC_REQUEST	= 0;
 	private static final int	RT_SYNC_REPLY	= 1;
 	private static final int	RT_DH_REQUEST	= 2;
@@ -224,21 +226,23 @@ MsgSyncHandler
 	
 	private long	last_not_delivered_reported;
 	
+	private static final boolean	GENERAL_CRYPTO_MIGRATION = true;
+	
+	private final byte[]	general_secret = new byte[16];
 	
 		// for private message handler:
 	
 	private final MsgSyncHandler			parent_handler;
-	private final byte[]					target_pk;
-	private final Map<String,Object>		target_contact;
-	private final MsgSyncNode				target_node;
+	private final byte[]					private_messaging_pk;
+	private final Map<String,Object>		private_messaging_contact;
+	private final MsgSyncNode				private_messaging_node;
 	
-	private volatile byte[]					target_secret;
-	private boolean							target_secret_getting;
-	private long							target_secret_getting_last;
-	private boolean							private_chat_fatal_error;
+	private volatile byte[]					private_messaging_secret;
+	private boolean							private_messaging_secret_getting;
+	private long							private_messaging_secret_getting_last;
+	private boolean							private_messaging_fatal_error;
 	
 	private Map<HashWrapper,Object[]>	secret_activities = new HashMap<HashWrapper,Object[]>();
-	
 	private BloomFilter					secret_activities_bloom = BloomFilterFactory.createAddRemove4Bit( 1024 );
 	
 	protected
@@ -257,9 +261,9 @@ MsgSyncHandler
 		is_anonymous_chat	= dht.getNetwork() != AENetworkClassifier.AT_PUBLIC;
 		
 		parent_handler		= null;
-		target_pk			= null;
-		target_contact		= null;
-		target_node			= null;
+		private_messaging_pk			= null;
+		private_messaging_contact		= null;
+		private_messaging_node			= null;
 		
 		String	config_key = CryptoManager.CRYPTO_CONFIG_PREFIX + "msgsync." + dht.getNetwork() + "." + ByteFormatter.encodeString( user_key );
 		
@@ -279,6 +283,16 @@ MsgSyncHandler
 			
 			config_updated = true;
 		}
+		
+		byte[] gs = GENERAL_SECRET_RAND.clone();
+		
+		for ( int i=0; i<user_key.length;i++ ){
+			gs[i%GENERAL_SECRET_RAND.length] ^= user_key[i];
+		}
+		
+		gs = new SHA1Simple().calculateHash( gs );
+		
+		System.arraycopy( gs, 0, general_secret, 0, general_secret.length );
 		
 		my_uid = _my_uid;
 		
@@ -359,9 +373,9 @@ MsgSyncHandler
 		is_anonymous_chat	= dht.getNetwork() != AENetworkClassifier.AT_PUBLIC;
 
 		parent_handler	= _parent_handler;
-		target_pk		= _target_pk;
-		target_contact	= _target_contact;
-		target_secret	= _shared_secret;
+		private_messaging_pk		= _target_pk;
+		private_messaging_contact	= _target_contact;
+		private_messaging_secret	= _shared_secret;
 		
 		if ( _user_key == null ){
 			
@@ -391,7 +405,7 @@ MsgSyncHandler
 			dht_listen_key[i] ^= HANDLER_BASE_KEY_BYTES[i];
 		}
 		
-		target_node = addNode( dht.importContact( target_contact ), new byte[0], target_pk );
+		private_messaging_node = addNode( dht.importContact( private_messaging_contact ), new byte[0], private_messaging_pk );
 				
 		dht_call_key = dht_listen_key.clone();
 		
@@ -707,9 +721,9 @@ MsgSyncHandler
 		
 		if ( parent_handler != null ){
 			
-			if ( target_secret == null ){
+			if ( private_messaging_secret == null ){
 				
-				if ( private_chat_fatal_error ){
+				if ( private_messaging_fatal_error ){
 					
 					return;
 				}
@@ -718,25 +732,25 @@ MsgSyncHandler
 					
 					reportError( "Parent chat destroyed!" );
 					
-					private_chat_fatal_error = true;
+					private_messaging_fatal_error = true;
 					
 					return;
 				}
 				
 				synchronized(  MsgSyncHandler.this ){
 					
-					if ( !target_secret_getting ){
+					if ( !private_messaging_secret_getting ){
 				
 						long now = SystemTime.getMonotonousTime();
 						
-						if ( now - target_secret_getting_last < 20*1000 ){
+						if ( now - private_messaging_secret_getting_last < 20*1000 ){
 							
 							return;
 						}
 						
-						target_secret_getting = true;
+						private_messaging_secret_getting = true;
 						
-						target_secret_getting_last	= now;
+						private_messaging_secret_getting_last	= now;
 						
 						reportInfo( "Connecting..." );
 						
@@ -749,9 +763,9 @@ MsgSyncHandler
 
 									try{
 										
-										target_secret = parent_handler.getSharedSecret( target_node, target_pk, user_key, fatal_error );
+										private_messaging_secret = parent_handler.getSharedSecret( private_messaging_node, private_messaging_pk, user_key, fatal_error );
 										
-										if ( target_secret != null ){
+										if ( private_messaging_secret != null ){
 											
 											reportInfo( "Private connection established" );	
 										}
@@ -759,7 +773,7 @@ MsgSyncHandler
 										
 										if ( fatal_error[0] ){
 											
-											private_chat_fatal_error = true;
+											private_messaging_fatal_error = true;
 										}
 										
 										reportError( e.getMessage());
@@ -768,7 +782,7 @@ MsgSyncHandler
 									
 									synchronized(  MsgSyncHandler.this ){
 										
-										target_secret_getting = false;
+										private_messaging_secret_getting = false;
 									}
 								}
 							}
@@ -962,7 +976,7 @@ MsgSyncHandler
 				
 					// don't remove private chat node
 				
-				if ( node == target_node ){
+				if ( node == private_messaging_node ){
 					
 					continue;
 				}
@@ -1551,6 +1565,71 @@ MsgSyncHandler
 		return( null );
 	}
 	
+	
+	private byte[]
+	generalMessageEncrypt(
+		byte[]	data )
+	{
+		try{
+			byte[] key = general_secret;
+							
+			SecretKeySpec secret = new SecretKeySpec( key, "AES");
+		
+			Cipher encipher = Cipher.getInstance("AES/CBC/PKCS5Padding" );
+					
+			encipher.init( Cipher.ENCRYPT_MODE, secret );
+					
+			AlgorithmParameters params = encipher.getParameters();
+					
+			byte[] IV = params.getParameterSpec(IvParameterSpec.class).getIV();
+					
+			byte[] enc = encipher.doFinal( data );
+		
+			byte[] rep_bytes = new byte[ IV.length + enc.length ];
+				
+			System.arraycopy( IV, 0, rep_bytes, 0, IV.length );
+			System.arraycopy( enc, 0, rep_bytes, IV.length, enc.length );
+			
+			return( rep_bytes );
+			
+		}catch( Throwable e ){
+			
+			Debug.out( e );
+			
+			return( null );
+		}
+	}
+	
+	private byte[]
+	generalMessageDecrypt(
+		byte[]	data )
+	{
+		try{
+			if ( data.length % 16 != 0 ){
+				
+				return( null );
+			}
+			
+			byte[] key = general_secret;
+								
+			SecretKeySpec secret = new SecretKeySpec( key, "AES");
+	
+			Cipher decipher = Cipher.getInstance ("AES/CBC/PKCS5Padding" );
+				
+			decipher.init(Cipher.DECRYPT_MODE, secret, new IvParameterSpec( data, 0, 16 ));
+	
+			byte[] result = decipher.doFinal( data, 16, data.length-16 );
+			
+			return( result );
+			
+		}catch( Throwable e ){
+			
+			Debug.out( e );
+			
+			return( null );
+		}
+	}
+	
 	private static final int AES_BYTES = 24;
 	
 	private byte[]
@@ -1581,11 +1660,11 @@ MsgSyncHandler
 	}
 	
 	private byte[]
-	encrypt(
+	privateMessageEncrypt(
 		byte[]	data )
 	{
 		try{
-			byte[] key = target_secret;
+			byte[] key = private_messaging_secret;
 			
 			if ( AES_BYTES == 16 ){
 				
@@ -1644,11 +1723,11 @@ MsgSyncHandler
 	}
 	
 	private byte[]
-	decrypt(
+	privateMessageDecrypt(
 		byte[]	data )
 	{
 		try{
-			byte[] key = target_secret;
+			byte[] key = private_messaging_secret;
 
 			if ( AES_BYTES == 16 ){
 								
@@ -1859,7 +1938,7 @@ MsgSyncHandler
 			
 			if ( parent_handler != null ){
 				
-				if ( target_secret == null ){
+				if ( private_messaging_secret == null ){
 								
 					return;
 				}
@@ -2253,9 +2332,16 @@ MsgSyncHandler
 		try{
 			byte[]	sync_data = BEncoder.encode( request_map );
 			
-			if ( target_secret != null ){
+			if ( private_messaging_secret != null ){
 				
-				sync_data = encrypt( sync_data );
+				sync_data = privateMessageEncrypt( sync_data );
+				
+			}else{
+				
+				if ( !GENERAL_CRYPTO_MIGRATION ){
+				
+					sync_data = generalMessageEncrypt( sync_data );
+				}
 			}
 			
 			byte[] reply_bytes = 
@@ -2278,18 +2364,25 @@ MsgSyncHandler
 					sync_data, 
 					30*1000 );
 		
-			if ( target_secret != null ){
+			if ( private_messaging_secret != null ){
 				
-				reply_bytes = decrypt( reply_bytes );
+				reply_bytes = privateMessageDecrypt( reply_bytes );
+				
+			}else{
+				
+				if ( !GENERAL_CRYPTO_MIGRATION ){
+				
+					reply_bytes = generalMessageDecrypt( reply_bytes );
+				}
 			}
-			
-			out_req_ok++;
-			
+						
 			if ( reply_bytes == null ){
 
 				throw( new Exception( "No reply" ));
 			}
 			
+			out_req_ok++;
+
 			Map<String,Object> reply_map = BDecoder.decode( reply_bytes );
 
 			int	type = reply_map.containsKey( "t" )?((Number)reply_map.get( "t" )).intValue():-1; 
@@ -2505,10 +2598,28 @@ MsgSyncHandler
 			
 			return( null );
 		}
+				
+		boolean skip_crypto = false;
 		
-		if ( target_secret != null ){
+		if ( private_messaging_secret != null ){
 			
-			key = decrypt( key );
+			key = privateMessageDecrypt( key );
+			
+		}else{
+			
+			if ( GENERAL_CRYPTO_MIGRATION && new String( key ).startsWith( "d1:bd6:" )){
+				
+				skip_crypto = true;
+				
+			}else{
+			
+				key = generalMessageDecrypt( key );
+			}
+		}
+		
+		if ( key == null ){
+			
+			return( null );
 		}
 		
 		try{
@@ -2749,9 +2860,16 @@ MsgSyncHandler
 			
 			byte[] reply_data = BEncoder.encode( reply_map );
 			
-			if ( target_secret != null ){
+			if ( private_messaging_secret != null ){
 				
-				reply_data = encrypt( reply_data );
+				reply_data = privateMessageEncrypt( reply_data );
+				
+			}else{
+				
+				if ( !skip_crypto ){
+				
+					reply_data = generalMessageEncrypt( reply_data );
+				}
 			}
 			
 			return( reply_data );
