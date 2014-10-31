@@ -45,6 +45,7 @@ import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.BEncoder;
+import org.gudy.azureus2.core3.util.Base32;
 import org.gudy.azureus2.core3.util.ByteArrayHashMap;
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
@@ -227,9 +228,12 @@ MsgSyncHandler
 	private long	last_not_delivered_reported;
 	
 	private static final boolean	GENERAL_CRYPTO_MIGRATION_INBOUND 	= true;
-	private static final boolean	GENERAL_CRYPTO_MIGRATION_OUTBOUND 	= true;
+	private static final boolean	GENERAL_CRYPTO_MIGRATION_OUTBOUND 	= false;
 	
 	private final byte[]	general_secret = new byte[16];
+	
+	private byte[]		managing_pk;
+	private boolean		managing_ro;
 	
 		// for private message handler:
 	
@@ -276,11 +280,83 @@ MsgSyncHandler
 		private_messaging_contact		= null;
 		private_messaging_node			= null;
 		
-		String	config_key = CryptoManager.CRYPTO_CONFIG_PREFIX + "msgsync." + dht.getNetwork() + "." + ByteFormatter.encodeString( user_key );
 		
 		boolean	config_updated = false;
-		
+
+		String	config_key = CryptoManager.CRYPTO_CONFIG_PREFIX + "msgsync." + dht.getNetwork() + "." + ByteFormatter.encodeString( user_key );
+
 		Map map = COConfigurationManager.getMapParameter( config_key, new HashMap());
+
+			// see if this is a related channel and shares keys
+					
+		try{
+			String str_key = new String( user_key, "UTF-8" );
+			
+			int	pos = str_key.indexOf( '[' );
+			
+			if ( pos != -1 && str_key.endsWith( "]" )){
+				
+				String	base_key	= str_key.substring( 0, pos );
+				
+				String	args_str = str_key.substring( pos+1, str_key.length() - 1 );
+				
+				String[] args = args_str.split( "&" );
+				
+				byte[] 	pk_arg 	= null;
+				boolean ro_arg	= false;
+				
+				for ( String arg_str: args ){
+					
+					String[] bits = arg_str.split( "=" );
+					
+					String lhs = bits[0];
+					String rhs = bits[1];
+					
+					if ( lhs.equals( "pk" )){
+						
+						pk_arg = Base32.decode( rhs );
+						
+					}else if ( lhs.equals( "ro" )){
+						
+						ro_arg = rhs.equals( "1" );
+					}
+				}
+				
+				if ( pk_arg != null ){
+					
+					managing_pk	= pk_arg;
+					managing_ro = ro_arg;
+					
+					String	related_config_key = CryptoManager.CRYPTO_CONFIG_PREFIX + "msgsync." + dht.getNetwork() + "." + ByteFormatter.encodeString( base_key.getBytes( "UTF-8" ));
+	
+					Map related_map = COConfigurationManager.getMapParameter( related_config_key, new HashMap());
+	
+					if ( related_map != null ){
+						
+						byte[]	related_pk = (byte[])related_map.get( "pub" );
+						
+							// this channel's public key matches our existing one
+						
+						if ( Arrays.equals( pk_arg, related_pk )){
+						
+							byte[] existing_pk = (byte[])map.get( "pub" );
+							
+							if ( existing_pk == null || !Arrays.equals( existing_pk, related_pk )){
+						
+									// inherit the keys
+								
+								map.put( "pub", related_pk );
+								map.put( "pri", related_map.get( "pri" ));
+								
+								config_updated = true;
+							}
+						}
+					}
+				}
+			}
+		}catch( Throwable e ){
+		}
+				
 		
 		byte[] _my_uid = (byte[])map.get( "uid" );
 		
@@ -316,7 +392,7 @@ MsgSyncHandler
 		if ( public_key_bytes != null && private_key_bytes != null ){
 		
 			try{
-				_public_key	= CryptoECCUtils.rawdataToPubkey( public_key_bytes );
+				_public_key		= CryptoECCUtils.rawdataToPubkey( public_key_bytes );
 				_private_key	= CryptoECCUtils.rawdataToPrivkey( private_key_bytes );
 				
 			}catch( Throwable e ){
@@ -1295,6 +1371,19 @@ MsgSyncHandler
 	{
 		MsgSyncMessage msg = new MsgSyncMessage( node, message_id, content, signature, age_secs );
 
+		if ( is_incoming ){
+		
+				// see if we have restarted and re-read our message from another node. If so
+				// then mark it as delivered
+			
+			if ( Arrays.equals( node.getPublicKey(), my_node.getPublicKey())){
+				
+				msg.delivered();
+
+				msg.seen();
+			}
+		}
+		
 		if ( is_incoming && opt_contact != null ){
 			
 				// see if this is a more up-to-date contact address for the contact
