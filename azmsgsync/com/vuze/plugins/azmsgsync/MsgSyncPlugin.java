@@ -619,6 +619,7 @@ MsgSyncPlugin
 
 		reply.put( "status", 		handler.getStatus());
 		reply.put( "dht_nodes", 	handler.getDHTCount());
+		reply.put( "node_est", 		handler.getLiveNodeEstimate());
 		
 		int[] node_counts = handler.getNodeCounts();
 		

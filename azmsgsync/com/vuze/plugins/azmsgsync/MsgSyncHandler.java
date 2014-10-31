@@ -246,6 +246,16 @@ MsgSyncHandler
 	private Map<HashWrapper,Object[]>	secret_activities = new HashMap<HashWrapper,Object[]>();
 	private BloomFilter					secret_activities_bloom = BloomFilterFactory.createAddRemove4Bit( 1024 );
 	
+	
+	private int LIVE_NODE_BLOOM_TIDY_PERIOD			= 60*1000;
+	private int	LIVE_NODE_BLOOM_TIDY_TICKS			= LIVE_NODE_BLOOM_TIDY_PERIOD / MsgSyncPlugin.TIMER_PERIOD;
+
+	private long			live_node_counter_bloom_start 	= SystemTime.getMonotonousTime();
+	private long			live_node_counter_last_new		= 0;
+	
+	private BloomFilter		live_node_counter_bloom = BloomFilterFactory.createAddOnly( 1000 );
+	private int				live_node_estimate;
+	
 	protected
 	MsgSyncHandler(
 		MsgSyncPlugin			_plugin,
@@ -547,6 +557,86 @@ MsgSyncHandler
 		return( user_key );
 	}
 
+	protected int
+	getLiveNodeEstimate()
+	{
+		return( live_node_estimate );
+	}
+	
+	private void
+	nodeIsAlive(
+		MsgSyncNode		node )
+	{
+		long now = SystemTime.getMonotonousTime();
+		
+		if ( live_node_counter_bloom.getEntryCount() >= 100 ){
+			
+				// too many to keep track beyond 100
+			
+			live_node_estimate = 100;
+			
+			live_node_counter_bloom.clear();
+			
+			live_node_counter_bloom_start = now;
+		}
+		
+		byte[] key = node.getContactAddress().getBytes();
+		
+		boolean present = live_node_counter_bloom.contains( key );
+		
+		if ( present ){
+			
+			
+				// not seen anything new recently, assume we've seen all there is
+			
+			if ( live_node_counter_last_new > 0 && now - live_node_counter_last_new > 2*60*1000 ){
+				
+				live_node_estimate = live_node_counter_bloom.getEntryCount();
+				
+				live_node_counter_bloom.clear();
+				
+				live_node_counter_bloom_start = now;
+				
+				live_node_counter_bloom.add( key );
+				
+				live_node_counter_last_new		= now;
+	
+			}
+		}else{
+			
+				// something new, update our current estimate if needed
+			
+			live_node_counter_bloom.add( key );
+			
+			live_node_counter_last_new = now;
+			
+			int hits = live_node_counter_bloom.getEntryCount();
+			
+			if ( hits > live_node_estimate ){
+				
+				live_node_estimate = hits;
+			}
+		}
+	}
+	
+	private void
+	checkLiveNodeBloom()
+	{		
+		long now = SystemTime.getMonotonousTime();
+
+		if ( 	( live_node_counter_last_new > 0 && now - live_node_counter_last_new >= 2*60*1000 ) ||
+				( now - live_node_counter_bloom_start >= 10*60*1000 )){
+			
+			int	entries = live_node_counter_bloom.getEntryCount();
+
+			live_node_estimate = entries;
+			
+			live_node_counter_bloom.clear();
+			
+			live_node_counter_bloom_start = now;
+		}
+	}
+		
 	private void
 	checkDHT(
 		final boolean	first_time )
@@ -993,6 +1083,11 @@ MsgSyncHandler
 				
 				checkDHT( false );
 			}
+		}
+		
+		if ( count % LIVE_NODE_BLOOM_TIDY_TICKS == 0 ){
+
+			checkLiveNodeBloom();
 		}
 		
 			// slower sync rate for anonymous, higher latency/cost 
@@ -2383,7 +2478,7 @@ MsgSyncHandler
 			}
 			
 			out_req_ok++;
-
+			
 			Map<String,Object> reply_map = BDecoder.decode( reply_bytes );
 
 			int	type = reply_map.containsKey( "t" )?((Number)reply_map.get( "t" )).intValue():-1; 
@@ -2410,6 +2505,8 @@ MsgSyncHandler
 					
 					sync_node.ok();
 					
+					nodeIsAlive( sync_node );
+
 					List<Map<String,Object>>	list = (List<Map<String,Object>>)reply_map.get( "m" );
 					
 					if ( list != null ){
@@ -2692,7 +2789,7 @@ MsgSyncHandler
 				
 				List<MsgSyncNode> caller_nodes = getNodes( uid );
 				
-				boolean found_originator = false;
+				MsgSyncNode originator_node = null;
 				
 				if ( caller_nodes != null ){
 					
@@ -2700,16 +2797,20 @@ MsgSyncHandler
 						
 						if ( sameContact( originator, n.getContact())){
 							
-							found_originator = true;
+							originator_node = n;
+							
+							break;
 						}
 					}
 				}
 				
-				if ( !found_originator ){
+				if ( originator_node == null  ){
 					
-					addNode( originator, uid, null );
+					originator_node = addNode( originator, uid, null );
 				}
 				
+				nodeIsAlive( originator_node );
+
 				BloomFilter bloom = BloomFilterFactory.deserialiseFromMap((Map<String,Object>)request_map.get("b"));
 								
 				List<MsgSyncMessage>	missing = new ArrayList<MsgSyncMessage>();
