@@ -226,7 +226,8 @@ MsgSyncHandler
 	
 	private long	last_not_delivered_reported;
 	
-	private static final boolean	GENERAL_CRYPTO_MIGRATION = true;
+	private static final boolean	GENERAL_CRYPTO_MIGRATION_INBOUND 	= true;
+	private static final boolean	GENERAL_CRYPTO_MIGRATION_OUTBOUND 	= true;
 	
 	private final byte[]	general_secret = new byte[16];
 	
@@ -2338,7 +2339,7 @@ MsgSyncHandler
 				
 			}else{
 				
-				if ( !GENERAL_CRYPTO_MIGRATION ){
+				if ( !GENERAL_CRYPTO_MIGRATION_OUTBOUND ){
 				
 					sync_data = generalMessageEncrypt( sync_data );
 				}
@@ -2370,7 +2371,7 @@ MsgSyncHandler
 				
 			}else{
 				
-				if ( !GENERAL_CRYPTO_MIGRATION ){
+				if ( !GENERAL_CRYPTO_MIGRATION_OUTBOUND ){
 				
 					reply_bytes = generalMessageDecrypt( reply_bytes );
 				}
@@ -2607,12 +2608,12 @@ MsgSyncHandler
 			
 		}else{
 			
-			if ( GENERAL_CRYPTO_MIGRATION && new String( key ).startsWith( "d1:bd6:" )){
+			if ( GENERAL_CRYPTO_MIGRATION_INBOUND && new String( key ).startsWith( "d1:" )){
 				
 				skip_crypto = true;
 				
 			}else{
-			
+							
 				key = generalMessageDecrypt( key );
 			}
 		}
