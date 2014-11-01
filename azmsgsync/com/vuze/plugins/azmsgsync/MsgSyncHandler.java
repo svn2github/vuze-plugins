@@ -227,7 +227,7 @@ MsgSyncHandler
 	
 	private long	last_not_delivered_reported;
 	
-	private static final boolean	GENERAL_CRYPTO_MIGRATION_INBOUND 	= true;
+	private static final boolean	GENERAL_CRYPTO_MIGRATION_INBOUND 	= false;
 	private static final boolean	GENERAL_CRYPTO_MIGRATION_OUTBOUND 	= false;
 	
 	private final byte[]	general_secret = new byte[16];
@@ -1373,6 +1373,14 @@ MsgSyncHandler
 	}
 	
 	private void
+	processManagementMessage(
+		MsgSyncMessage		message )
+	{
+		
+		System.out.println( "management message:" + message );
+	}
+	
+	private void
 	addMessage(
 		MsgSyncNode				node,
 		byte[]					message_id,
@@ -1384,8 +1392,20 @@ MsgSyncHandler
 	{
 		MsgSyncMessage msg = new MsgSyncMessage( node, message_id, content, signature, age_secs );
 
+		boolean management_message = managing_pk != null && Arrays.equals( node.getPublicKey(), managing_pk );
+		
 		if ( is_incoming ){
 		
+				// reject all messages in read only channels that aren't from the owner
+			
+			if ( managing_ro ){
+				
+				if ( !management_message ){
+					
+					return;
+				}				
+			}
+			
 				// see if we have restarted and re-read our message from another node. If so
 				// then mark it as delivered
 			
@@ -1395,6 +1415,11 @@ MsgSyncHandler
 
 				msg.seen();
 			}
+		}
+		
+		if ( management_message ){
+			
+			processManagementMessage( msg );
 		}
 		
 		if ( is_incoming && opt_contact != null ){
@@ -1792,7 +1817,7 @@ MsgSyncHandler
 			
 		}catch( Throwable e ){
 			
-			Debug.out( e );
+			// Debug.out( e );
 			
 			return( null );
 		}
@@ -1822,7 +1847,7 @@ MsgSyncHandler
 			
 		}catch( Throwable e ){
 			
-			Debug.out( e );
+			// Debug.out( e );
 			
 			return( null );
 		}
