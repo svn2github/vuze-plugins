@@ -420,6 +420,10 @@ MsgSyncPlugin
 		reply.put( "handler", handler );
 		
 		reply.put( "pk", handler.getPublicKey());
+		
+		reply.put( "mpk", handler.getManagingPublicKey());
+		
+		reply.put( "ro", handler.isReadOnly());
 
 		synchronized( this ){
 			

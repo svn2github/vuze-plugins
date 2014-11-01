@@ -552,6 +552,19 @@ MsgSyncHandler
 			return( null );
 		}
 	}
+	
+	public byte[]
+	getManagingPublicKey()
+	{
+		return( managing_pk );
+	}
+	
+	public boolean
+	isReadOnly()
+	{
+		return( managing_ro );
+	}
+	
 	public int
 	getDHTCount()
 	{
