@@ -30,6 +30,8 @@ import java.util.*;
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.AEThread2;
+import org.gudy.azureus2.core3.util.BDecoder;
+import org.gudy.azureus2.core3.util.BEncoder;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.SimpleTimer;
 import org.gudy.azureus2.core3.util.TimerEvent;
@@ -308,7 +310,7 @@ MsgSyncPlugin
 					
 					byte[]	key_bytes = key.getBytes( "UTF-8" );
 						
-					MsgSyncHandler handler = getSyncHandler( dht, key_bytes );
+					MsgSyncHandler handler = getSyncHandler( dht, key_bytes, new HashMap<String, Object>());
 						
 					log( "Got handler: " + handler.getString());
 					
@@ -407,7 +409,7 @@ MsgSyncPlugin
 			
 		}else{
 		
-			handler = getSyncHandler( dht, key );
+			handler = getSyncHandler( dht, key, options );
 		}
 		
 		Object listener = options.get( "listener" );
@@ -469,7 +471,9 @@ MsgSyncPlugin
 		Map<String,Object>	reply = new HashMap<String, Object>();
 
 		reply.put( "pk", handler.getPublicKey());
-		
+		reply.put( "mpk", handler.getManagingPublicKey());
+		reply.put( "ro", handler.isReadOnly());
+
 		return( reply );
 	}
 	
@@ -647,6 +651,81 @@ MsgSyncPlugin
 	}
 	
 	public Map<String,Object>
+	exportMessageHandler(
+		Map<String,Object>		options )
+		
+		throws IPCException
+	{
+		synchronized( this ){
+			
+			if ( !init_called ){
+				
+				throw( new IPCException( "Not initialised" ));
+			}
+		}
+				
+		MsgSyncHandler handler = (MsgSyncHandler)options.get( "handler" );
+	
+		Map<String,Object> map = handler.export();
+		
+		Map<String,Object>	reply = new HashMap<String, Object>();
+
+		try{
+			reply.put( "export_data", new String( BEncoder.encode( map ), "UTF-8" ));
+		
+			return( reply );
+			
+		}catch( Throwable e ){
+			
+			throw( new IPCException( e ));
+		}
+	}
+	
+	public Map<String,Object>
+	importMessageHandler(
+		Map<String,Object>		options )
+		
+		throws IPCException
+	{
+		byte[]	import_data = (byte[])options.get( "import_data" );
+		
+		if ( import_data == null ){
+			
+			throw( new IPCException( "import_data missing" ));
+		}
+		
+		try{
+			Map<String,Object>	map = BDecoder.decode( import_data );
+			
+			Object[] temp = MsgSyncHandler.extractKeyAndNetwork( map );
+			
+			byte[]		key 		= (byte[])temp[0];
+			String		network		= (String)temp[1];
+		
+			Map<String,Object>		add_options = new HashMap<String, Object>();
+			
+			add_options.put( "key", key );
+			add_options.put( "network", network );
+			add_options.put( "import_data", map );
+			
+			Map<String,Object> reply = getMessageHandler( add_options );
+			
+			reply.put( "key", key );
+			reply.put( "network", network );
+			
+			return( reply );
+			
+		}catch( IPCException e ){
+			
+			throw( e );
+			
+		}catch( Throwable e ){
+			
+			throw( new IPCException( e ));
+		}
+	}
+	
+	public Map<String,Object>
 	removeMessageHandler(
 		Map<String,Object>		options )
 		
@@ -702,7 +781,8 @@ MsgSyncPlugin
 	private MsgSyncHandler
 	getSyncHandler(
 		DHTPluginInterface		dht,
-		byte[]					key )
+		byte[]					key,
+		Map<String,Object>		options )
 		
 		throws IPCException
 	{
@@ -722,7 +802,18 @@ MsgSyncPlugin
 			}
 			
 			try{
-				MsgSyncHandler h = new MsgSyncHandler( this, dht, key );
+				Map<String,Object>	import_data = (Map<String,Object>)options.get( "import_data" );
+				
+				MsgSyncHandler h;
+				
+				if ( import_data == null ){
+					
+					h = new MsgSyncHandler( this, dht, key );
+					
+				}else{
+					
+					h = new MsgSyncHandler( this, dht, import_data );
+				}
 				
 				sync_handlers.add( h );
 				

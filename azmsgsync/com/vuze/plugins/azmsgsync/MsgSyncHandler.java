@@ -141,19 +141,19 @@ MsgSyncHandler
 	private final MsgSyncPlugin						plugin;
 	private final DHTPluginInterface				dht;
 	private final byte[]							user_key;
-	private final byte[]							dht_listen_key;
-	private final byte[]							dht_call_key;
+	private byte[]									dht_listen_key;
+	private byte[]									dht_call_key;
 	private boolean									checking_dht;
 	private long									last_dht_check;
 
 	private final boolean				is_private_chat;
 	private final boolean				is_anonymous_chat;
 	
-	private final PrivateKey			private_key;
-	private final PublicKey				public_key;
+	private PrivateKey			private_key;
+	private PublicKey			public_key;
 	
-	private final byte[]				my_uid;
-	private final MsgSyncNode			my_node;
+	private byte[]				my_uid;
+	private MsgSyncNode			my_node;
 	
 	private ByteArrayHashMap<List<MsgSyncNode>>		node_uid_map 		= new ByteArrayHashMap<List<MsgSyncNode>>();
 	private ByteArrayHashMap<MsgSyncNode>			node_uid_loopbacks	= new ByteArrayHashMap<MsgSyncNode>();
@@ -275,12 +275,19 @@ MsgSyncHandler
 		is_private_chat		= false;
 		is_anonymous_chat	= dht.getNetwork() != AENetworkClassifier.AT_PUBLIC;
 		
-		parent_handler		= null;
+		parent_handler					= null;
 		private_messaging_pk			= null;
 		private_messaging_contact		= null;
 		private_messaging_node			= null;
 		
-		
+		init();
+	}
+	
+	private void
+	init()
+	
+		throws Exception
+	{
 		boolean	config_updated = false;
 
 		String	config_key = CryptoManager.CRYPTO_CONFIG_PREFIX + "msgsync." + dht.getNetwork() + "." + ByteFormatter.encodeString( user_key );
@@ -459,7 +466,7 @@ MsgSyncHandler
 		is_private_chat		= true;
 		is_anonymous_chat	= dht.getNetwork() != AENetworkClassifier.AT_PUBLIC;
 
-		parent_handler	= _parent_handler;
+		parent_handler				= _parent_handler;
 		private_messaging_pk		= _target_pk;
 		private_messaging_contact	= _target_contact;
 		private_messaging_secret	= _shared_secret;
@@ -515,6 +522,121 @@ MsgSyncHandler
 		dht.registerHandler( dht_listen_key, this, xfer_options );
 	}
 		
+	protected
+	MsgSyncHandler(
+		MsgSyncPlugin			_plugin,
+		DHTPluginInterface		_dht,
+		Map<String,Object>		_data )
+		
+		throws Exception
+	{
+		plugin			= _plugin;
+		dht				= _dht;
+		user_key		= importB32Bytes( _data, "key" );
+			
+		is_private_chat		= false;
+		is_anonymous_chat	= dht.getNetwork() != AENetworkClassifier.AT_PUBLIC;
+		
+		parent_handler					= null;
+		private_messaging_pk			= null;
+		private_messaging_contact		= null;
+		private_messaging_node			= null;
+		
+		String	config_key = CryptoManager.CRYPTO_CONFIG_PREFIX + "msgsync." + dht.getNetwork() + "." + ByteFormatter.encodeString( user_key );
+
+		Map<String,Object>	config_map = new HashMap<String, Object>();
+		
+		config_map.put( "uid", importB32Bytes( _data, "uid" ));
+		config_map.put( "pub", importB32Bytes( _data, "pub" ));
+		config_map.put( "pri", importB32Bytes( _data, "pri" ));
+		
+		COConfigurationManager.setParameter( config_key, config_map );
+		
+		COConfigurationManager.setDirty();
+		
+		init();
+	}
+	
+	private static String
+	importString(
+		Map		map,
+		String	key )
+		
+		throws Exception
+	{
+		Object obj = map.get( key );
+		
+		String	str;
+		
+		if ( obj instanceof String ){
+		
+			str = (String)obj;
+			
+		}else if ( obj instanceof byte[] ){
+	
+			str = new String((byte[])obj, "UTF-8" );
+			
+		}else{
+			
+			str = null;
+		}
+		
+		return( str );
+	}
+	
+	private static byte[]
+	importB32Bytes(
+		Map		map,
+		String	key )
+		
+		throws Exception
+	{
+		String str = importString( map, key );
+		
+		return( Base32.decode( str ));
+	}
+	
+	private void
+	exportB32Bytes(
+		Map			map,
+		String		key,
+		byte[]		bytes )
+	{
+		map.put( key, Base32.encode( bytes ));
+	}
+	
+	public static Object[]
+	extractKeyAndNetwork(
+		Map<String,Object>		map )
+		
+		throws Exception
+	{
+		return( new Object[]{ importB32Bytes( map, "key" ), AENetworkClassifier.internalise( importString( map, "network" ))});
+	}
+		
+	public Map<String,Object>
+	export()
+	{
+		Map<String,Object>	result = new HashMap<String, Object>();
+		
+		exportB32Bytes( result, "key", user_key );
+		
+		result.put( "network", dht.getNetwork());
+		
+		exportB32Bytes( result, "uid", my_uid );
+		
+		try{
+			exportB32Bytes( result, "pub", CryptoECCUtils.keyToRawdata( public_key ));
+			exportB32Bytes( result, "pri", CryptoECCUtils.keyToRawdata( private_key ));
+		
+		}catch( Throwable e){
+			
+			Debug.out(e );
+		}
+		
+		return( result );
+	}
+	
 	protected MsgSyncPlugin
 	getPlugin()
 	{
