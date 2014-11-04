@@ -88,7 +88,7 @@ MsgSyncHandler
 	static{
 		if ( TEST_LOOPBACK_CHAT ){
 	
-			Debug.outNoStack( "Lookpach chate debug enabled, this BREAKS NON LOOPBACK CHAT!!!!");
+			Debug.outNoStack( "Loopback chat debug enabled, this BREAKS NON LOOPBACK CHAT!!!!");
 		}
 	}
 	
@@ -226,10 +226,7 @@ MsgSyncHandler
 	private volatile long send_last;
 	
 	private long	last_not_delivered_reported;
-	
-	private static final boolean	GENERAL_CRYPTO_MIGRATION_INBOUND 	= false;
-	private static final boolean	GENERAL_CRYPTO_MIGRATION_OUTBOUND 	= false;
-	
+		
 	private final byte[]	general_secret = new byte[16];
 	
 	private byte[]		managing_pk;
@@ -299,7 +296,7 @@ MsgSyncHandler
 		try{
 			String str_key = new String( user_key, "UTF-8" );
 			
-			int	pos = str_key.indexOf( '[' );
+			int	pos = str_key.lastIndexOf( '[' );
 			
 			if ( pos != -1 && str_key.endsWith( "]" )){
 				
@@ -2682,11 +2679,8 @@ MsgSyncHandler
 				sync_data = privateMessageEncrypt( sync_data );
 				
 			}else{
-				
-				if ( !GENERAL_CRYPTO_MIGRATION_OUTBOUND ){
-				
-					sync_data = generalMessageEncrypt( sync_data );
-				}
+								
+				sync_data = generalMessageEncrypt( sync_data );
 			}
 			
 			byte[] reply_bytes = 
@@ -2714,11 +2708,8 @@ MsgSyncHandler
 				reply_bytes = privateMessageDecrypt( reply_bytes );
 				
 			}else{
-				
-				if ( !GENERAL_CRYPTO_MIGRATION_OUTBOUND ){
-				
-					reply_bytes = generalMessageDecrypt( reply_bytes );
-				}
+								
+				reply_bytes = generalMessageDecrypt( reply_bytes );
 			}
 						
 			if ( reply_bytes == null ){
@@ -2945,23 +2936,14 @@ MsgSyncHandler
 			
 			return( null );
 		}
-				
-		boolean skip_crypto = false;
-		
+						
 		if ( private_messaging_secret != null ){
 			
 			key = privateMessageDecrypt( key );
 			
 		}else{
-			
-			if ( GENERAL_CRYPTO_MIGRATION_INBOUND && new String( key ).startsWith( "d1:" )){
-				
-				skip_crypto = true;
-				
-			}else{
 							
-				key = generalMessageDecrypt( key );
-			}
+			key = generalMessageDecrypt( key );
 		}
 		
 		if ( key == null ){
@@ -3216,11 +3198,8 @@ MsgSyncHandler
 				reply_data = privateMessageEncrypt( reply_data );
 				
 			}else{
-				
-				if ( !skip_crypto ){
-				
-					reply_data = generalMessageEncrypt( reply_data );
-				}
+								
+				reply_data = generalMessageEncrypt( reply_data );
 			}
 			
 			return( reply_data );

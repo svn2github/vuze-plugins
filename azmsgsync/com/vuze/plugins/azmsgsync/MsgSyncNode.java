@@ -35,7 +35,7 @@ MsgSyncNode
 	private byte[]					uid;
 	private byte[]					public_key;
 	
-	private String			contact_str;
+	private volatile String			contact_str;
 	
 	private volatile long	last_alive;
 	private volatile int	fail_count;
@@ -51,8 +51,6 @@ MsgSyncNode
 		contact		= _contact;
 		uid			= _uid;
 		public_key	= _public_key;
-		
-		contact_str = MsgSyncHandler.getString( contact );
 	}
 	
 	protected boolean
@@ -69,8 +67,6 @@ MsgSyncNode
 	
 			contact			= _contact;
 			public_key		= _public_key;
-			
-			contact_str = MsgSyncHandler.getString( contact );
 			
 			return( true );
 		}
@@ -146,12 +142,21 @@ MsgSyncNode
 	public String
 	getContactAddress()
 	{
+		if ( contact_str != null ){
+			
+			return( contact_str );
+		}
+		
+			//  this can block for a while in the case of anonymous DHT that hasn't initialised, so delay getting it
+		
+		contact_str = MsgSyncHandler.getString( contact );
+		
 		return( contact_str );
 	}
 	
 	public String
 	getName()
 	{
-		return( contact_str );
+		return(getContactAddress());
 	}
 }
