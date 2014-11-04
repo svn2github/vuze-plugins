@@ -1787,7 +1787,9 @@ MsgSyncHandler
 			request_map.put( "k", keys );
 			
 			byte[]	request_data = BEncoder.encode( request_map );
-						
+				
+			request_data = generalMessageEncrypt( request_data );
+			
 			byte[] reply_bytes = 
 				target_node.getContact().call(
 					new DHTPluginProgressListener() {
@@ -1807,6 +1809,8 @@ MsgSyncHandler
 					dht_call_key,
 					request_data, 
 					30*1000 );
+			
+			reply_bytes = generalMessageDecrypt( reply_bytes );
 			
 			Map<String,Object> reply_map = BDecoder.decode( reply_bytes );
 
@@ -1866,6 +1870,8 @@ MsgSyncHandler
 				
 				request_data = BEncoder.encode( request_map );
 
+				request_data = generalMessageEncrypt( request_data );
+
 				reply_bytes = 
 						target_node.getContact().call(
 							new DHTPluginProgressListener() {
@@ -1886,6 +1892,8 @@ MsgSyncHandler
 							request_data, 
 							30*1000 );
 				
+				reply_bytes = generalMessageDecrypt( reply_bytes );
+
 				reply_map = BDecoder.decode( reply_bytes );
 				
 				if ( reply_map.containsKey( "error" )){
@@ -2964,7 +2972,11 @@ MsgSyncHandler
 				
 				reply_map.put( "t", RT_DH_REPLY );
 				
-				return( BEncoder.encode( reply_map ));
+				byte[] reply_bytes = BEncoder.encode( reply_map );
+				
+				reply_bytes = generalMessageEncrypt( reply_bytes );
+
+				return( reply_bytes );
 			}
 			
 			if ( type != RT_SYNC_REQUEST ){
