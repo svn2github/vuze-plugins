@@ -32,6 +32,7 @@ import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.SystemTime;
 import org.parg.azureus.plugins.networks.i2p.snarkdht.NodeInfo;
+import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTTransportI2P.AZRequestResult;
 
 import com.aelitis.azureus.core.dht.DHT;
 import com.aelitis.azureus.core.dht.DHTLogger;
@@ -790,6 +791,8 @@ DHTTransportAZ
 		DHTTransportContactAZ		contact,
 		Map<String,Object>			payload )
 	{
+		stats.dataReceived();
+
 		// System.out.println( "Received " + payload );
 		
 		if ( TRACE ) trace( "AZ: receiveData from " + contact.getString());
@@ -1139,7 +1142,7 @@ DHTTransportAZ
 		stats.total_bytes_received += length;
 	}
 	
-	public Map<String,Object>
+	public AZRequestResult
 	receiveRequest(
 		DHTTransportContactI2P		contact,
 		Map<String,Object>			payload_in )
@@ -1169,6 +1172,8 @@ DHTTransportAZ
 		
 		DHTTransportContactAZ az_contact = new DHTTransportContactAZ( this, contact );
 		
+		boolean	adhoc = true;
+		
 		switch( method ){
 			case METHOD_PING:{
 				payload_out = receivePing( az_contact, payload_in );
@@ -1188,6 +1193,7 @@ DHTTransportAZ
 			}
 			case METHOD_DATA:{
 				payload_out = receiveData( az_contact, payload_in );
+				adhoc = false;
 				break;
 			}
 
@@ -1203,10 +1209,38 @@ DHTTransportAZ
 			payload_out.put( "_f", (int)getGenericFlags());
 		}
 		
-		return( payload_out );
+		return( new AZRequestResultImpl(payload_out, adhoc));
 	}
 
-
+	private final class
+	AZRequestResultImpl
+		implements AZRequestResult
+	{
+		private final Map<String,Object>		payload;
+		private final boolean					adhoc;
+		
+		private
+		AZRequestResultImpl(
+			 Map<String,Object>		_payload,
+			 boolean				_adhoc )
+		{
+			payload		= _payload;
+			adhoc		= _adhoc;
+		}
+		
+		public Map<String,Object>
+		getReply()
+		{
+			return( payload );
+		}
+		
+		public boolean
+		isAdHoc()
+		{
+			return( adhoc );
+		}
+	}
+	
 	public DHTTransportContactAZ
 	importContact(
 		InetSocketAddress		address )

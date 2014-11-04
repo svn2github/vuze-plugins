@@ -741,7 +741,7 @@ DHTTransportI2P
 		
 		map.put("r", resps);
 		
-		sendResponse( originator, message_id, map );
+		sendResponse( originator, message_id, map, true );
 	}
 	   
 	protected boolean
@@ -982,7 +982,7 @@ DHTTransportI2P
 	        
 			resps.put( "nodes", nodes );
 			
-			sendResponse( originator, message_id, map );
+			sendResponse( originator, message_id, map, true );
 		}
 	}
 	
@@ -1222,7 +1222,7 @@ DHTTransportI2P
 			
 			if ( TRACE ) trace( "    findValue->" + map);
 	
-			sendResponse( originator, message_id, map );
+			sendResponse( originator, message_id, map, true );
 		}
 	}
 	
@@ -1492,7 +1492,7 @@ DHTTransportI2P
 		
 		map.put( "r", resps);
 		
-		sendResponse( originator, message_id, map );
+		sendResponse( originator, message_id, map, true );
 	}
 	
 	
@@ -1619,9 +1619,9 @@ DHTTransportI2P
 			originator.setRandomID2( token_in );
 		}
 		
-		Map<String, Object>	payload_out = az_request_handler.receiveRequest( originator, payload_in );
+		AZRequestResult	result = az_request_handler.receiveRequest( originator, payload_in );
 				
-		if ( payload_out != null ){
+		if ( result != null ){
 			
 				// dispatch reply
 			
@@ -1641,9 +1641,11 @@ DHTTransportI2P
 				}
 			}
 			
+			Map<String, Object> payload_out = result.getReply();
+			
 			resps.put( "p", payload_out );
 			
-			int sent = sendResponse( originator, message_id, map );
+			int sent = sendResponse( originator, message_id, map, result.isAdHoc());
 			
 			az_request_handler.packetSent( sent );
 		}
@@ -1840,7 +1842,9 @@ DHTTransportI2P
 	    boolean	ok = false;
 	    
 	    try{
-	    	int res = sendMessage( dest, port, map, rpc_type );
+	    		// override sleeping is used for data requests so we assume they are not adhoc
+	    	
+	    	int res = sendMessage( dest, port, map, rpc_type, !override_sleeping );
 	    	
 	    	ok	= true;
 	    	
@@ -1866,7 +1870,8 @@ DHTTransportI2P
     sendResponse(
     	DHTTransportContactI2P 		originator, 
     	byte[]						message_id, 
-    	Map							map )
+    	Map							map,
+    	boolean						adhoc )
     	
     	throws Exception
     {
@@ -1891,7 +1896,7 @@ DHTTransportI2P
         
         encodeVersion( resps );
         
-        return( sendMessage( dest, node.getPort() + 1, map, RPC_TYPE_UNREPLIABLE ));
+        return( sendMessage( dest, node.getPort() + 1, map, RPC_TYPE_UNREPLIABLE, adhoc ));
     }
     
     private void
@@ -1918,7 +1923,8 @@ DHTTransportI2P
     	Destination 			dest, 
     	int 					toPort, 
     	Map					 	map, 
-    	int		 				rpc_type ) 
+    	int		 				rpc_type,
+    	boolean					adhoc )
     	
     	throws Exception
     {
@@ -1945,9 +1951,11 @@ DHTTransportI2P
         
         opts.setDate( SystemTime.getCurrentTime() + 60*1000);
         
-        // advised to just use defaults
-        //opts.setTagsToSend(SEND_CRYPTO_TAGS);       
-        //opts.setTagThreshold(LOW_CRYPTO_TAGS);
+        if ( adhoc ){
+        
+        	opts.setTagsToSend(SEND_CRYPTO_TAGS);       
+        	opts.setTagThreshold(LOW_CRYPTO_TAGS);
+        }
         
         if ( rpc_type == RPC_TYPE_UNREPLIABLE ){
         	
@@ -2654,12 +2662,22 @@ DHTTransportI2P
 		packetReceived(
 			int		length );
 		
-		public Map<String,Object>
+		public AZRequestResult
 		receiveRequest(
 			DHTTransportContactI2P		contact,
 			Map<String,Object>			args )
 			
 			throws Exception;
+	}
+	
+	public interface
+	AZRequestResult
+	{
+		public Map<String,Object>
+		getReply();
+		
+		public boolean
+		isAdHoc();
 	}
 	
 	public interface

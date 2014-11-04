@@ -152,8 +152,9 @@ I2PHelperPlugin
 {	
 	/*
 	 *	Router: commented out System.setProperties for timezone, http agent etc in static initialiser
-	 *	RoutingKeyGenerator: (patch integrated in 0.9.13, yay!) Fixed up SimpleDateFormat as it assumes GMT (TimeZone default used within SimpleDateFormat)
-	 *    	private final static SimpleDateFormat _fmt = new SimpleDateFormat(FORMAT, Locale.UK);
+	 
+	 	RoutingKeyGenerator: (patch integrated in 0.9.13, yay!) Fixed up SimpleDateFormat as it assumes GMT (TimeZone default used within SimpleDateFormat)
+	     	private final static SimpleDateFormat _fmt = new SimpleDateFormat(FORMAT, Locale.UK);
     		static{
     			_fmt.setCalendar( _cal );	 // PARG
     		}
@@ -167,8 +168,14 @@ I2PHelperPlugin
         	}
         	
         CoreVersion: Added a getVersion method to avoid constant getting cached within Vuze when printing it
-        
+            public static String
+		    getVersion()
+		    {
+		    	return( VERSION );
+		    }
+		    
         UDPReceiver - hacked in a sleep(1000) after detection of exception on reading socket to avoid 100% CPU issue
+        // 0.9.16 has some core changes to hopefully prevent this, so no hack required!
 	*/
 	
 	private static final String	BOOTSTRAP_SERVER = "http://i2pboot.vuze.com:60000/?getNodes=true";
