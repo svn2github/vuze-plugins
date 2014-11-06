@@ -72,8 +72,22 @@ public class Plugin implements org.gudy.azureus2.plugins.Plugin {
 		config.addBooleanParameter2("AutoStartManual", "RSSFeed.Config.AutoStartManual", true);
 		config.addIntParameter2("KeepOld", "RSSFeed.Config.KeepOld", 2);
 		config.addIntParameter2("KeepMax", "RSSFeed.Config.KeepMax", 1000);
-		config.addBooleanParameter2("ForceNoProxy", "RSSFeed.Config.ForceNoProxy", false);
+		final BooleanParameter fnp = config.addBooleanParameter2("ForceNoProxy", "RSSFeed.Config.ForceNoProxy", false);
+		final BooleanParameter tpp = config.addBooleanParameter2("TryPluginProxy", "RSSFeed.Config.TryPluginProxy", false);
+			
+		ParameterListener proxy_listener = 
+			new ParameterListener() {
 				
+				public void parameterChanged(Parameter param) {		
+					tpp.setEnabled( !fnp.getValue());
+				}
+			};
+			
+		fnp.addListener( proxy_listener );
+		tpp.addListener( proxy_listener );
+		
+		proxy_listener.parameterChanged( null );
+		
 		ActionParameter export_param = config.addActionParameter2(  "RSSFeed.Config.export.info", "RSSFeed.Config.export.label" );
 		
 		export_param.addListener(
@@ -283,6 +297,29 @@ public class Plugin implements org.gudy.azureus2.plugins.Plugin {
     pluginInterface.getPluginconfig().setPluginParameter(name, value);
   }
 
+  public static final int PROXY_DEFAULT		= 0;
+  public static final int PROXY_FORCE_NONE	= 1;
+  public static final int PROXY_TRY_PLUGIN	= 2;
+  
+  public static int
+  getProxyOption()
+  {
+	  if ( Plugin.getBooleanParameter( "ForceNoProxy")){
+		  
+		  return( PROXY_FORCE_NONE );
+	  }else{
+		  
+		  if ( Plugin.getBooleanParameter( "TryPluginProxy")){
+
+			  return( PROXY_TRY_PLUGIN );
+			  
+		  }else{
+			  
+			  return( PROXY_DEFAULT );
+		  }
+	  }
+  }
+  
   public static PluginInterface
   getPluginInterface()
   {

@@ -22,7 +22,9 @@ package org.kmallan.azureus.rssfeed;
 import javax.swing.text.html.*;
 import javax.swing.text.MutableAttributeSet;
 
+import com.aelitis.azureus.core.proxy.AEProxyFactory;
 import com.aelitis.azureus.core.proxy.AEProxySelectorFactory;
+import com.aelitis.azureus.core.proxy.AEProxyFactory.PluginProxy;
 
 import java.util.*;
 import java.net.*;
@@ -152,7 +154,7 @@ public class HtmlAnalyzer extends HTMLEditorKit.ParserCallback implements Runnab
       int count = 1;
       for(Iterator iter = hrefs.iterator(); iter.hasNext(); ) {
         href = (String)iter.next();
-        if(isHrefTorrent(href, Plugin.getBooleanParameter( "ForceNoProxy"))) {
+        if(isHrefTorrent(href)) {
           torrentUrl = href;
           Plugin.debugOut("found torrent: " + href);
           break;
@@ -178,16 +180,48 @@ public class HtmlAnalyzer extends HTMLEditorKit.ParserCallback implements Runnab
    * @param href
    * @return
    */
-  private boolean isHrefTorrent(String href, boolean forceNoProxy) {
+  private boolean isHrefTorrent(String _href) {
+    int proxy_opt = Plugin.getProxyOption();
+
+    PluginProxy	plugin_proxy = null;
+    
     try {
-      if ( forceNoProxy ){
+      URL 	url 		= new URL( _href );
+      URL	initial_url	= url;
+      Proxy	proxy		= null;
+      
+      if ( proxy_opt == Plugin.PROXY_FORCE_NONE ){
     		
     	AEProxySelectorFactory.getSelector().startNoProxy();
+    	
+      }else if ( proxy_opt == Plugin.PROXY_TRY_PLUGIN ){
+    	  
+		plugin_proxy = AEProxyFactory.getPluginProxy( "RSSFeed plugin", url );
+
+		if ( plugin_proxy != null ){
+			
+			url 	= plugin_proxy.getURL();
+			proxy	= plugin_proxy.getProxy();
+		}
       }
       
-      URLConnection conn = new URL(href).openConnection();
+      URLConnection conn;
+      
+      if ( proxy == null ){
+    	  
+    	  conn = url.openConnection();
+    	  
+      }else{
+    	  
+    	  conn = url.openConnection( proxy );
+      }
       
       if(conn instanceof HttpURLConnection) {
+		if ( plugin_proxy != null ){
+				
+			conn.setRequestProperty( "HOST", plugin_proxy.getURLHostRewrite() + (initial_url.getPort()==-1?"":(":" + initial_url.getPort())));
+		}
+
         ((HttpURLConnection)conn).setRequestMethod("HEAD");
         String cookie = listBean.getFeed().getCookie();
         if(cookie != null && cookie.length() > 0) conn.setRequestProperty("Cookie", cookie);
@@ -195,7 +229,7 @@ public class HtmlAnalyzer extends HTMLEditorKit.ParserCallback implements Runnab
         String ct = conn.getContentType();
         ((HttpURLConnection)conn).disconnect();
         if(ct != null) {
-          Plugin.debugOut("href: " + href + " -> " + ct);
+          Plugin.debugOut("href: " + _href + " -> " + ct);
           return ct.toLowerCase().startsWith("application/x-bittorrent");
         }
       }
@@ -203,9 +237,13 @@ public class HtmlAnalyzer extends HTMLEditorKit.ParserCallback implements Runnab
       e.printStackTrace();
     }finally{
     	
-      if ( forceNoProxy ){
+      if ( proxy_opt == Plugin.PROXY_FORCE_NONE ){
     		
     	AEProxySelectorFactory.getSelector().endNoProxy();
+    	
+      }else if ( plugin_proxy != null ){
+    	
+    	  plugin_proxy.setOK( true );
       }
     }
     return false;

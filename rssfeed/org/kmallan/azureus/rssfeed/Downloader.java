@@ -22,10 +22,12 @@ package org.kmallan.azureus.rssfeed;
 
 import org.gudy.azureus2.core3.util.Constants;
 
-import com.aelitis.azureus.core.proxy.AEProxySelector;
+import com.aelitis.azureus.core.proxy.AEProxyFactory;
+import com.aelitis.azureus.core.proxy.AEProxyFactory.PluginProxy;
 import com.aelitis.azureus.core.proxy.AEProxySelectorFactory;
 
 import javax.net.ssl.*;
+
 import java.io.*;
 import java.net.*;
 import java.util.*;
@@ -39,7 +41,8 @@ public class Downloader extends InputStream {
   final static int DOWNLOADER_DOWNLOADING = 3, DOWNLOADER_FINISHED = 4, DOWNLOADER_CANCELED = 5;
   final static int DOWNLOADER_NOTMODIFIED = 6, DOWNLOADER_CHECKING = 7, DOWNLOADER_ERROR = -1;
 
-  private URL url;
+  private String target_url_str;
+  
   private URLConnection con;
 
   private int state = DOWNLOADER_NON_INIT;
@@ -131,193 +134,244 @@ public class Downloader extends InputStream {
     testDownload(url);
   }
 */
-  public void init(String urlStr, boolean forceNoProxy, String accept, String referer, String cookie, long lastModSince, String oldEtag) {
+  public void init(String _urlStr, String accept, String referer, String cookie, long lastModSince, String oldEtag) {
 
-	boolean is_magnet = urlStr.toLowerCase().startsWith( "magnet:" );
-	
-	if ( !is_magnet ){
-	    Pattern exprHost = Pattern.compile(".*(https?://.*?)", Pattern.CASE_INSENSITIVE);
-	    Matcher m = exprHost.matcher(urlStr);
-	    if(m.matches() && !m.group(1).equalsIgnoreCase(urlStr)) urlStr = m.group(1);
-	}
-	
-    urlStr = urlStr.replaceAll(" ", "%20");
+	  int proxy_opt = Plugin.getProxyOption();
 
-    try {
-    	if ( forceNoProxy ){
-    		
-    		AEProxySelectorFactory.getSelector().startNoProxy();
-    	}
-      synchronized(listeners) {
-        url = new URL(urlStr);
+	  boolean is_magnet = _urlStr.toLowerCase().startsWith( "magnet:" );
 
-        for (int i=0;i<2;i++){
-          try{
-        
-	        if(url.getProtocol().equalsIgnoreCase("https")) {
-	          HttpsURLConnection sslCon = (HttpsURLConnection)url.openConnection();
-	          
-	          // allow for certs that contain IP addresses rather than dns names
-	          sslCon.setHostnameVerifier(new HostnameVerifier() {
-	            public boolean verify(String host, SSLSession session) {return true;}
-	          });
-	          con = sslCon;
-	        } else {
-	        
-	          con = url.openConnection();
-	        }
-	
-	        con.setDoInput(true);
-	        con.setUseCaches(false);
-	
-	        if(con instanceof HttpURLConnection) {
-	          if ( !is_magnet ){
-	        	  Pattern exprHost = Pattern.compile("https?://([^/]+@)?([^/@:]+)(:[0-9]+)?/.*");
-	        	  Matcher m = exprHost.matcher(urlStr.toLowerCase());
-	        	  if(m.matches()) con.setRequestProperty("Host", m.group(2)); // isn't this handled automatically? /bow
-	          }
-	          con.setRequestProperty("User-Agent", Plugin.PLUGIN_VERSION);
-	          if(referer != null && referer.length() > 0) con.setRequestProperty("Referer", referer);
-	          if(accept != null && accept.length() > 0) con.setRequestProperty("Accept", accept);
-	          if(cookie != null && cookie.length() > 0) con.setRequestProperty("Cookie", cookie);
-	          if(lastModSince > 0) con.setIfModifiedSince(lastModSince);
-	          if(oldEtag != null) con.setRequestProperty("If-None-Match", oldEtag);
-	        }
-	
-	        state = DOWNLOADER_INIT;
-	        fireDownloaderUpdate(state, 0, 0, "");
-	
-	        con.connect();        
-	
-	        if(con instanceof HttpURLConnection) {
-	          int response = ((HttpURLConnection)con).getResponseCode();
-	          Plugin.debugOut("response code: " + response);
-	
-	          if(response == -1) { // HttpURLConnection in undefined state? weird stuff... occurs sporadically
-	            Thread.sleep(10000); // waiting and trying again seems to do the trick
-	            if(refCount++ < 5) {
-	              init(urlStr, forceNoProxy,accept, referer, cookie, lastModSince, oldEtag);
-	              return;
-	            }
-	          }
-	
-	          String refresh = con.getHeaderField("Refresh");
-	          if(refresh != null) {
-	            Plugin.debugOut("refresh: " + refresh);
-	            int idx = refresh.indexOf("url=");
-	            if(idx > -1) {
-	              refresh = refresh.substring(idx + 4);
-	              if(refresh.indexOf(' ') > -1) refresh = refresh.substring(0, refresh.lastIndexOf(' '));
-	              ((HttpURLConnection)con).disconnect();
-	              if(refresh.indexOf("://") == -1) refresh = HtmlAnalyzer.resolveRelativeURL(urlStr, refresh);
-	              Plugin.debugOut("new url: " + refresh);
-	              if(refCount++ < 3) init(refresh, forceNoProxy,accept, referer, cookie, lastModSince, oldEtag);
-	            }
-	          }
-	
-	          if(response == HttpURLConnection.HTTP_NOT_MODIFIED) {
-	            state = DOWNLOADER_NOTMODIFIED;
-	            return;
-	          } else if((response != HttpURLConnection.HTTP_ACCEPTED) && (response != HttpURLConnection.HTTP_OK)) {
-	            error("Bad response for '" + url.toString() + "': " + Integer.toString(response) + " " + ((HttpURLConnection)con).getResponseMessage());
-	            return;
-	          }
-	          contentType = con.getContentType();
-	          lastModified = con.getLastModified();
-	          etag = con.getHeaderField("ETag");
-	          url = con.getURL();
-	
-	          // some code to handle b0rked servers.
-	          fileName = con.getHeaderField("Content-Disposition");
-	          if((fileName != null) && fileName.toLowerCase().matches(".*attachment.*"))
-	            while(fileName.toLowerCase().charAt(0) != 'a') fileName = fileName.substring(1);
-	          if((fileName == null) || !fileName.toLowerCase().startsWith("attachment") || (fileName.indexOf('=') == -1)) {
-	            String tmp = url.getFile();
-	            if(tmp.lastIndexOf('/') != -1) tmp = tmp.substring(tmp.lastIndexOf('/') + 1);
-	            // remove any params in the url
-	            int paramPos = tmp.indexOf('?');
-	            if(paramPos != -1) tmp = tmp.substring(0, paramPos);
-	
-	            fileName = URLDecoder.decode(tmp, Constants.DEFAULT_ENCODING);
-	          } else {
-	            fileName = fileName.substring(fileName.indexOf('=') + 1);
-	            if(fileName.startsWith("\"") && fileName.endsWith("\"")) fileName = fileName.substring(1, fileName.lastIndexOf('\"'));
-	            File temp = new File(fileName);
-	            fileName = temp.getName();
-	          }
-	        }
-	        
-	        break;
-          }catch( SSLException e ){
-        	  
-        	  if ( i == 0 ){
-        		  
-        		  Plugin.getPluginInterface().getUtilities().getSecurityManager().installServerCertificate( url );
-        		  
-        	  }else{
-        		  
-        		  throw( e );
-        	  }
-          }
-        }
+	  if ( !is_magnet ){
+		  Pattern exprHost = Pattern.compile(".*(https?://.*?)", Pattern.CASE_INSENSITIVE);
+		  Matcher m = exprHost.matcher(_urlStr);
+		  if(m.matches() && !m.group(1).equalsIgnoreCase(_urlStr)) _urlStr = m.group(1);
+	  }
 
-      }
-    } catch(java.net.MalformedURLException e) {
-      e.printStackTrace();
-      error("Bad URL '" + url + "':" + e.getMessage());
-    } catch(java.net.UnknownHostException e) {
-      e.printStackTrace();
-      error("Unknown Host '" + e.getMessage() + "'");
-    } catch(IOException ioe) {
-      ioe.printStackTrace();
-      error("Failed: " + ioe.getMessage());
-    } catch(Throwable e) {
-      e.printStackTrace();
-      error("Failed: " + e.toString());
-    }finally{
-    	
-    	if ( forceNoProxy ){
-    		
-    		AEProxySelectorFactory.getSelector().endNoProxy();
-    	}
-    }
+	  target_url_str = _urlStr.replaceAll(" ", "%20");
 
-    if(state != DOWNLOADER_ERROR) {
-      synchronized(listeners) {
-        state = DOWNLOADER_START;
-        fireDownloaderUpdate(state, 0, 0, "");
-        state = DOWNLOADER_DOWNLOADING;
-        fireDownloaderUpdate(state, 0, 0, "");
-      }
-      try {
-        in = con.getInputStream();
-        
-        String encoding = con.getHeaderField( "content-encoding");
+	  try {
+		  URL target_url = new URL(target_url_str);
 
-        boolean compressed = false;
-        
-        if ( encoding != null ){
+		  if ( proxy_opt == Plugin.PROXY_FORCE_NONE ){
 
-        	if ( encoding.equalsIgnoreCase( "gzip"  )){
+			  AEProxySelectorFactory.getSelector().startNoProxy();
+		  }
+		  
+		  synchronized( listeners ){
 
-        		compressed = true;
+			  for (int i=0;i<2;i++){
+				  
+				  PluginProxy plugin_proxy = null;
+				  
+				  URL	url			= target_url;
+				  URL	initial_url	= url;
+				  
+				  try{
+				      Proxy	proxy		= null;
 
-        		in = new GZIPInputStream( in );
+					  if ( proxy_opt == Plugin.PROXY_TRY_PLUGIN ){
 
-        	}else if ( encoding.equalsIgnoreCase( "deflate" )){
+						  plugin_proxy = AEProxyFactory.getPluginProxy( "RSSFeed plugin", url );
+	
+						  if ( plugin_proxy != null ){
+	
+							  url 	= plugin_proxy.getURL();
+							  proxy	= plugin_proxy.getProxy();
+						  }
+					  }
+					  
+					  if (url.getProtocol().equalsIgnoreCase("https")) {
+						  
+						  HttpsURLConnection sslCon;
+						  
+						  if ( proxy == null ){
+							  
+							  sslCon = (HttpsURLConnection)url.openConnection();
+							  
+						  }else{
+							  
+							  sslCon = (HttpsURLConnection)url.openConnection( proxy );
+						  }
 
-        		compressed = true;
+						  // allow for certs that contain IP addresses rather than dns names
+						  sslCon.setHostnameVerifier(new HostnameVerifier() {
+							  public boolean verify(String host, SSLSession session) {return true;}
+						  });
+						  con = sslCon;
+						  
+					  } else {
+						  if ( proxy == null ){
+						  
+							  con = url.openConnection();
+							  
+						  }else{
+							  
+							  con = url.openConnection( proxy );
+						  }
+					  }
 
-        		in = new InflaterInputStream( in );
-        	}
-        }
-			
-        size = compressed?-1:con.getContentLength();
-        percentDone = readTotal = 0;
-      } catch(Exception e) {
-        error("Exception while downloading '" + url.toString() + "':" + e.getMessage());
-      }
-    }
+					  con.setDoInput(true);
+					  con.setUseCaches(false);
+
+					  if(con instanceof HttpURLConnection) {
+						  if ( !is_magnet ){
+							  Pattern exprHost = Pattern.compile("https?://([^/]+@)?([^/@:]+)(:[0-9]+)?/.*");
+							  Matcher m = exprHost.matcher(target_url_str.toLowerCase());
+							  if(m.matches()) con.setRequestProperty("Host", m.group(2)); // isn't this handled automatically? /bow
+						  }
+						  con.setRequestProperty("User-Agent", Plugin.PLUGIN_VERSION);
+						  if(referer != null && referer.length() > 0) con.setRequestProperty("Referer", referer);
+						  if(accept != null && accept.length() > 0) con.setRequestProperty("Accept", accept);
+						  if(cookie != null && cookie.length() > 0) con.setRequestProperty("Cookie", cookie);
+						  if(lastModSince > 0) con.setIfModifiedSince(lastModSince);
+						  if(oldEtag != null) con.setRequestProperty("If-None-Match", oldEtag);
+						  
+						  if ( plugin_proxy != null ){
+								
+							con.setRequestProperty( "HOST", plugin_proxy.getURLHostRewrite() + (initial_url.getPort()==-1?"":(":" + initial_url.getPort())));
+						  }
+					  }
+
+					  state = DOWNLOADER_INIT;
+					  fireDownloaderUpdate(state, 0, 0, "");
+
+					  con.connect();        
+
+					  if(con instanceof HttpURLConnection) {
+						  int response = ((HttpURLConnection)con).getResponseCode();
+						  Plugin.debugOut("response code: " + response);
+
+						  if(response == -1) { // HttpURLConnection in undefined state? weird stuff... occurs sporadically
+							  Thread.sleep(10000); // waiting and trying again seems to do the trick
+							  if(refCount++ < 5) {
+								  init(_urlStr, accept, referer, cookie, lastModSince, oldEtag);
+								  return;
+							  }
+						  }
+
+						  String refresh = con.getHeaderField("Refresh");
+						  if(refresh != null) {
+							  Plugin.debugOut("refresh: " + refresh);
+							  int idx = refresh.indexOf("url=");
+							  if(idx > -1) {
+								  refresh = refresh.substring(idx + 4);
+								  if(refresh.indexOf(' ') > -1) refresh = refresh.substring(0, refresh.lastIndexOf(' '));
+								  ((HttpURLConnection)con).disconnect();
+								  if(refresh.indexOf("://") == -1) refresh = HtmlAnalyzer.resolveRelativeURL(target_url_str, refresh);
+								  Plugin.debugOut("new url: " + refresh);
+								  if(refCount++ < 3) init(refresh, accept, referer, cookie, lastModSince, oldEtag);
+							  }
+						  }
+
+						  if(response == HttpURLConnection.HTTP_NOT_MODIFIED) {
+							  state = DOWNLOADER_NOTMODIFIED;
+							  return;
+						  } else if((response != HttpURLConnection.HTTP_ACCEPTED) && (response != HttpURLConnection.HTTP_OK)) {
+							  error("Bad response for '" + url.toString() + "': " + Integer.toString(response) + " " + ((HttpURLConnection)con).getResponseMessage());
+							  return;
+						  }
+						  contentType = con.getContentType();
+						  lastModified = con.getLastModified();
+						  etag = con.getHeaderField("ETag");
+						  
+						  url = con.getURL();
+
+						  // some code to handle b0rked servers.
+						  fileName = con.getHeaderField("Content-Disposition");
+						  if((fileName != null) && fileName.toLowerCase().matches(".*attachment.*"))
+							  while(fileName.toLowerCase().charAt(0) != 'a') fileName = fileName.substring(1);
+						  if((fileName == null) || !fileName.toLowerCase().startsWith("attachment") || (fileName.indexOf('=') == -1)) {
+							  String tmp = url.getFile();
+							  if(tmp.lastIndexOf('/') != -1) tmp = tmp.substring(tmp.lastIndexOf('/') + 1);
+							  // remove any params in the url
+							  int paramPos = tmp.indexOf('?');
+							  if(paramPos != -1) tmp = tmp.substring(0, paramPos);
+
+							  fileName = URLDecoder.decode(tmp, Constants.DEFAULT_ENCODING);
+						  } else {
+							  fileName = fileName.substring(fileName.indexOf('=') + 1);
+							  if(fileName.startsWith("\"") && fileName.endsWith("\"")) fileName = fileName.substring(1, fileName.lastIndexOf('\"'));
+							  File temp = new File(fileName);
+							  fileName = temp.getName();
+						  }
+					  }
+
+					  break;
+				  }catch( SSLException e ){
+
+					  if ( i == 0 ){
+
+						  Plugin.getPluginInterface().getUtilities().getSecurityManager().installServerCertificate( url );
+
+					  }else{
+
+						  throw( e );
+					  }
+				  }finally{
+				 
+					  if ( plugin_proxy != null ){
+
+						  plugin_proxy.setOK( true );
+					  }
+				  }
+			  }
+
+		  }
+	  } catch(java.net.MalformedURLException e) {
+		  e.printStackTrace();
+		  error("Bad URL '" + target_url_str + "':" + e.getMessage());
+	  } catch(java.net.UnknownHostException e) {
+		  e.printStackTrace();
+		  error("Unknown Host '" + e.getMessage() + "'");
+	  } catch(IOException ioe) {
+		  ioe.printStackTrace();
+		  error("Failed: " + ioe.getMessage());
+	  } catch(Throwable e) {
+		  e.printStackTrace();
+		  error("Failed: " + e.toString());
+	  }finally{
+
+		  if ( proxy_opt == Plugin.PROXY_FORCE_NONE ){
+
+			  AEProxySelectorFactory.getSelector().endNoProxy();
+		  }
+	  }
+
+	  if(state != DOWNLOADER_ERROR) {
+		  synchronized(listeners) {
+			  state = DOWNLOADER_START;
+			  fireDownloaderUpdate(state, 0, 0, "");
+			  state = DOWNLOADER_DOWNLOADING;
+			  fireDownloaderUpdate(state, 0, 0, "");
+		  }
+		  try {
+			  in = con.getInputStream();
+
+			  String encoding = con.getHeaderField( "content-encoding");
+
+			  boolean compressed = false;
+
+			  if ( encoding != null ){
+
+				  if ( encoding.equalsIgnoreCase( "gzip"  )){
+
+					  compressed = true;
+
+					  in = new GZIPInputStream( in );
+
+				  }else if ( encoding.equalsIgnoreCase( "deflate" )){
+
+					  compressed = true;
+
+					  in = new InflaterInputStream( in );
+				  }
+			  }
+
+			  size = compressed?-1:con.getContentLength();
+			  percentDone = readTotal = 0;
+		  } catch(Exception e) {
+			  error("Exception while downloading '" + target_url_str + "':" + e.getMessage());
+		  }
+	  }
   }
 
   public InputStream getStream() {
@@ -336,7 +390,7 @@ public class Downloader extends InputStream {
     if(state == DOWNLOADER_ERROR || state == DOWNLOADER_CANCELED || state == DOWNLOADER_FINISHED) return;
     synchronized(listeners) {
       if(state != DOWNLOADER_NOTMODIFIED && readTotal == 0) {
-        error("No data contained in '" + url.toString() + "'");
+        error("No data contained in '" + target_url_str + "'");
         return;
       }
       state = DOWNLOADER_FINISHED;
@@ -354,12 +408,17 @@ public class Downloader extends InputStream {
 
   protected void finalize() {
     try {
-      in.close();
+    	InputStream _in = in;
+    	
+    	if ( _in != null ){
+    		_in.close();
+    	}
     } catch(Throwable e) {}
     
     try{
-    	if ( con instanceof HttpURLConnection ){
-    		((HttpURLConnection)con).disconnect();
+    	URLConnection _con = con;
+    	if ( _con instanceof HttpURLConnection ){
+    		((HttpURLConnection)_con).disconnect();
     		
     	}
     }catch( Throwable e ){}
