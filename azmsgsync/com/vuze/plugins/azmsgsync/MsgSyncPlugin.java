@@ -248,6 +248,21 @@ MsgSyncPlugin
 		}
 	}
 	
+	protected String
+	getMessageText(
+		String		key,
+		String...	args )
+	{
+		if ( args == null || args.length == 0 ){
+			
+			return( loc_utils.getLocalisedMessageText( key ));
+			
+		}else{
+			
+			return( loc_utils.getLocalisedMessageText( key, args ));
+		}
+	}
+	
 	private void
 	setUnloadable(
 		boolean	b )
@@ -515,9 +530,9 @@ MsgSyncPlugin
 							
 							map.put( "id", msg_id );
 							
-							if ( message.getStatus() != MsgSyncMessage.ST_OK ){
+							if ( message.getMessageType() != MsgSyncMessage.ST_NORMAL_MESSAGE ){
 								
-								map.put( "error", message.getError());
+								map.put( "error", message.getLocalMessage());
 							}
 							
 							mesasge_callback.invoke( listener, map );

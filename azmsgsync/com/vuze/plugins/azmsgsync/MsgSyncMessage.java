@@ -27,8 +27,8 @@ import org.gudy.azureus2.core3.util.SystemTime;
 public class 
 MsgSyncMessage 
 {
-	public static final int ST_OK			= 1;
-	public static final int ST_ERROR		= 2;
+	public static final int ST_NORMAL_MESSAGE	= 1;
+	public static final int ST_LOCAL_MESSAGE	= 2;
 	
 	private MsgSyncNode		node;
 	private byte[]			message_id;
@@ -42,7 +42,7 @@ MsgSyncMessage
 	private int				delivery_count;
 	private int				seen_count;
 	
-	private String			error;
+	private String			local_msg;
 	
 	protected
 	MsgSyncMessage(
@@ -68,7 +68,7 @@ MsgSyncMessage
 			
 			content = new byte[0];
 			
-			setError( "Message rejected - too large (max bytes=" + MsgSyncHandler.MAX_MESSAGE_SIZE + ")" );
+			setLocalMessage( "Message rejected - too large (max bytes=" + MsgSyncHandler.MAX_MESSAGE_SIZE + ")" );
 		}
 	}
 	
@@ -77,7 +77,7 @@ MsgSyncMessage
 		MsgSyncNode		_node,
 		byte[]			_message_id,
 		byte[]			_signature,
-		String			_error )
+		String			_local_msg )
 	{
 		node		= _node;
 		message_id	= _message_id;
@@ -87,26 +87,26 @@ MsgSyncMessage
 		age_when_received_secs	= 0;
 		time_received			= SystemTime.getCurrentTime();
 		
-		error	= _error;
+		local_msg	= _local_msg;
 	}
 	
 	public int
-	getStatus()
+	getMessageType()
 	{
-		return( error==null?ST_OK:ST_ERROR );
+		return( local_msg==null?ST_NORMAL_MESSAGE:ST_LOCAL_MESSAGE );
 	}
 	
 	public String
-	getError()
+	getLocalMessage()
 	{
-		return( error );
+		return( local_msg );
 	}
 	
 	protected void
-	setError(
-		String		_error )
+	setLocalMessage(
+		String		_local_msg )
 	{ 
-		error	= _error;
+		local_msg	= _local_msg;
 	}
 	
 	public MsgSyncNode

@@ -146,6 +146,8 @@ MsgSyncHandler
 	private boolean									checking_dht;
 	private long									last_dht_check;
 
+	private String						friendly_name = "";
+
 	private final boolean				is_private_chat;
 	private final boolean				is_anonymous_chat;
 	
@@ -292,7 +294,7 @@ MsgSyncHandler
 		Map map = COConfigurationManager.getMapParameter( config_key, new HashMap());
 
 			// see if this is a related channel and shares keys
-					
+							
 		try{
 			String str_key = new String( user_key, "UTF-8" );
 			
@@ -301,6 +303,8 @@ MsgSyncHandler
 			if ( pos != -1 && str_key.endsWith( "]" )){
 				
 				String	base_key	= str_key.substring( 0, pos );
+				
+				friendly_name = base_key.trim();
 				
 				String	args_str = str_key.substring( pos+1, str_key.length() - 1 );
 				
@@ -357,6 +361,9 @@ MsgSyncHandler
 						}
 					}
 				}
+			}else{
+				
+				friendly_name = str_key;
 			}
 		}catch( Throwable e ){
 		}
@@ -743,7 +750,7 @@ MsgSyncHandler
 
 			for ( MsgSyncMessage msg: messages ){
 				
-				if ( msg.getStatus() == MsgSyncMessage.ST_OK ){
+				if ( msg.getMessageType() == MsgSyncMessage.ST_NORMAL_MESSAGE ){
 					
 					result.add( msg );
 				}
@@ -1029,7 +1036,7 @@ MsgSyncHandler
 				
 				if ( parent_handler.destroyed ){
 					
-					reportError( "Parent chat destroyed!" );
+					reportErrorText( "azmsgsync.report.pchat.destroyed" );
 					
 					private_messaging_fatal_error = true;
 					
@@ -1051,7 +1058,7 @@ MsgSyncHandler
 						
 						private_messaging_secret_getting_last	= now;
 						
-						reportInfo( "Connecting..." );
+						reportInfoText( "azmsgsync.report.connecting" );
 						
 						new AEThread2( "MsgSyncHandler:getsecret"){
 							
@@ -1066,7 +1073,7 @@ MsgSyncHandler
 										
 										if ( private_messaging_secret != null ){
 											
-											reportInfo( "Private connection established" );	
+											reportInfoText( "azmsgsync.report.connected" );	
 										}
 									}catch( IPCException e ){
 										
@@ -1075,7 +1082,7 @@ MsgSyncHandler
 											private_messaging_fatal_error = true;
 										}
 										
-										reportError( e.getMessage());
+										reportErrorRaw( e.getMessage());
 									}
 								}finally{
 									
@@ -1148,7 +1155,7 @@ MsgSyncHandler
 						
 						last_not_delivered_reported = not_delivered_count;
 						
-						reportInfo( not_delivered_count + " message(s) not delivered yet" );
+						reportInfoText( "azmsgsync.report.not.delivered", String.valueOf( not_delivered_count ));
 						
 					}else{
 						
@@ -1156,7 +1163,7 @@ MsgSyncHandler
 							
 							last_not_delivered_reported = 0;
 							
-							reportInfo( "All messages delivered" );
+							reportInfoText( "azmsgsync.report.all.delivered" );
 						}
 					}
 				}
@@ -1566,7 +1573,7 @@ MsgSyncHandler
 		int					age_secs,
 		boolean				is_incoming )
 	{				
-		if ( msg.getStatus() == MsgSyncMessage.ST_OK || is_incoming ){
+		if ( msg.getMessageType() == MsgSyncMessage.ST_NORMAL_MESSAGE || is_incoming ){
 			
 				// remember message if is it valid or it is incoming - latter is to 
 				// prevent an invalid incoming message from being replayed over and over
@@ -1627,7 +1634,7 @@ MsgSyncHandler
 			}
 		}
 		
-		if ( msg.getStatus() == MsgSyncMessage.ST_OK || !is_incoming ){
+		if ( msg.getMessageType() == MsgSyncMessage.ST_NORMAL_MESSAGE || !is_incoming ){
 			
 				// we want to deliver any local error responses back to the caller but not
 				// incoming messages that are errors as these are maintained for house
@@ -1677,22 +1684,48 @@ MsgSyncHandler
 	}
 	
 	private void
-	reportInfo(
-		String		error )
+	reportInfoText(
+		MsgSyncListener		listener,
+		String				resource_key,
+		String...			args )
 	{
-		reportSupport( "i:" + error );
+		reportSupport( listener, "i:" + plugin.getMessageText( resource_key, args ));
 	}
 	
 	private void
-	reportError(
+	reportInfoText(
+		String		resource_key,
+		String...	args )
+	{
+		reportSupport( null, "i:" + plugin.getMessageText( resource_key, args ));
+	}
+	
+	private void
+	reportInfoRaw(
 		String		error )
 	{
-		reportSupport( "e:" + error );
+		reportSupport( null, "i:" + error );
+	}
+	
+	private void
+	reportErrorText(
+		String		resource_key,
+		String...	args )
+	{
+		reportSupport( null, "e:" + plugin.getMessageText( resource_key, args ));
+	}
+	
+	private void
+	reportErrorRaw(
+		String		error )
+	{
+		reportSupport( null, "e:" + error );
 	}
 	
 	private void
 	reportSupport(
-		String		error )
+		MsgSyncListener		opt_listener,
+		String				str )
 	{
 		try{
 			Signature sig = CryptoECCUtils.getSignature( private_key );
@@ -1706,9 +1739,24 @@ MsgSyncHandler
 			
 			byte[]	sig_bytes = sig.sign();
 			
-			MsgSyncMessage msg = new MsgSyncMessage( my_node, message_id, sig_bytes, error  );
+			MsgSyncMessage msg = new MsgSyncMessage( my_node, message_id, sig_bytes, str  );
 			
-			addMessage( msg, 0, false );
+			if ( opt_listener == null ){
+				
+				for ( MsgSyncListener l: listeners ){
+					
+					try{
+						l.messageReceived( msg );
+						
+					}catch( Throwable e ){
+						
+						Debug.out( e );
+					}
+				}
+			}else{
+				
+				opt_listener.messageReceived( msg );
+			}
 			
 		}catch( Throwable e ){
 			
@@ -2239,7 +2287,7 @@ MsgSyncHandler
 							
 						if ( nick != null ){
 							
-							chat_handler.reportInfo( "Private connection established to '" + nick + "'" );
+							chat_handler.reportInfoText( "azmsgsync.report.connected.to", nick );
 						}
 						
 						accepted = true;
@@ -2777,7 +2825,7 @@ MsgSyncHandler
 								
 								Map<String,Object>		contact_map		= (Map<String,Object>)m.get( "k" );
 																
-								log( "Message: " + ByteFormatter.encodeString( message_id ) + ": " + new String( content ) + ", age=" + age );
+									//log( "Message: " + ByteFormatter.encodeString( message_id ) + ": " + new String( content ) + ", age=" + age );
 																
 								boolean handled = false;
 								
@@ -3105,9 +3153,9 @@ MsgSyncHandler
 										
 					for ( MsgSyncMessage message: missing ){
 
-						if ( message.getStatus() != MsgSyncMessage.ST_OK ){
+						if ( message.getMessageType() != MsgSyncMessage.ST_NORMAL_MESSAGE ){
 							
-								// invalid message, don't propagate
+								// local/invalid message, don't propagate
 						
 							continue;
 						}
@@ -3241,6 +3289,11 @@ MsgSyncHandler
 		MsgSyncListener		listener )
 	{
 		listeners.add( listener );
+		
+		if ( !is_private_chat ){
+		
+			reportInfoText( listener, "azmsgsync.report.joined", friendly_name );
+		}
 	}
 	
 	public void
