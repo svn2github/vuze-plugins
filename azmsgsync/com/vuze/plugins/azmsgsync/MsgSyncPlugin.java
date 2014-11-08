@@ -28,8 +28,10 @@ import java.lang.reflect.Method;
 import java.util.*;
 
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
+import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.AEThread2;
+import org.gudy.azureus2.core3.util.AsyncDispatcher;
 import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.BEncoder;
 import org.gudy.azureus2.core3.util.Debug;
@@ -492,6 +494,9 @@ MsgSyncPlugin
 		return( reply );
 	}
 	
+	private AsyncDispatcher	msg_dispatcher_pub 	= new AsyncDispatcher( "MsgSyncPlugin:msgdisp" );
+	private AsyncDispatcher	msg_dispatcher_anon = new AsyncDispatcher( "MsgSyncPlugin:msgdisp" );
+	
 	private void
 	addListener(
 		final MsgSyncHandler		handler,
@@ -509,38 +514,52 @@ MsgSyncPlugin
 					@Override
 					public void 
 					messageReceived(
-						MsgSyncMessage message ) 
+						final MsgSyncMessage message ) 
 					{
-						try{
-							Map<String,Object> map = new HashMap<String, Object>();
-							
-							map.put( "content", message.getContent());
-							map.put( "age", message.getAgeSecs());
-							map.put( "pk", message.getNode().getPublicKey());
-							map.put( "address", message.getNode().getContact().getAddress());
-							map.put( "contact", message.getNode().getContact().exportToMap());
-							
-								// as a public ID we use the start of the signature 
-							
-							byte[]	sig = message.getSignature();
-							
-							byte[] 	msg_id = new byte[12];
-							
-							System.arraycopy( sig, 0, msg_id, 0, msg_id.length );
-							
-							map.put( "id", msg_id );
-							
-							if ( message.getMessageType() != MsgSyncMessage.ST_NORMAL_MESSAGE ){
+							// don't block things, in particular the message.getNode().getContact() can
+							// block when DHTs are initialising...
+						
+						AsyncDispatcher dispatcher = handler.getDHT().getNetwork()==AENetworkClassifier.AT_PUBLIC?msg_dispatcher_pub:msg_dispatcher_anon;
+						
+						dispatcher.dispatch(
+							new AERunnable() {
 								
-								map.put( "error", message.getLocalMessage());
-							}
-							
-							mesasge_callback.invoke( listener, map );
-							
-						}catch( Throwable e ){
-							
-							Debug.out( e );
-						}
+								@Override
+								public void 
+								runSupport() 
+								{
+									try{
+										Map<String,Object> map = new HashMap<String, Object>();
+										
+										map.put( "content", message.getContent());
+										map.put( "age", message.getAgeSecs());
+										map.put( "pk", message.getNode().getPublicKey());
+										map.put( "address", message.getNode().getContact().getAddress());
+										map.put( "contact", message.getNode().getContact().exportToMap());
+										
+											// as a public ID we use the start of the signature 
+										
+										byte[]	sig = message.getSignature();
+										
+										byte[] 	msg_id = new byte[12];
+										
+										System.arraycopy( sig, 0, msg_id, 0, msg_id.length );
+										
+										map.put( "id", msg_id );
+										
+										if ( message.getMessageType() != MsgSyncMessage.ST_NORMAL_MESSAGE ){
+											
+											map.put( "error", message.getLocalMessage());
+										}
+										
+										mesasge_callback.invoke( listener, map );
+										
+									}catch( Throwable e ){
+										
+										Debug.out( e );
+									}
+								}
+							});
 					}
 					
 					public String
