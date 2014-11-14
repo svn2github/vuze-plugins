@@ -130,15 +130,16 @@ DHTTransportI2P
 	private static final int RPC_TYPE_ONE_WAY			= 2;
 	private static final int RPC_TYPE_UNREPLIABLE		= 3;
 
-	private I2PSession					session;
-	private NodeInfo					my_node;
-	private int							query_port;
-	private int							reply_port;
-	private NID							my_nid;
+	private final DHTI2PAdapter			adapter;
+	private final I2PSession			session;
+	private final NodeInfo				my_node;
+	private final int					query_port;
+	private final int					reply_port;
+	private final NID					my_nid;
 	
-	private DHTTransportStatsI2P		stats;
+	private final DHTTransportStatsI2P		stats;
 	
-	private DHTTransportContactI2P		local_contact;
+	private final DHTTransportContactI2P		local_contact;
 	
 	private DHTTransportRequestHandler	request_handler;
 	private AZRequestHandler			az_request_handler;
@@ -169,10 +170,12 @@ DHTTransportI2P
 	
 	protected
 	DHTTransportI2P(
+		DHTI2PAdapter	_dht_adapter,
 		I2PSession 		_session,
 		NodeInfo		_my_node,
 		int				_request_timeout )
 	{
+		adapter			= _dht_adapter;
 		session 		= _session;
 		my_node			= _my_node;
 		request_timeout	= _request_timeout;
@@ -623,7 +626,7 @@ DHTTransportI2P
 	        final AESemaphore sem = new AESemaphore( "i2p:wait" );
 	        
 	        sendQuery( 
-	        	new ReplyHandlerAdapter()
+	        	new ReplyHandlerAdapter( null )
 	        	{
 	        		@Override
 	        		public void 
@@ -680,7 +683,7 @@ DHTTransportI2P
 	        map.put( "a", args );
 	        
 	        sendQuery( 
-	        	new ReplyHandlerAdapter()
+	        	new ReplyHandlerAdapter( contact )
 	        	{
 	        		@Override
 	        		public void 
@@ -767,7 +770,7 @@ DHTTransportI2P
 	        final AESemaphore sem = new AESemaphore( "i2p:wait" );
 	        
 	        sendQuery( 
-	        	new ReplyHandlerAdapter()
+	        	new ReplyHandlerAdapter( null )
 	        	{
 	        		@Override
 	        		public void 
@@ -885,7 +888,7 @@ DHTTransportI2P
 		        args.put( "target", target );
 		        
 		        sendQuery( 
-		        	new ReplyHandlerAdapter()
+		        	new ReplyHandlerAdapter( contact )
 		        	{
 		        		@Override
 		        		public void 
@@ -1016,7 +1019,7 @@ DHTTransportI2P
 	        }
 	        
 	        sendQuery( 
-	        	new ReplyHandlerAdapter()
+	        	new ReplyHandlerAdapter( contact )
 	        	{
 	        		@Override
 	        		public void 
@@ -1406,7 +1409,7 @@ DHTTransportI2P
 						args.put( "seed", new Long(seed?1:0));
 											
 						sendQuery( 
-								new ReplyHandlerAdapter()
+								new ReplyHandlerAdapter( contact )
 								{
 									@Override
 									public void 
@@ -1529,7 +1532,7 @@ DHTTransportI2P
 	        }
 	        
         	sendQuery( 
-	        	new ReplyHandler()
+	        	new ReplyHandlerAdapter( contact )
 	        	{
 	        		@Override
 	        		public void 
@@ -1678,7 +1681,7 @@ DHTTransportI2P
 	
 	private void 
     sendQuery(
-    	ReplyHandler				handler,
+    	ReplyHandlerAdapter			handler,
     	DHTTransportContactI2P		contact,
     	Map					 		map, 
     	int		 					rpc_type,
@@ -1699,7 +1702,7 @@ DHTTransportI2P
    
     private void 
     sendQuery(
-    	final ReplyHandler				handler,
+    	final ReplyHandlerAdapter		handler,
     	final NodeInfo					node,
     	final Map				 		map, 
     	final int	 					rpc_type,
@@ -1787,7 +1790,7 @@ DHTTransportI2P
     
     private void 
     sendQuery(
-    	ReplyHandler				handler,
+    	ReplyHandlerAdapter			handler,
     	Destination					dest,
     	int							port,
     	Map				 			map, 
@@ -2106,15 +2109,17 @@ DHTTransportI2P
 	        		
 	        		if ( TRACE ) trace( "Request took " + elapsed );
 	        		
-	        		ReplyHandler reply_handler = request.getHandler();
+	        		ReplyHandlerAdapter reply_handler = request.getHandler();
 	        		
+                    reply_handler.contactAlive();
+
 	        		try{
 		                if ( type.equals("r")){
 		                	
 		                    Map reply = (Map)map.get( "r" );
 		                                        
 		                    int	contact_version = decodeVersion( reply );
-		                    
+		                    		                    
 		                    reply_handler.packetReceived( raw_payload_length );
 		                    
 		                    reply_handler.handleReply( contact_version, reply );
@@ -2431,6 +2436,24 @@ DHTTransportI2P
 	ReplyHandlerAdapter
 		implements ReplyHandler
 	{
+		private final DHTTransportContactI2P		contact;
+		
+		public
+		ReplyHandlerAdapter(
+			DHTTransportContactI2P		_contact )
+		{
+			contact	= _contact;
+		}
+		
+		public void
+		contactAlive()
+		{
+			if ( contact != null ){
+				
+				adapter.contactAlive( contact );
+			}
+		}
+		
 		public void
 		packetSent(
 			int		length )
@@ -2469,14 +2492,14 @@ DHTTransportI2P
 	Request
 	{
 		private Destination					dest;
-		private ReplyHandler				handler;
+		private ReplyHandlerAdapter			handler;
     	
     	private long	start_time = SystemTime.getMonotonousTime();
     	
     	private
     	Request(
-    		Destination					_dest,
-    		ReplyHandler				_handler )
+    		Destination						_dest,
+    		ReplyHandlerAdapter				_handler )
     	{
     		dest		= _dest;
     		handler		= _handler;
@@ -2488,7 +2511,7 @@ DHTTransportI2P
     		return( dest );
     	}
     	
-    	private ReplyHandler
+    	private ReplyHandlerAdapter
     	getHandler()
     	{
     		return( handler );

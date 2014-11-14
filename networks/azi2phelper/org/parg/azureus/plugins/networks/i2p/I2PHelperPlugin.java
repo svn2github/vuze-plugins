@@ -220,6 +220,8 @@ I2PHelperPlugin
 
 	private I2PHelperMessageHandler		message_handler;
 	
+	private I2PHelperAltNetHandler		alt_network_handler;
+	
 	private I2PHelperNetworkMixer		network_mixer;
 	
 	private MagnetURIHandlerListener	magnet_handler =
@@ -795,6 +797,8 @@ I2PHelperPlugin
 
 				message_handler = new I2PHelperMessageHandler( I2PHelperPlugin.this );
 				
+				alt_network_handler = new I2PHelperAltNetHandler();
+				
 				plugin_interface.addListener(
 					new PluginAdapter()
 					{
@@ -1110,6 +1114,22 @@ I2PHelperPlugin
 	getDHTCount()
 	{
 		return( dht_count );
+	}
+	
+	public void 
+	contactAlive(
+		I2PHelperDHT 				dht,
+		DHTTransportContactI2P 		contact) 
+	{
+		if ( dht.getDHTIndex() == I2PHelperRouter.DHT_MIX ){
+			
+			I2PHelperAltNetHandler net = alt_network_handler;
+			
+			if ( net != null ){
+				
+				net.contactAlive( contact );
+			}
+		}
 	}
 	
 	private I2PHelperSocksProxy
@@ -3356,6 +3376,13 @@ I2PHelperPlugin
 					uri_handler.removeListener( magnet_handler );
 				}
 				
+				if ( alt_network_handler != null ){
+					
+					alt_network_handler.destroy();
+					
+					alt_network_handler = null;
+				}
+				
 				if ( message_handler != null ){
 					
 					message_handler.destroy();
@@ -3631,6 +3658,14 @@ I2PHelperPlugin
 					}
 				}
 				
+				@Override
+				public void 
+				contactAlive(
+					I2PHelperDHT 			dht,
+					DHTTransportContactI2P 	contact ) 
+				{
+				}
+				
 				public void 
 				incomingConnection(
 					I2PSocket socket )
@@ -3641,6 +3676,7 @@ I2PHelperPlugin
 					
 					socket.close();
 				}
+				
 				public void 
 				outgoingConnection(
 					I2PSocket socket )

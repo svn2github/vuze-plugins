@@ -119,7 +119,19 @@ DHTAZClient
 		
 						NodeInfo my_node= new NodeInfo( dht_nid, my_dest, dht_port );
 		
-						DHTTransportI2P base_transport = new DHTTransportI2P( session, my_node, DHTUtilsI2P.REQUEST_TIMEOUT );
+						DHTTransportI2P base_transport = 
+							new DHTTransportI2P(
+								new DHTI2PAdapter(){
+									@Override
+									public void 
+									contactAlive(
+										DHTTransportContactI2P contact) 
+									{
+									}
+								},
+								session, 
+								my_node, 
+								DHTUtilsI2P.REQUEST_TIMEOUT );
 							
 						//base_transport.setTraceOn( true );
 						

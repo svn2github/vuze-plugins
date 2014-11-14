@@ -43,6 +43,7 @@ import org.gudy.azureus2.plugins.PluginInterface;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperDHT;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperAdapter;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperDHTListener;
+import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouter;
 import org.parg.azureus.plugins.networks.i2p.snarkdht.NID;
 import org.parg.azureus.plugins.networks.i2p.snarkdht.NodeInfo;
 
@@ -61,7 +62,7 @@ import com.aelitis.azureus.plugins.dht.impl.DHTPluginStorageManager;
 
 public class 
 DHTI2P
-	implements DHTLogger, I2PHelperDHT
+	implements DHTLogger, I2PHelperDHT, DHTI2PAdapter
 {
 		
 		// increased as snark 0.9.13-2 increased expiry to 3 hours along with num-stores to 4. given that
@@ -137,7 +138,7 @@ DHTI2P
 		
 		storage_manager = new DHTPluginStorageManager( DHTUtilsI2P.DHT_NETWORK, this, storage_dir );
 
-		transport = new DHTTransportI2P( session, my_node, DHTUtilsI2P.REQUEST_TIMEOUT );
+		transport = new DHTTransportI2P( this, session, my_node, DHTUtilsI2P.REQUEST_TIMEOUT );
 				
 		Properties	props = new Properties();
 		
@@ -331,7 +332,7 @@ DHTI2P
 		return( dht );
 	}
 	
-	protected int
+	public int
 	getDHTIndex()
 	{
 		return( dht_index );
@@ -341,6 +342,13 @@ DHTI2P
 	getTransport()
 	{
 		return( transport );
+	}
+	
+	public void
+	contactAlive(
+		DHTTransportContactI2P		contact )
+	{
+		adapter.contactAlive( this, contact );
 	}
 	
 	/*

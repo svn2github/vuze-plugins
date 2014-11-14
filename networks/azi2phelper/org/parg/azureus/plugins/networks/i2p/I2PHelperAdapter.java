@@ -23,6 +23,7 @@ package org.parg.azureus.plugins.networks.i2p;
 
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouterDHT;
+import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTTransportContactI2P;
 
 import net.i2p.client.streaming.I2PSocket;
 
@@ -53,6 +54,11 @@ I2PHelperAdapter
 	public void
 	stateChanged(
 		I2PHelperRouterDHT		dht );
+	
+	public void
+	contactAlive(
+		I2PHelperDHT			dht,
+		DHTTransportContactI2P	contact );
 	
 	public void
 	incomingConnection(

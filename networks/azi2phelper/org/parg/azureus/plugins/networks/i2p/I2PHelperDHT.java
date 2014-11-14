@@ -37,6 +37,9 @@ I2PHelperDHT
 	public I2PHelperAZDHT
 	getHelperAZDHT();
 	
+	public int
+	getDHTIndex();
+	
 	public String
 	getLocalAddress();
 	

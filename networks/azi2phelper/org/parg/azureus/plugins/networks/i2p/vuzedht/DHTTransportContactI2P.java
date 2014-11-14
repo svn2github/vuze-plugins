@@ -107,7 +107,7 @@ DHTTransportContactI2P
 		generic_flags	= _flags;
 	}
 	
-	protected NodeInfo
+	public NodeInfo
 	getNode()
 	{
 		return( node );
