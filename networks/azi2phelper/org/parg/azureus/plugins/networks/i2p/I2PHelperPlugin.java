@@ -128,6 +128,9 @@ import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT.DHTContact;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT.DHTValue;
 
+import com.aelitis.azureus.core.dht.transport.DHTTransportAlternativeContact;
+import com.aelitis.azureus.core.dht.transport.DHTTransportAlternativeNetwork;
+import com.aelitis.azureus.core.dht.transport.udp.impl.DHTUDPUtils;
 import com.aelitis.azureus.core.networkmanager.NetworkManager;
 import com.aelitis.azureus.core.proxy.AEProxyAddressMapper;
 import com.aelitis.azureus.core.proxy.AEProxyFactory;
@@ -1740,6 +1743,18 @@ I2PHelperPlugin
 					
 					adapter.tryExternalBootstrap( dht, true );
 					
+				}else if ( cmd.equals( "alt_net" )){
+
+					List<DHTTransportAlternativeContact> contacts = DHTUDPUtils.getAlternativeContacts( DHTTransportAlternativeNetwork.AT_I2P, 16 );
+					
+					System.out.println( "alt_contacts=" + contacts.size());
+					
+					for ( DHTTransportAlternativeContact c: contacts ){
+						
+						System.out.println( c.getAge());
+						
+						System.out.println( "    " + c.getProperties() + " -> " + plugin_maybe_null.alt_network_handler.decodeContact( c ));
+					}
 				}else{
 			
 					adapter.log( "Usage: print|info..." );
@@ -1828,6 +1843,35 @@ I2PHelperPlugin
 				}
 			}
 		}else{
+			I2PHelperAltNetHandler anh = alt_network_handler;
+			
+			if ( anh != null ){
+				
+				List<DHTTransportAlternativeContact> contacts = DHTUDPUtils.getAlternativeContacts( DHTTransportAlternativeNetwork.AT_I2P, 16 );
+	
+				if ( contacts.size() > 0 ){
+					
+					int	found = 0;
+							
+					for ( DHTTransportAlternativeContact c: contacts ){
+					
+						NodeInfo ni = anh.decodeContact( c );
+						
+						if ( ni != null ){
+						
+							dht.heardAbout( ni );
+							
+							found++;
+						}
+					}
+					
+					if ( found > 0 ){
+					
+						log( "Injecting " + found + " alt-network nodes" );
+					}
+				}
+			}
+			
 			List<NodeInfo>	temp = null;
 			
 			synchronized( bootstrap_nodes_from_peers ){

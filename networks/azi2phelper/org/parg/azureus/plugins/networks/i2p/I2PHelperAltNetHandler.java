@@ -29,8 +29,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import net.i2p.data.Destination;
+
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.SystemTime;
+import org.parg.azureus.plugins.networks.i2p.snarkdht.NID;
 import org.parg.azureus.plugins.networks.i2p.snarkdht.NodeInfo;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTTransportContactI2P;
 
@@ -55,9 +58,36 @@ I2PHelperAltNetHandler
 	{
 		NodeInfo node_info = contact.getNode();
 		
-		if ( node_info.getDestination() != null ){
+		if ( node_info.getDestination() != null && node_info.getNID() != null ){
 		
 			i2p_net.addContact( node_info );
+		}
+	}
+	
+	public NodeInfo
+	decodeContact(
+		DHTTransportAlternativeContact		contact )
+	{
+		try{
+			Map<String,Object>	map = contact.getProperties();
+			
+	    	byte[]	nid_bytes 	= (byte[])map.get( "n" );
+	    	int		port 		= ((Number)map.get( "p" )).intValue();
+	    	byte[]	dest_bytes	= (byte[])map.get( "d" );
+	    	
+	    	NID nid = new NID( nid_bytes );
+	    	
+	    	Destination destination = new Destination();
+	    
+	    	destination.fromByteArray( dest_bytes );
+	    	
+	    	NodeInfo ni = new NodeInfo( nid, destination, port );
+
+	    	return( ni );
+	    	
+		}catch( Throwable e ){
+			
+			return( null );
 		}
 	}
 	

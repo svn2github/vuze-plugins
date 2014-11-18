@@ -58,6 +58,10 @@ I2PHelperDHT
 		Map			map );
 	
 	public void
+	heardAbout(
+		NodeInfo	ni );
+	
+	public void
 	ping(
 		Destination		destination,
 		int				port,

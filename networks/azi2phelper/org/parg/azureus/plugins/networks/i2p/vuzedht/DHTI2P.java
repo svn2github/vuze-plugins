@@ -392,6 +392,13 @@ DHTI2P
 	}
 	
 	public void
+	heardAbout(
+		NodeInfo			ni )
+	{
+		transport.importContact( ni, false );
+	}
+	
+	public void
 	ping(
 		Destination		destination,
 		int				port,
@@ -841,7 +848,9 @@ DHTI2P
         			}
         			
         			log( "Bootstrapping..." );
-        			       
+        			    
+        			boolean	try_external = false;
+        			
         			if ( transport.lookupDest( bootstrap_node )){
 
         				if ( destroyed ){
@@ -872,13 +881,19 @@ DHTI2P
     						log( "Bootstrap worked" );
     							
     					}else{
-    							
+    						try_external = true;
+    						
     						log( "Bootstrap failed" );
 						}
         			}else{
         				
-        				log( "Bootstrap not resolved" );
+        				try_external = true;
         				
+        				log( "Bootstrap not resolved" );
+        			}
+        			
+        			if ( try_external ){
+        				    				
         				adapter.tryExternalBootstrap( this, force_bootstrap );
         			}
         			
