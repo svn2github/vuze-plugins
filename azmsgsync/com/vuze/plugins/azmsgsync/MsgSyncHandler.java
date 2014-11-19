@@ -2759,6 +2759,11 @@ MsgSyncHandler
 					sync_data, 
 					30*1000 );
 		
+			if ( reply_bytes == null ){
+
+				throw( new Exception( "Timeout - no reply" ));
+			}
+			
 			if ( private_messaging_secret != null ){
 				
 				reply_bytes = privateMessageDecrypt( reply_bytes );
@@ -2766,11 +2771,6 @@ MsgSyncHandler
 			}else{
 								
 				reply_bytes = generalMessageDecrypt( reply_bytes );
-			}
-						
-			if ( reply_bytes == null ){
-
-				throw( new Exception( "No reply" ));
 			}
 			
 			out_req_ok++;
