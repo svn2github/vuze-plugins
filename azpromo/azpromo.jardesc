@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="WINDOWS-1252" standalone="no"?>
+<jardesc>
+    <jar path="azpromo/azpromo.jar"/>
+    <options buildIfNeeded="true" compress="true" descriptionLocation="/azpromo/azpromo.jardesc" exportErrors="true" exportWarnings="true" includeDirectoryEntries="false" overwrite="false" saveDescription="true" storeRefactorings="false" useSourceFolders="false"/>
+    <storedRefactorings deprecationInfo="true" structuralOnly="false"/>
+    <selectedProjects/>
+    <manifest generateManifest="true" manifestLocation="" manifestVersion="1.0" reuseManifest="false" saveManifest="false" usesManifest="true">
+        <sealing sealJar="false">
+            <packagesToSeal/>
+            <packagesToUnSeal/>
+        </sealing>
+    </manifest>
+    <selectedElements exportClassFiles="true" exportJavaFiles="true" exportOutputFolder="false">
+        <javaElement handleIdentifier="=azpromo/&lt;com.vuze.azureus.plugin.azpromo.internat"/>
+        <file path="/azpromo/azpromo_1.0.6.jar"/>
+        <file path="/azpromo/plugin.properties"/>
+        <javaElement handleIdentifier="=azpromo/&lt;com.vuze.azureus.plugin.azpromo"/>
+        <file path="/azpromo/.project"/>
+        <file path="/azpromo/.classpath"/>
+        <file path="/azpromo/jarit.jardesc"/>
+    </selectedElements>
+</jardesc>
