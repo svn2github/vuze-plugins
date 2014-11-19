@@ -23,6 +23,8 @@
 package com.aelitis.azureus.plugins.azdhtfeed;
 
 import java.io.*;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.security.interfaces.RSAPublicKey;
@@ -35,6 +37,7 @@ import java.util.HashMap;
 
 
 import java.util.List;
+import java.util.Map;
 
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.AEThread2;
@@ -63,6 +66,8 @@ import org.gudy.azureus2.plugins.ui.tables.TableRow;
 import org.gudy.azureus2.plugins.utils.resourcedownloader.*;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 
+import com.aelitis.azureus.core.proxy.AEProxyFactory;
+import com.aelitis.azureus.core.proxy.AEProxyFactory.PluginProxy;
 import com.aelitis.azureus.core.subs.Subscription;
 import com.aelitis.azureus.core.subs.SubscriptionManagerFactory;
 import com.aelitis.azureus.core.tag.Tag;
@@ -856,39 +861,77 @@ DHTFeedPlugin
 		
 		String network;
 		
-		if ( lc.startsWith( "http:" ) || lc.startsWith( "https:" ) || lc.startsWith( "magnet:" )){
-			
-			rd = plugin_interface.getUtilities().getResourceDownloaderFactory().create( new URL( resource ));
-			
-			network = lc.contains( "&net=i2p" )?AENetworkClassifier.AT_I2P:AENetworkClassifier.AT_PUBLIC;
-			
-		}else{
-			
-			rd = plugin_interface.getUtilities().getResourceDownloaderFactory().create( new File( resource ));
+		PluginProxy plugin_proxy	= null;
+		boolean		ok				= false;
 		
-			network = null;
-		}
-		
-		rd.addListener(
-			new ResourceDownloaderAdapter()
-			{
-				public void
-				reportActivity(
-					ResourceDownloader	downloader,
-					String				activity )
-				{
-					log.log( activity );
-				}
-			});
-		
-	
-		InputStream	is = rd.download();
+		try{
+			if ( lc.startsWith( "http:" ) || lc.startsWith( "https:" ) || lc.startsWith( "magnet:" )){
 				
-		downloadDetails result = new downloadDetails(is, (String)rd.getProperty( ResourceDownloader.PR_STRING_CONTENT_TYPE ), network );
+				rd = plugin_interface.getUtilities().getResourceDownloaderFactory().create( new URL( resource ));
+				
+				network = lc.contains( "&net=i2p" )?AENetworkClassifier.AT_I2P:AENetworkClassifier.AT_PUBLIC;
+				
+			}else if ( lc.startsWith( "tor:" )){
+				
+				String target_resource = resource.substring( 4 );
+	
+				Map<String,Object>	options = new HashMap<String,Object>();
+				
+				options.put( AEProxyFactory.PO_PEER_NETWORKS, new String[]{ AENetworkClassifier.AT_TOR });
+				
+				plugin_proxy = 
+					AEProxyFactory.getPluginProxy( 
+						"DDB Feed download of '" + target_resource + "'",
+						new URL( target_resource ),
+						options,
+						true );
+	
+				if ( plugin_proxy == null ){
+					
+					throw( new Exception( "No Tor plugin proxy available" ));
+				}
+				
+				rd = plugin_interface.getUtilities().getResourceDownloaderFactory().create( plugin_proxy.getURL(), plugin_proxy.getProxy());		
+				
+				network = lc.contains( "&net=i2p" )?AENetworkClassifier.AT_I2P:AENetworkClassifier.AT_PUBLIC;
+
+			}else{
+				
+				rd = plugin_interface.getUtilities().getResourceDownloaderFactory().create( new File( resource ));
+			
+				network = null;
+			}
+			
+			rd.addListener(
+				new ResourceDownloaderAdapter()
+				{
+					public void
+					reportActivity(
+						ResourceDownloader	downloader,
+						String				activity )
+					{
+						log.log( activity );
+					}
+				});
+			
 		
-		log.log( "Download of " + resource  + " completed" );
-		
-		return( result );
+			InputStream	is = rd.download();
+					
+			downloadDetails result = new downloadDetails(is, (String)rd.getProperty( ResourceDownloader.PR_STRING_CONTENT_TYPE ), network );
+			
+			log.log( "Download of " + resource  + " completed" );
+			
+			ok = true;
+			
+			return( result );
+			
+		}finally{
+			
+			if ( plugin_proxy != null ){
+				
+				plugin_proxy.setOK( ok );
+			}
+		}
 	}
 	
 	protected byte[]
