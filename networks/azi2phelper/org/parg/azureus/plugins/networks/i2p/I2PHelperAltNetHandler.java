@@ -72,9 +72,15 @@ I2PHelperAltNetHandler
 			Map<String,Object>	map = contact.getProperties();
 			
 	    	byte[]	nid_bytes 	= (byte[])map.get( "n" );
-	    	int		port 		= ((Number)map.get( "p" )).intValue();
 	    	byte[]	dest_bytes	= (byte[])map.get( "d" );
+
+	    	if ( !map.containsKey( "p" )){
+	    		
+	    		return( null );
+	    	}
 	    	
+	    	int		port 		= ((Number)map.get( "p" )).intValue();
+
 	    	NID nid = new NID( nid_bytes );
 	    	
 	    	Destination destination = new Destination();
@@ -138,14 +144,7 @@ I2PHelperAltNetHandler
 		public List<DHTTransportAlternativeContact>
 		getContacts(
 			int		max )
-		{
-				// serialisation of these is large so limit
-			
-			if ( max > 2 ){
-				
-				max = 2;
-			}
-			
+		{	
 			List<DHTTransportAlternativeContact> result = new ArrayList<DHTTransportAlternativeContact>( max );
 			
 			synchronized( address_history ){
