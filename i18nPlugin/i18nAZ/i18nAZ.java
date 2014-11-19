@@ -162,7 +162,8 @@ public class i18nAZ implements UnloadablePlugin
 
         if (COConfigurationManager.hasParameter("i18nAZ.AllowRemotePlugin", true) == false)
         {
-            COConfigurationManager.setParameter("i18nAZ.AllowRemotePlugin", true);
+        		// PARG - switched this to FALSE as unfortunately blindly translating all plugins is a general waste of time for translators due to the effort involved in republishing them
+            COConfigurationManager.setParameter("i18nAZ.AllowRemotePlugin", false);
         }
 
         final BooleanParameter allowRemotePluginBooleanParameter = basicPluginConfigModel.addBooleanParameter2("AllowRemotePlugin", "i18nAZ.Labels.AllowRemotePlugin", COConfigurationManager.getBooleanParameter("i18nAZ.AllowRemotePlugin"));
