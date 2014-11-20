@@ -1799,6 +1799,59 @@ MsgSyncHandler
 		}
 	}
 		
+	private void
+	tryTunnel(
+		final MsgSyncNode		sync_node,
+		final Runnable			to_run )
+	{
+		synchronized( active_tunnels ){
+			
+			if ( active_tunnels.size() < MAX_CONC_TUNNELS && !active_tunnels.contains( sync_node )){
+				
+				active_tunnels.add( sync_node );
+				
+				new AEThread2( "msgsync:tunnel"){
+					
+					@Override
+					public void run(){
+					
+						boolean	worked = false;
+						
+						try{
+							if ( TRACE )System.out.println( "Tunneling to " + sync_node.getName());
+							
+							if ( sync_node.getContact().openTunnel() != null ){
+								
+								if ( TRACE )System.out.println( "    tunneling to " + sync_node.getName() + " worked" );
+						
+								worked = true;
+								
+								if ( to_run != null ){
+								
+									to_run.run();
+								}
+							}
+							
+						}catch( Throwable e ){
+							
+						}finally{
+							
+							if ( !worked ){
+								
+								if ( TRACE )System.out.println( "    tunneling to " + sync_node.getName() + " failed");
+							}
+							
+							synchronized( active_tunnels ){
+								
+								active_tunnels.remove( sync_node );
+							}
+						}
+					}
+				}.start();
+			}
+		}
+	}
+	
 	private byte[]
 	getSharedSecret(
 		MsgSyncNode		target_node,
@@ -1809,6 +1862,8 @@ MsgSyncHandler
 		throws IPCException
 	{
 		try{
+			tryTunnel( target_node, null );
+			
 			CryptoSTSEngine sts = AzureusCoreFactory.getSingleton().getCryptoManager().getECCHandler().getSTSEngine( public_key, private_key );
 			
 			Map<String,Object>		request_map = new HashMap<String, Object>();
@@ -2593,50 +2648,17 @@ MsgSyncHandler
 			if ( is_private_chat && !is_anonymous_chat ){
 				
 				if ( sync_node.getFailCount() > 0 || sync_node.getLastAlive() == 0 ){
-					
-					synchronized( active_tunnels ){
-					
-						if ( active_tunnels.size() < MAX_CONC_TUNNELS && !active_tunnels.contains( sync_node )){
-							
-							active_tunnels.add( sync_node );
-							
-							new AEThread2( "msgsync:tunnel"){
-								
-								@Override
-								public void run(){
-								
-									boolean	worked = false;
-									
-									try{
-										if ( TRACE )System.out.println( "Tunneling to " + sync_node.getName());
-										
-										if ( sync_node.getContact().openTunnel() != null ){
-											
-											if ( TRACE )System.out.println( "    tunneling to " + sync_node.getName() + " worked" );
-									
-											worked = true;
-											
-											sync( sync_node, true );
-										}
-										
-									}catch( Throwable e ){
-										
-									}finally{
-										
-										if ( !worked ){
-											
-											if ( TRACE )System.out.println( "    tunneling to " + sync_node.getName() + " failed");
-										}
-										
-										synchronized( active_tunnels ){
-											
-											active_tunnels.remove( sync_node );
-										}
-									}
-								}
-							}.start();
-						}
-					}
+				
+					tryTunnel(
+						sync_node,
+						new Runnable()
+						{
+							public void
+							run()
+							{
+								sync( sync_node, true );
+							}
+						});
 				}
 			}
 		}
