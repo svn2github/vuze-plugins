@@ -79,7 +79,10 @@ public class
 MsgSyncHandler 
 	implements DHTPluginTransferHandler
 {
-	private static final int VERSION	= 1;
+		// version 1 - initial release
+		// version 2 - invert deleted message bloom keys
+	
+	private static final int VERSION	= 2;
 	
 	private static final boolean TRACE = System.getProperty( "az.msgsync.trace.enable", "0" ).equals( "1" );
 	
@@ -256,6 +259,8 @@ MsgSyncHandler
 	private BloomFilter					biased_node_bloom = BloomFilterFactory.createAddOnly( 512 );
 	private volatile MsgSyncNode		biased_node_in;
 	private volatile MsgSyncNode		biased_node_out;
+	
+	private volatile MsgSyncNode		random_liveish_node;
 	
 	private int LIVE_NODE_BLOOM_TIDY_PERIOD			= 60*1000;
 	private int	LIVE_NODE_BLOOM_TIDY_TICKS			= LIVE_NODE_BLOOM_TIDY_PERIOD / MsgSyncPlugin.TIMER_PERIOD;
@@ -2479,6 +2484,11 @@ MsgSyncHandler
 				}
 			}
 			
+			if ( not_failed.size() > 0 ){
+				
+				random_liveish_node = not_failed.get(RandomUtils.nextInt(not_failed.size()));
+			}
+			
 			MsgSyncNode	current_biased_node_in 	= biased_node_in;
 			MsgSyncNode	current_biased_node_out = biased_node_out;
 			
@@ -2832,6 +2842,18 @@ MsgSyncHandler
 					for ( int j=0;j<rand.length;j++){
 						
 						sig[j] ^= rand[j];
+					}
+					
+					bloom_keys.put( sig, ""  );
+					
+						// in version 2 used inverted key for deleted messages to allow differentiation
+						// between the two kinds of match in the filter
+					
+					sig = sig.clone();
+					
+					for ( int j=0;j<sig.length;j++){
+						
+						sig[j] ^= 0xff; 
 					}
 					
 					bloom_keys.put( sig, ""  );
@@ -3230,6 +3252,16 @@ MsgSyncHandler
 							}
 						}
 					}
+					
+					Map rln = (Map)reply_map.get( "n" );
+					
+					if ( rln != null ){
+						
+						byte[]	uid = (byte[])rln.get( "u" );
+						Map		c	= (Map)rln.get( "c" );
+						
+						addNode( dht.importContact( c ), uid, null );
+					}
 				}
 			}
 		}catch( Throwable e ){
@@ -3331,6 +3363,8 @@ MsgSyncHandler
 				
 				status = STATUS_OK;
 				
+				int	version = ((Number)request_map.get( "v" )).intValue();
+				
 				Number	m_temp = (Number)request_map.get( "m" );
 				
 				int	messages_they_have = m_temp==null?-1:m_temp.intValue();
@@ -3363,9 +3397,13 @@ MsgSyncHandler
 								
 				List<MsgSyncMessage>	missing = new ArrayList<MsgSyncMessage>();
 				
-				int	messages_we_both_have = 0;
+				int messages_we_have;
+				
+				int	messages_we_have_they_deleted = 0;
 				
 				synchronized( message_lock ){
+					
+					messages_we_have = messages.size();
 					
 					for ( MsgSyncMessage msg: messages ){
 						
@@ -3376,7 +3414,18 @@ MsgSyncHandler
 							sig[i] ^= rand[i];
 						}
 						
-						if ( !bloom.contains( sig )){
+						byte[] del_sig = sig.clone();
+						
+						for ( int i=0;i<del_sig.length;i++){
+							
+							del_sig[i] ^= 0xff;
+						}
+						
+						if ( version >= 2 && bloom.contains( del_sig )){
+							
+							messages_we_have_they_deleted++;
+							
+						}else if ( !bloom.contains( sig )){
 						
 								// I have it, they don't
 							
@@ -3392,8 +3441,6 @@ MsgSyncHandler
 								
 								msg.seen();
 							}
-							
-							messages_we_both_have ++;
 						}
 					}
 				}
@@ -3487,11 +3534,13 @@ MsgSyncHandler
 					}
 				}
 				
-				if ( messages_they_have > messages_we_both_have ){
+				if ( 	messages_they_have > messages_we_have ||
+						( 	messages_they_have == messages_we_have &&
+							messages_we_have_they_deleted > 0 )){
 					
-					// previously thought about returning bloom so and have them push messages to us. However,
-					// if we can get a reply to them with the bloom then we should equally as well be able to 
-					// hit them directly as normal
+						// previously thought about returning bloom so and have them push messages to us. However,
+						// if we can get a reply to them with the bloom then we should equally as well be able to 
+						// hit them directly as normal
 					
 					byte[] bk = originator_node.getContactAddress().getBytes( "UTF-8" );
 					
@@ -3506,6 +3555,19 @@ MsgSyncHandler
 							biased_node_in = originator_node;
 						}
 					}
+				}
+				
+				MsgSyncNode rln = random_liveish_node;
+				
+				if ( rln != null && rln != originator_node ){
+				
+					Map rln_map = new HashMap();
+					
+					rln_map.put( "u", rln.getUID());
+					
+					rln_map.put( "c", rln.getContact().exportToMap());
+					
+					reply_map.put( "n", rln_map );
 				}
 			}
 			
