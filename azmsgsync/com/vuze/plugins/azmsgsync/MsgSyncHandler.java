@@ -203,7 +203,10 @@ MsgSyncHandler
 	private static final int MAX_CONC_SYNC	= 5;
 	private static final int MAX_FAIL_SYNC	= 2;
 		
-	private Set<MsgSyncNode> active_syncs	 = new HashSet<MsgSyncNode>();
+	private static final int MAX_CONC_TUNNELS	= 3;
+	
+	private Set<MsgSyncNode> active_syncs		 = new HashSet<MsgSyncNode>();
+	private Set<MsgSyncNode> active_tunnels	 	= new HashSet<MsgSyncNode>();
 		
 	private boolean	prefer_live_sync_outstanding;
 
@@ -2443,7 +2446,7 @@ MsgSyncHandler
 			public void run() {
 				try{
 					
-					sync( f_sync_node );
+					sync( f_sync_node, false );
 					
 				}finally{
 						
@@ -2575,7 +2578,8 @@ MsgSyncHandler
 	
 	private void
 	sync(
-		MsgSyncNode		sync_node )
+		final MsgSyncNode		sync_node,
+		boolean					no_tunnel )
 	{
 		byte[]		rand 	= new byte[8];
 		BloomFilter	bloom	= null;
@@ -2584,6 +2588,59 @@ MsgSyncHandler
 		
 		List<MsgSyncNode>	all_public_keys = new ArrayList<MsgSyncNode>();
 
+		if ( !no_tunnel ){
+			
+			if ( is_private_chat && !is_anonymous_chat ){
+				
+				if ( sync_node.getFailCount() > 0 || sync_node.getLastAlive() == 0 ){
+					
+					synchronized( active_tunnels ){
+					
+						if ( active_tunnels.size() < MAX_CONC_TUNNELS && !active_tunnels.contains( sync_node )){
+							
+							active_tunnels.add( sync_node );
+							
+							new AEThread2( "msgsync:tunnel"){
+								
+								@Override
+								public void run(){
+								
+									boolean	worked = false;
+									
+									try{
+										if ( TRACE )System.out.println( "Tunneling to " + sync_node.getName());
+										
+										if ( sync_node.getContact().openTunnel() != null ){
+											
+											if ( TRACE )System.out.println( "    tunneling to " + sync_node.getName() + " worked" );
+									
+											worked = true;
+											
+											sync( sync_node, true );
+										}
+										
+									}catch( Throwable e ){
+										
+									}finally{
+										
+										if ( !worked ){
+											
+											if ( TRACE )System.out.println( "    tunneling to " + sync_node.getName() + " failed");
+										}
+										
+										synchronized( active_tunnels ){
+											
+											active_tunnels.remove( sync_node );
+										}
+									}
+								}
+							}.start();
+						}
+					}
+				}
+			}
+		}
+		
 		int	message_count;
 				
 		synchronized( message_lock ){
