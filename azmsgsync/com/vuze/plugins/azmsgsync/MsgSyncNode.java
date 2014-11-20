@@ -40,6 +40,8 @@ MsgSyncNode
 	private volatile long	last_alive;
 	private volatile int	fail_count;
 	
+	private volatile long	last_tunnel;
+	
 	private long			last_message_timestamp;
 	
 	protected
@@ -94,6 +96,19 @@ MsgSyncNode
 			
 			return( last_message_timestamp );
 		}
+	}
+	
+	protected long
+	getLastTunnel()
+	{
+		return( last_tunnel );
+	}
+	
+	protected void
+	setLastTunnel(
+		long		t )
+	{
+		last_tunnel = t;
 	}
 	
 	protected void

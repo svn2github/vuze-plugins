@@ -128,6 +128,9 @@ MsgSyncHandler
 	private int SECRET_TIDY_PERIOD					= 60*1000;
 	private int	SECRET_TIDY_TICKS					= SECRET_TIDY_PERIOD / MsgSyncPlugin.TIMER_PERIOD;
 
+	private int BIASED_BLOOM_CLEAR_PERIOD			= 60*1000;
+	private int	BIASED_BLOOM_CLEAR_TICKS			= BIASED_BLOOM_CLEAR_PERIOD / MsgSyncPlugin.TIMER_PERIOD;
+
 	
 	private static final int STATUS_OK			= 1;
 	private static final int STATUS_LOOPBACK	= 2;
@@ -179,14 +182,12 @@ MsgSyncHandler
 	private static WeakHashMap<String, Long>	anon_dest_use_map = new WeakHashMap<String, Long>();
 	*/
 		
-	private Object							message_lock	= new Object();
-	
-	private LinkedList<MsgSyncMessage>		messages 	= new LinkedList<MsgSyncMessage>();
-	
+	private Object							message_lock			= new Object();
+	private LinkedList<MsgSyncMessage>		messages 				= new LinkedList<MsgSyncMessage>();
 	private LinkedList<byte[]>				deleted_messages_sigs 	= new LinkedList<byte[]>();
-
+	private int								message_mutation_id;
 	
-	private ByteArrayHashMap<String>		message_sigs	= new ByteArrayHashMap<String>();
+	private ByteArrayHashMap<String>		message_sigs			= new ByteArrayHashMap<String>();
 	
 		
 	private Map<HashWrapper,String>	request_id_history = 
@@ -252,6 +253,9 @@ MsgSyncHandler
 	private Map<HashWrapper,Object[]>	secret_activities = new HashMap<HashWrapper,Object[]>();
 	private BloomFilter					secret_activities_bloom = BloomFilterFactory.createAddRemove4Bit( 1024 );
 	
+	private BloomFilter					biased_node_bloom = BloomFilterFactory.createAddOnly( 512 );
+	private volatile MsgSyncNode		biased_node_in;
+	private volatile MsgSyncNode		biased_node_out;
 	
 	private int LIVE_NODE_BLOOM_TIDY_PERIOD			= 60*1000;
 	private int	LIVE_NODE_BLOOM_TIDY_TICKS			= LIVE_NODE_BLOOM_TIDY_PERIOD / MsgSyncPlugin.TIMER_PERIOD;
@@ -1028,6 +1032,14 @@ MsgSyncHandler
 			}
 		}
 		
+		if ( count % BIASED_BLOOM_CLEAR_TICKS == 0 ){
+
+			synchronized( biased_node_bloom ){
+				
+				biased_node_bloom.clear();
+			}
+		}
+			
 		if ( parent_handler != null ){
 			
 			if ( private_messaging_secret == null ){
@@ -1619,6 +1631,8 @@ MsgSyncHandler
 					messages.addFirst( msg );
 				}
 				
+				message_mutation_id++;
+				
 				if ( messages.size() > MAX_MESSAGES ){
 											
 					MsgSyncMessage removed = messages.removeFirst();
@@ -1628,7 +1642,7 @@ MsgSyncHandler
 					message_sigs.remove( sig );
 					
 					deleted_messages_sigs.addLast( sig );
-					
+										
 					if ( deleted_messages_sigs.size() > MAX_DELETED_MESSAGES ){
 						
 						deleted_messages_sigs.removeFirst();
@@ -1801,14 +1815,27 @@ MsgSyncHandler
 		
 	private void
 	tryTunnel(
-		final MsgSyncNode		sync_node,
+		final MsgSyncNode		node,
+		boolean					force,
 		final Runnable			to_run )
 	{
+		if ( !force ){
+			
+			long	last_tunnel = node.getLastTunnel();
+			
+			if ( last_tunnel != 0 && SystemTime.getMonotonousTime() - last_tunnel < 2*60*1000 ){
+				
+				return;
+			}
+		}
+		
 		synchronized( active_tunnels ){
 			
-			if ( active_tunnels.size() < MAX_CONC_TUNNELS && !active_tunnels.contains( sync_node )){
+			if ( active_tunnels.size() < MAX_CONC_TUNNELS && !active_tunnels.contains( node )){
 				
-				active_tunnels.add( sync_node );
+				active_tunnels.add( node );
+				
+				node.setLastTunnel( SystemTime.getMonotonousTime());
 				
 				new AEThread2( "msgsync:tunnel"){
 					
@@ -1818,11 +1845,11 @@ MsgSyncHandler
 						boolean	worked = false;
 						
 						try{
-							if ( TRACE )System.out.println( "Tunneling to " + sync_node.getName());
+							if ( TRACE )System.out.println( "Tunneling to " + node.getName());
 							
-							if ( sync_node.getContact().openTunnel() != null ){
+							if ( node.getContact().openTunnel() != null ){
 								
-								if ( TRACE )System.out.println( "    tunneling to " + sync_node.getName() + " worked" );
+								if ( TRACE )System.out.println( "    tunneling to " + node.getName() + " worked" );
 						
 								worked = true;
 								
@@ -1838,12 +1865,12 @@ MsgSyncHandler
 							
 							if ( !worked ){
 								
-								if ( TRACE )System.out.println( "    tunneling to " + sync_node.getName() + " failed");
+								if ( TRACE )System.out.println( "    tunneling to " + node.getName() + " failed");
 							}
 							
 							synchronized( active_tunnels ){
 								
-								active_tunnels.remove( sync_node );
+								active_tunnels.remove( node );
 							}
 						}
 					}
@@ -1862,7 +1889,9 @@ MsgSyncHandler
 		throws IPCException
 	{
 		try{
-			tryTunnel( target_node, null );
+				// no harm in throwing in a tunnel attempt regardless
+			
+			tryTunnel( target_node, true, null );
 			
 			CryptoSTSEngine sts = AzureusCoreFactory.getSingleton().getCryptoManager().getECCHandler().getSTSEngine( public_key, private_key );
 			
@@ -2450,13 +2479,45 @@ MsgSyncHandler
 				}
 			}
 			
-			if ( prefer_live_sync_outstanding && live.size() > 0 ){
-								
-				sync_node = getRandomSyncNode( live );
+			MsgSyncNode	current_biased_node_in 	= biased_node_in;
+			MsgSyncNode	current_biased_node_out = biased_node_out;
+			
+			if ( current_biased_node_out != null ){
 				
-				if ( sync_node != null ){
+					// node_out should be live as we should have just successfully hit it
+				
+				if ( live.contains( current_biased_node_out )){
+								
+					sync_node = current_biased_node_out;
 					
-					prefer_live_sync_outstanding = false;
+					if ( TRACE )System.out.println( "Selecting biased node_out " + sync_node.getName());
+				}
+				
+				biased_node_out = null;
+				
+			}else if ( current_biased_node_in != null ){
+			
+					// node_in might be alive or unknown at this point
+				
+				if ( not_failed.contains( current_biased_node_in )){
+				
+					sync_node = current_biased_node_in;
+					
+					if ( TRACE )System.out.println( "Selecting biased node_in " + sync_node.getName());
+				}
+				
+				biased_node_in = null;
+				
+			}else{
+				
+				if ( prefer_live_sync_outstanding && live.size() > 0 ){
+									
+					sync_node = getRandomSyncNode( live );
+					
+					if ( sync_node != null ){
+						
+						prefer_live_sync_outstanding = false;
+					}
 				}
 			}
 			
@@ -2631,41 +2692,61 @@ MsgSyncHandler
 		}
 	}
 	
-	private void
-	sync(
-		final MsgSyncNode		sync_node,
-		boolean					no_tunnel )
+	private class
+	BloomDetails
 	{
-		byte[]		rand 	= new byte[8];
-		BloomFilter	bloom	= null;
+		private final long				create_time = SystemTime.getMonotonousTime();
+		private final int				mutation_id;
+		private final byte[]			rand;
+		private final BloomFilter		bloom;
 		
-		ByteArrayHashMap<List<MsgSyncNode>>	msg_node_map = null;
+		private final ByteArrayHashMap<List<MsgSyncNode>>	msg_node_map;
 		
-		List<MsgSyncNode>	all_public_keys = new ArrayList<MsgSyncNode>();
+		private final List<MsgSyncNode>	all_public_keys;
 
-		if ( !no_tunnel ){
-			
-			if ( is_private_chat && !is_anonymous_chat ){
-				
-				if ( sync_node.getFailCount() > 0 || sync_node.getLastAlive() == 0 ){
-				
-					tryTunnel(
-						sync_node,
-						new Runnable()
-						{
-							public void
-							run()
-							{
-								sync( sync_node, true );
-							}
-						});
-				}
-			}
-		}
+		private final int				message_count;	
 		
-		int	message_count;
-				
+		private
+		BloomDetails(
+			int									_mutation_id,
+			byte[]								_rand,
+			BloomFilter							_bloom,
+			ByteArrayHashMap<List<MsgSyncNode>>	_msg_node_map,
+			List<MsgSyncNode>					_all_public_keys,
+			int									_message_count )
+		{
+			mutation_id		= _mutation_id;
+			rand			= _rand;
+			bloom			= _bloom;
+			msg_node_map	= _msg_node_map;
+			all_public_keys	= _all_public_keys;
+			message_count	= _message_count;
+		}
+	}
+	
+	private BloomDetails	last_bloom_details;
+	
+	private BloomDetails
+	buildBloom()
+	{
 		synchronized( message_lock ){
+
+			if ( 	last_bloom_details != null && 
+					last_bloom_details.mutation_id == message_mutation_id &&
+					SystemTime.getMonotonousTime() - last_bloom_details.create_time < 30*1000 ){
+				
+				return( last_bloom_details );
+			}
+						
+			byte[]		rand 	= new byte[8];
+			BloomFilter	bloom	= null;
+			
+			ByteArrayHashMap<List<MsgSyncNode>>	msg_node_map = null;
+			
+			List<MsgSyncNode>	all_public_keys = new ArrayList<MsgSyncNode>();
+
+			int	message_count;
+					
 
 			message_count = messages.size();
 			
@@ -2785,15 +2866,252 @@ MsgSyncHandler
 					
 					break;
 				}
+			}		
+		
+			last_bloom_details = new BloomDetails( message_mutation_id, rand, bloom, msg_node_map, all_public_keys, message_count );
+			
+			return( last_bloom_details );
+		}	
+	}
+	
+	private void
+	receiveMessages(
+		BloomDetails					bloom_details,
+		List<Map<String,Object>>		list )
+	{
+			// prevent multiple concurrent replies using a cached bloom filter state from
+			// interfering with one another during message extraction
+		
+		synchronized( bloom_details ){
+			
+			ByteArrayHashMap<List<MsgSyncNode>>	msg_node_map = bloom_details.msg_node_map;
+			
+			List<MsgSyncNode>	all_public_keys = bloom_details.all_public_keys;
+	
+			for ( Map<String,Object> m: list ){
+				
+				try{
+					Set<MsgSyncNode>		keys_to_try = null;
+					
+					byte[] node_uid		= (byte[])m.get( "u" );
+					byte[] message_id 	= (byte[])m.get( "i" );
+					byte[] content		= (byte[])m.get( "c" );
+					byte[] signature	= (byte[])m.get( "s" );
+					
+					int	age = ((Number)m.get( "a" )).intValue();
+							
+						// these won't be present if remote believes we already have it (subject to occasional bloom false positives)
+					
+					byte[] 	public_key		= (byte[])m.get( "p" );
+					
+					Map<String,Object>		contact_map		= (Map<String,Object>)m.get( "k" );
+													
+						//log( "Message: " + ByteFormatter.encodeString( message_id ) + ": " + new String( content ) + ", age=" + age );
+													
+					boolean handled = false;
+					
+						// see if we already have a node with the correct public key
+					
+					List<MsgSyncNode> nodes = msg_node_map.get( node_uid );
+					
+					if ( nodes != null ){
+						
+						for ( MsgSyncNode node: nodes ){
+							
+							byte[] pk = node.getPublicKey();
+							
+							if ( pk != null ){
+								
+								if ( keys_to_try == null ){
+									
+									keys_to_try = new HashSet<MsgSyncNode>( all_public_keys );
+								}
+								
+								keys_to_try.remove( node );
+								
+								Signature sig = CryptoECCUtils.getSignature( CryptoECCUtils.rawdataToPubkey( pk ));
+								
+								sig.update( node_uid );
+								sig.update( message_id );
+								sig.update( content );
+								
+								if ( sig.verify( signature )){
+									
+									addMessage( node, message_id, content, signature, age, contact_map, true );
+									
+									handled = true;
+									
+									break;
+								}
+							}
+						}
+					}
+						
+					if ( !handled ){
+						
+						if ( public_key == null ){
+							
+								// the required public key could be registered against another node-id
+								// in this case the other side won't have returned it to us but we won't
+								// find it under the existing set of keys associated with the node-id
+							
+							if ( keys_to_try == null ){
+								
+								keys_to_try = new HashSet<MsgSyncNode>( all_public_keys );
+							}
+							
+							for ( MsgSyncNode n: keys_to_try ){
+								
+								byte[] pk = n.getPublicKey();
+								
+								Signature sig = CryptoECCUtils.getSignature( CryptoECCUtils.rawdataToPubkey( pk));
+								
+								sig.update( node_uid );
+								sig.update( message_id );
+								sig.update( content );
+								
+								if ( sig.verify( signature )){
+									
+										// dunno if the contact has changed so all we can do is use the existing
+										// one associated with this key
+									
+									MsgSyncNode msg_node = addNode( n.getContact(), node_uid, pk );
+									
+									addMessage( msg_node, message_id, content, signature, age, contact_map, true );
+									
+									handled = true;
+									
+									break;
+								}
+							}
+						}else{
+							
+								// no existing pk - we HAVE to record this message against
+								// this supplied pk otherwise we can't replicate it later
+	
+							Signature sig = CryptoECCUtils.getSignature( CryptoECCUtils.rawdataToPubkey( public_key ));
+							
+							sig.update( node_uid );
+							sig.update( message_id );
+							sig.update( content );
+							
+							if ( sig.verify( signature )){
+								
+								DHTPluginContact contact = dht.importContact( contact_map );
+								
+								MsgSyncNode msg_node = null;
+								
+									// look for existing node without public key that we can use
+								
+								if ( nodes != null ){
+									
+									for ( MsgSyncNode node: nodes ){
+										
+										if ( node.setDetails( contact, public_key )){
+											
+											msg_node = node;
+											
+											break;
+										}
+									}
+								}
+								
+								if ( msg_node == null ){
+								
+									msg_node = addNode( contact, node_uid, public_key );
+									
+										// save so local list so pk available to other messages
+										// in this loop
+									
+									List<MsgSyncNode> x = msg_node_map.get( node_uid );
+									
+									if ( x == null ){
+										
+										x = new ArrayList<MsgSyncNode>();
+										
+										msg_node_map.put( node_uid, x );
+									}
+									
+									x.add( msg_node );
+								}
+									
+								all_public_keys.add( msg_node );
+								
+								addMessage( msg_node, message_id, content, signature, age, contact_map, true );
+							}
+						}
+					}
+				}catch( Throwable e ){
+					
+					Debug.out( e );
+				}
+			}
+		}
+	}
+	
+	private void
+	sync(
+		final MsgSyncNode		sync_node,
+		boolean					no_tunnel )
+	{
+
+		if ( !( no_tunnel || is_anonymous_chat )){
+						
+			boolean node_dead = sync_node.getFailCount() > 0 || sync_node.getLastAlive() == 0;
+			
+			if ( node_dead ){
+				
+				boolean	try_tunnel;
+				boolean	force;
+				
+				if ( is_private_chat ){
+					
+					try_tunnel 	= true;
+					force		= true;
+					
+				}else{
+					
+					force = false;
+					
+					int[] node_counts = getNodeCounts();
+					
+					int	total 	= node_counts[0];
+					int live	= node_counts[1];
+					
+					try_tunnel = ( live == 0 ) || ( total <= 5 && live < 2 ) || ( total <= 10 && live < 3 );
+				}
+				
+				if ( try_tunnel ){
+					
+					tryTunnel(
+						sync_node,
+						force,
+						new Runnable()
+						{
+							public void
+							run()
+							{
+								sync( sync_node, true );
+							}
+						});
+				}
 			}
 		}
 		
+		BloomDetails bloom_details = buildBloom();
+		
+		BloomFilter	bloom	= bloom_details.bloom;
+	
 		if ( bloom == null ){
 			
 				// clashed too many times, whatever, we'll try again soon
 			
 			return;
 		}
+		
+		byte[]		rand 	= bloom_details.rand;
+		int	message_count 	= bloom_details.message_count;
+
 		
 		Map<String,Object> request_map = new HashMap<String,Object>();
 		
@@ -2886,162 +3204,7 @@ MsgSyncHandler
 					
 					if ( list != null ){
 												
-						for ( Map<String,Object> m: list ){
-							
-							try{
-								Set<MsgSyncNode>		keys_to_try = null;
-								
-								byte[] node_uid		= (byte[])m.get( "u" );
-								byte[] message_id 	= (byte[])m.get( "i" );
-								byte[] content		= (byte[])m.get( "c" );
-								byte[] signature	= (byte[])m.get( "s" );
-								
-								int	age = ((Number)m.get( "a" )).intValue();
-										
-									// these won't be present if remote believes we already have it (subject to occasional bloom false positives)
-								
-								byte[] 	public_key		= (byte[])m.get( "p" );
-								
-								Map<String,Object>		contact_map		= (Map<String,Object>)m.get( "k" );
-																
-									//log( "Message: " + ByteFormatter.encodeString( message_id ) + ": " + new String( content ) + ", age=" + age );
-																
-								boolean handled = false;
-								
-									// see if we already have a node with the correct public key
-								
-								List<MsgSyncNode> nodes = msg_node_map.get( node_uid );
-								
-								if ( nodes != null ){
-									
-									for ( MsgSyncNode node: nodes ){
-										
-										byte[] pk = node.getPublicKey();
-										
-										if ( pk != null ){
-											
-											if ( keys_to_try == null ){
-												
-												keys_to_try = new HashSet<MsgSyncNode>( all_public_keys );
-											}
-											
-											keys_to_try.remove( node );
-											
-											Signature sig = CryptoECCUtils.getSignature( CryptoECCUtils.rawdataToPubkey( pk ));
-											
-											sig.update( node_uid );
-											sig.update( message_id );
-											sig.update( content );
-											
-											if ( sig.verify( signature )){
-												
-												addMessage( node, message_id, content, signature, age, contact_map, true );
-												
-												handled = true;
-												
-												break;
-											}
-										}
-									}
-								}
-									
-								if ( !handled ){
-									
-									if ( public_key == null ){
-										
-											// the required public key could be registered against another node-id
-											// in this case the other side won't have returned it to us but we won't
-											// find it under the existing set of keys associated with the node-id
-										
-										if ( keys_to_try == null ){
-											
-											keys_to_try = new HashSet<MsgSyncNode>( all_public_keys );
-										}
-										
-										for ( MsgSyncNode n: keys_to_try ){
-											
-											byte[] pk = n.getPublicKey();
-											
-											Signature sig = CryptoECCUtils.getSignature( CryptoECCUtils.rawdataToPubkey( pk));
-											
-											sig.update( node_uid );
-											sig.update( message_id );
-											sig.update( content );
-											
-											if ( sig.verify( signature )){
-												
-													// dunno if the contact has changed so all we can do is use the existing
-													// one associated with this key
-												
-												MsgSyncNode msg_node = addNode( n.getContact(), node_uid, pk );
-												
-												addMessage( msg_node, message_id, content, signature, age, contact_map, true );
-												
-												handled = true;
-												
-												break;
-											}
-										}
-									}else{
-										
-											// no existing pk - we HAVE to record this message against
-											// ths supplied pk otherwise we can't replicate it later
-
-										Signature sig = CryptoECCUtils.getSignature( CryptoECCUtils.rawdataToPubkey( public_key ));
-										
-										sig.update( node_uid );
-										sig.update( message_id );
-										sig.update( content );
-										
-										if ( sig.verify( signature )){
-											
-											DHTPluginContact contact = dht.importContact( contact_map );
-											
-											MsgSyncNode msg_node = null;
-											
-												// look for existing node without public key that we can use
-											
-											if ( nodes != null ){
-												
-												for ( MsgSyncNode node: nodes ){
-													
-													if ( node.setDetails( contact, public_key )){
-														
-														msg_node = node;
-														
-														break;
-													}
-												}
-											}
-											
-											if ( msg_node == null ){
-											
-												msg_node = addNode( contact, node_uid, public_key );
-												
-													// save so local list so pk available to other messages
-													// in this loop
-												
-												List<MsgSyncNode> x = msg_node_map.get( node_uid );
-												
-												if ( x == null ){
-													
-													x = new ArrayList<MsgSyncNode>();
-													
-													msg_node_map.put( node_uid, x );
-												}
-												
-												x.add( msg_node );
-											}
-																						
-											addMessage( msg_node, message_id, content, signature, age, contact_map, true );
-										}
-									}
-								}
-							}catch( Throwable e ){
-								
-								Debug.out( e );
-							}
-						}
+						receiveMessages( bloom_details, list );
 					}
 					
 					Number x_temp = (Number)reply_map.get( "x" );
@@ -3050,7 +3213,22 @@ MsgSyncHandler
 						
 						int	more_to_come = x_temp.intValue();
 						
-						// TODO: bias us hitting them again?
+						if ( more_to_come > 0 ){
+							
+							byte[] bk = sync_node.getContactAddress().getBytes( "UTF-8" );
+							
+							synchronized( biased_node_bloom ){
+								
+								if ( biased_node_out == null && !biased_node_bloom.contains( bk )){
+									
+									biased_node_bloom.add( bk );
+									
+									if ( TRACE )System.out.println( "Proposing biased node_out " + sync_node.getName());
+
+									biased_node_out = sync_node;
+								}
+							}
+						}
 					}
 				}
 			}
@@ -3311,13 +3489,23 @@ MsgSyncHandler
 				
 				if ( messages_they_have > messages_we_both_have ){
 					
-					// TODO: prioritize us hitting them to get this based on num missing prolly?
+					// previously thought about returning bloom so and have them push messages to us. However,
+					// if we can get a reply to them with the bloom then we should equally as well be able to 
+					// hit them directly as normal
 					
-					// actually we should return our bloom to them, they can cache the bloom and if
-					// they find themselves hitting us withing (say) 60 seconds of receiving the bloom
-					// they can push some messages to us (helps deal with the case where they can talk
-					// to us but for some reason we can't talk to them
+					byte[] bk = originator_node.getContactAddress().getBytes( "UTF-8" );
 					
+					synchronized( biased_node_bloom ){
+						
+						if ( biased_node_in == null && !biased_node_bloom.contains( bk )){
+							
+							biased_node_bloom.add( bk );
+							
+							if ( TRACE )System.out.println( "Proposing biased node_in " + originator_node.getName());
+
+							biased_node_in = originator_node;
+						}
+					}
 				}
 			}
 			
