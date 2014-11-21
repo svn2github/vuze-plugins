@@ -3421,26 +3421,25 @@ MsgSyncHandler
 							del_sig[i] ^= 0xff;
 						}
 						
-						if ( version >= 2 && bloom.contains( del_sig )){
+						if ( bloom.contains( sig )){
+
+							if ( messages_they_have >= messages.size()){
+								
+								// just in case we have a bloom clash and they don't really have
+								// the message, double check that they have at least as many
+								// messages as us
+							
+								msg.seen();
+							}
+						}else if ( version >= 2 && bloom.contains( del_sig )){
 							
 							messages_we_have_they_deleted++;
 							
-						}else if ( !bloom.contains( sig )){
+						}else{
 						
 								// I have it, they don't
 							
 							missing.add( msg );
-							
-						}else{
-							
-							if ( messages_they_have >= messages.size()){
-							
-									// just in case we have a bloom clash and they don't really have
-									// the message, double check that they have at least as many
-									// messages as us
-								
-								msg.seen();
-							}
 						}
 					}
 				}
