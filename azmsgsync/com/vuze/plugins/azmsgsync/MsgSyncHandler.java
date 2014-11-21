@@ -1128,7 +1128,7 @@ MsgSyncHandler
 		last_out_req	= out_req;
 		last_in_req		= in_req;
 		
-		//System.out.println( in_req_average.getAverage()*1000/MsgSyncPlugin.TIMER_PERIOD + "/" + out_req_average.getAverage()*1000/MsgSyncPlugin.TIMER_PERIOD);
+		//trace( in_req_average.getAverage()*1000/MsgSyncPlugin.TIMER_PERIOD + "/" + out_req_average.getAverage()*1000/MsgSyncPlugin.TIMER_PERIOD);
 		
 		
 		if ( count % MSG_STATUS_CHECK_TICKS == 0 ){
@@ -1204,13 +1204,13 @@ MsgSyncHandler
 				List<MsgSyncNode>	not_failing	 	= new ArrayList<MsgSyncNode>( MAX_NODES*2 );
 				List<MsgSyncNode>	failing 		= new ArrayList<MsgSyncNode>( MAX_NODES*2 );
 								
-				//if ( TRACE )System.out.println( "Current nodes: ");
+				//if ( TRACE )trace( "Current nodes: ");
 				
 				for ( List<MsgSyncNode> nodes: node_uid_map.values()){
 					
 					for ( MsgSyncNode node: nodes ){
 						
-						//if ( TRACE )System.out.println( "    " + node.getContact().getAddress() + "/" + ByteFormatter.encodeString( node.getUID()));
+						//if ( TRACE )trace( "    " + node.getContact().getAddress() + "/" + ByteFormatter.encodeString( node.getUID()));
 						
 						total++;
 						
@@ -1420,7 +1420,7 @@ MsgSyncHandler
 				
 			nodes.add( node );		
 
-			if ( TRACE )System.out.println( "Add node: " + contact.getName() + ByteFormatter.encodeString( uid ) + "/" + (public_key==null?"no PK":"with PK" ) + ", total uids=" + node_uid_map.size());
+			if ( TRACE )trace( "Add node: " + contact.getName() + ByteFormatter.encodeString( uid ) + "/" + (public_key==null?"no PK":"with PK" ) + ", total uids=" + node_uid_map.size());
 			
 			return( node );
 		}	
@@ -1451,7 +1451,7 @@ MsgSyncHandler
 						node_uid_map.remove( node_id );
 					}
 					
-					//if ( TRACE )System.out.println( "Remove node: " + node.getContact().getName() + ByteFormatter.encodeString( node_id ) + ", loop=" + is_loopback );
+					//if ( TRACE )trace( "Remove node: " + node.getContact().getName() + ByteFormatter.encodeString( node_id ) + ", loop=" + is_loopback );
 				}
 			}
 		}
@@ -1523,7 +1523,7 @@ MsgSyncHandler
 		MsgSyncMessage		message )
 	{
 		
-		System.out.println( "management message:" + message );
+		trace( "management message:" + message );
 	}
 	
 	private void
@@ -1821,17 +1821,14 @@ MsgSyncHandler
 	private void
 	tryTunnel(
 		final MsgSyncNode		node,
-		boolean					force,
+		boolean					short_cache,
 		final Runnable			to_run )
-	{
-		if ( !force ){
+	{			
+		long	last_tunnel = node.getLastTunnel();
+		
+		if ( last_tunnel != 0 && SystemTime.getMonotonousTime() - last_tunnel < (short_cache?45*1000:2*60*1000 )){
 			
-			long	last_tunnel = node.getLastTunnel();
-			
-			if ( last_tunnel != 0 && SystemTime.getMonotonousTime() - last_tunnel < 2*60*1000 ){
-				
-				return;
-			}
+			return;
 		}
 		
 		synchronized( active_tunnels ){
@@ -1850,11 +1847,11 @@ MsgSyncHandler
 						boolean	worked = false;
 						
 						try{
-							if ( TRACE )System.out.println( "Tunneling to " + node.getName());
+							if ( TRACE )trace( "Tunneling to " + node.getName());
 							
 							if ( node.getContact().openTunnel() != null ){
 								
-								if ( TRACE )System.out.println( "    tunneling to " + node.getName() + " worked" );
+								if ( TRACE )trace( "    tunneling to " + node.getName() + " worked" );
 						
 								worked = true;
 								
@@ -1870,7 +1867,7 @@ MsgSyncHandler
 							
 							if ( !worked ){
 								
-								if ( TRACE )System.out.println( "    tunneling to " + node.getName() + " failed");
+								if ( TRACE )trace( "    tunneling to " + node.getName() + " failed");
 							}
 							
 							synchronized( active_tunnels ){
@@ -1895,7 +1892,7 @@ MsgSyncHandler
 	{
 		try{
 				// no harm in throwing in a tunnel attempt regardless
-			
+						
 			tryTunnel( target_node, true, null );
 			
 			CryptoSTSEngine sts = AzureusCoreFactory.getSingleton().getCryptoManager().getECCHandler().getSTSEngine( public_key, private_key );
@@ -2439,7 +2436,7 @@ MsgSyncHandler
 				prefer_live_sync_outstanding = true;
 			}
 			
-			if ( TRACE )System.out.println( "Sync: active=" + active_syncs );
+			if ( TRACE )trace( "Sync: active=" + active_syncs );
 			
 			if ( active_syncs.size() > MAX_CONC_SYNC ){
 				
@@ -2500,7 +2497,7 @@ MsgSyncHandler
 								
 					sync_node = current_biased_node_out;
 					
-					if ( TRACE )System.out.println( "Selecting biased node_out " + sync_node.getName());
+					if ( TRACE )trace( "Selecting biased node_out " + sync_node.getName());
 				}
 				
 				biased_node_out = null;
@@ -2513,7 +2510,7 @@ MsgSyncHandler
 				
 					sync_node = current_biased_node_in;
 					
-					if ( TRACE )System.out.println( "Selecting biased node_in " + sync_node.getName());
+					if ( TRACE )trace( "Selecting biased node_in " + sync_node.getName());
 				}
 				
 				biased_node_in = null;
@@ -2554,7 +2551,7 @@ MsgSyncHandler
 				}
 			}
 			
-			if ( TRACE )System.out.println( "    selected " + (sync_node==null?"none":sync_node.getName()));
+			if ( TRACE )trace( "    selected " + (sync_node==null?"none":sync_node.getName()));
 			
 			if ( sync_node == null ){
 				
@@ -3142,6 +3139,13 @@ MsgSyncHandler
 		request_map.put( "t", RT_SYNC_REQUEST );		// type
 
 		request_map.put( "u", my_uid );
+		
+		byte[]	request_id = new byte[6];
+		
+		RandomUtils.nextBytes( request_id );
+		
+		request_map.put( "q", request_id );
+		
 		request_map.put( "b", bloom.serialiseToMap());
 		request_map.put( "r", rand );
 		request_map.put( "m", message_count );
@@ -3157,6 +3161,8 @@ MsgSyncHandler
 								
 				sync_data = generalMessageEncrypt( sync_data );
 			}
+			
+			long	start = SystemTime.getMonotonousTime();
 			
 			byte[] reply_bytes = 
 				sync_node.getContact().call(
@@ -3178,6 +3184,8 @@ MsgSyncHandler
 					sync_data, 
 					30*1000 );
 		
+			if (TRACE )trace( "Call took " + ( SystemTime.getMonotonousTime() - start ));
+			
 			if ( reply_bytes == null ){
 
 				throw( new Exception( "Timeout - no reply" ));
@@ -3208,7 +3216,7 @@ MsgSyncHandler
 				
 			}else{
 				
-				if ( TRACE )System.out.println( "reply: " + reply_map + " from " + sync_node.getName());
+				if ( TRACE )trace( "reply: " + reply_map + " from " + sync_node.getName());
 				
 				int status = ((Number)reply_map.get( "s" )).intValue();
 				
@@ -3245,7 +3253,7 @@ MsgSyncHandler
 									
 									biased_node_bloom.add( bk );
 									
-									if ( TRACE )System.out.println( "Proposing biased node_out " + sync_node.getName());
+									if ( TRACE )trace( "Proposing biased node_out " + sync_node.getName());
 
 									biased_node_out = sync_node;
 								}
@@ -3265,6 +3273,8 @@ MsgSyncHandler
 				}
 			}
 		}catch( Throwable e ){
+			
+			if ( TRACE )trace(e.getMessage());
 			
 			out_req_fail++;
 			
@@ -3323,21 +3333,23 @@ MsgSyncHandler
 
 			byte[]	rand = (byte[])request_map.get( "r" );
 
-			HashWrapper rand_wrapper = new HashWrapper( rand );
+			byte[]	request_id = (byte[])request_map.get( "q" );
+			
+			HashWrapper request_id_wrapper = new HashWrapper( request_id==null?rand:request_id );
 			
 			synchronized( request_id_history ){
 				
-				if ( request_id_history.get( rand_wrapper ) != null ){
+				if ( request_id_history.get( request_id_wrapper ) != null ){
 				
-					if ( TRACE )System.out.println( "duplicate request: " + request_map + " from " + getString( originator ));
+					if ( TRACE )trace( "duplicate request: " + ByteFormatter.encodeString( request_id_wrapper.getBytes(), 0, 4 ) + " - " + request_map + " from " + getString( originator ));
 					
 					return( null );
 				}
 				
-				request_id_history.put( rand_wrapper, "" );
+				request_id_history.put( request_id_wrapper, "" );
 			}
 			
-			if ( TRACE )System.out.println( "request: " + request_map + " from " + getString( originator ));
+			if ( TRACE )trace( "request: " + request_map + " from " + getString( originator ));
 
 			in_req++;
 			
@@ -3357,7 +3369,7 @@ MsgSyncHandler
 				/*
 				if ( originator.getAddress().isUnresolved()){
 					
-					System.out.println( "unresolved" );
+					trace( "unresolved" );
 				}
 				*/
 				
@@ -3405,6 +3417,8 @@ MsgSyncHandler
 					
 					messages_we_have = messages.size();
 					
+					List<MsgSyncMessage>	messages_we_both_have = new ArrayList<MsgSyncMessage>( messages_we_have );
+
 					for ( MsgSyncMessage msg: messages ){
 						
 						byte[]	sig = msg.getSignature().clone();	// clone as we mod it
@@ -3423,14 +3437,8 @@ MsgSyncHandler
 						
 						if ( bloom.contains( sig )){
 
-							if ( messages_they_have >= messages.size()){
-								
-								// just in case we have a bloom clash and they don't really have
-								// the message, double check that they have at least as many
-								// messages as us
-							
-								msg.seen();
-							}
+							messages_we_both_have.add( msg );
+
 						}else if ( version >= 2 && bloom.contains( del_sig )){
 							
 							messages_we_have_they_deleted++;
@@ -3440,6 +3448,18 @@ MsgSyncHandler
 								// I have it, they don't
 							
 							missing.add( msg );
+						}
+					}
+					
+					if ( messages_they_have >= messages_we_have && messages_we_have_they_deleted == 0 ){
+						
+						// just in case we have a bloom clash and they don't really have
+						// the message, double check that they have at least as many
+						// messages as us
+					
+						for ( MsgSyncMessage msg: messages_we_both_have ){
+						
+							msg.seen();
 						}
 					}
 				}
@@ -3470,7 +3490,7 @@ MsgSyncHandler
 							continue;
 						}
 																		
-						if ( TRACE )System.out.println( "    returning " + ByteFormatter.encodeString( message.getID()));
+						if ( TRACE )trace( "    returning " + ByteFormatter.encodeString( message.getID()));
 						
 						Map<String,Object> m = new HashMap<String,Object>();
 						
@@ -3513,7 +3533,7 @@ MsgSyncHandler
 									
 									if ( !bloom.contains( ad )){
 										
-										if ( TRACE )System.out.println( "    and pk" );
+										if ( TRACE )trace( "    and pk" );
 										
 										m.put( "p", n.getPublicKey());
 										
@@ -3549,7 +3569,7 @@ MsgSyncHandler
 							
 							biased_node_bloom.add( bk );
 							
-							if ( TRACE )System.out.println( "Proposing biased node_in " + originator_node.getName());
+							if ( TRACE )trace( "Proposing biased node_in " + originator_node.getName());
 
 							biased_node_in = originator_node;
 						}
@@ -3594,7 +3614,7 @@ MsgSyncHandler
 			
 		}catch( Throwable e ){
 			
-			//e.printStackTrace();
+			if ( TRACE )trace( e.toString());
 		}
 		
 		return( null );
@@ -3703,6 +3723,13 @@ MsgSyncHandler
 			
 			dht.unregisterHandler( dht_listen_key, this );
 		}
+	}
+	
+	private void
+	trace(
+		String		str )
+	{		
+		System.out.println( str );
 	}
 	
 	private void
