@@ -185,9 +185,9 @@ MsgSyncHandler
 	private static WeakHashMap<String, Long>	anon_dest_use_map = new WeakHashMap<String, Long>();
 	*/
 		
-	private Object							message_lock			= new Object();
-	private LinkedList<MsgSyncMessage>		messages 				= new LinkedList<MsgSyncMessage>();
-	private LinkedList<byte[]>				deleted_messages_sigs 	= new LinkedList<byte[]>();
+	private Object							message_lock					= new Object();
+	private LinkedList<MsgSyncMessage>		messages 						= new LinkedList<MsgSyncMessage>();
+	private LinkedList<byte[]>				deleted_messages_inverted_sigs 	= new LinkedList<byte[]>();
 	private int								message_mutation_id;
 	
 	private ByteArrayHashMap<String>		message_sigs			= new ByteArrayHashMap<String>();
@@ -1149,12 +1149,13 @@ MsgSyncHandler
 							
 								// delivery isn't sufficient as the reply might not get through :(
 							
-							boolean	not_delivered 	= msg.getDeliveryCount() == 0;
+							int	delivery_count 		= msg.getDeliveryCount();
+							
 							boolean	not_seen 		= msg.getSeenCount() == 0;
 							
-							if ( not_delivered || not_seen ){
+							if ( delivery_count == 0 || not_seen ){
 								
-								long period = not_delivered?MSG_STATUS_CHECK_PERIOD:2*MSG_STATUS_CHECK_PERIOD;
+								long period = MSG_STATUS_CHECK_PERIOD*(delivery_count+1);
 								
 								if ( is_anonymous_chat ){
 									
@@ -1646,11 +1647,18 @@ MsgSyncHandler
 					
 					message_sigs.remove( sig );
 					
-					deleted_messages_sigs.addLast( sig );
-										
-					if ( deleted_messages_sigs.size() > MAX_DELETED_MESSAGES ){
+					byte[] inv_sig = sig.clone();
+					
+					for ( int j=0;j<inv_sig.length;j++){
 						
-						deleted_messages_sigs.removeFirst();
+						inv_sig[j] ^= 0xff; 
+					}
+					
+					deleted_messages_inverted_sigs.addLast( inv_sig );
+										
+					if ( deleted_messages_inverted_sigs.size() > MAX_DELETED_MESSAGES ){
+						
+						deleted_messages_inverted_sigs.removeFirst();
 					}
 				}
 			}
@@ -2832,28 +2840,9 @@ MsgSyncHandler
 					bloom_keys.put( sig, ""  );
 				}
 				
-				for ( byte[] sig: deleted_messages_sigs ){
-				
-					sig = sig.clone();
+				for ( byte[] inv_sig: deleted_messages_inverted_sigs ){
 					
-					for ( int j=0;j<rand.length;j++){
-						
-						sig[j] ^= rand[j];
-					}
-					
-					bloom_keys.put( sig, ""  );
-					
-						// in version 2 used inverted key for deleted messages to allow differentiation
-						// between the two kinds of match in the filter
-					
-					sig = sig.clone();
-					
-					for ( int j=0;j<sig.length;j++){
-						
-						sig[j] ^= 0xff; 
-					}
-					
-					bloom_keys.put( sig, ""  );
+					bloom_keys.put( inv_sig, ""  );
 				}
 				
 					// in theory we could have 64 sigs + 64 pks -> 128 -> 1280 bits -> 160 bytes + overhead
@@ -3184,7 +3173,7 @@ MsgSyncHandler
 					sync_data, 
 					30*1000 );
 		
-			if (TRACE )trace( "Call took " + ( SystemTime.getMonotonousTime() - start ));
+			//if (TRACE )trace( "Call took " + ( SystemTime.getMonotonousTime() - start ));
 			
 			if ( reply_bytes == null ){
 
@@ -3274,7 +3263,7 @@ MsgSyncHandler
 			}
 		}catch( Throwable e ){
 			
-			if ( TRACE )trace(e.getMessage());
+			//if ( TRACE )trace(e.getMessage());
 			
 			out_req_fail++;
 			
@@ -3308,7 +3297,7 @@ MsgSyncHandler
 		
 		try{
 			Map<String,Object> request_map = BDecoder.decode( key );
-
+			
 			int	type = request_map.containsKey( "t" )?((Number)request_map.get( "t" )).intValue():-1; 
 
 			if ( type == RT_DH_REQUEST ){
@@ -3329,6 +3318,15 @@ MsgSyncHandler
 			if ( type != RT_SYNC_REQUEST ){
 				
  				return( null );
+			}
+
+			int	version = ((Number)request_map.get( "v" )).intValue();
+			
+			if ( version < 2 ){
+				
+					// no longer support old nodes
+				
+				return( null );
 			}
 
 			byte[]	rand = (byte[])request_map.get( "r" );
@@ -3374,8 +3372,6 @@ MsgSyncHandler
 				*/
 				
 				status = STATUS_OK;
-				
-				int	version = ((Number)request_map.get( "v" )).intValue();
 				
 				Number	m_temp = (Number)request_map.get( "m" );
 				
@@ -3439,7 +3435,7 @@ MsgSyncHandler
 
 							messages_we_both_have.add( msg );
 
-						}else if ( version >= 2 && bloom.contains( del_sig )){
+						}else if ( bloom.contains( del_sig )){
 							
 							messages_we_have_they_deleted++;
 							
