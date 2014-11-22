@@ -1608,6 +1608,18 @@ MsgSyncHandler
 					return;
 				}
 				
+				byte[] inv_signature = signature.clone();
+				
+				for ( int i=0;i<inv_signature.length;i++ ){
+					
+					inv_signature[i] ^= 0xff;
+				}
+				
+				if ( deleted_messages_inverted_sigs.contains( inv_signature )){
+					
+					return;
+				}
+				
 				message_sigs.put( signature, "" );
 										
 				ListIterator<MsgSyncMessage> lit = messages.listIterator(messages.size());
@@ -1646,6 +1658,13 @@ MsgSyncHandler
 					byte[]	sig = removed.getSignature();
 					
 					message_sigs.remove( sig );
+					
+					if ( removed == msg ){
+					
+							// not added after all
+						
+						return;
+					}
 					
 					byte[] inv_sig = sig.clone();
 					
