@@ -23,6 +23,7 @@ package com.vuze.plugins.azmsgsync;
 
 
 
+import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
@@ -81,6 +82,8 @@ MsgSyncPlugin
 	
 	private AESemaphore				init_sem = new AESemaphore( "MsgSync:init" );
 	
+	private File		data_dir;
+	
 	public void 
 	initialize(
 		PluginInterface _plugin_interface )
@@ -95,6 +98,8 @@ MsgSyncPlugin
 				plugin_interface	= _plugin_interface;
 				
 				setUnloadable( true );
+				
+				data_dir = plugin_interface.getPluginconfig().getPluginUserFile( "test" ).getParentFile();
 				
 				loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
 				
@@ -197,6 +202,22 @@ MsgSyncPlugin
 							}
 						}
 					});
+				
+				plugin_interface.addListener(
+					new PluginAdapter()
+					{
+						public void
+						closedownInitiated()
+						{
+							synchronized( MsgSyncPlugin.this ){
+								
+								for ( MsgSyncHandler h: sync_handlers ){
+
+									h.saveMessages();
+								}
+							}	
+						}
+					});
 			}	
 		}catch( Throwable e){
 			
@@ -228,6 +249,8 @@ MsgSyncPlugin
 			}
 			
 			for ( MsgSyncHandler handler: sync_handlers ){
+				
+				handler.saveMessages();
 				
 				handler.destroy( true );
 			}
@@ -333,6 +356,15 @@ MsgSyncPlugin
 					
 					handler.sendMessage( message.getBytes( "UTF-8" ));
 					
+				}else if ( c.equals( "save" )){
+					
+					synchronized( this ){
+						
+						for ( MsgSyncHandler h: sync_handlers ){
+
+							h.saveMessages();
+						}
+					}
 				}else{
 				
 					log( "Unrecognized command" );
@@ -342,6 +374,32 @@ MsgSyncPlugin
 			
 			log( "Command exec failed", e );
 		}
+	}
+	
+	protected File
+	getLogsDir()
+	{
+		File logs_dir = new File( data_dir, "logs" );
+		
+		if ( !logs_dir.exists()){
+			
+			logs_dir.mkdirs();
+		}
+		
+		return( logs_dir );
+	}
+	
+	protected File
+	getPersistDir()
+	{
+		File logs_dir = new File( data_dir, "save" );
+		
+		if ( !logs_dir.exists()){
+			
+			logs_dir.mkdirs();
+		}
+		
+		return( logs_dir );
 	}
 	
 		// IPC start
@@ -484,6 +542,8 @@ MsgSyncPlugin
 			
 			addListener( handler, listener );
 		}
+		
+		handler.updateOptions( options );
 		
 		Map<String,Object>	reply = new HashMap<String, Object>();
 
@@ -842,7 +902,7 @@ MsgSyncPlugin
 				
 				if ( import_data == null ){
 					
-					h = new MsgSyncHandler( this, dht, key );
+					h = new MsgSyncHandler( this, dht, key, options );
 					
 				}else{
 					

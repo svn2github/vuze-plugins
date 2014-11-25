@@ -22,6 +22,7 @@
 
 package com.vuze.plugins.azmsgsync;
 
+import java.io.File;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.security.AlgorithmParameters;
@@ -49,6 +50,7 @@ import org.gudy.azureus2.core3.util.Base32;
 import org.gudy.azureus2.core3.util.ByteArrayHashMap;
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.FileUtil;
 import org.gudy.azureus2.core3.util.HashWrapper;
 import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.SHA1Simple;
@@ -271,11 +273,15 @@ MsgSyncHandler
 	private BloomFilter		live_node_counter_bloom = BloomFilterFactory.createAddOnly( 1000 );
 	private int				live_node_estimate;
 	
+	private boolean			save_messages;
+	private boolean			messages_loading;
+	
 	protected
 	MsgSyncHandler(
 		MsgSyncPlugin			_plugin,
 		DHTPluginInterface		_dht,
-		byte[]					_key )
+		byte[]					_key,
+		Map<String,Object>		_options )
 		
 		throws Exception
 	{
@@ -290,6 +296,8 @@ MsgSyncHandler
 		private_messaging_pk			= null;
 		private_messaging_contact		= null;
 		private_messaging_node			= null;
+		
+		updateOptions( _options );
 		
 		init();
 	}
@@ -461,6 +469,8 @@ MsgSyncHandler
 		
 		dht_call_key = dht_listen_key;
 		
+		loadMessages();
+		
 		checkDHT( true );
 	}
 	
@@ -571,6 +581,18 @@ MsgSyncHandler
 		COConfigurationManager.setDirty();
 		
 		init();
+	}
+	
+	protected void
+	updateOptions(
+		Map<String,Object>		options )
+	{
+		Boolean b = (Boolean)options.get( "save_messages" );
+		
+		if ( b != null ){
+			
+			save_messages = b;
+		}
 	}
 	
 	private static String
@@ -3681,6 +3703,198 @@ MsgSyncHandler
 		}
 		
 		return( false );
+	}
+	
+	private void
+	loadMessages()
+	{
+		if ( save_messages ){
+		
+			File dir = plugin.getPersistDir();
+			
+			final File file_name = new File( dir, Base32.encode( user_key ) + (is_anonymous_chat?"a":"p") + ".dat" );
+
+			if ( file_name.exists()){
+				
+				synchronized( message_lock ){
+
+					if ( dht.isInitialising()){
+					
+						messages_loading = true;
+						
+						final TimerEventPeriodic[]	event = {null};
+						
+						event[0] = 
+							SimpleTimer.addPeriodicEvent(
+								"msg-load",
+								1000,
+								new TimerEventPerformer() 
+								{
+									@Override
+									public void 
+									perform(
+										TimerEvent e ) 
+									{
+										synchronized( message_lock ){
+	
+											if ( messages_loading ){
+												
+												if ( dht.isInitialising()){
+		
+													return;
+												}
+												
+												messages_loading = false;
+													
+												loadMessages( file_name );
+											}
+											
+											event[0].cancel();
+										}
+									}
+								});
+					}else{
+						
+						loadMessages( file_name );
+					}
+				}
+			}
+		}
+	}
+	
+	private void
+	loadMessages(
+		File		file_name )
+	{
+		try{
+			Map map = FileUtil.readResilientFile( file_name );
+			
+			Long				time 		= (Long)map.get( "time" );
+			Map<String,Map>		node_imp	= (Map)map.get( "nodes" );
+			List<Map>			msg_imp		= (List<Map>)map.get( "messages" );
+			
+			if ( time == null || node_imp == null || msg_imp == null ){
+				
+				return;
+			}
+			
+			int	elapsed_secs = (int)( ( SystemTime.getCurrentTime() - time )/1000 );
+			
+			if ( elapsed_secs < 0 ){
+				
+				elapsed_secs = 0;
+			}
+			
+			Map<Integer,MsgSyncNode>	node_map = new HashMap<Integer, MsgSyncNode>();
+			
+			for ( Map.Entry<String,Map>	entry: node_imp.entrySet()){
+				
+				int id = Integer.parseInt( entry.getKey());
+				
+				Map	m = entry.getValue();
+				
+				byte[]	uid 		= (byte[])m.get( "u" );
+				byte[]	public_key	= (byte[])m.get( "p" );
+				
+				DHTPluginContact	contact = dht.importContact((Map)m.get( "c" ));
+				
+				MsgSyncNode node = addNode( contact, uid, public_key );
+				
+				node_map.put( id, node );
+			}
+			
+			for ( Map m: msg_imp ){
+				
+				int node_id = ((Long)m.get( "n" )).intValue();
+				
+				MsgSyncNode node = node_map.get( node_id );
+				
+				if ( node == null ){
+					
+					Debug.out( "Node not found!" );
+					
+					continue;
+				}
+				
+				byte[]	id 		= (byte[])m.get( "i" );
+				byte[]	content = generalMessageDecrypt((byte[])m.get( "c" ));
+				byte[]	sig		= (byte[])m.get( "s" );
+				
+				int	age_secs = ((Long)m.get( "a" )).intValue();
+				
+				addMessage( node, id, content, sig, age_secs + elapsed_secs, null, true );
+			}
+		}catch( Throwable e ){
+			
+			
+		}
+	}
+	
+	protected void
+	saveMessages()
+	{
+		if ( save_messages ){
+			
+			File dir = plugin.getPersistDir();
+			
+			File file_name = new File( dir, Base32.encode( user_key ) + (is_anonymous_chat?"a":"p") + ".dat" );
+						
+			synchronized( message_lock ){
+			
+				if ( messages_loading ){
+					
+					return;
+				}
+				
+				Map map = new HashMap();
+
+				map.put( "time", SystemTime.getCurrentTime());
+				
+				Map	node_exp = new HashMap();
+
+				map.put( "nodes", node_exp );
+				
+				List msg_exp =new ArrayList<Map>();
+				
+				map.put( "messages", msg_exp );
+			
+				Map<MsgSyncNode,Integer>	node_map = new HashMap<MsgSyncNode, Integer>();
+						
+				for ( MsgSyncMessage msg: messages ){
+
+					MsgSyncNode node = msg.getNode();
+					
+					Integer node_id = node_map.get( node );
+					
+					if ( node_id == null ){
+						
+						node_id = new Integer( node_map.size());
+						
+						node_map.put( node, node_id );
+						
+						Map m = new HashMap();
+						
+						m.put( "u", node.getUID());
+						m.put( "p", node.getPublicKey());
+						m.put( "c", node.getContact().exportToMap());
+						
+						node_exp.put( String.valueOf( node_id ), m );
+					}
+					
+					Map m = new HashMap();
+					
+					m.put( "n", node_id.intValue());
+					m.put( "i", msg.getID());
+					m.put( "c", generalMessageEncrypt( msg.getContent())); 
+					m.put( "s", msg.getSignature());
+					m.put( "a", msg.getAgeSecs());
+					
+					msg_exp.add( m );
+				}
+					
+				FileUtil.writeResilientFile( file_name,  map );
+			}
+		}
 	}
 	
 	protected void
