@@ -416,7 +416,7 @@ class ConsoleText extends StyledText implements MouseMoveListener, MouseListener
 			{
 				pos = getOffsetAtLocation(new Point(e.x, e.y));
 				extendedStyle = getExtendedStyle(pos);
-				if ((extendedStyle[2] & HYPERLINK) > 0)
+				if (extendedStyle != null && (extendedStyle[2] & HYPERLINK) > 0)
 				{
 					setSelection(extendedStyle[0], extendedStyle[0] +
 					extendedStyle[1]);
