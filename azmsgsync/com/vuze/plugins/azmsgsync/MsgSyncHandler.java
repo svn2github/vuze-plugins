@@ -388,6 +388,7 @@ MsgSyncHandler
 		}catch( Throwable e ){
 		}
 				
+		log( "Created" );
 		
 		byte[] _my_uid = (byte[])map.get( "uid" );
 		
@@ -3824,10 +3825,11 @@ MsgSyncHandler
 				
 				addMessage( node, id, content, sig, age_secs + elapsed_secs, null, true );
 			}
+						
 		}catch( Throwable e ){
-			
-			
 		}
+		
+		log( "Loaded " + messages.size() + " messages" );
 	}
 	
 	protected void
@@ -3893,6 +3895,8 @@ MsgSyncHandler
 				}
 					
 				FileUtil.writeResilientFile( file_name,  map );
+				
+				log( "Saved " + messages.size() + " messages" );
 			}
 		}
 	}
@@ -3909,6 +3913,8 @@ MsgSyncHandler
 		}
 		
 		if ( linger ){
+			
+			log( "Destroying..." );
 			
 			final long start = SystemTime.getMonotonousTime();
 			
@@ -3946,6 +3952,8 @@ MsgSyncHandler
 			}
 		}else{
 			
+			log( "Destroyed" );
+
 			destroyed	= true;
 			
 			status = ST_DESTROYED;
@@ -3965,7 +3973,7 @@ MsgSyncHandler
 	log(
 		String	str )
 	{
-		plugin.log( str );
+		plugin.log( friendly_name + ": " + str );
 	}
 	
 

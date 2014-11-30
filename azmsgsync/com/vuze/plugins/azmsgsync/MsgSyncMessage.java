@@ -57,7 +57,7 @@ MsgSyncMessage
 		content		= _content;
 		signature	= _signature;
 		
-		age_when_received_secs	= _age_secs;
+		age_when_received_secs	= _age_secs < 0 ?0:_age_secs;
 		time_received			= SystemTime.getCurrentTime();		// can't use monotime here as computer sleep suspends it :(
 		
 		if ( content == null ){
@@ -124,7 +124,7 @@ MsgSyncMessage
 	public long
 	getTimestamp()
 	{
-		return( time_received - age_when_received_secs*1000 );
+		return( time_received - age_when_received_secs*1000L );
 	}
 	
 	public int
