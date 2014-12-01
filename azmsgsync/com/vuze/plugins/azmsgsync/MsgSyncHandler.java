@@ -1727,32 +1727,56 @@ MsgSyncHandler
 			
 	public void
 	sendMessage(
-		final byte[]		content )
+		final byte[]		content,
+		Map<String,Object>	options )
 	{
-		long now = SystemTime.getMonotonousTime();
+		Boolean is_local = (Boolean)options.get( "is_local" );
 		
-		long time_since_last = now - send_last;
-		
-		long delay = 1000 - time_since_last;
-		
-		if ( delay > 0 ){
-			
-			if ( delay > 1000 ){
-				
-				delay = 1000;
-			}
+		if ( is_local != null && is_local ){
 			
 			try{
-				Thread.sleep( delay );
+				String message = (String)options.get( "message" );
 				
+				int	message_type = ((Number)options.get( "message_type" )).intValue();
+				
+				if ( message_type == 1 || message_type == 2 ){
+				
+					reportInfoRaw( message );
+					
+				}else{
+					
+					reportErrorRaw( message );
+				}
 			}catch( Throwable e ){
 				
+				Debug.out( e );
 			}
+		}else{
+			long now = SystemTime.getMonotonousTime();
+			
+			long time_since_last = now - send_last;
+			
+			long delay = 1000 - time_since_last;
+			
+			if ( delay > 0 ){
+				
+				if ( delay > 1000 ){
+					
+					delay = 1000;
+				}
+				
+				try{
+					Thread.sleep( delay );
+					
+				}catch( Throwable e ){
+					
+				}
+			}
+			
+			send_last = SystemTime.getMonotonousTime();
+			
+			sendMessageSupport(content );
 		}
-		
-		send_last = SystemTime.getMonotonousTime();
-		
-		sendMessageSupport( content );
 	}
 	
 	private void
@@ -1774,9 +1798,9 @@ MsgSyncHandler
 	
 	private void
 	reportInfoRaw(
-		String		error )
+		String		info )
 	{
-		reportSupport( null, "i:" + error );
+		reportSupport( null, "i:" + info );
 	}
 	
 	private void

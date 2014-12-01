@@ -66,6 +66,8 @@ MsgSyncPlugin
 {
 	protected static final int	TIMER_PERIOD = 2500;
 	
+	private static final int 	IPC_VERSION	= 2;
+	
 	
 	private PluginInterface			plugin_interface;
 	private LoggerChannel 			log;
@@ -354,7 +356,7 @@ MsgSyncPlugin
 						
 					log( "Got handler: " + handler.getString());
 					
-					handler.sendMessage( message.getBytes( "UTF-8" ));
+					handler.sendMessage( message.getBytes( "UTF-8" ), new HashMap<String, Object>());
 					
 				}else if ( c.equals( "save" )){
 					
@@ -502,6 +504,8 @@ MsgSyncPlugin
 		
 		reply.put( "ro", handler.isReadOnly());
 
+		reply.put( "ipc_version", IPC_VERSION );
+		 
 		synchronized( this ){
 			
 			if ( destroyed ){
@@ -551,6 +555,8 @@ MsgSyncPlugin
 		reply.put( "mpk", handler.getManagingPublicKey());
 		reply.put( "ro", handler.isReadOnly());
 
+		reply.put( "ipc_version", IPC_VERSION );
+		
 		return( reply );
 	}
 	
@@ -697,7 +703,7 @@ MsgSyncPlugin
 			throw( new IPCException( "Plugin has been unloaded" ));
 		}
 		
-		handler.sendMessage( content );
+		handler.sendMessage( content, options );
 		
 		Map<String,Object>	reply = new HashMap<String, Object>();
 
