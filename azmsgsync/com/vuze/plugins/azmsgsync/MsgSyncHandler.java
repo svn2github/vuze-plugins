@@ -1550,7 +1550,7 @@ MsgSyncHandler
 		trace( "management message:" + message );
 	}
 	
-	private void
+	private boolean
 	addMessage(
 		MsgSyncNode				node,
 		byte[]					message_id,
@@ -1573,7 +1573,7 @@ MsgSyncHandler
 				
 				if ( !management_message ){
 					
-					return;
+					return( false );
 				}				
 			}
 			
@@ -1609,10 +1609,10 @@ MsgSyncHandler
 			}
 		}
 		
-		addMessage( msg, age_secs, is_incoming );
+		return( addMessage( msg, age_secs, is_incoming ));
 	}
 	
-	private void
+	private boolean
 	addMessage(
 		MsgSyncMessage		msg,
 		int					age_secs,
@@ -1629,7 +1629,7 @@ MsgSyncHandler
 			
 				if ( message_sigs.containsKey( signature )){
 					
-					return;
+					return( false );
 				}
 				
 				byte[] inv_signature = signature.clone();
@@ -1641,7 +1641,7 @@ MsgSyncHandler
 				
 				if ( deleted_messages_inverted_sigs.contains( inv_signature )){
 					
-					return;
+					return( false );
 				}
 				
 				message_sigs.put( signature, "" );
@@ -1687,7 +1687,7 @@ MsgSyncHandler
 					
 							// not added after all
 						
-						return;
+						return( false );
 					}
 					
 					byte[] inv_sig = sig.clone();
@@ -1724,6 +1724,8 @@ MsgSyncHandler
 				}
 			}
 		}
+		
+		return( true );
 	}
 			
 	public void
@@ -2909,6 +2911,13 @@ MsgSyncHandler
 				
 				for ( byte[] inv_sig: deleted_messages_inverted_sigs ){
 					
+					inv_sig = inv_sig.clone();
+					
+					for ( int j=0;j<rand.length;j++){
+						
+						inv_sig[j] ^= rand[j];
+					}
+
 					bloom_keys.put( inv_sig, ""  );
 				}
 				
@@ -3042,7 +3051,8 @@ MsgSyncHandler
 													
 						//log( "Message: " + ByteFormatter.encodeString( message_id ) + ": " + new String( content ) + ", age=" + age );
 													
-					boolean handled = false;
+					boolean handled 	= false;
+					boolean	new_message	= false;
 					
 						// see if we already have a node with the correct public key
 					
@@ -3071,7 +3081,7 @@ MsgSyncHandler
 								
 								if ( sig.verify( signature )){
 									
-									addMessage( node, message_id, content, signature, age, new_history, contact_map, true );
+									new_message = addMessage( node, message_id, content, signature, age, new_history, contact_map, true );
 									
 									handled = true;
 									
@@ -3111,7 +3121,7 @@ MsgSyncHandler
 									
 									MsgSyncNode msg_node = addNode( n.getContact(), node_uid, pk );
 									
-									addMessage( msg_node, message_id, content, signature, age, new_history, contact_map, true );
+									new_message = addMessage( msg_node, message_id, content, signature, age, new_history, contact_map, true );
 									
 									handled = true;
 									
@@ -3171,16 +3181,30 @@ MsgSyncHandler
 									
 								all_public_keys.add( msg_node );
 								
-								addMessage( msg_node, message_id, content, signature, age, new_history, contact_map, true );
+								new_message = addMessage( msg_node, message_id, content, signature, age, new_history, contact_map, true );
 								
 								handled = true;
 							}
 						}
 					}
 					
-					if (handled ){
+					if ( new_message ){
 						
 						total_received++;
+						
+						if ( new_history != null ){
+							
+							int	len = new_history.length & 0x0000fffc;
+							
+							for ( int i=0; i < len; i+=4 ){
+								
+								byte[] key = new byte[4];
+								
+								System.arraycopy( new_history, 0, key, 0, 4 );
+								
+								System.out.println( "key=" + ByteFormatter.encodeString( key ) + ", tot=" + total_received );
+							}
+						}
 					}
 				}catch( Throwable e ){
 					
@@ -3286,7 +3310,7 @@ MsgSyncHandler
 				sync_data = generalMessageEncrypt( sync_data );
 			}
 			
-			long	start = SystemTime.getMonotonousTime();
+			// long	start = SystemTime.getMonotonousTime();
 			
 			byte[] reply_bytes = 
 				sync_node.getContact().call(
@@ -3308,7 +3332,7 @@ MsgSyncHandler
 					sync_data, 
 					30*1000 );
 		
-			//if (TRACE )trace( "Call took " + ( SystemTime.getMonotonousTime() - start ));
+			// if (TRACE )trace( "Call took " + ( SystemTime.getMonotonousTime() - start ));
 			
 			if ( reply_bytes == null ){
 
