@@ -12,11 +12,6 @@
     </manifest>
     <selectedElements exportClassFiles="true" exportJavaFiles="true" exportOutputFolder="false">
         <javaElement handleIdentifier="=azpromo/&lt;com.vuze.azureus.plugin.azpromo.internat"/>
-        <file path="/azpromo/azpromo_1.0.6.jar"/>
-        <file path="/azpromo/plugin.properties"/>
         <javaElement handleIdentifier="=azpromo/&lt;com.vuze.azureus.plugin.azpromo"/>
-        <file path="/azpromo/.project"/>
-        <file path="/azpromo/.classpath"/>
-        <file path="/azpromo/jarit.jardesc"/>
     </selectedElements>
 </jardesc>
