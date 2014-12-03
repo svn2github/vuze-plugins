@@ -1557,10 +1557,11 @@ MsgSyncHandler
 		byte[]					content,
 		byte[]					signature,
 		int						age_secs,
+		byte[]					history,
 		Map<String,Object>		opt_contact,
 		boolean					is_incoming )
 	{
-		MsgSyncMessage msg = new MsgSyncMessage( node, message_id, content, signature, age_secs );
+		MsgSyncMessage msg = new MsgSyncMessage( node, message_id, content, signature, age_secs, history );
 
 		boolean management_message = managing_pk != null && Arrays.equals( node.getPublicKey(), managing_pk );
 		
@@ -1882,7 +1883,7 @@ MsgSyncHandler
 			
 			byte[]	sig_bytes = sig.sign();
 			
-			addMessage( my_node, message_id, content, sig_bytes, 0, null, false );
+			addMessage( my_node, message_id, content, sig_bytes, 0, null, null, false );
 			
 			sync( true );
 			
@@ -2948,13 +2949,18 @@ MsgSyncHandler
 		}	
 	}
 	
-	private void
+	private int
 	receiveMessages(
+		MsgSyncNode						originator,
 		BloomDetails					bloom_details,
 		List<Map<String,Object>>		list )
 	{
 			// prevent multiple concurrent replies using a cached bloom filter state from
 			// interfering with one another during message extraction
+		
+		byte[]	originator_key = null;
+		
+		int	total_received = 0;
 		
 		synchronized( bloom_details ){
 			
@@ -2962,6 +2968,10 @@ MsgSyncHandler
 			
 			List<MsgSyncNode>	all_public_keys = bloom_details.all_public_keys;
 	
+				// don't bother with this until its a busy channel
+			
+			boolean	record_history = messages.size() >= MAX_MESSAGES;
+			
 			for ( Map<String,Object> m: list ){
 				
 				try{
@@ -2971,6 +2981,56 @@ MsgSyncHandler
 					byte[] message_id 	= (byte[])m.get( "i" );
 					byte[] content		= (byte[])m.get( "c" );
 					byte[] signature	= (byte[])m.get( "s" );
+					byte[] old_history	= (byte[])m.get( "h" );
+					
+					byte[] new_history;
+					
+					if ( record_history ){
+						
+						if ( originator_key == null ){
+							
+							originator_key = new byte[4];
+
+							try{
+								byte[] temp = new SHA1Simple().calculateHash( originator.getContactAddress().getBytes( "UTF-8" ));
+							
+								System.arraycopy( temp, 0, originator_key, 0, 4 );
+								
+							}catch( Throwable e ){
+								
+								Debug.out( e );
+							}
+						}
+						
+						if ( old_history == null || old_history.length == 0 ){
+							
+							new_history	= originator_key;
+							
+						}else{
+							
+							int	old_len = old_history.length;
+							
+							if ( old_len > 36 ){
+								
+								new_history = new byte[40];
+								
+								System.arraycopy( originator_key, 0, new_history, 0, 4 );
+								
+								System.arraycopy( old_history, 0, new_history, 4, 36 );
+								
+							}else{
+	
+								new_history = new byte[old_len + 4];
+								
+								System.arraycopy( originator_key, 0, new_history, 0, 4 );
+								
+								System.arraycopy( old_history, 0, new_history, 4, old_len );
+							}
+						}
+					}else{
+						
+						new_history = old_history;
+					}
 					
 					int	age = ((Number)m.get( "a" )).intValue();
 							
@@ -3011,7 +3071,7 @@ MsgSyncHandler
 								
 								if ( sig.verify( signature )){
 									
-									addMessage( node, message_id, content, signature, age, contact_map, true );
+									addMessage( node, message_id, content, signature, age, new_history, contact_map, true );
 									
 									handled = true;
 									
@@ -3051,7 +3111,7 @@ MsgSyncHandler
 									
 									MsgSyncNode msg_node = addNode( n.getContact(), node_uid, pk );
 									
-									addMessage( msg_node, message_id, content, signature, age, contact_map, true );
+									addMessage( msg_node, message_id, content, signature, age, new_history, contact_map, true );
 									
 									handled = true;
 									
@@ -3111,9 +3171,16 @@ MsgSyncHandler
 									
 								all_public_keys.add( msg_node );
 								
-								addMessage( msg_node, message_id, content, signature, age, contact_map, true );
+								addMessage( msg_node, message_id, content, signature, age, new_history, contact_map, true );
+								
+								handled = true;
 							}
 						}
+					}
+					
+					if (handled ){
+						
+						total_received++;
 					}
 				}catch( Throwable e ){
 					
@@ -3121,6 +3188,8 @@ MsgSyncHandler
 				}
 			}
 		}
+		
+		return( total_received );
 	}
 	
 	private void
@@ -3287,14 +3356,20 @@ MsgSyncHandler
 
 					List<Map<String,Object>>	list = (List<Map<String,Object>>)reply_map.get( "m" );
 					
+					int	received;
+					
 					if ( list != null ){
 												
-						receiveMessages( bloom_details, list );
+						received = receiveMessages( sync_node, bloom_details, list );
+						
+					}else{
+						
+						received = 0;
 					}
 					
 					Number x_temp = (Number)reply_map.get( "x" );
 					
-					if ( x_temp != null ){
+					if ( x_temp != null && received >= 2 ){
 						
 						int	more_to_come = x_temp.intValue();
 						
@@ -3569,7 +3644,8 @@ MsgSyncHandler
 						m.put( "c", content );
 						m.put( "s", message.getSignature());
 						m.put( "a", message.getAgeSecs());
-							
+						m.put( "h", message.getHistory());
+						
 						message.delivered();
 						
 						if ( !done_nodes.contains( n )){
@@ -3845,9 +3921,11 @@ MsgSyncHandler
 				byte[]	content = generalMessageDecrypt((byte[])m.get( "c" ));
 				byte[]	sig		= (byte[])m.get( "s" );
 				
+				byte[]	history	= (byte[])m.get( "h" );
+				
 				int	age_secs = ((Long)m.get( "a" )).intValue();
 				
-				addMessage( node, id, content, sig, age_secs + elapsed_secs, null, true );
+				addMessage( node, id, content, sig, age_secs + elapsed_secs, history, null, true );
 			}
 						
 		}catch( Throwable e ){
@@ -3914,6 +3992,7 @@ MsgSyncHandler
 					m.put( "c", generalMessageEncrypt( msg.getContent())); 
 					m.put( "s", msg.getSignature());
 					m.put( "a", msg.getAgeSecs());
+					m.put( "h", msg.getHistory());
 					
 					msg_exp.add( m );
 				}
