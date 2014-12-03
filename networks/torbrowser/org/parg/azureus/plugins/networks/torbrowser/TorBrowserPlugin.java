@@ -938,6 +938,8 @@ TorBrowserPlugin
 				
 				cmd_list.add( PROFILE_DIR + slash );
 				
+				cmd_list.add( "-allow-remote" );
+				
 			}else if ( Constants.isOSX ){
 								
 				if ( new_launch ){
@@ -947,6 +949,8 @@ TorBrowserPlugin
 					cmd_list.add( "-profile" );
 					
 					cmd_list.add( PROFILE_DIR );
+					
+					cmd_list.add( "-allow-remote" );
 					
 				}else{
 					
@@ -990,6 +994,8 @@ TorBrowserPlugin
 				cmd_list.add( "-profile" );
 				
 				cmd_list.add( PROFILE_DIR );
+				
+				cmd_list.add( "-allow-remote" );
 			}
 			
 			ProcessBuilder pb = GeneralUtils.createProcessBuilder( root, cmd_list.toArray(new String[cmd_list.size()]), null );

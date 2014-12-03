@@ -3,11 +3,12 @@ The 'Tor Browser' components included in this plugin are derived directly from t
 -- versions 4.0 and higher
 
 Windows:
-    .\Docs
-    .\Tor
     .\Start Tor Browser.exe
-    .\Data\Tor
-    .\Data\Browser\profile.default\extensions\tor-launcher@torproject.org.xpi
+    .\Browser\TorBrowser\Docs
+    .\Browser\TorBrowser\Tor
+    .\Browser\TorBrowser\Data\Tor
+    .\Browser\TorBrowser\Data\Browser\profile.default\extensions\tor-launcher@torproject.org.xpi
+
 
 Mac:
     .\TorBrowser\Docs
@@ -18,11 +19,11 @@ Mac:
 -- versions prior to 4.0
 
 Windows:
+    .\Docs
+    .\Tor
     .\Start Tor Browser.exe
-    .\Browser\TorBrowser\Docs
-    .\Browser\TorBrowser\Tor
-    .\Browser\TorBrowser\Data\Tor
-    .\Browser\TorBrowser\Data\Browser\profile.default\extensions\tor-launcher@torproject.org.xpi
+    .\Data\Tor
+    .\Data\Browser\profile.default\extensions\tor-launcher@torproject.org.xpi
 
 Mac:
     .\Docs
