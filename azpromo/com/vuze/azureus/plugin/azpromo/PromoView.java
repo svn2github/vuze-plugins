@@ -171,13 +171,17 @@ public class PromoView
 				super.onAdStarted();
 			}
 		});
+		
+		String pubID = PromoPlugin.pluginInterface.getPluginProperties().getProperty("PubID", "mawra2ag1");
+		log("pubID len=" + pubID.length());
+
 		IAdControlOptions options = adControl.getOptions();
 		options.setPlayerOption(IAdControlOptions.Player.AUTO_MUTE, true);
-		options.setPubID("mawra2ag1");
+		options.setPubID(pubID);
 		options.setPageName("vuze");
 		options.setPubConfigURL("http://vuze-pubcfg.desktopadx.com/service/pubcfg/get.php?id=");   
 		options.setRequestDomain("btpr.vuze.com");
-
+		
 		PromoPlugin.pluginInterface.getUtilities().createThread("LoadPromo",
 				new Runnable() {
 
