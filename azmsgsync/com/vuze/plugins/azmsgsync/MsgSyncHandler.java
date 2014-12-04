@@ -189,7 +189,17 @@ MsgSyncHandler
 		
 	private Object							message_lock					= new Object();
 	private LinkedList<MsgSyncMessage>		messages 						= new LinkedList<MsgSyncMessage>();
-	private LinkedList<byte[]>				deleted_messages_inverted_sigs 	= new LinkedList<byte[]>();
+	private Map<HashWrapper,String>			deleted_messages_inverted_sigs_map = 
+			new LinkedHashMap<HashWrapper,String>(MAX_DELETED_MESSAGES,0.75f,true)
+			{
+				protected boolean 
+				removeEldestEntry(
+			   		Map.Entry<HashWrapper,String> eldest) 
+				{
+					return size() > MAX_DELETED_MESSAGES;
+				}
+			};
+			
 	private int								message_mutation_id;
 	
 	private ByteArrayHashMap<String>		message_sigs			= new ByteArrayHashMap<String>();
@@ -1639,7 +1649,7 @@ MsgSyncHandler
 					inv_signature[i] ^= 0xff;
 				}
 				
-				if ( deleted_messages_inverted_sigs.contains( inv_signature )){
+				if ( deleted_messages_inverted_sigs_map.containsKey( new HashWrapper( inv_signature ))){
 					
 					return( false );
 				}
@@ -1697,12 +1707,7 @@ MsgSyncHandler
 						inv_sig[j] ^= 0xff; 
 					}
 					
-					deleted_messages_inverted_sigs.addLast( inv_sig );
-										
-					if ( deleted_messages_inverted_sigs.size() > MAX_DELETED_MESSAGES ){
-						
-						deleted_messages_inverted_sigs.removeFirst();
-					}
+					deleted_messages_inverted_sigs_map.put( new HashWrapper( inv_sig ), "" );
 				}
 			}
 		}
@@ -2909,9 +2914,9 @@ MsgSyncHandler
 					bloom_keys.put( sig, ""  );
 				}
 				
-				for ( byte[] inv_sig: deleted_messages_inverted_sigs ){
+				for ( HashWrapper hw: deleted_messages_inverted_sigs_map.keySet()){
 					
-					inv_sig = inv_sig.clone();
+					byte[] inv_sig = hw.getBytes().clone();
 					
 					for ( int j=0;j<rand.length;j++){
 						
@@ -3202,7 +3207,7 @@ MsgSyncHandler
 								
 								System.arraycopy( new_history, 0, key, 0, 4 );
 								
-								System.out.println( "key=" + ByteFormatter.encodeString( key ) + ", tot=" + total_received );
+								//System.out.println( "key=" + ByteFormatter.encodeString( key ) + ", tot=" + total_received );
 							}
 						}
 					}
