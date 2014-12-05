@@ -49,6 +49,7 @@ import org.gudy.azureus2.core3.util.BEncoder;
 import org.gudy.azureus2.core3.util.Base32;
 import org.gudy.azureus2.core3.util.ByteArrayHashMap;
 import org.gudy.azureus2.core3.util.ByteFormatter;
+import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.FileUtil;
 import org.gudy.azureus2.core3.util.HashWrapper;
@@ -201,10 +202,12 @@ MsgSyncHandler
 			};
 			
 	private int								message_mutation_id;
+	private int								message_new_count;
 	
 	private ByteArrayHashMap<String>		message_sigs			= new ByteArrayHashMap<String>();
 	
-		
+	private static final int MAX_HISTORY_RECORD_LEN	= 80;
+	
 	private Map<HashWrapper,String>	request_id_history = 
 		new LinkedHashMap<HashWrapper,String>(512,0.75f,true)
 		{
@@ -742,15 +745,26 @@ MsgSyncHandler
 		return( last_dht_count );
 	}
 	
+	private int[]	node_count_cache;
+	private long	node_count_cache_time;
+	
 	public int[]
-	getNodeCounts()
+	getNodeCounts(
+		boolean	allow_cache )
 	{
 		int	total	= 0;
 		int	live	= 0;
 		int	dying	= 0;
 		
+		long now = SystemTime.getMonotonousTime();
+		
 		synchronized( node_uid_map ){
 		
+			if ( allow_cache && node_count_cache != null && now - node_count_cache_time < 5000 ){
+				
+				return( node_count_cache );
+			}
+			
 			for ( List<MsgSyncNode> nodes: node_uid_map.values()){
 				
 				for ( MsgSyncNode node: nodes ){
@@ -769,9 +783,13 @@ MsgSyncHandler
 					}
 				}
 			}
-		}
+			
+			node_count_cache = new int[]{ total, live, dying }; 
 		
-		return( new int[]{ total, live, dying });
+			node_count_cache_time	= now;
+					
+			return( node_count_cache );
+		}
 	}
 	
 	public double[]
@@ -1560,6 +1578,10 @@ MsgSyncHandler
 		trace( "management message:" + message );
 	}
 	
+	final static int	MS_LOCAL		= 0;
+	final static int	MS_INCOMING		= 1;
+	final static int	MS_LOADING		= 2;
+	
 	private boolean
 	addMessage(
 		MsgSyncNode				node,
@@ -1569,11 +1591,24 @@ MsgSyncHandler
 		int						age_secs,
 		byte[]					history,
 		Map<String,Object>		opt_contact,
-		boolean					is_incoming )
+		int						msg_source )
 	{
 		MsgSyncMessage msg = new MsgSyncMessage( node, message_id, content, signature, age_secs, history );
 
+		return( addMessage( msg, opt_contact, msg_source ));
+	}
+	
+	private boolean
+	addMessage(
+		MsgSyncMessage 			msg,
+		Map<String,Object>		opt_contact,
+		int						msg_source )
+	{
+		MsgSyncNode node = msg.getNode();
+		
 		boolean management_message = managing_pk != null && Arrays.equals( node.getPublicKey(), managing_pk );
+		
+		boolean is_incoming = msg_source == MS_INCOMING || msg_source == MS_LOADING;
 		
 		if ( is_incoming ){
 		
@@ -1603,6 +1638,16 @@ MsgSyncHandler
 			processManagementMessage( msg );
 		}
 		
+		byte[] history = msg.getHistory();
+		
+		if ( msg_source == MS_INCOMING && history.length > 0 ){
+			
+			if ( !historyReceived( history )){
+				
+				msg.setLocalMessage( "Message ignored due to flooding" );
+			}
+		}
+		
 		if ( is_incoming && opt_contact != null ){
 			
 				// see if this is a more up-to-date contact address for the contact
@@ -1618,16 +1663,7 @@ MsgSyncHandler
 				node.setDetails( new_contact, current );
 			}
 		}
-		
-		return( addMessage( msg, age_secs, is_incoming ));
-	}
-	
-	private boolean
-	addMessage(
-		MsgSyncMessage		msg,
-		int					age_secs,
-		boolean				is_incoming )
-	{				
+				
 		if ( msg.getMessageType() == MsgSyncMessage.ST_NORMAL_MESSAGE || is_incoming ){
 			
 				// remember message if is it valid or it is incoming - latter is to 
@@ -1659,6 +1695,8 @@ MsgSyncHandler
 				ListIterator<MsgSyncMessage> lit = messages.listIterator(messages.size());
 				
 				boolean added = false;
+				
+				int	age_secs = msg.getAgeSecsWhenReceived();
 				
 				while( lit.hasPrevious()){
 					
@@ -1709,6 +1747,8 @@ MsgSyncHandler
 					
 					deleted_messages_inverted_sigs_map.put( new HashWrapper( inv_sig ), "" );
 				}
+				
+				message_new_count++;
 			}
 		}
 		
@@ -1732,14 +1772,31 @@ MsgSyncHandler
 		
 		return( true );
 	}
+		
+	private void
+	processCommand(
+		String		cmd )
+	{
+		if ( cmd.equals( "reset" )){
 			
+			resetHistories();
+			
+			reportInfoRaw( "Reset performed" );
+			
+		}else{
+		
+			reportErrorRaw( "Unrecognized control command: " + cmd );
+		}
+	}
+	
 	public void
 	sendMessage(
 		final byte[]		content,
 		Map<String,Object>	options )
 	{
-		Boolean is_local = (Boolean)options.get( "is_local" );
-		
+		Boolean is_local 	= (Boolean)options.get( "is_local" );
+		Boolean is_control 	= (Boolean)options.get( "is_control" );
+
 		if ( is_local != null && is_local ){
 			
 			try{
@@ -1759,6 +1816,13 @@ MsgSyncHandler
 				
 				Debug.out( e );
 			}
+			
+		}else if ( is_control != null && is_control ){
+			
+			String cmd = (String)options.get( "cmd" );
+
+			processCommand( cmd );
+			
 		}else{
 			long now = SystemTime.getMonotonousTime();
 			
@@ -1890,7 +1954,7 @@ MsgSyncHandler
 			
 			byte[]	sig_bytes = sig.sign();
 			
-			addMessage( my_node, message_id, content, sig_bytes, 0, null, null, false );
+			addMessage( my_node, message_id, content, sig_bytes, 0, null, null, MS_LOCAL );
 			
 			sync( true );
 			
@@ -2892,10 +2956,10 @@ MsgSyncHandler
 								
 								for ( int j=0;j<rand.length;j++){
 									
-									ad[j] ^= rand[j];
+									pk_ad[j] ^= rand[j];
 								}
 								
-								bloom_keys.put( ad, "" );
+								bloom_keys.put( pk_ad, "" );
 								
 							}catch( Throwable e ){
 								
@@ -2928,7 +2992,7 @@ MsgSyncHandler
 				
 					// in theory we could have 64 sigs + 64 pks -> 128 -> 1280 bits -> 160 bytes + overhead
 				
-				int	bloom_bits = bloom_keys.size() * 10;
+				int	bloom_bits = bloom_keys.size() * 10 + RandomUtils.nextInt( 19 );
 					
 				if ( bloom_bits < MIN_BLOOM_BITS ){
 				
@@ -2957,6 +3021,14 @@ MsgSyncHandler
 				}
 			}		
 		
+			if ( bloom == null ){
+				
+				if ( Constants.isCVSVersion()){
+					
+					Debug.out( "Bloom construction failed" );
+				}
+			}
+			
 			last_bloom_details = new BloomDetails( message_mutation_id, rand, bloom, msg_node_map, all_public_keys, message_count );
 			
 			return( last_bloom_details );
@@ -2984,7 +3056,7 @@ MsgSyncHandler
 	
 				// don't bother with this until its a busy channel
 			
-			boolean	record_history = messages.size() >= MAX_MESSAGES;
+			boolean	record_history = message_new_count >= MAX_MESSAGES;
 			
 			for ( Map<String,Object> m: list ){
 				
@@ -3026,11 +3098,11 @@ MsgSyncHandler
 							
 							if ( old_len > 36 ){
 								
-								new_history = new byte[40];
+								new_history = new byte[MAX_HISTORY_RECORD_LEN];
 								
 								System.arraycopy( originator_key, 0, new_history, 0, 4 );
 								
-								System.arraycopy( old_history, 0, new_history, 4, 36 );
+								System.arraycopy( old_history, 0, new_history, 4, MAX_HISTORY_RECORD_LEN-4 );
 								
 							}else{
 	
@@ -3086,7 +3158,7 @@ MsgSyncHandler
 								
 								if ( sig.verify( signature )){
 									
-									new_message = addMessage( node, message_id, content, signature, age, new_history, contact_map, true );
+									new_message = addMessage( node, message_id, content, signature, age, new_history, contact_map, MS_INCOMING );
 									
 									handled = true;
 									
@@ -3126,7 +3198,7 @@ MsgSyncHandler
 									
 									MsgSyncNode msg_node = addNode( n.getContact(), node_uid, pk );
 									
-									new_message = addMessage( msg_node, message_id, content, signature, age, new_history, contact_map, true );
+									new_message = addMessage( msg_node, message_id, content, signature, age, new_history, contact_map, MS_INCOMING );
 									
 									handled = true;
 									
@@ -3186,7 +3258,7 @@ MsgSyncHandler
 									
 								all_public_keys.add( msg_node );
 								
-								new_message = addMessage( msg_node, message_id, content, signature, age, new_history, contact_map, true );
+								new_message = addMessage( msg_node, message_id, content, signature, age, new_history, contact_map, MS_INCOMING );
 								
 								handled = true;
 							}
@@ -3196,20 +3268,6 @@ MsgSyncHandler
 					if ( new_message ){
 						
 						total_received++;
-						
-						if ( new_history != null ){
-							
-							int	len = new_history.length & 0x0000fffc;
-							
-							for ( int i=0; i < len; i+=4 ){
-								
-								byte[] key = new byte[4];
-								
-								System.arraycopy( new_history, 0, key, 0, 4 );
-								
-								//System.out.println( "key=" + ByteFormatter.encodeString( key ) + ", tot=" + total_received );
-							}
-						}
 					}
 				}catch( Throwable e ){
 					
@@ -3219,6 +3277,164 @@ MsgSyncHandler
 		}
 		
 		return( total_received );
+	}
+	
+	private BloomFilter	history_key_bloom;
+	private long		history_key_bloom_create_time;
+	private int			history_key_bloom_size	= 1024;
+	
+	private Map<HashWrapper,HistoryWatchEntry>	history_watch_map = new HashMap<HashWrapper,HistoryWatchEntry>();
+	
+	private Set<HashWrapper>		history_bad_keys = new HashSet<HashWrapper>();
+
+	private void
+	resetHistories()
+	{
+		synchronized( message_lock ){
+			
+			history_key_bloom	= null;
+			
+			history_watch_map.clear();
+			history_bad_keys.clear();
+		}
+	}
+	
+	private boolean
+	historyReceived(
+		byte[]		history )
+	{
+		synchronized( message_lock ){
+				
+			if ( message_new_count <= MAX_MESSAGES ){
+				
+				return( true );
+			}
+			
+			long now = SystemTime.getMonotonousTime();
+
+			if ( 	history_key_bloom != null && 
+					history_key_bloom.getEntryCount() > history_key_bloom_size/10 ){
+				
+				history_key_bloom_size += 1024;
+				
+				history_key_bloom = null;
+			}
+			
+			if ( history_key_bloom == null || now - history_key_bloom_create_time > 60*1000 ){
+				
+				history_key_bloom_create_time = now;
+				
+				history_key_bloom = BloomFilterFactory.createAddRemove4Bit( history_key_bloom_size );
+			}
+			
+			int	len = history.length & 0x0000fffc;
+			
+			for ( int i=0; i < len; i+=4 ){
+							
+				HashWrapper	hkey = new HashWrapper( history, i, 4 );
+				
+				if ( history_bad_keys.contains( hkey )){
+					
+					return( false );
+				}
+				
+				HistoryWatchEntry watch_entry = history_watch_map.get( hkey );
+				
+				if ( watch_entry == null ){
+					
+					int count = history_key_bloom.add( hkey.getBytes());
+					
+					if ( count > 5 ){
+																			
+						watch_entry = new HistoryWatchEntry( hkey );
+							
+						history_watch_map.put( hkey, watch_entry );
+						
+						if ( !watch_entry.addRecord( history, i )){
+							
+							break;
+						}
+					}
+				}else{
+					
+					if ( !watch_entry.addRecord( history, i )){
+						
+						break;
+					}
+				}
+			}
+		}
+		
+		return( true );
+	}
+	
+	private class
+	HistoryWatchEntry
+	{
+		private long			create_time	= SystemTime.getCurrentTime();
+		
+		private HashWrapper		key;
+		
+		private org.gudy.azureus2.core3.util.Average minute_average 	= org.gudy.azureus2.core3.util.Average.getInstance(60000, 60*2); 
+		private org.gudy.azureus2.core3.util.Average two_minute_average = org.gudy.azureus2.core3.util.Average.getInstance(120000, 120*2); 
+		
+		private Set<HashWrapper>	tail_enders = new HashSet<HashWrapper>();
+		
+		private
+		HistoryWatchEntry(
+			HashWrapper		_key )
+		{
+			key		= _key;
+			
+			System.out.println( "new watch: " + getName());
+		}
+		
+		private boolean
+		addRecord(
+			byte[]		history,
+			int			key_offset )
+		{
+			minute_average.addValue( 60 );
+			two_minute_average.addValue( 120 );
+			
+				// flooder could inject bogus history entries in attempt to get other people banned
+			
+			for ( int i=key_offset+4; i<history.length; i+=4 ){
+				
+				tail_enders.add( new HashWrapper( history, i, 4 ));
+			}
+			
+			System.out.println( getName() + ": add -> " + minute_average.getAverage() + "/" + two_minute_average.getAverage());
+
+			if ( minute_average.getAverage() > 30 || two_minute_average.getAverage() > 50 ){
+				
+				history_bad_keys.add( key );
+				
+				for ( HashWrapper te: tail_enders ){
+					
+					if ( history_bad_keys.contains( te )){
+						
+						history_bad_keys.remove( te );
+					}
+					
+					history_watch_map.remove( te );
+				}
+				
+				reportErrorRaw( "Node '" + getName() + "' has been banned due to flooding" );
+				
+				return( false );
+				
+			}else{
+				
+				return( true );
+			}
+		}
+		
+		private String
+		getName()
+		{
+			return( ByteFormatter.encodeString( key.getBytes()));
+		}
 	}
 	
 	private void
@@ -3245,7 +3461,7 @@ MsgSyncHandler
 					
 					force = false;
 					
-					int[] node_counts = getNodeCounts();
+					int[] node_counts = getNodeCounts( false );
 					
 					int	total 	= node_counts[0];
 					int live	= node_counts[1];
@@ -3407,6 +3623,9 @@ MsgSyncHandler
 							byte[] bk = sync_node.getContactAddress().getBytes( "UTF-8" );
 							
 							synchronized( biased_node_bloom ){
+								
+									// important we don't allow a node to repeatedly bias itself else
+									// it can organise a flood to go via a single node and masquarade behind it
 								
 								if ( biased_node_out == null && !biased_node_bloom.contains( bk )){
 									
@@ -3695,10 +3914,10 @@ MsgSyncHandler
 									
 									for ( int i=0;i<rand.length;i++){
 										
-										ad[i] ^= rand[i];
+										pk_ad[i] ^= rand[i];
 									}
 									
-									if ( !bloom.contains( ad )){
+									if ( !bloom.contains( pk_ad )){
 										
 										if ( TRACE )trace( "    and pk" );
 										
@@ -3954,7 +4173,21 @@ MsgSyncHandler
 				
 				int	age_secs = ((Long)m.get( "a" )).intValue();
 				
-				addMessage( node, id, content, sig, age_secs + elapsed_secs, history, null, true );
+				MsgSyncMessage msg = new MsgSyncMessage( node, id, content, sig, age_secs + elapsed_secs, history );
+
+				byte[]	local_msg	= (byte[])m.get( "l" );
+				
+				if ( local_msg != null ){
+					
+					try{
+						msg.setLocalMessage( new String( local_msg, "UTF-8" ));;
+						
+					}catch( Throwable e ){
+						
+					}
+				}
+				
+				addMessage( msg, null, MS_LOADING );
 			}
 						
 		}catch( Throwable e ){
@@ -4022,6 +4255,18 @@ MsgSyncHandler
 					m.put( "s", msg.getSignature());
 					m.put( "a", msg.getAgeSecs());
 					m.put( "h", msg.getHistory());
+					
+					String lm = msg.getLocalMessage();
+					
+					if ( lm != null ){
+						
+						try{
+							map.put("l", lm.getBytes( "UTF-8" ));
+							
+						}catch( Throwable e ){
+							
+						}
+					}
 					
 					msg_exp.add( m );
 				}

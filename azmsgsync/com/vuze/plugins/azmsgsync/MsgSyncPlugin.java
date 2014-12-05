@@ -66,7 +66,7 @@ MsgSyncPlugin
 {
 	protected static final int	TIMER_PERIOD = 2500;
 	
-	private static final int 	IPC_VERSION	= 2;
+	private static final int 	IPC_VERSION	= 3;
 	
 	
 	private PluginInterface			plugin_interface;
@@ -729,7 +729,7 @@ MsgSyncPlugin
 		reply.put( "dht_nodes", 	handler.getDHTCount());
 		reply.put( "node_est", 		handler.getLiveNodeEstimate());
 		
-		int[] node_counts = handler.getNodeCounts();
+		int[] node_counts = handler.getNodeCounts( true );
 		
 		reply.put( "nodes_local", new Long(node_counts[0]));
 		reply.put( "nodes_live", new Long(node_counts[1]));

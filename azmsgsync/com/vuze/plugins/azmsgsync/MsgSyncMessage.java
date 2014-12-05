@@ -135,6 +135,12 @@ MsgSyncMessage
 	}
 	
 	public int
+	getAgeSecsWhenReceived()
+	{
+		return( age_when_received_secs );
+	}
+	
+	public int
 	getAgeSecs()
 	{
 		long now	=  SystemTime.getCurrentTime();
