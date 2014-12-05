@@ -250,7 +250,7 @@ MsgSyncHandler
 	private Average		in_req_average 	= AverageFactory.MovingImmediateAverage( 30*1000/MsgSyncPlugin.TIMER_PERIOD );
 	private Average		out_req_average = AverageFactory.MovingImmediateAverage( 30*1000/MsgSyncPlugin.TIMER_PERIOD );
 	
-	private volatile long send_last;
+	private volatile long message_sent_count;
 	
 	private long	last_not_delivered_reported;
 		
@@ -1207,7 +1207,7 @@ MsgSyncHandler
 		
 		if ( count % MSG_STATUS_CHECK_TICKS == 0 ){
 			
-			if ( send_last > 0 ){
+			if ( message_sent_count > 0 ){
 				
 				long now = SystemTime.getCurrentTime();
 				
@@ -1888,6 +1888,14 @@ MsgSyncHandler
 		}
 	}
 	
+	private static final int	LAST_MESSAGE_WINDOW = 60;
+	private static final int	LAST_MESSAGE_LIMIT	= 30;		// 30 messages in 60 seconds
+	
+	private final int[]		last_message_times 		= new int[LAST_MESSAGE_LIMIT];
+	private int				last_message_times_pos	= 0;
+	
+	private int				last_flood_warning		= 0;
+	
 	public void
 	sendMessage(
 		final byte[]		content,
@@ -1923,29 +1931,93 @@ MsgSyncHandler
 			processCommand( cmd );
 			
 		}else{
-			long now = SystemTime.getMonotonousTime();
-			
-			long time_since_last = now - send_last;
-			
-			long delay = 1000 - time_since_last;
-			
-			if ( delay > 0 ){
 				
-				if ( delay > 1000 ){
+			synchronized( last_message_times ){
+			
+				int now_secs = (int)( SystemTime.getMonotonousTime()/1000 );
+
+				int	limit_secs = now_secs - LAST_MESSAGE_WINDOW;
+				
+				int	newest	= 0;
+				int	oldest	= Integer.MAX_VALUE;
+				
+				int	count = 0;
+				
+				for ( int i=0;i<last_message_times.length;i++){
+				
+					int	time = last_message_times[i];
 					
-					delay = 1000;
+					if ( time > 0 ){
+						
+						if ( time >= limit_secs ){
+							
+							count++;
+							
+							if ( time > newest ){
+								
+								newest = time;
+							}
+							
+							if ( time < oldest ){
+								
+								oldest = time;
+							}
+						}
+					}
 				}
 				
-				try{
-					Thread.sleep( delay );
+				int	remaining_messages 	= LAST_MESSAGE_LIMIT - count;
+				int remaining_secs		= oldest + LAST_MESSAGE_WINDOW - now_secs;
+				
+				int	delay_millis;
+				
+				if ( count < LAST_MESSAGE_LIMIT/4){
 					
-				}catch( Throwable e ){
+					delay_millis = 0;
 					
+				}else if ( count < LAST_MESSAGE_LIMIT/2 ){
+					
+					delay_millis = 1000;
+										
+				}else{
+					
+					if ( count > 3*LAST_MESSAGE_LIMIT/4 ){
+						
+						if ( last_flood_warning == 0 || now_secs - last_flood_warning > 60 ){
+							
+							last_flood_warning = now_secs;
+							
+							reportErrorRaw( "You are flooding the channel. Excessive flooding will result in a PERMANENT ban." );
+						}
+					}
+					
+					if ( remaining_secs <= 0 || remaining_messages <= 0 ){
+						
+						delay_millis = (LAST_MESSAGE_WINDOW*1000)/LAST_MESSAGE_LIMIT;
+						
+					}else{
+					
+						delay_millis = (remaining_secs * 1000)/ remaining_messages;
+					}
 				}
+				
+				//System.out.println( "delay=" + delay_millis + ", count=" + count + ", rem_secs=" + remaining_secs + ", rem_msg=" + remaining_messages);
+				
+				last_message_times[last_message_times_pos++%last_message_times.length] = now_secs;
+				
+				if ( delay_millis > 0 ){
+					
+					try{
+						Thread.sleep( delay_millis );
+						
+					}catch( Throwable e ){
+						
+					}
+				}
+				
+				message_sent_count++;
 			}
-			
-			send_last = SystemTime.getMonotonousTime();
-			
+						
 			sendMessageSupport(content );
 		}
 	}
