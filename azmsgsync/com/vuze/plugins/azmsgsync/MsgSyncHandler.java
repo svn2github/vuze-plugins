@@ -137,6 +137,9 @@ MsgSyncHandler
 	private int BIASED_BLOOM_CLEAR_PERIOD			= 60*1000;
 	private int	BIASED_BLOOM_CLEAR_TICKS			= BIASED_BLOOM_CLEAR_PERIOD / MsgSyncPlugin.TIMER_PERIOD;
 
+	private int CHECK_HISTORIES_PERIOD				= 60*1000;
+	private int	CHECK_HISTORIES_TICKS				= CHECK_HISTORIES_PERIOD / MsgSyncPlugin.TIMER_PERIOD;
+
 	
 	private static final int STATUS_OK			= 1;
 	private static final int STATUS_LOOPBACK	= 2;
@@ -288,6 +291,19 @@ MsgSyncHandler
 	
 	private boolean			save_messages;
 	private boolean			messages_loading;
+	
+	
+	private boolean		node_banning_enabled	= true;
+	
+	private BloomFilter	history_key_bloom;
+	private long		history_key_bloom_create_time;
+	private int			history_key_bloom_size	= 1024;
+	
+	private Map<HashWrapper,HistoryWatchEntry>	history_watch_map = new HashMap<HashWrapper,HistoryWatchEntry>();
+	
+	private Set<HashWrapper>		history_bad_keys = new HashSet<HashWrapper>();
+
+	
 	
 	protected
 	MsgSyncHandler(
@@ -510,6 +526,8 @@ MsgSyncHandler
 		private_messaging_pk		= _target_pk;
 		private_messaging_contact	= _target_contact;
 		private_messaging_secret	= _shared_secret;
+		
+		node_banning_enabled	= false;
 		
 		if ( _user_key == null ){
 			
@@ -1096,6 +1114,11 @@ MsgSyncHandler
 			}
 		}
 			
+		if ( count % CHECK_HISTORIES_TICKS == 0 ){
+
+			checkHistories();
+		}
+		
 		if ( parent_handler != null ){
 			
 			if ( private_messaging_secret == null ){
@@ -1777,15 +1800,91 @@ MsgSyncHandler
 	processCommand(
 		String		cmd )
 	{
-		if ( cmd.equals( "reset" )){
+		try{
+			if ( cmd.equals( "reset" )){
+				
+				resetHistories();
+				
+				reportInfoRaw( "Reset performed" );
 			
-			resetHistories();
+				return;
+				
+			}else{
+				
+				String[] bits = cmd.split( "[\\s]+" );
+				
+				cmd = bits[0].toLowerCase( Locale.US );
+				
+				if ( cmd.equals( "unban" )){
+					
+					String	node = bits[1];
+					
+					if ( bits.length > 1 ){
+						
+						if ( node.equalsIgnoreCase( "all" )){
+							
+							resetHistories();
+							
+							reportInfoRaw( "All nodes unbanned" );
+							
+						}else{
+							
+							HashWrapper hkey = new HashWrapper( ByteFormatter.decodeString( bits[1] ));
+							
+							synchronized( message_lock ){
+								
+								if ( history_bad_keys.remove( hkey )){
+									
+									reportInfoRaw( "Node unbanned" );
+									
+								}else{
+									
+									reportErrorRaw( "Node not found" );
+								}
+							}
+						}
+						
+						return;
+					}
+					
+				}else if ( cmd.equals( "banning" )){
+					
+					if ( bits.length > 1 ){
+
+						String	arg = bits[1];
+						
+						if ( arg.equalsIgnoreCase( "enable" )){
+							
+							resetHistories( true );
+							
+							reportInfoRaw( "Banning enabled" );
+							
+						}else if ( arg.equalsIgnoreCase( "disable" )){
+							
+							resetHistories( false );
+							
+							reportInfoRaw( "Banning disabled" );
+							
+						}else{
+							
+							reportErrorRaw( "invalid argument '" + arg + "'" );
+						}
+						
+						return;
+					}
+				}else if ( cmd.equals( "status" )){
+					
+					reportHistoryStatus();
+					
+					return;
+				}
+			}
+						
+			reportErrorRaw( "Unrecognized/Invalid control command: " + cmd );
 			
-			reportInfoRaw( "Reset performed" );
+		}catch( Throwable  e){
 			
-		}else{
-		
-			reportErrorRaw( "Unrecognized control command: " + cmd );
+			reportErrorRaw( "Control command processing failed: " + Debug.getNestedExceptionMessage( e ));
 		}
 	}
 	
@@ -3279,23 +3378,74 @@ MsgSyncHandler
 		return( total_received );
 	}
 	
-	private BloomFilter	history_key_bloom;
-	private long		history_key_bloom_create_time;
-	private int			history_key_bloom_size	= 1024;
+	private void
+	reportHistoryStatus()
+	{
+		synchronized( message_lock ){
+		
+			String msg = "Banning " + (node_banning_enabled?"enabled":"disabled" );
+			
+			if ( node_banning_enabled ){
+				
+				msg += "\nWatching " + history_watch_map.size() + " node(s)";
+				
+				String banned ="";
+				
+				for ( HashWrapper hw: history_bad_keys ){
+					
+					banned += (banned==""?"":", ") + ByteFormatter.encodeString( hw.getBytes());
+				}
+				
+				if ( banned != "" ){
+					
+					msg += "\nBanned: " + banned;
+				}
+			}
+			
+			reportInfoRaw( msg );
+		}
+	}
 	
-	private Map<HashWrapper,HistoryWatchEntry>	history_watch_map = new HashMap<HashWrapper,HistoryWatchEntry>();
-	
-	private Set<HashWrapper>		history_bad_keys = new HashSet<HashWrapper>();
-
 	private void
 	resetHistories()
 	{
 		synchronized( message_lock ){
-			
+						
 			history_key_bloom	= null;
 			
 			history_watch_map.clear();
 			history_bad_keys.clear();
+		}
+	}
+	
+	private void
+	resetHistories(
+		boolean		enable )
+	{
+		synchronized( message_lock ){
+			
+			node_banning_enabled = enable;
+			
+			resetHistories();
+		}
+	}
+	
+	private void
+	checkHistories()
+	{
+		synchronized( message_lock ){
+
+			Iterator<Map.Entry<HashWrapper,HistoryWatchEntry>>	it = history_watch_map.entrySet().iterator();
+			
+			while( it.hasNext()){
+				
+				Map.Entry<HashWrapper,HistoryWatchEntry> entry = it.next();
+				
+				if ( entry.getValue().canDelete()){
+					
+					it.remove();
+				}
+			}
 		}
 	}
 	
@@ -3305,6 +3455,11 @@ MsgSyncHandler
 	{
 		synchronized( message_lock ){
 				
+			if ( !node_banning_enabled ){
+				
+				return( true );
+			}
+			
 			if ( message_new_count <= MAX_MESSAGES ){
 				
 				return( true );
@@ -3371,7 +3526,10 @@ MsgSyncHandler
 	private class
 	HistoryWatchEntry
 	{
-		private long			create_time	= SystemTime.getCurrentTime();
+		private static final int MINUTE_BAN_MSG_AVERAGE		= 30;
+		private static final int TWO_MINUTE_BAN_MSG_AVERAGE	= 50;
+		
+		private long			create_time	= SystemTime.getMonotonousTime();
 		
 		private HashWrapper		key;
 		
@@ -3386,7 +3544,7 @@ MsgSyncHandler
 		{
 			key		= _key;
 			
-			System.out.println( "new watch: " + getName());
+			//System.out.println( "new watch: " + getKeyString());
 		}
 		
 		private boolean
@@ -3404,11 +3562,13 @@ MsgSyncHandler
 				tail_enders.add( new HashWrapper( history, i, 4 ));
 			}
 			
-			System.out.println( getName() + ": add -> " + minute_average.getAverage() + "/" + two_minute_average.getAverage());
+			//System.out.println( getKeyString() + ": add -> " + minute_average.getAverage() + "/" + two_minute_average.getAverage());
 
-			if ( minute_average.getAverage() > 30 || two_minute_average.getAverage() > 50 ){
+			if ( minute_average.getAverage() > MINUTE_BAN_MSG_AVERAGE || two_minute_average.getAverage() > TWO_MINUTE_BAN_MSG_AVERAGE ){
 				
 				history_bad_keys.add( key );
+				
+				history_watch_map.remove( key );
 				
 				for ( HashWrapper te: tail_enders ){
 					
@@ -3420,7 +3580,10 @@ MsgSyncHandler
 					history_watch_map.remove( te );
 				}
 				
-				reportErrorRaw( "Node '" + getName() + "' has been banned due to flooding" );
+				reportErrorRaw( 
+					"Node '" + getKeyString() + 
+					"' has been banned due to flooding\nTo unban the node enter '/control unban " + getKeyString() + 
+					"'. See http://wiki.vuze.com/w/Decentralized_Chat#Control_Commands[[Control%20Commands]] for more information." );
 				
 				return( false );
 				
@@ -3430,8 +3593,23 @@ MsgSyncHandler
 			}
 		}
 		
+		private boolean
+		canDelete()
+		{
+			if ( SystemTime.getMonotonousTime() - create_time > 3*60*1000 ){
+				
+				//System.out.println( "del watch as boring: " + getKeyString());
+				
+				return( minute_average.getAverage() < MINUTE_BAN_MSG_AVERAGE/2 && two_minute_average.getAverage() < TWO_MINUTE_BAN_MSG_AVERAGE/2 );
+				
+			}else{
+				
+				return( false );
+			}
+		}
+		
 		private String
-		getName()
+		getKeyString()
 		{
 			return( ByteFormatter.encodeString( key.getBytes()));
 		}
