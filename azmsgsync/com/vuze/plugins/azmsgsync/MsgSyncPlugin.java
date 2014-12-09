@@ -367,6 +367,40 @@ MsgSyncPlugin
 							h.saveMessages();
 						}
 					}
+					
+				}else if ( c.equals( "peek" )){
+						
+					if ( bits.length != 3 ){
+						
+						throw( new Exception( "Usage: peek <dht_id> <key>" ));
+					}
+					
+					String dht_id 	= bits[1];
+					String key		= bits[2];
+					
+					DHTPluginInterface dht;
+					
+					if ( dht_id.equals( "p" )){
+						
+						dht = ((DDBaseImpl)plugin_interface.getDistributedDatabase()).getDHTPlugin();
+						
+					}else{
+									
+						List<DistributedDatabase> ddbs = plugin_interface.getUtilities().getDistributedDatabases( new String[]{ AENetworkClassifier.AT_I2P });
+						
+						if ( ddbs.size() == 0 ){
+							
+							throw( new Exception( "No I2P DDB Available" ));
+						}
+						
+						dht = ((DDBaseImpl)ddbs.get(0)).getDHTPlugin();
+					}
+					
+					byte[]	key_bytes = key.getBytes( "UTF-8" );
+
+					MsgSyncHandler handler = new MsgSyncHandler( MsgSyncPlugin.this, dht, key_bytes, new HashMap<String, Object>(), true );
+					
+					handler.destroy( true );
 				}else{
 				
 					log( "Unrecognized command" );

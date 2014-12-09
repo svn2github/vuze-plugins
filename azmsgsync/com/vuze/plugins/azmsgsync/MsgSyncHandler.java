@@ -158,6 +158,11 @@ MsgSyncHandler
 	private boolean									checking_dht;
 	private long									last_dht_check;
 
+	private byte[]									peek_xfer_key;
+	private DHTPluginTransferHandler				peek_xfer_handler;
+	
+	private boolean									dht_listen_key_registered;
+	
 	private String						friendly_name = "";
 
 	private final boolean				is_private_chat;
@@ -304,13 +309,13 @@ MsgSyncHandler
 	private Set<HashWrapper>		history_bad_keys = new HashSet<HashWrapper>();
 
 	
-	
 	protected
 	MsgSyncHandler(
 		MsgSyncPlugin			_plugin,
 		DHTPluginInterface		_dht,
 		byte[]					_key,
-		Map<String,Object>		_options )
+		Map<String,Object>		_options,
+		boolean					_peek )
 		
 		throws Exception
 	{
@@ -326,168 +331,64 @@ MsgSyncHandler
 		private_messaging_contact		= null;
 		private_messaging_node			= null;
 		
-		updateOptions( _options );
+		try{
+			if ( _peek ){
+			
+				init( false );
+			
+				peekDHT();
+				
+			}else{
+				
+				updateOptions( _options );
+				
+				init( true );
+			}
+			
+		}catch( Throwable e ){
+			
+			destroy( true );
+			
+			if ( e instanceof Exception ){
+				
+				throw((Exception)e);
+				
+			}else{
+				
+				throw( new Exception( e ));
+			}
+		}
+	}
+	
+	protected
+	MsgSyncHandler(
+		MsgSyncPlugin			_plugin,
+		DHTPluginInterface		_dht,
+		byte[]					_key,
+		Map<String,Object>		_options )
 		
-		init();
+		throws Exception
+	{
+		this( _plugin, _dht, _key, _options, false );
 	}
 	
 	private void
-	init()
+	init(
+		boolean		full )
 	
 		throws Exception
 	{
-		boolean	config_updated = false;
-
-		String	config_key = CryptoManager.CRYPTO_CONFIG_PREFIX + "msgsync." + dht.getNetwork() + "." + ByteFormatter.encodeString( user_key );
-
-		Map map = COConfigurationManager.getMapParameter( config_key, new HashMap());
-
-			// see if this is a related channel and shares keys
-							
-		try{
-			String str_key = new String( user_key, "UTF-8" );
-			
-			int	pos = str_key.lastIndexOf( '[' );
-			
-			if ( pos != -1 && str_key.endsWith( "]" )){
-				
-				String	base_key	= str_key.substring( 0, pos );
-				
-				friendly_name = base_key.trim();
-				
-				String	args_str = str_key.substring( pos+1, str_key.length() - 1 );
-				
-				String[] args = args_str.split( "&" );
-				
-				byte[] 	pk_arg 	= null;
-				boolean ro_arg	= false;
-				
-				for ( String arg_str: args ){
-					
-					String[] bits = arg_str.split( "=" );
-					
-					String lhs = bits[0];
-					String rhs = bits[1];
-					
-					if ( lhs.equals( "pk" )){
-						
-						pk_arg = Base32.decode( rhs );
-						
-					}else if ( lhs.equals( "ro" )){
-						
-						ro_arg = rhs.equals( "1" );
-					}
-				}
-				
-				if ( pk_arg != null ){
-					
-					managing_pk	= pk_arg;
-					managing_ro = ro_arg;
-					
-					String	related_config_key = CryptoManager.CRYPTO_CONFIG_PREFIX + "msgsync." + dht.getNetwork() + "." + ByteFormatter.encodeString( base_key.getBytes( "UTF-8" ));
-	
-					Map related_map = COConfigurationManager.getMapParameter( related_config_key, new HashMap());
-	
-					if ( related_map != null ){
-						
-						byte[]	related_pk = (byte[])related_map.get( "pub" );
-						
-							// this channel's public key matches our existing one
-						
-						if ( Arrays.equals( pk_arg, related_pk )){
-						
-							byte[] existing_pk = (byte[])map.get( "pub" );
-							
-							if ( existing_pk == null || !Arrays.equals( existing_pk, related_pk )){
-						
-									// inherit the keys
-								
-								map.put( "pub", related_pk );
-								map.put( "pri", related_map.get( "pri" ));
-								
-								config_updated = true;
-							}
-						}
-					}
-				}
-			}else{
-				
-				friendly_name = str_key;
-			}
-		}catch( Throwable e ){
-		}
-				
-		log( "Created" );
-		
-		byte[] _my_uid = (byte[])map.get( "uid" );
-		
-		if ( _my_uid == null || _my_uid.length != 8 ){
-		
-			_my_uid = new byte[8];
-		
-			RandomUtils.nextSecureBytes( _my_uid );
-			
-			map.put( "uid", _my_uid );
-			
-			config_updated = true;
-		}
-		
 		byte[] gs = GENERAL_SECRET_RAND.clone();
 		
 		for ( int i=0; i<user_key.length;i++ ){
+			
 			gs[i%GENERAL_SECRET_RAND.length] ^= user_key[i];
 		}
 		
 		gs = new SHA1Simple().calculateHash( gs );
 		
 		System.arraycopy( gs, 0, general_secret, 0, general_secret.length );
-		
-		my_uid = _my_uid;
-		
-		byte[]	public_key_bytes 	= (byte[])map.get( "pub" );
-		byte[]	private_key_bytes 	= (byte[])map.get( "pri" );
-		 
-		PrivateKey	_private_key 	= null;
-		PublicKey	_public_key		= null;
-		
-		if ( public_key_bytes != null && private_key_bytes != null ){
-		
-			try{
-				_public_key		= CryptoECCUtils.rawdataToPubkey( public_key_bytes );
-				_private_key	= CryptoECCUtils.rawdataToPrivkey( private_key_bytes );
-				
-			}catch( Throwable e ){
-				
-				_public_key		= null;
-				_private_key	= null;
-			}
-		}
-		
-		if ( _public_key == null || _private_key == null ){
-			
-			KeyPair ecc_keys = CryptoECCUtils.createKeys();
 
-			_public_key	= ecc_keys.getPublic();
-			_private_key	= ecc_keys.getPrivate();
-			
-			map.put( "pub", CryptoECCUtils.keyToRawdata( _public_key ));
-			map.put( "pri", CryptoECCUtils.keyToRawdata( _private_key ));
-			
-			config_updated = true;
-		}
-		
-		public_key	= _public_key;
-		private_key	= _private_key;
-		
-		if ( config_updated ){
-			
-			COConfigurationManager.setParameter( config_key, map );
-			
-			COConfigurationManager.setDirty();
-		}
-		
-		my_node	= new MsgSyncNode( dht.getLocalAddress(), my_uid, CryptoECCUtils.keyToRawdata( public_key ));
-		
 		dht_listen_key = new SHA1Simple().calculateHash( user_key );
 		
 		for ( int i=0;i<dht_listen_key.length;i++){
@@ -495,13 +396,223 @@ MsgSyncHandler
 			dht_listen_key[i] ^= HANDLER_BASE_KEY_BYTES[i];
 		}
 		
-		dht.registerHandler( dht_listen_key, this, xfer_options );
-		
 		dht_call_key = dht_listen_key;
+
+		peek_xfer_key = dht_listen_key.clone();
 		
-		loadMessages();
+		peek_xfer_key[1] ^= 0x01;
+
 		
-		checkDHT( true );
+		if ( full ){
+			
+			boolean	config_updated = false;
+	
+			String	config_key = CryptoManager.CRYPTO_CONFIG_PREFIX + "msgsync." + dht.getNetwork() + "." + ByteFormatter.encodeString( user_key );
+	
+			Map map = COConfigurationManager.getMapParameter( config_key, new HashMap());
+	
+				// see if this is a related channel and shares keys
+								
+			try{
+				String str_key = new String( user_key, "UTF-8" );
+				
+				int	pos = str_key.lastIndexOf( '[' );
+				
+				if ( pos != -1 && str_key.endsWith( "]" )){
+					
+					String	base_key	= str_key.substring( 0, pos );
+					
+					friendly_name = base_key.trim();
+					
+					String	args_str = str_key.substring( pos+1, str_key.length() - 1 );
+					
+					String[] args = args_str.split( "&" );
+					
+					byte[] 	pk_arg 	= null;
+					boolean ro_arg	= false;
+					
+					for ( String arg_str: args ){
+						
+						String[] bits = arg_str.split( "=" );
+						
+						String lhs = bits[0];
+						String rhs = bits[1];
+						
+						if ( lhs.equals( "pk" )){
+							
+							pk_arg = Base32.decode( rhs );
+							
+						}else if ( lhs.equals( "ro" )){
+							
+							ro_arg = rhs.equals( "1" );
+						}
+					}
+					
+					if ( pk_arg != null ){
+						
+						managing_pk	= pk_arg;
+						managing_ro = ro_arg;
+						
+						String	related_config_key = CryptoManager.CRYPTO_CONFIG_PREFIX + "msgsync." + dht.getNetwork() + "." + ByteFormatter.encodeString( base_key.getBytes( "UTF-8" ));
+		
+						Map related_map = COConfigurationManager.getMapParameter( related_config_key, new HashMap());
+		
+						if ( related_map != null ){
+							
+							byte[]	related_pk = (byte[])related_map.get( "pub" );
+							
+								// this channel's public key matches our existing one
+							
+							if ( Arrays.equals( pk_arg, related_pk )){
+							
+								byte[] existing_pk = (byte[])map.get( "pub" );
+								
+								if ( existing_pk == null || !Arrays.equals( existing_pk, related_pk )){
+							
+										// inherit the keys
+									
+									map.put( "pub", related_pk );
+									map.put( "pri", related_map.get( "pri" ));
+									
+									config_updated = true;
+								}
+							}
+						}
+					}
+				}else{
+					
+					friendly_name = str_key;
+				}
+			}catch( Throwable e ){
+			}
+					
+			log( "Created" );
+			
+			byte[] _my_uid = (byte[])map.get( "uid" );
+			
+			if ( _my_uid == null || _my_uid.length != 8 ){
+			
+				_my_uid = new byte[8];
+			
+				RandomUtils.nextSecureBytes( _my_uid );
+				
+				map.put( "uid", _my_uid );
+				
+				config_updated = true;
+			}
+					
+			my_uid = _my_uid;
+			
+			byte[]	public_key_bytes 	= (byte[])map.get( "pub" );
+			byte[]	private_key_bytes 	= (byte[])map.get( "pri" );
+			 
+			PrivateKey	_private_key 	= null;
+			PublicKey	_public_key		= null;
+			
+			if ( public_key_bytes != null && private_key_bytes != null ){
+			
+				try{
+					_public_key		= CryptoECCUtils.rawdataToPubkey( public_key_bytes );
+					_private_key	= CryptoECCUtils.rawdataToPrivkey( private_key_bytes );
+					
+				}catch( Throwable e ){
+					
+					_public_key		= null;
+					_private_key	= null;
+				}
+			}
+			
+			if ( _public_key == null || _private_key == null ){
+				
+				KeyPair ecc_keys = CryptoECCUtils.createKeys();
+	
+				_public_key	= ecc_keys.getPublic();
+				_private_key	= ecc_keys.getPrivate();
+				
+				map.put( "pub", CryptoECCUtils.keyToRawdata( _public_key ));
+				map.put( "pri", CryptoECCUtils.keyToRawdata( _private_key ));
+				
+				config_updated = true;
+			}
+			
+			public_key	= _public_key;
+			private_key	= _private_key;
+			
+			if ( config_updated ){
+				
+				COConfigurationManager.setParameter( config_key, map );
+				
+				COConfigurationManager.setDirty();
+			}
+			
+			my_node	= new MsgSyncNode( dht.getLocalAddress(), my_uid, CryptoECCUtils.keyToRawdata( public_key ));
+		
+			if ( !is_private_chat ){
+							
+				peek_xfer_handler = 
+					new DHTPluginTransferHandler()
+					{
+						public String
+						getName()
+						{
+							return( "Message Sync (Peek): " + getString());
+						}
+						
+						public byte[]
+						handleRead(
+							DHTPluginContact	originator,
+							byte[]				key )
+						{
+							try{
+								Map<String,Object> request = BDecoder.decode( generalMessageDecrypt( key ));
+								
+								System.out.println( "request-> " + request );
+								
+								Map<String,Object> reply = new HashMap<String, Object>();
+								
+								reply.put( "m", messages.size());
+								
+								int[] node_counts = getNodeCounts( false );
+								
+								int	total 	= node_counts[0];
+								int live	= node_counts[1];
+
+								reply.put( "t", total );
+								reply.put( "l", live );
+								reply.put( "e", getLiveNodeEstimate());
+								
+								return( generalMessageEncrypt( BEncoder.encode( reply )));
+								
+							}catch( Throwable e ){
+							}
+							
+							return( null );
+						}
+						
+						public byte[]
+						handleWrite(
+							DHTPluginContact	originator,
+							byte[]				key,
+							byte[]				value )
+						{
+							return( null );
+						}
+					};
+					
+				dht.registerHandler( 
+					peek_xfer_key, 
+					peek_xfer_handler, 
+					xfer_options );
+			}
+					
+			dht.registerHandler( dht_listen_key, this, xfer_options );
+
+			dht_listen_key_registered	= true;
+			
+			loadMessages();
+			
+			checkDHT( true );
+		}
 	}
 	
 	protected
@@ -578,6 +689,8 @@ MsgSyncHandler
 		}
 		
 		dht.registerHandler( dht_listen_key, this, xfer_options );
+		
+		dht_listen_key_registered = true;
 	}
 		
 	protected
@@ -612,7 +725,7 @@ MsgSyncHandler
 		
 		COConfigurationManager.setDirty();
 		
-		init();
+		init( true );
 	}
 	
 	protected void
@@ -933,6 +1046,133 @@ MsgSyncHandler
 		}
 	}
 		
+	private void
+	peekDHT()
+	{	
+		log( "Checking DHT for nodes" );
+		
+		dht.get(
+			dht_listen_key,
+			"Message Sync peek: " + getString(),
+			DHTPluginInterface.FLAG_SINGLE_VALUE,
+			32,
+			60*1000,
+			false,
+			true,
+			new DHTPluginOperationAdapter() 
+			{
+				private int	active_threads = 0;
+				
+				private LinkedList<DHTPluginContact>	waiting_contacts = new LinkedList<DHTPluginContact>();
+				
+				public boolean 
+				diversified() 
+				{
+					return( true );
+				}
+				
+				@Override
+				public void 
+				valueRead(
+					DHTPluginContact 	originator, 
+					DHTPluginValue 		value ) 
+				{
+					System.out.println( "Peek found " + originator.getName());
+					
+					synchronized( waiting_contacts ){
+						
+						waiting_contacts.add( originator );
+						
+						if ( active_threads < 3 ){
+														
+							active_threads++;
+							
+							new AEThread2( "msp:peek" )
+							{
+								public void
+								run()
+								{
+									try{									
+										while( true ){
+											
+											DHTPluginContact contact;
+											
+											synchronized( waiting_contacts ){
+												
+												if ( waiting_contacts.isEmpty()){
+													
+													break;
+												}
+												
+												contact = waiting_contacts.removeFirst();
+											}
+											
+											try{
+												Map<String, Object> request = new HashMap<String, Object>();
+												
+												byte[] rand = new byte[16];
+												
+												RandomUtils.nextBytes( rand );
+												
+												request.put( "r", rand );
+												
+												byte[] bytes = generalMessageEncrypt( BEncoder.encode( request ));
+												
+												byte[] result = 
+													contact.read(
+														new DHTPluginProgressListener() {
+															
+															@Override
+															public void reportSize(long size) {
+															}
+															
+															@Override
+															public void reportCompleteness(int percent) {
+															}
+															
+															@Override
+															public void reportActivity(String str) {
+															}
+														},
+														peek_xfer_key,
+														bytes,
+														is_anonymous_chat?20*1000:10*1000 );
+												
+												if ( result != null ){
+													
+													Map<String,Object> reply = BDecoder.decode( generalMessageDecrypt( result ));
+													
+													System.out.println( "Got result: " + reply );
+												}
+												
+											}catch( Throwable e ){
+												
+											}
+										}
+									}finally{
+										
+										synchronized( waiting_contacts ){
+											
+											active_threads--;
+										}
+									}
+								}
+							}.start();
+						}
+					}
+				}
+				
+				@Override
+				public void 
+				complete(
+					byte[] 		key, 
+					boolean 	timeout_occurred) 
+				{	
+					System.out.println( "Peek complete" );
+				}
+			});		
+	}
+	
 	private void
 	checkDHT(
 		final boolean	first_time )
@@ -4585,7 +4825,15 @@ MsgSyncHandler
 			
 			status = ST_DESTROYED;
 			
-			dht.unregisterHandler( dht_listen_key, this );
+			if ( dht_listen_key_registered ){
+			
+				dht.unregisterHandler( dht_listen_key, this );
+			}
+			
+			if ( peek_xfer_handler != null ){
+			
+				dht.unregisterHandler( peek_xfer_key, peek_xfer_handler ); 
+			}
 		}
 	}
 	
