@@ -37,6 +37,7 @@ import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.BEncoder;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.SimpleTimer;
+import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.gudy.azureus2.core3.util.TimerEventPeriodic;
@@ -66,7 +67,9 @@ MsgSyncPlugin
 {
 	protected static final int	TIMER_PERIOD = 2500;
 	
-	private static final int 	IPC_VERSION	= 3;
+		// 4 - added peek IPC
+	
+	private static final int 	IPC_VERSION	= 4;
 	
 	
 	private PluginInterface			plugin_interface;
@@ -398,9 +401,39 @@ MsgSyncPlugin
 					
 					byte[]	key_bytes = key.getBytes( "UTF-8" );
 
-					MsgSyncHandler handler = new MsgSyncHandler( MsgSyncPlugin.this, dht, key_bytes, new HashMap<String, Object>(), true );
-					
-					handler.destroy( true );
+					MsgSyncHandler handler = 
+						new MsgSyncHandler( 
+							MsgSyncPlugin.this, 
+							dht, 
+							key_bytes, 
+							new HashMap<String, Object>(), 
+							new MsgSyncPeekListener()
+							{
+								@Override
+								public boolean 
+								dataReceived(
+									MsgSyncHandler			handler,
+									Map<String,Object>		data )
+								{
+									System.out.println( "Peek received: " + data );
+									
+									return( true );
+								}
+								
+								@Override
+								public void 
+								complete(
+									MsgSyncHandler		handler )
+								{
+									try{
+										System.out.println( "Peek complete" );
+										
+									}finally{
+										
+										handler.destroy( true );
+									}
+								}
+							});
 				}else{
 				
 					log( "Unrecognized command" );
@@ -438,30 +471,15 @@ MsgSyncPlugin
 		return( logs_dir );
 	}
 	
-		// IPC start
-	
-	public Map<String,Object>
-	getMessageHandler(
+	private DHTPluginInterface
+	getDHT(
 		Map<String,Object>		options )
 		
 		throws IPCException
 	{
-		synchronized( this ){
-			
-			if ( !init_called ){
-				
-				throw( new IPCException( "Not initialised" ));
-			}
-		}
-		
-		init_sem.reserve();
-		
-		Map<String,Object>	reply = new HashMap<String, Object>();
-		
 		String		network = (String)options.get( "network" );
-		byte[]		key		= (byte[])options.get( "key" );
-		
-		DHTPluginInterface dht;
+
+		DHTPluginInterface	dht;
 		
 		if ( network == null || network == AENetworkClassifier.AT_PUBLIC ){
 			
@@ -505,8 +523,165 @@ MsgSyncPlugin
 		}else{
 			
 			throw( new IPCException( "Unsupported network: " + network ));
-		}
+		}	
+		
+		return( dht );
+	}
+	
+		// IPC start
+	
+	public Map<String,Object>
+	getPluginStatus(
+		Map<String,Object>		options )
+		
+		throws IPCException
+	{
+		Map<String,Object>	reply = new HashMap<String, Object>();
+
+		reply.put( "ipc_version", IPC_VERSION );
+
+		return( reply );
+	}
+	
+	public Map<String,Object>
+	peekMessageHandler(
+		Map<String,Object>		options )
+		
+		throws IPCException
+	{
+		synchronized( this ){
+			
+			if ( !init_called ){
 				
+				throw( new IPCException( "Not initialised" ));
+			}
+		}
+		
+		init_sem.reserve();
+				
+		byte[]		key		= (byte[])options.get( "key" );
+		
+		DHTPluginInterface dht = getDHT( options );
+			
+		final AESemaphore	sem = new AESemaphore( "msp:peek" );
+		
+		try{
+			final Map<String,Object>	reply = new HashMap<String, Object>();
+
+			reply.put( "ipc_version", IPC_VERSION );
+
+			MsgSyncHandler handler = 
+				new MsgSyncHandler( 
+					MsgSyncPlugin.this, 
+					dht, 
+					key, 
+					options, 
+					new MsgSyncPeekListener()
+					{
+						private int	result_count;
+						
+						private int	max_messages;
+						private int	max_live;
+						private int	max_estimate;
+						
+						@Override
+						public boolean 
+						dataReceived(
+							MsgSyncHandler			handler,
+							Map<String,Object>		data )
+						{
+							int	messages = ((Number)data.get( "m" )).intValue();
+							int	live	 = ((Number)data.get( "l" )).intValue();
+							int	estimate = ((Number)data.get( "e" )).intValue();
+														
+							synchronized( reply ){
+								
+								result_count++;
+								
+								max_messages = Math.max( max_messages, messages );
+								max_live	 = Math.max( max_live, live );
+								max_estimate = Math.max( max_estimate, estimate );
+								
+								reply.put( "m", max_messages );
+								reply.put( "n", Math.max( max_live, max_estimate ));
+								
+								if ( result_count == 1 ){
+									
+										// lurk for a bit
+									
+									SimpleTimer.addEvent(
+										"msp:peek",
+										SystemTime.getOffsetTime( 10*1000 ),
+										new TimerEventPerformer()
+										{										
+											@Override
+											public void 
+											perform(
+												TimerEvent event) 
+											{
+												sem.releaseForever();	
+											}
+										});
+								}
+							
+								return( result_count < 3 );
+							}
+						}
+						
+						@Override
+						public void 
+						complete(
+							MsgSyncHandler		handler )
+						{
+							try{
+								sem.releaseForever();
+								
+							}finally{
+								
+								handler.destroy( true );
+							}
+						}
+					});
+			
+			if ( !sem.reserve( 3*60*1000 )){
+				
+				// limit just in case of madness
+				
+				Debug.out( "Peek didn't complete correctly");
+			}
+			
+			synchronized( reply ){
+			
+				return( new HashMap<String, Object>( reply ));
+			}
+		}catch( Throwable e ){
+			
+			throw( new IPCException( e ));
+		}
+	}
+	
+	public Map<String,Object>
+	getMessageHandler(
+		Map<String,Object>		options )
+		
+		throws IPCException
+	{
+		synchronized( this ){
+			
+			if ( !init_called ){
+				
+				throw( new IPCException( "Not initialised" ));
+			}
+		}
+		
+		init_sem.reserve();
+		
+		Map<String,Object>	reply = new HashMap<String, Object>();
+		
+		byte[]		key		= (byte[])options.get( "key" );
+		
+		DHTPluginInterface dht = getDHT( options );
+					
 		MsgSyncHandler	parent_handler = (MsgSyncHandler)options.get( "parent_handler" );
 		
 		MsgSyncHandler handler;

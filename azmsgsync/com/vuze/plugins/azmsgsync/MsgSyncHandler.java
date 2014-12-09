@@ -315,7 +315,7 @@ MsgSyncHandler
 		DHTPluginInterface		_dht,
 		byte[]					_key,
 		Map<String,Object>		_options,
-		boolean					_peek )
+		MsgSyncPeekListener		_peek_listener )
 		
 		throws Exception
 	{
@@ -332,11 +332,11 @@ MsgSyncHandler
 		private_messaging_node			= null;
 		
 		try{
-			if ( _peek ){
+			if ( _peek_listener != null ){
 			
 				init( false );
 			
-				peekDHT();
+				peekDHT( _options, _peek_listener );
 				
 			}else{
 				
@@ -369,7 +369,7 @@ MsgSyncHandler
 		
 		throws Exception
 	{
-		this( _plugin, _dht, _key, _options, false );
+		this( _plugin, _dht, _key, _options, null );
 	}
 	
 	private void
@@ -561,12 +561,18 @@ MsgSyncHandler
 						public byte[]
 						handleRead(
 							DHTPluginContact	originator,
-							byte[]				key )
+							byte[]				request_bytes )
 						{
 							try{
-								Map<String,Object> request = BDecoder.decode( generalMessageDecrypt( key ));
+								Map<String,Object> request = BDecoder.decode( generalMessageDecrypt( request_bytes ));
+										
+								byte[] rand = (byte[])request.get( "r" );
+								byte[] key	= (byte[])request.get( "k" );
 								
-								System.out.println( "request-> " + request );
+								if ( rand == null || !Arrays.equals( peek_xfer_key, key )){
+									
+									return( null );
+								}
 								
 								Map<String,Object> reply = new HashMap<String, Object>();
 								
@@ -612,6 +618,29 @@ MsgSyncHandler
 			loadMessages();
 			
 			checkDHT( true );
+			
+		}else{
+			
+			try{
+				String str_key = new String( user_key, "UTF-8" );
+				
+				int	pos = str_key.lastIndexOf( '[' );
+				
+				if ( pos != -1 && str_key.endsWith( "]" )){
+					
+					String	base_key	= str_key.substring( 0, pos );
+					
+					friendly_name = base_key.trim();
+					
+				}else{
+					
+					friendly_name = str_key;
+					
+				}
+			}catch( Throwable e ){	
+			}
+			
+			log( "Created" );
 		}
 	}
 	
@@ -1047,21 +1076,32 @@ MsgSyncHandler
 	}
 		
 	private void
-	peekDHT()
+	peekDHT(
+		Map<String,Object>				options,
+		final MsgSyncPeekListener		peek_listener )
 	{	
-		log( "Checking DHT for nodes" );
+		log( "Peeking DHT for nodes" );
+		
+		final long start 	= SystemTime.getMonotonousTime();
+		
+		Long	l_timeout = ((Number)options.get( "timeout" )).longValue();
+		
+		final long timeout = l_timeout==null?60*1000:l_timeout;
 		
 		dht.get(
 			dht_listen_key,
 			"Message Sync peek: " + getString(),
 			DHTPluginInterface.FLAG_SINGLE_VALUE,
 			32,
-			60*1000,
+			timeout,
 			false,
 			true,
 			new DHTPluginOperationAdapter() 
 			{
-				private int	active_threads = 0;
+				private int			active_threads = 0;
+				
+				private boolean		dht_done;
+				private boolean		overall_done;
 				
 				private LinkedList<DHTPluginContact>	waiting_contacts = new LinkedList<DHTPluginContact>();
 				
@@ -1077,13 +1117,16 @@ MsgSyncHandler
 					DHTPluginContact 	originator, 
 					DHTPluginValue 		value ) 
 				{
-					System.out.println( "Peek found " + originator.getName());
-					
 					synchronized( waiting_contacts ){
+						
+						if ( checkDone( false )){
+							
+							return;
+						}
 						
 						waiting_contacts.add( originator );
 						
-						if ( active_threads < 3 ){
+						if ( active_threads < 5 ){
 														
 							active_threads++;
 							
@@ -1092,68 +1135,81 @@ MsgSyncHandler
 								public void
 								run()
 								{
-									try{									
-										while( true ){
-											
-											DHTPluginContact contact;
-											
-											synchronized( waiting_contacts ){
-												
-												if ( waiting_contacts.isEmpty()){
-													
-													break;
-												}
-												
-												contact = waiting_contacts.removeFirst();
-											}
-											
-											try{
-												Map<String, Object> request = new HashMap<String, Object>();
-												
-												byte[] rand = new byte[16];
-												
-												RandomUtils.nextBytes( rand );
-												
-												request.put( "r", rand );
-												
-												byte[] bytes = generalMessageEncrypt( BEncoder.encode( request ));
-												
-												byte[] result = 
-													contact.read(
-														new DHTPluginProgressListener() {
-															
-															@Override
-															public void reportSize(long size) {
-															}
-															
-															@Override
-															public void reportCompleteness(int percent) {
-															}
-															
-															@Override
-															public void reportActivity(String str) {
-															}
-														},
-														peek_xfer_key,
-														bytes,
-														is_anonymous_chat?20*1000:10*1000 );
-												
-												if ( result != null ){
-													
-													Map<String,Object> reply = BDecoder.decode( generalMessageDecrypt( result ));
-													
-													System.out.println( "Got result: " + reply );
-												}
-												
-											}catch( Throwable e ){
-												
-											}
-										}
-									}finally{
+									while( true ){
+										
+										DHTPluginContact contact;
 										
 										synchronized( waiting_contacts ){
 											
+												// temporarily decrease active count for checkDone test
+											
 											active_threads--;
+
+											if ( checkDone( false )){
+																								
+												return;
+											}
+											
+											if ( waiting_contacts.isEmpty()){
+																								
+												break;
+											}
+											
+											active_threads++;
+											
+											contact = waiting_contacts.removeFirst();
+										}
+										
+										try{
+											Map<String, Object> request = new HashMap<String, Object>();
+											
+											byte[] rand = new byte[16];
+											
+											RandomUtils.nextBytes( rand );
+											
+											request.put( "r", rand );
+											
+											request.put( "k", peek_xfer_key );
+											
+											byte[] bytes = generalMessageEncrypt( BEncoder.encode( request ));
+											
+											byte[] result = 
+												contact.read(
+													new DHTPluginProgressListener() {
+														
+														@Override
+														public void reportSize(long size) {
+														}
+														
+														@Override
+														public void reportCompleteness(int percent) {
+														}
+														
+														@Override
+														public void reportActivity(String str) {
+														}
+													},
+													peek_xfer_key,
+													bytes,
+													is_anonymous_chat?20*1000:10*1000 );
+											
+											if ( result != null ){
+												
+												Map<String,Object> reply = BDecoder.decode( generalMessageDecrypt( result ));
+												
+												try{
+													if ( !peek_listener.dataReceived( MsgSyncHandler.this, reply )){
+														
+														checkDone( true );
+													}
+													
+												}catch( Throwable e ){
+													
+													Debug.out( e );
+												}
+											}
+																						
+										}catch( Throwable e ){
 										}
 									}
 								}
@@ -1168,7 +1224,80 @@ MsgSyncHandler
 					byte[] 		key, 
 					boolean 	timeout_occurred) 
 				{	
-					System.out.println( "Peek complete" );
+					synchronized( waiting_contacts ){
+						
+						if ( dht_done ){
+							
+							return;
+						}
+						
+						dht_done = true;
+						
+						if ( checkDone( false )){
+							
+							return;
+						}
+						
+							// need to hang around to pick up results
+						
+						long	rem = timeout - ( SystemTime.getMonotonousTime() - start );
+						
+						if ( rem <= 0 ){
+							
+							checkDone( true );
+							
+						}else{
+							
+							SimpleTimer.addEvent(
+								"msp:peek",
+								SystemTime.getOffsetTime( rem ),
+								new TimerEventPerformer()
+								{									
+									@Override
+									public void 
+									perform(
+										TimerEvent event) 
+									{
+										checkDone( true );
+									}
+								});
+						}
+					}
+				}
+				
+				private boolean
+				checkDone(
+					boolean	yes_we_are )
+				{
+					synchronized( waiting_contacts ){
+						
+						if ( overall_done ){
+							
+							return( true );
+						}
+						
+						if ( 	destroyed || 
+								yes_we_are ||
+								( dht_done && active_threads == 0 ) ||
+								SystemTime.getMonotonousTime() - start > timeout ){
+							
+							overall_done = true;
+							
+							waiting_contacts.clear();
+							
+							try{
+								peek_listener.complete( MsgSyncHandler.this );
+								
+							}catch( Throwable e ){
+								
+								Debug.out( e );
+							}
+							
+							return( true );
+						}
+					}
+					
+					return( false );
 				}
 			});		
 	}
@@ -3507,7 +3636,7 @@ MsgSyncHandler
 							
 							int	old_len = old_history.length;
 							
-							if ( old_len > 36 ){
+							if ( old_len > MAX_HISTORY_RECORD_LEN - 4 ){
 								
 								new_history = new byte[MAX_HISTORY_RECORD_LEN];
 								
