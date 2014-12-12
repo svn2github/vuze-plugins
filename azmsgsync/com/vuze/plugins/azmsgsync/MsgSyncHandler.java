@@ -84,8 +84,9 @@ MsgSyncHandler
 {
 		// version 1 - initial release
 		// version 2 - invert deleted message bloom keys
+		// version 3 - increased max msg size from 350 to 600
 	
-	private static final int VERSION	= 2;
+	private static final int VERSION	= 3;
 	
 	private static final boolean TRACE = System.getProperty( "az.msgsync.trace.enable", "0" ).equals( "1" );
 	
@@ -185,7 +186,7 @@ MsgSyncHandler
 	private static final int				MAX_NODES				= 128;
 	private static final int				MIN_NODES				= 3;
 
-	protected static final int				MAX_MESSAGE_SIZE		= 350;
+	protected static final int				MAX_MESSAGE_SIZE		= 600;		// increased from 350 at version 3
 	
 	private static final int				MAX_MESSSAGE_REPLY_SIZE	= 4*1024;
 	
@@ -485,7 +486,12 @@ MsgSyncHandler
 				}
 			}catch( Throwable e ){
 			}
-					
+				
+			if ( managing_ro ){
+				
+				node_banning_enabled	= false; 
+			}
+			
 			log( "Created" );
 			
 			byte[] _my_uid = (byte[])map.get( "uid" );
@@ -1967,7 +1973,7 @@ MsgSyncHandler
 		MsgSyncMessage		message )
 	{
 		
-		trace( "management message:" + message );
+		//trace( "management message:" + message );
 	}
 	
 	final static int	MS_LOCAL		= 0;

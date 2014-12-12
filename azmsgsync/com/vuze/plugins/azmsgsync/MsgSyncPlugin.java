@@ -804,6 +804,11 @@ MsgSyncPlugin
 								runSupport() 
 								{
 									try{
+										while( handler.getDHT().isInitialising()){
+											
+											Thread.sleep(1000);
+										}
+										
 										Map<String,Object> map = new HashMap<String, Object>();
 										
 										map.put( "content", message.getContent());
