@@ -22,6 +22,9 @@
 
 package com.vuze.plugins.azmsgsync;
 
+import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -31,6 +34,8 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.util.*;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
@@ -85,8 +90,11 @@ MsgSyncHandler
 		// version 1 - initial release
 		// version 2 - invert deleted message bloom keys
 		// version 3 - increased max msg size from 350 to 600
+		// version 4 - optional reply compression
 	
-	private static final int VERSION	= 3;
+	private static final int VERSION	= 4;
+	
+	private static final int MIN_VERSION	= 2;
 	
 	private static final boolean TRACE = System.getProperty( "az.msgsync.trace.enable", "0" ).equals( "1" );
 	
@@ -4226,6 +4234,22 @@ MsgSyncHandler
 
 					List<Map<String,Object>>	list = (List<Map<String,Object>>)reply_map.get( "m" );
 					
+					if ( list == null ){
+						
+						byte[]	compressed = (byte[])reply_map.get( "z" );
+						
+						if ( compressed != null ){
+							
+							ByteArrayInputStream bais = new ByteArrayInputStream( compressed );
+							
+							GZIPInputStream zip = new GZIPInputStream( bais );
+													
+							Map temp = BDecoder.decode( new BufferedInputStream( zip, MAX_MESSSAGE_REPLY_SIZE ));
+							
+							list = (List<Map<String,Object>>)temp.get( "m" );
+						}
+					}
+					
 					int	received;
 					
 					if ( list != null ){
@@ -4334,12 +4358,10 @@ MsgSyncHandler
  				return( null );
 			}
 
-			int	version = ((Number)request_map.get( "v" )).intValue();
+			int	caller_version = ((Number)request_map.get( "v" )).intValue();
 			
-			if ( version < 2 ){
-				
-					// no longer support old nodes
-				
+			if ( caller_version < MIN_VERSION ){
+								
 				return( null );
 			}
 
@@ -4479,9 +4501,7 @@ MsgSyncHandler
 					Set<MsgSyncNode>	done_nodes = new HashSet<MsgSyncNode>();
 					
 					List<Map<String,Object>> l = new ArrayList<Map<String,Object>>();
-					
-					reply_map.put( "m", l );
-					
+										
 					int	content_bytes = 0;
 										
 					for ( MsgSyncMessage message: missing ){
@@ -4493,12 +4513,16 @@ MsgSyncHandler
 							continue;
 						}
 						
-						if ( content_bytes > MAX_MESSSAGE_REPLY_SIZE ){
+						byte[]	content = message.getContent();
+
+						if ( content_bytes + content.length > MAX_MESSSAGE_REPLY_SIZE ){
 							
 							more_to_come++;
 							
 							continue;
 						}
+						
+						content_bytes += content.length;
 																		
 						if ( TRACE )trace( "    returning " + ByteFormatter.encodeString( message.getID()));
 						
@@ -4506,11 +4530,7 @@ MsgSyncHandler
 						
 						l.add( m );
 						
-						MsgSyncNode	n = message.getNode();
-						
-						byte[]	content = message.getContent();
-						
-						content_bytes += content.length;
+						MsgSyncNode	n = message.getNode();					
 
 						m.put( "u", n.getUID());
 						m.put( "i", message.getID());
@@ -4561,6 +4581,41 @@ MsgSyncHandler
 								Debug.out( "Should always have pk" );
 							}
 						}
+					}
+					
+					boolean	 is_compressed = false;
+					
+					if ( caller_version >= 4 ){
+					
+						Map temp = new HashMap();
+						
+						temp.put( "m", l );
+						
+						byte[] plain = BEncoder.encode( temp );
+						
+						ByteArrayOutputStream	baos = new ByteArrayOutputStream( plain.length * 2 );
+						
+						GZIPOutputStream zip = new GZIPOutputStream( baos );
+						
+						zip.write( plain );
+						
+						zip.finish();
+						
+						zip.close();
+						
+						byte[] compressed = baos.toByteArray();
+						
+						if ( compressed.length < plain.length ){
+							
+							reply_map.put( "z", compressed );
+							
+							is_compressed = true;
+						}
+					}
+					
+					if ( !is_compressed ){
+					
+						reply_map.put( "m", l );
 					}
 				}
 				
