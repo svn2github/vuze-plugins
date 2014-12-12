@@ -58,6 +58,7 @@ import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.FileUtil;
 import org.gudy.azureus2.core3.util.HashWrapper;
+import org.gudy.azureus2.core3.util.HashWrapper2;
 import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.SHA1Simple;
 import org.gudy.azureus2.core3.util.SimpleTimer;
@@ -313,10 +314,11 @@ MsgSyncHandler
 	private long		history_key_bloom_create_time;
 	private int			history_key_bloom_size	= 1024;
 	
-	private Map<HashWrapper,HistoryWatchEntry>	history_watch_map = new HashMap<HashWrapper,HistoryWatchEntry>();
-	
-	private Set<HashWrapper>		history_bad_keys = new HashSet<HashWrapper>();
+	private Map<HashWrapper,HistoryWatchEntry>	history_watch_map 	= new HashMap<HashWrapper,HistoryWatchEntry>();
+	private Set<HashWrapper>					history_bad_keys 	= new HashSet<HashWrapper>();
 
+	private Map<HashWrapper2, SpammerEntry>	spammer_map			= new HashMap<HashWrapper2, SpammerEntry>();
+	private Set<HashWrapper2>				spammer_bad_keys	= new HashSet<HashWrapper2>();
 	
 	protected
 	MsgSyncHandler(
@@ -780,6 +782,49 @@ MsgSyncHandler
 		if ( b != null ){
 			
 			save_messages = b;
+		}
+		
+		byte[]	pk 		= (byte[])options.get( "pk" );
+
+		if ( pk != null ){
+			
+			Boolean spammer = (Boolean)options.get( "spammer" );
+
+			if ( spammer != null ){
+				
+				synchronized( message_lock ){
+
+					HashWrapper2 hw = new HashWrapper2( pk );
+					
+					SpammerEntry entry = spammer?spammer_map.get( hw ):spammer_map.remove( hw );
+					
+					if ( spammer ){
+						
+						if ( entry == null ){
+							
+							entry = new SpammerEntry( pk );
+							
+							spammer_map.put( hw, entry );
+							
+							for ( MsgSyncMessage msg: messages ){
+								
+								if ( Arrays.equals( pk, msg.getNode().getPublicKey())){
+									
+									byte[] history = msg.getHistory();
+																		
+									entry.addRecord( history );
+								}
+							}
+						}
+					}else{
+						
+						if ( entry != null ){
+							
+							entry.destroy();
+						}
+					}
+				}
+			}
 		}
 	}
 	
@@ -2012,7 +2057,9 @@ MsgSyncHandler
 	{
 		MsgSyncNode node = msg.getNode();
 		
-		boolean management_message = managing_pk != null && Arrays.equals( node.getPublicKey(), managing_pk );
+		byte[]	originator_pk = node.getPublicKey();
+		
+		boolean management_message = managing_pk != null && Arrays.equals( originator_pk, managing_pk );
 		
 		boolean is_incoming = msg_source == MS_INCOMING || msg_source == MS_LOADING;
 		
@@ -2031,7 +2078,7 @@ MsgSyncHandler
 				// see if we have restarted and re-read our message from another node. If so
 				// then mark it as delivered
 			
-			if ( Arrays.equals( node.getPublicKey(), my_node.getPublicKey())){
+			if ( Arrays.equals( originator_pk, my_node.getPublicKey())){
 				
 				msg.delivered();
 
@@ -2048,9 +2095,9 @@ MsgSyncHandler
 		
 		if ( msg_source == MS_INCOMING && history.length > 0 ){
 			
-			if ( !historyReceived( history )){
+			if ( !historyReceived( originator_pk, history )){
 				
-				msg.setLocalMessage( "Message ignored due to flooding" );
+				msg.setLocalMessage( "Message ignored due to spam/flooding" );
 			}
 		}
 		
@@ -2154,7 +2201,10 @@ MsgSyncHandler
 					deleted_messages_inverted_sigs_map.put( new HashWrapper( inv_sig ), "" );
 				}
 				
-				message_new_count++;
+				if ( msg_source != MS_LOADING ){
+				
+					message_new_count++;
+				}
 			}
 		}
 		
@@ -2258,6 +2308,8 @@ MsgSyncHandler
 				}else if ( cmd.equals( "status" )){
 					
 					reportHistoryStatus();
+					
+					reportSpamStatus();
 					
 					return;
 				}
@@ -2366,11 +2418,14 @@ MsgSyncHandler
 					
 					if ( count > 3*LAST_MESSAGE_LIMIT/4 ){
 						
-						if ( last_flood_warning == 0 || now_secs - last_flood_warning > 60 ){
+						if ( !managing_ro ){
 							
-							last_flood_warning = now_secs;
-							
-							reportErrorRaw( "You are flooding the channel. Excessive flooding will result in a PERMANENT ban." );
+							if ( last_flood_warning == 0 || now_secs - last_flood_warning > 60 ){
+								
+								last_flood_warning = now_secs;
+								
+								reportErrorRaw( "You are flooding the channel. Excessive flooding will result in a PERMANENT ban." );
+							}
 						}
 					}
 					
@@ -3834,6 +3889,35 @@ MsgSyncHandler
 	}
 	
 	private void
+	reportSpamStatus()
+	{
+		synchronized( message_lock ){
+		
+			if ( spammer_map.size() == 0 ){
+				
+				return;
+			}
+							
+			String	msg = "Spam: " + spammer_map.size() + " key(s) identified";
+			
+			String banned = "";
+			
+			for ( HashWrapper2 hw: spammer_bad_keys ){
+				
+				banned += (banned==""?"":", ") + ByteFormatter.encodeString( hw.getBytes(), hw.getOffset(), hw.getLength());
+
+			}
+			
+			if ( banned != "" ){
+				
+				msg += "\n    Banned: " + banned;
+			}
+			
+			reportInfoRaw( msg );
+		}
+	}
+	
+	private void
 	reportHistoryStatus()
 	{
 		synchronized( message_lock ){
@@ -3844,7 +3928,7 @@ MsgSyncHandler
 				
 				msg += "\nWatching " + history_watch_map.size() + " node(s)";
 				
-				String banned ="";
+				String banned = "";
 				
 				for ( HashWrapper hw: history_bad_keys ){
 					
@@ -3853,7 +3937,7 @@ MsgSyncHandler
 				
 				if ( banned != "" ){
 					
-					msg += "\nBanned: " + banned;
+					msg += "\n    Banned: " + banned;
 				}
 			}
 			
@@ -3906,10 +3990,38 @@ MsgSyncHandler
 	
 	private boolean
 	historyReceived(
+		byte[]		originator_pk,
 		byte[]		history )
 	{
 		synchronized( message_lock ){
 				
+			if ( spammer_map.size() > 0 ){
+				
+				SpammerEntry spam = spammer_map.get( new HashWrapper2( originator_pk ));
+				
+				if ( spam != null ){
+					
+						// direct hit, however we don't believe this as someone could be spamming
+						// by re-injecting someone else's messages
+					
+					spam.addRecord( history );
+				}
+				
+					// look for the currently deduced set of bad keys
+				
+				int	len = history.length & 0x0000fffc;
+				
+				for ( int i=0; i<len; i+=4 ){
+								
+					HashWrapper2	hkey = new HashWrapper2( history, i, 4 );
+	
+					if ( spammer_bad_keys.contains( hkey )){
+						
+						return( false );
+					}
+				}
+			}
+			
 			if ( !node_banning_enabled ){
 				
 				return( true );
@@ -3976,6 +4088,134 @@ MsgSyncHandler
 		}
 		
 		return( true );
+	}
+	
+	private void
+	computeSpamStatus()
+	{
+		List<byte[]>	histories = new ArrayList<byte[]>();
+		
+		for ( SpammerEntry entry: spammer_map.values()){
+			
+			histories.addAll( entry.getHistories());
+		}
+		
+		Map<HashWrapper2,int[]>	key_counts = new HashMap<HashWrapper2, int[]>();
+		
+		for ( byte[] history: histories ){
+			
+			int	len = history.length & 0x0000fffc;
+			
+			for ( int i=0; i<len; i+=4 ){
+							
+				HashWrapper2	hkey = new HashWrapper2( history, i, 4 );
+				
+				int[] c = key_counts.get( hkey );
+				
+				if ( c == null ){
+					
+					c = new int[]{ 1 };
+					
+					key_counts.put( hkey, c );
+					
+				}else{
+					
+					c[0]++;
+				}
+			}
+		}
+		
+		spammer_bad_keys.clear();
+		
+		for ( byte[] history: histories ){
+			
+			int	len = history.length & 0x0000fffc;
+			
+			int	max 				= 0;
+			HashWrapper2 max_hash 	= null;
+			
+			for ( int i=0; i<len; i+=4 ){
+							
+				HashWrapper2	hkey = new HashWrapper2( history, i, 4 );
+				
+				int[] c = key_counts.get( hkey );
+				
+				if ( c[0] > max ){
+					
+					max			= c[0];
+					max_hash 	= hkey;
+				}
+			}
+			
+			if ( max > 1 ){
+				
+				spammer_bad_keys.add( max_hash );
+				
+			}else{
+				
+				for ( int i=0; i<len; i+=4 ){
+					
+					HashWrapper2	hkey = new HashWrapper2( history, i, 4 );
+					
+					spammer_bad_keys.add( hkey );
+				}
+			}
+		}
+	}
+	
+	private class
+	SpammerEntry
+	{
+		private byte[]		public_key;
+			
+		private LinkedList<byte[]>	histories = new LinkedList<byte[]>();
+		private
+		SpammerEntry(
+			byte[]		pk )
+		{
+			public_key		= pk;
+		}
+		
+		private void
+		addRecord(
+			byte[]	history )
+		{
+			//System.out.println( "addRecord: " + ByteFormatter.encodeString( public_key ) + "/" +  ByteFormatter.encodeString( history ));
+			
+			if ( history == null || history.length == 0 ){
+				
+				return;
+			}
+			
+			synchronized( message_lock ){
+				
+				histories.add( history );
+				
+				if ( histories.size() > 16 ){
+					
+					histories.removeFirst();
+				}
+				
+				computeSpamStatus();
+			}
+		}
+		
+		private List<byte[]>
+		getHistories()
+		{
+			return( histories );
+		}
+		
+		public void
+		destroy()
+		{
+			//System.out.println( "Destroy: " + ByteFormatter.encodeString( public_key ));
+			
+			synchronized( message_lock ){
+				
+				computeSpamStatus();
+			}
+		}
 	}
 	
 	private class
