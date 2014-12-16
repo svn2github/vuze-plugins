@@ -32,6 +32,7 @@ import org.gudy.azureus2.core3.util.ByteArrayHashMap;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.DisplayFormatters;
 import org.gudy.azureus2.core3.util.FileUtil;
+import org.gudy.azureus2.core3.util.HashWrapper;
 import org.gudy.azureus2.core3.util.SHA1Simple;
 import org.gudy.azureus2.core3.util.SimpleTimer;
 import org.gudy.azureus2.core3.util.TimerEvent;
@@ -69,6 +70,7 @@ RSSToChat
 {
 	public static final int MAX_MESSAGE_SIZE		= 450;
 	public static final int MAX_POSTS_PER_REFRESH	= 10;
+	public static final int MAX_HISTORY_ENTRIES		= 1000;
 	
 	private PluginInterface			plugin_interface;
 	private LoggerChannel 			log;
@@ -1147,7 +1149,16 @@ RSSToChat
 		
 		private long 	latest_publish;
 		
-		private ByteArrayHashMap<String>	history = new ByteArrayHashMap<String>();
+		private Map<HashWrapper,String>	history =
+				new LinkedHashMap<HashWrapper,String>(MAX_HISTORY_ENTRIES,0.75f,false)
+				{
+					protected boolean 
+					removeEldestEntry(
+				   		Map.Entry<HashWrapper,String> eldest) 
+					{
+						return size() > MAX_HISTORY_ENTRIES;
+					}
+				};
 		
 		private boolean dirty;
 		
@@ -1180,7 +1191,7 @@ RSSToChat
 				
 				for ( byte[] id: l ){
 					
-					history.put( id, "" );
+					history.put( new HashWrapper( id ), "" );
 				}
 			}
 		}
@@ -1195,7 +1206,7 @@ RSSToChat
 		hasPublished(
 			String		id )
 		{
-			return( history.containsKey( getKey( id )));
+			return( history.containsKey( new HashWrapper( getKey( id ))));
 		}
 
 		private void
@@ -1203,7 +1214,7 @@ RSSToChat
 			String		id,
 			long		item_time )
 		{
-			history.put( getKey( id ), "" );
+			history.put( new HashWrapper( getKey( id )), "" );
 			
 			if ( item_time > latest_publish ){
 				
@@ -1226,9 +1237,9 @@ RSSToChat
 				
 				map.put( "ids", l );
 				
-				for ( byte[] k: history.keys()){
+				for ( HashWrapper k: history.keySet()){
 					
-					l.add( k );
+					l.add( k.getBytes());
 				}
 				
 				FileUtil.writeResilientFile( file, map );
