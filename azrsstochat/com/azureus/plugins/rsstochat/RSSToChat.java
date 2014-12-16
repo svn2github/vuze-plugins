@@ -1025,6 +1025,8 @@ RSSToChat
 			network		= _network;
 			key			= _key;
 			refresh		= _refresh;
+			
+			retry_outstanding = true;		// initial load regardless
 		}
 		
 		private void
