@@ -28,8 +28,11 @@ import java.util.*;
 
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.Base32;
+import org.gudy.azureus2.core3.util.ByteArrayHashMap;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.DisplayFormatters;
+import org.gudy.azureus2.core3.util.FileUtil;
+import org.gudy.azureus2.core3.util.SHA1Simple;
 import org.gudy.azureus2.core3.util.SimpleTimer;
 import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
@@ -64,7 +67,8 @@ public class
 RSSToChat
 	implements UnloadablePlugin
 {
-	public static final int MAX_MESSAGE_SIZE	= 450;
+	public static final int MAX_MESSAGE_SIZE		= 450;
+	public static final int MAX_POSTS_PER_REFRESH	= 10;
 	
 	private PluginInterface			plugin_interface;
 	private LoggerChannel 			log;
@@ -73,7 +77,8 @@ RSSToChat
 	private LocaleUtilities			loc_utils;
 
 	private File		config_file;
-	
+	private File		history_dir;
+
 	private TimerEventPeriodic	timer;
 	
 	private List<Mapping>		mappings = new ArrayList<Mapping>();
@@ -91,6 +96,9 @@ RSSToChat
 		File data_dir = plugin_interface.getPluginconfig().getPluginUserFile( "test" ).getParentFile();
 		
 		config_file = new File( data_dir, "config.xml" );
+		history_dir = new File( data_dir, "history" );
+		
+		history_dir.mkdirs();
 		
 		loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
 		
@@ -415,11 +423,14 @@ RSSToChat
 		}
 	}
 	
-	private void
+	private boolean
 	updateRSS(
 		String			rss_source,
-		ChatInstance	inst )
+		ChatInstance	inst,
+		History			history )
 	{
+		boolean	try_again = false;
+		
 		try{
 			RSSFeed feed = plugin_interface.getUtilities().getRSSFeed( new URL( rss_source ));
 			
@@ -451,8 +462,15 @@ RSSToChat
 				});
 			
 			int	posted = 0;
-			
+						
 			for ( RSSItem item: items ){
+				
+				long	item_time = item.getPublicationDate().getTime();
+				
+				if ( item_time > 0 && item_time < history.getLatestPublish()){
+					
+					continue;
+				}
 				
 				String title = item.getTitle();
 				
@@ -639,6 +657,13 @@ RSSToChat
 						(dl_link==null?"":("&fl=" + UrlUtils.encode( dl_link )));
 				}
 				
+				String history_key = magnet;
+				
+				if ( history.hasPublished( history_key )){
+					
+					continue;
+				}
+				
 				String lc_magnet = magnet.toLowerCase( Locale.US );
 				
 				if ( !lc_magnet.contains( "&dn=" )){	
@@ -665,7 +690,7 @@ RSSToChat
 				
 				String info = "";
 				
-				if ( size != -1 ){
+				if ( size > 0 ){
 					
 					info = DisplayFormatters.formatByteCountToKiBEtc( size );
 				}
@@ -687,22 +712,38 @@ RSSToChat
 				
 				inst.sendMessage( magnet, new HashMap<String, Object>());
 				
+				history.setPublished( history_key, item_time );
+				
 				posted++;
+				
+				if ( posted >= MAX_POSTS_PER_REFRESH ){
+					
+					try_again = true;
+					
+					break;
+				}
 			}
 			
 			log( "    Posted " + posted + " new results" );
 			
 		}catch( Throwable e ){
 			
+			try_again = true;
+			
 			log( "RSS update for " + rss_source + " failed", e );
 		}
+		
+		return( try_again );
 	}	
 	
-	private void
+	private boolean
 	updateSubscription(
 		String			subscription_name,
-		ChatInstance	chat )
+		ChatInstance	chat,
+		History			history )
 	{
+		boolean	try_again = false;
+		
 		Subscription[] subscriptions = SubscriptionManagerFactory.getSingleton().getSubscriptions();
 		
 		boolean	subs_found = false;
@@ -720,25 +761,88 @@ RSSToChat
 				
 				subs_found = true;
 				
-				SubscriptionResult[] results = sub.getResults( false );
+				final Map<SubscriptionResult, Map<Integer,Object>>	result_map = new HashMap<SubscriptionResult, Map<Integer,Object>>();
+								
+				SubscriptionResult[] all_results = sub.getResults( false );
 				
-				log( "    Subscription '" + subscription_name + "' returned " + results.length + " total results" );
+				for ( SubscriptionResult result: all_results ){
+					
+					String history_key = result.getID();
+					
+					if ( history.hasPublished( history_key )){
+						
+						continue;
+					}
+					
+					result_map.put( result, result.toPropertyMap());
+				}
+				
+				Map<SubscriptionResult, Map<Integer,Object>> sorted_result_map = 
+					new TreeMap<SubscriptionResult, Map<Integer,Object>>(
+							new Comparator<SubscriptionResult>()
+							{
+								public int 
+								compare(
+									SubscriptionResult r1,
+									SubscriptionResult r2 ) 
+								{
+									Map<Integer,Object> p1 = result_map.get( r1 );
+									Map<Integer,Object> p2 = result_map.get( r2 );
+									
+									Date 	pub_date1 	= (Date)p1.get( SearchResult.PR_PUB_DATE );
+
+									long	result_time1 = pub_date1==null?0:pub_date1.getTime();
+									
+									Date 	pub_date2 	= (Date)p2.get( SearchResult.PR_PUB_DATE );
+
+									long	result_time2 = pub_date2==null?0:pub_date2.getTime();
+									
+									if ( result_time1 < result_time2 ){
+										
+										return( -1 );
+										
+									}else if ( result_time1 > result_time2 ){
+										
+										return( 1 );
+										
+									}else{
+										
+										return( r1.getID().compareTo(r2.getID()));
+									}
+
+								}
+							});
+					
+				sorted_result_map.putAll( result_map );
+				
+				log( "    Subscription '" + subscription_name + "' returned " + all_results.length + " total results" );
 
 				int	posted = 0;
 				
-				for ( SubscriptionResult result: results ){
+				for ( Map.Entry<SubscriptionResult, Map<Integer,Object>> entry: sorted_result_map.entrySet()){
 					
-					String id = result.getID();
+					SubscriptionResult	result = entry.getKey();
 					
-					Map<Integer,Object>	props = result.toPropertyMap();
+					String history_key = result.getID();
 					
-					System.out.println( id + " -> " + result.toPropertyMap());
+					Map<Integer,Object>	props = entry.getValue();
+					
+					//System.out.println( history_key + " -> " + result.toPropertyMap());
 					
 					String title = (String)props.get( SearchResult.PR_NAME );
 					
 					if ( title.length() > 80 ){
 						
 						title = title.substring( 0, 80 ) + "...";
+					}
+					
+					Date 	pub_date 	= (Date)props.get( SearchResult.PR_PUB_DATE );
+
+					long	result_time = pub_date==null?0:pub_date.getTime();
+					
+					if ( result_time > 0 && result_time < history.getLatestPublish()){
+						
+						continue;
 					}
 					
 					byte[] 	b_hash 		= (byte[])props.get( SearchResult.PR_HASH );
@@ -799,7 +903,7 @@ RSSToChat
 					
 					String info = "";
 					
-					if ( size != -1 ){
+					if ( size > 0 ){
 						
 						info = DisplayFormatters.formatByteCountToKiBEtc( size );
 					}
@@ -821,9 +925,13 @@ RSSToChat
 					
 					chat.sendMessage( magnet, new HashMap<String, Object>());
 
-					posted ++;
-
-					if ( posted++ > 5 ){
+					history.setPublished( history_key, result_time );
+					
+					posted++;
+					
+					if ( posted >= MAX_POSTS_PER_REFRESH ){
+						
+						try_again = true;
 						
 						break;
 					}
@@ -837,8 +945,30 @@ RSSToChat
 			
 			log( "Subscription '" + subscription_name + "' not found" );
 		}
+		
+		return( try_again );
 	}
 	
+	private byte[]
+	getKey(
+		String		str )
+	{
+		try{
+			byte[] temp = new SHA1Simple().calculateHash( str.getBytes( "UTF-8" ));
+			
+			byte[] result = new byte[8];
+			
+			System.arraycopy( temp, 0, result, 0, 8 );
+			
+			return( result );
+			
+		}catch( Throwable e){
+	
+			Debug.out( e );
+			
+			return( new byte[8] );
+		}
+	}
 	
 	public void
 	unload() 
@@ -876,7 +1006,7 @@ RSSToChat
 		
 		private ChatInstance	chat;
 		private boolean			updating;
-		private int				last_udpate_ticks;
+		private boolean			retry_outstanding;
 		
 		private boolean	destroyed;
 		
@@ -897,58 +1027,82 @@ RSSToChat
 		
 		private void
 		update(
-			BuddyPluginBeta	bp,
-			int				minute_count )
+			BuddyPluginBeta		bp,
+			int					minute_count )
 		{
-			if ( minute_count % refresh != 0 ){
-				
-				return;
-			}
-						
-			log( "Refreshing " + getSourceName());
-			
-			ChatInstance chat_instance;
-			
 			synchronized( this ){
 				
-				if ( destroyed ){
-					
-					log( "Mapping destroyed" );
+				if ( updating ){
 					
 					return;
 				}
 				
-				if ( chat == null || chat.isDestroyed()){
+				updating = true;
+			}
+			
+			try{
+				if ( 	retry_outstanding || 
+						minute_count % refresh == 0 ){
+									
+					retry_outstanding = false;
 					
+					log( "Refreshing " + getSourceName());
 					
+					ChatInstance chat_instance;
+					
+					synchronized( this ){
+						
+						if ( destroyed ){
+							
+							log( "Mapping destroyed" );
+							
+							return;
+						}
+						
+						if ( chat == null || chat.isDestroyed()){
+							
+							
+							try{
+								chat = bp.getChat( network, key );
+								
+								chat.setFavourite( true );
+								
+								chat.setSaveMessages( true );
+								
+							}catch( Throwable e ){
+								
+								log( "Failed to create chat '" + getChatName() + "': " + Debug.getNestedExceptionMessage( e ));
+								
+								return;
+							}
+						}
+						
+						chat_instance = chat;
+					}
+						
+					History history = new History( this );
+								
 					try{
-						chat = bp.getChat( network, key );
+						if ( is_rss ){
+							
+							retry_outstanding = updateRSS( source, chat_instance, history );
+							
+						}else{
+							
+							retry_outstanding = updateSubscription( source, chat_instance, history );
+						}
+					}finally{
 						
-						chat.setFavourite( true );
-						
-						chat.setSaveMessages( true );
-						
-					}catch( Throwable e ){
-						
-						log( "Failed to create chat '" + getChatName() + "': " + Debug.getNestedExceptionMessage( e ));
-						
-						return;
+						history.save();
 					}
 				}
+			}finally{
 				
-				chat_instance = chat;
+				synchronized( this ){
+					
+					updating = false;
+				}
 			}
-			
-			if ( is_rss ){
-				
-				updateRSS( source, chat_instance );
-				
-			}else{
-				
-				updateSubscription( source, chat_instance);
-			}
-			
-			last_udpate_ticks = minute_count;
 		}
 		
 		private void
@@ -983,6 +1137,102 @@ RSSToChat
 		getChatName()
 		{
 			return((network==AENetworkClassifier.AT_PUBLIC?"Public":"Anonymous") + ": " + key );
+		}
+	}
+	
+	private class
+	History
+	{
+		private File file;
+		
+		private long 	latest_publish;
+		
+		private ByteArrayHashMap<String>	history = new ByteArrayHashMap<String>();
+		
+		private boolean dirty;
+		
+		private
+		History(
+			Mapping		mapping )
+		{
+			String	key = mapping.getSourceName() + "/" + mapping.getChatName();
+			
+			try{
+				file = new File( history_dir, Base32.encode( getKey( key )) + ".dat" );
+				
+			}catch( Throwable e ){
+				
+				Debug.out( e );
+			}
+			
+			if ( file.exists()){
+				
+				Map map = FileUtil.readResilientFile( file );
+				
+				Long lp = (Long)map.get( "last_publish" );
+				
+				if ( lp != null ){
+					
+					latest_publish = lp.longValue();
+				}
+				
+				List<byte[]> l = (List<byte[]>)map.get( "ids" );
+				
+				for ( byte[] id: l ){
+					
+					history.put( id, "" );
+				}
+			}
+		}
+		
+		private long
+		getLatestPublish()
+		{
+			return( latest_publish );
+		}
+		
+		private boolean
+		hasPublished(
+			String		id )
+		{
+			return( history.containsKey( getKey( id )));
+		}
+
+		private void
+		setPublished(
+			String		id,
+			long		item_time )
+		{
+			history.put( getKey( id ), "" );
+			
+			if ( item_time > latest_publish ){
+				
+				latest_publish = item_time;
+			}
+			
+			dirty = true;
+		}
+		
+		private void
+		save()
+		{
+			if ( dirty ){
+				
+				Map map = new HashMap();
+				
+				map.put( "last_publish", latest_publish );
+				
+				List	l = new ArrayList( history.size());
+				
+				map.put( "ids", l );
+				
+				for ( byte[] k: history.keys()){
+					
+					l.add( k );
+				}
+				
+				FileUtil.writeResilientFile( file, map );
+			}
 		}
 	}
 }
