@@ -24,6 +24,7 @@ package com.azureus.plugins.rsstochat;
 
 import java.io.*;
 import java.net.URL;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
@@ -200,17 +201,17 @@ RSSToChat
 						perform(
 							TimerEvent event ) 
 						{
-							minute_count++;
-							
 							BuddyPluginBeta bp = BuddyPluginUtils.getBetaPlugin();
 							
-							if ( bp == null ){
+							if ( bp == null || !bp.isInitialised()){
 								
 								log( "Decentralized chat not available (yet)" );
 								
 								return;
 							}
 							
+							minute_count++;
+													
 							List<Mapping>	maps;
 							
 							synchronized( mappings ){
@@ -344,8 +345,9 @@ RSSToChat
 					throw( new Exception( "<mapping> must contain a <chat> entry" ));
 				}
 				
-				SimpleXMLParserDocumentNode net_node = chat_node.getChild( "network" );
-				SimpleXMLParserDocumentNode key_node = chat_node.getChild( "key" );
+				SimpleXMLParserDocumentNode net_node 	= chat_node.getChild( "network" );
+				SimpleXMLParserDocumentNode key_node 	= chat_node.getChild( "key" );
+				SimpleXMLParserDocumentNode type_node 	= chat_node.getChild( "type" );
 
 				if ( net_node == null || key_node == null ){
 					
@@ -373,6 +375,7 @@ RSSToChat
 				
 				if ( 	key.startsWith( "Tag:" ) || 
 						key.startsWith( "Download:" ) || 
+						key.startsWith( "Vuze:" ) || 
 						key.startsWith( "General:" ) || 
 						key.startsWith( "Announce:" )){
 					
@@ -397,7 +400,30 @@ RSSToChat
 
 				}
 				
-				Mapping mapping = new Mapping( source, is_rss, network, key, refresh_mins );
+				int	type = Mapping.TYPE_NORMAL;
+				
+				if ( type_node != null ){
+					
+					String type_str = type_node.getValue().trim();
+					
+					if ( type_str.equalsIgnoreCase( "normal" )){
+						
+					}else if ( type_str.equalsIgnoreCase( "readonly" )){
+						
+						type = Mapping.TYPE_READ_ONLY;
+						
+					}else if ( type_str.equalsIgnoreCase( "admin" )){
+					
+						type = Mapping.TYPE_ADMIN;
+						
+					}else{
+						
+						throw( new Exception( "<type> value of '" + type_str + "' is invalid" ));
+
+					}
+				}
+				
+				Mapping mapping = new Mapping( source, is_rss, network, key, type, refresh_mins );
 				
 				log( "    Mapping: " + mapping.getOverallName());
 				
@@ -686,6 +712,10 @@ RSSToChat
 					magnet += "&_l="  + leechers;
 				}
 				
+				if ( item_time > 0 ){
+					magnet += "&_d="  + item_time;
+				}
+				
 				length_rem -= magnet.length();
 				
 				String tail = "[[$dn]]";
@@ -697,9 +727,13 @@ RSSToChat
 					info = DisplayFormatters.formatByteCountToKiBEtc( size );
 				}
 				
-				if ( cdp_link != null ){
+				if ( item_time > 0 ){
+					info += (info==""?"":", ")+new SimpleDateFormat( "yy/MM/dd").format( new Date( item_time ));
+				}
+
+				if ( cdp_link != null && ( dl_link == null || !cdp_link.equals( dl_link ))){
 					
-					info += (info==""?"":", ")+ cdp_link + "[[details]]";
+					info += (info==""?"":", ") + cdp_link + "[[details]]";
 				}
 				
 				if ( info != "" ){
@@ -899,6 +933,10 @@ RSSToChat
 						magnet += "&_l="  + leechers;
 					}
 					
+					if ( result_time > 0 ){
+						magnet += "&_d="  + result_time;
+					}
+					
 					length_rem -= magnet.length();
 					
 					String tail = "[[$dn]]";
@@ -908,6 +946,10 @@ RSSToChat
 					if ( size > 0 ){
 						
 						info = DisplayFormatters.formatByteCountToKiBEtc( size );
+					}
+					
+					if ( result_time > 0 ){
+						info += (info==""?"":", ")+new SimpleDateFormat( "yy/MM/dd").format( new Date( result_time ));
 					}
 					
 					if ( cdp_link != null ){
@@ -920,6 +962,7 @@ RSSToChat
 						tail += " (" + info + ")";
 					}
 					
+
 					if ( tail.length() < length_rem ){
 						
 						magnet += tail;
@@ -1000,8 +1043,13 @@ RSSToChat
 	private class
 	Mapping
 	{
+		private static final int	TYPE_NORMAL			= 1;
+		private static final int	TYPE_READ_ONLY		= 2;
+		private static final int	TYPE_ADMIN			= 3;
+		
 		private final String		source;
 		private final boolean		is_rss;
+		private final int			type;
 		private final String		network;
 		private final String		key;
 		private final int			refresh;
@@ -1018,12 +1066,14 @@ RSSToChat
 			boolean			_is_rss,
 			String			_network,
 			String			_key,
+			int				_type,
 			int				_refresh )
 		{
 			source		= _source;
 			is_rss		= _is_rss;
 			network		= _network;
 			key			= _key;
+			type		= _type;
 			refresh		= _refresh;
 			
 			retry_outstanding = true;		// initial load regardless
@@ -1054,6 +1104,8 @@ RSSToChat
 					
 					ChatInstance chat_instance;
 					
+					History history = new History( this );
+					
 					synchronized( this ){
 						
 						if ( destroyed ){
@@ -1065,14 +1117,63 @@ RSSToChat
 						
 						if ( chat == null || chat.isDestroyed()){
 							
+							chat = null;
 							
 							try{
-								chat = bp.getChat( network, key );
+								if ( type != TYPE_NORMAL ){
+									
+									List<ChatInstance> chats = bp.getChats();
+
+									for ( ChatInstance inst: chats ){
+										
+										if ( type == TYPE_ADMIN ){
+											
+											if ( inst.isManagedFor( network, key )){
+											
+												chat = inst;
+												
+												break;
+											}
+										}else if ( type == TYPE_READ_ONLY ){
+										
+											if ( inst.isReadOnlyFor( network, key )){
+											
+												chat = inst;
+												
+												break;
+											}
+										}
+									}
+								}
+								
+								if ( chat == null ){
+									
+									chat = bp.getChat( network, key );
+									
+									if ( type == TYPE_ADMIN ){
+										
+										ChatInstance man_inst = chat.getManagedChannel();
+										
+										chat.destroy();
+										
+										chat	= man_inst;
+										
+									}else  if ( type == TYPE_READ_ONLY ){
+										
+										ChatInstance ro_inst = chat.getReadOnlyChannel();
+										
+										chat.destroy();
+										
+										chat	= ro_inst;
+									}
+								}
 								
 								chat.setFavourite( true );
 								
 								chat.setSaveMessages( true );
-								
+									
+								log( "Chat initialised for '" + getChatName() + "': URL=" + chat.getURL() + ", history=" + history.getFileName());
+
 							}catch( Throwable e ){
 								
 								log( "Failed to create chat '" + getChatName() + "': " + Debug.getNestedExceptionMessage( e ));
@@ -1081,10 +1182,8 @@ RSSToChat
 							}
 						}
 						
-						chat_instance = chat;
+						chat_instance = chat;						
 					}
-						
-					History history = new History( this );
 								
 					try{
 						if ( is_rss ){
@@ -1128,7 +1227,17 @@ RSSToChat
 		private String
 		getOverallName()
 		{
-			return( getSourceName() + ", " + getChatName() + ", refresh=" + refresh + " min" );
+			String type_str;
+			
+			if ( type == TYPE_NORMAL ){
+				type_str = "normal";
+			}else if ( type == TYPE_READ_ONLY ){
+				type_str = "readonly";
+			}else{
+				type_str = "admin";
+			}
+			
+			return( getSourceName() + ", " + getChatName() + ", type=" + type_str + ", refresh=" + refresh + " min" );
 		}
 		
 		private String
@@ -1196,6 +1305,12 @@ RSSToChat
 					history.put( new HashWrapper( id ), "" );
 				}
 			}
+		}
+		
+		private String
+		getFileName()
+		{
+			return( file.getName());
 		}
 		
 		private long
