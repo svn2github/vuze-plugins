@@ -53,7 +53,8 @@ public class PromoPlugin
 	private static final String VIEWID = "SidebarPromo";
 
 	private UISWTInstance swtInstance = null;
-
+	private BasicPluginConfigModel configModel;
+	
 	public static PluginInterface pluginInterface;
 
 	public static String readStringFromUrl(String url) {
@@ -92,7 +93,7 @@ public class PromoPlugin
 //		}
 
 		UIManager uiManager = pluginInterface.getUIManager();
-		BasicPluginConfigModel configModel = uiManager.createBasicPluginConfigModel("ConfigView.Section."
+		configModel = uiManager.createBasicPluginConfigModel("ConfigView.Section."
 				+ VIEWID);
 		BooleanParameter paramEnabled = configModel.addBooleanParameter2("enabled",
 				VIEWID + ".enabled", true);
@@ -188,8 +189,14 @@ public class PromoPlugin
 
 	// @see org.gudy.azureus2.plugins.UnloadablePlugin#unload()
 	public void unload() throws PluginException {
-		if (swtInstance != null)
+		if (swtInstance != null){
 			swtInstance.removeViews(UISWTInstance.VIEW_SIDEBAR_AREA, VIEWID);
+		}
+		
+		if (configModel != null ){
+			configModel.destroy();
+			configModel = null;
+		}
 	}
 
 	public static void logEvent(String event) {
