@@ -1167,7 +1167,10 @@ I2PHelperRouter
 								}
 							}catch( Throwable e ){
 								
-								Debug.out( e );
+								if ( !Debug.getNestedExceptionMessage(e).toLowerCase(Locale.US).contains( "closed" )){
+
+									Debug.out( e );
+								}
 								
 								break;
 							}

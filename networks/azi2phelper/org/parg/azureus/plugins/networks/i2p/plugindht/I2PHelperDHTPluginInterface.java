@@ -38,7 +38,6 @@ import org.gudy.azureus2.core3.util.TimerEventPeriodic;
 import org.parg.azureus.plugins.networks.i2p.*;
 import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouter;
 import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouterDHT;
-import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTTransportContactAZ;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT;
 
 

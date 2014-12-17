@@ -24,6 +24,7 @@ package org.parg.azureus.plugins.networks.i2p.router;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.util.Locale;
 import java.util.Properties;
 
 import net.i2p.I2PAppContext;
@@ -299,7 +300,10 @@ I2PHelperRouterDHT
 									}
 								}catch( Throwable e ){
 									
-									Debug.out( e );
+									if ( !Debug.getNestedExceptionMessage(e).toLowerCase(Locale.US).contains( "closed" )){
+									
+										Debug.out( e );
+									}
 									
 									break;
 								}
