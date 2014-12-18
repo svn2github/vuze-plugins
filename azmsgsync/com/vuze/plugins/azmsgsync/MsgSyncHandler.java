@@ -713,7 +713,14 @@ MsgSyncHandler
 			dht_listen_key[i] ^= HANDLER_BASE_KEY_BYTES[i];
 		}
 		
-		private_messaging_node = addNode( dht.importContact( private_messaging_contact ), new byte[0], private_messaging_pk );
+		DHTPluginContact contact = dht.importContact( private_messaging_contact );
+		
+		if ( contact == null ){
+			
+			throw( new Exception( "Contact import failed: " + private_messaging_contact ));
+		}
+		
+		private_messaging_node = addNode( contact, new byte[0], private_messaging_pk );
 				
 		dht_call_key = dht_listen_key.clone();
 		
@@ -2112,8 +2119,11 @@ MsgSyncHandler
 			if ( current > last ){
 				
 				DHTPluginContact new_contact = dht.importContact( opt_contact );
-								
-				node.setDetails( new_contact, current );
+				
+				if ( new_contact != null ){
+				
+					node.setDetails( new_contact, current );
+				}
 			}
 		}
 				
@@ -3466,7 +3476,8 @@ MsgSyncHandler
 		
 		private final List<MsgSyncNode>	all_public_keys;
 
-		private final int				message_count;	
+		private final int				message_count;
+		private final int				new_message_count;
 		
 		private
 		BloomDetails(
@@ -3475,14 +3486,16 @@ MsgSyncHandler
 			BloomFilter							_bloom,
 			ByteArrayHashMap<List<MsgSyncNode>>	_msg_node_map,
 			List<MsgSyncNode>					_all_public_keys,
-			int									_message_count )
+			int									_message_count,
+			int									_new_message_count )
 		{
-			mutation_id		= _mutation_id;
-			rand			= _rand;
-			bloom			= _bloom;
-			msg_node_map	= _msg_node_map;
-			all_public_keys	= _all_public_keys;
-			message_count	= _message_count;
+			mutation_id			= _mutation_id;
+			rand				= _rand;
+			bloom				= _bloom;
+			msg_node_map		= _msg_node_map;
+			all_public_keys		= _all_public_keys;
+			message_count		= _message_count;
+			new_message_count	= _new_message_count;
 		}
 	}
 	
@@ -3638,7 +3651,7 @@ MsgSyncHandler
 				}
 			}
 			
-			last_bloom_details = new BloomDetails( message_mutation_id, rand, bloom, msg_node_map, all_public_keys, message_count );
+			last_bloom_details = new BloomDetails( message_mutation_id, rand, bloom, msg_node_map, all_public_keys, message_count, message_new_count );
 			
 			return( last_bloom_details );
 		}	
@@ -3662,11 +3675,11 @@ MsgSyncHandler
 			ByteArrayHashMap<List<MsgSyncNode>>	msg_node_map = bloom_details.msg_node_map;
 			
 			List<MsgSyncNode>	all_public_keys = bloom_details.all_public_keys;
-	
+				
 				// don't bother with this until its a busy channel
 			
-			boolean	record_history = message_new_count >= MAX_MESSAGES;
-			
+			boolean	record_history = bloom_details.new_message_count >= MAX_MESSAGES;
+
 			for ( Map<String,Object> m: list ){
 				
 				try{
@@ -3829,52 +3842,57 @@ MsgSyncHandler
 								
 								DHTPluginContact contact = dht.importContact( contact_map );
 								
-								MsgSyncNode msg_node = null;
+									// really can't do anything if contact deserialiseation fails
 								
-									// look for existing node without public key that we can use
-								
-								if ( nodes != null ){
+								if ( contact != null ){
 									
-									for ( MsgSyncNode node: nodes ){
+									MsgSyncNode msg_node = null;
+									
+										// look for existing node without public key that we can use
+									
+									if ( nodes != null ){
 										
-										if ( node.setDetails( contact, public_key )){
+										for ( MsgSyncNode node: nodes ){
 											
-											msg_node = node;
-											
-											break;
+											if ( node.setDetails( contact, public_key )){
+												
+												msg_node = node;
+												
+												break;
+											}
 										}
 									}
-								}
-								
-								if ( msg_node == null ){
-								
-									msg_node = addNode( contact, node_uid, public_key );
 									
-										// save so local list so pk available to other messages
-										// in this loop
+									if ( msg_node == null ){
 									
-									List<MsgSyncNode> x = msg_node_map.get( node_uid );
-									
-									if ( x == null ){
+										msg_node = addNode( contact, node_uid, public_key );
 										
-										x = new ArrayList<MsgSyncNode>();
+											// save so local list so pk available to other messages
+											// in this loop
 										
-										msg_node_map.put( node_uid, x );
+										List<MsgSyncNode> x = msg_node_map.get( node_uid );
+										
+										if ( x == null ){
+											
+											x = new ArrayList<MsgSyncNode>();
+											
+											msg_node_map.put( node_uid, x );
+										}
+										
+										x.add( msg_node );
 									}
+										
+									all_public_keys.add( msg_node );
 									
-									x.add( msg_node );
+									new_message = addMessage( msg_node, message_id, content, signature, age, new_history, contact_map, MS_INCOMING );
+									
+									handled = true;
 								}
-									
-								all_public_keys.add( msg_node );
-								
-								new_message = addMessage( msg_node, message_id, content, signature, age, new_history, contact_map, MS_INCOMING );
-								
-								handled = true;
 							}
 						}
 					}
 					
-					if ( new_message ){
+					if ( new_message && handled ){
 						
 						total_received++;
 					}
@@ -4391,6 +4409,7 @@ MsgSyncHandler
 		request_map.put( "b", bloom.serialiseToMap());
 		request_map.put( "r", rand );
 		request_map.put( "m", message_count );
+		request_map.put( "n", bloom_details.new_message_count );
 				
 		try{
 			byte[]	sync_data = BEncoder.encode( request_map );
@@ -4493,7 +4512,7 @@ MsgSyncHandler
 					int	received;
 					
 					if ( list != null ){
-												
+						
 						received = receiveMessages( sync_node, bloom_details, list );
 						
 					}else{
@@ -4535,7 +4554,12 @@ MsgSyncHandler
 						byte[]	uid = (byte[])rln.get( "u" );
 						Map		c	= (Map)rln.get( "c" );
 						
-						addNode( dht.importContact( c ), uid, null );
+						DHTPluginContact contact = dht.importContact( c );
+						
+						if ( contact != null ){
+						
+							addNode( contact, uid, null );
+						}
 					}
 				}
 			}
@@ -5067,9 +5091,12 @@ MsgSyncHandler
 				
 				DHTPluginContact	contact = dht.importContact((Map)m.get( "c" ));
 				
-				MsgSyncNode node = addNode( contact, uid, public_key );
+				if ( contact != null ){
 				
-				node_map.put( id, node );
+					MsgSyncNode node = addNode( contact, uid, public_key );
+				
+					node_map.put( id, node );
+				}
 			}
 			
 			for ( Map m: msg_imp ){
