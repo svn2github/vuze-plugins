@@ -375,7 +375,7 @@ RSSToChat
 				
 				if ( 	key.startsWith( "Tag:" ) || 
 						key.startsWith( "Download:" ) || 
-						key.startsWith( "Vuze:" ) || 
+						//key.startsWith( "Vuze:" ) || 
 						key.startsWith( "General:" ) || 
 						key.startsWith( "Announce:" )){
 					
@@ -669,82 +669,16 @@ RSSToChat
 					continue;
 				}
 					
-				int	length_rem = MAX_MESSAGE_SIZE;
-				
-				String magnet;
-				
-				if ( dl_link != null && dl_link.toLowerCase(Locale.US).startsWith( "magnet:" )){
-					
-					magnet = dl_link;
-					
-				}else{
-				
-					magnet = 
-						"magnet:?xt=urn:btih:" + hash + 
-						"&dn=" + UrlUtils.encode( title ) + 
-						(dl_link==null?"":("&fl=" + UrlUtils.encode( dl_link )));
-				}
+				String magnet = buildMagnetHead( dl_link, hash, title );
 				
 				String history_key = magnet;
 				
-				if ( history.hasPublished( history_key )){
+				if ( history != null && history.hasPublished( history_key )){
 					
 					continue;
 				}
 				
-				String lc_magnet = magnet.toLowerCase( Locale.US );
-				
-				if ( !lc_magnet.contains( "&dn=" )){	
-					magnet += "&dn=" + UrlUtils.encode( title );
-				}
-				
-				if ( size != -1 ){
-					if ( !lc_magnet.contains( "&xl=" )){
-						magnet += "&xl="  + size;
-					}
-				}
-				
-				if ( seeds != -1 ){
-					magnet += "&_s="  + seeds;
-				}
-				
-				if ( leechers != -1 ){
-					magnet += "&_l="  + leechers;
-				}
-				
-				if ( item_time > 0 ){
-					magnet += "&_d="  + item_time;
-				}
-				
-				length_rem -= magnet.length();
-				
-				String tail = "[[$dn]]";
-				
-				String info = "";
-				
-				if ( size > 0 ){
-					
-					info = DisplayFormatters.formatByteCountToKiBEtc( size );
-				}
-				
-				if ( item_time > 0 ){
-					info += (info==""?"":", ")+new SimpleDateFormat( "yy/MM/dd").format( new Date( item_time ));
-				}
-
-				if ( cdp_link != null && ( dl_link == null || !cdp_link.equals( dl_link ))){
-					
-					info += (info==""?"":", ") + cdp_link + "[[details]]";
-				}
-				
-				if ( info != "" ){
-					
-					tail += " (" + info + ")";
-				}
-				
-				if ( tail.length() < length_rem ){
-					
-					magnet += tail;
-				}
+				magnet = buildMagnetTail(magnet, dl_link, cdp_link, title, size, item_time, seeds, leechers );
 				
 				inst.sendMessage( magnet, new HashMap<String, Object>());
 				
@@ -899,75 +833,10 @@ RSSToChat
 						
 					int	length_rem = MAX_MESSAGE_SIZE;
 					
-					String magnet;
+					String magnet = buildMagnetHead( dl_link, hash, title );
 					
-					if ( dl_link != null && dl_link.toLowerCase(Locale.US).startsWith( "magnet:" )){
+					magnet = buildMagnetTail(magnet, dl_link, cdp_link, title, size, result_time, seeds, leechers );
 						
-						magnet = dl_link;
-						
-					}else{
-					
-						magnet = 
-							"magnet:?xt=urn:btih:" + hash + 
-							"&dn=" + UrlUtils.encode( title ) + 
-							(dl_link==null?"":("&fl=" + UrlUtils.encode( dl_link )));
-					}
-					
-					String lc_magnet = magnet.toLowerCase( Locale.US );
-					
-					if ( !lc_magnet.contains( "&dn=" )){	
-						magnet += "&dn=" + UrlUtils.encode( title );
-					}
-					
-					if ( size != -1 ){
-						if ( !lc_magnet.contains( "&xl=" )){
-							magnet += "&xl="  + size;
-						}
-					}
-					
-					if ( seeds != -1 ){
-						magnet += "&_s="  + seeds;
-					}
-					
-					if ( leechers != -1 ){
-						magnet += "&_l="  + leechers;
-					}
-					
-					if ( result_time > 0 ){
-						magnet += "&_d="  + result_time;
-					}
-					
-					length_rem -= magnet.length();
-					
-					String tail = "[[$dn]]";
-					
-					String info = "";
-					
-					if ( size > 0 ){
-						
-						info = DisplayFormatters.formatByteCountToKiBEtc( size );
-					}
-					
-					if ( result_time > 0 ){
-						info += (info==""?"":", ")+new SimpleDateFormat( "yy/MM/dd").format( new Date( result_time ));
-					}
-					
-					if ( cdp_link != null ){
-						
-						info += (info==""?"":", ")+ cdp_link + "[[details]]";
-					}
-					
-					if ( info != "" ){
-						
-						tail += " (" + info + ")";
-					}
-					
-
-					if ( tail.length() < length_rem ){
-						
-						magnet += tail;
-					}
-					
 					chat.sendMessage( magnet, new HashMap<String, Object>());
 
 					history.setPublished( history_key, result_time );
@@ -992,6 +861,106 @@ RSSToChat
 		}
 		
 		return( try_again );
+	}
+	
+	private String
+	buildMagnetHead(
+		String		dl_link,
+		String		hash,
+		String		title )
+	{
+		String magnet;
+		
+		if ( dl_link != null && dl_link.toLowerCase(Locale.US).startsWith( "magnet:" )){
+			
+			magnet = dl_link;
+			
+		}else{
+		
+			magnet = 
+				"magnet:?xt=urn:btih:" + hash + 
+				"&dn=" + UrlUtils.encode( title ) + 
+				(dl_link==null?"":("&fl=" + UrlUtils.encode( dl_link )));
+		}
+		
+		return( magnet );
+	}
+	
+	private String
+	buildMagnetTail(
+		String		magnet,
+		String		dl_link,
+		String		cdp_link,
+		String		title,
+		long		size,
+		long		time,
+		long		seeds,
+		long		leechers )
+		
+	{
+		int	length_rem = MAX_MESSAGE_SIZE;
+		
+		String lc_magnet = magnet.toLowerCase( Locale.US );
+		
+		if ( !lc_magnet.contains( "&dn=" )){	
+			magnet += "&dn=" + UrlUtils.encode( title );
+		}
+		
+		if ( size != -1 ){
+			if ( !lc_magnet.contains( "&xl=" )){
+				magnet += "&xl="  + size;
+			}
+		}
+		
+		if ( seeds != -1 ){
+			magnet += "&_s="  + seeds;
+		}
+		
+		if ( leechers != -1 ){
+			magnet += "&_l="  + leechers;
+		}
+		
+		if ( time > 0 ){
+			magnet += "&_d="  + time;
+		}
+		
+		boolean	has_cdp = cdp_link != null && ( dl_link == null || !cdp_link.equals( dl_link ));
+		
+		if ( has_cdp ){
+			magnet += "&_c=" + UrlUtils.encode( cdp_link );
+		}
+		
+		length_rem -= magnet.length();
+		
+		String tail = "[[$dn]]";
+		
+		String info = "";
+		
+		if ( size > 0 ){
+			
+			info = DisplayFormatters.formatByteCountToKiBEtc( size );
+		}
+		
+		if ( time > 0 ){
+			info += (info==""?"":", ")+new SimpleDateFormat( "yyyy/MM/dd").format( new Date( time ));
+		}
+
+		if ( has_cdp ){
+			
+			info += (info==""?"":", ") + "\"$_c[[details]]\"";
+		}
+		
+		if ( info != "" ){
+			
+			tail += " (" + info + ")";
+		}
+		
+		if ( tail.length() < length_rem ){
+			
+			magnet += tail;
+		}
+		
+		return( magnet );
 	}
 	
 	private byte[]
