@@ -3709,7 +3709,7 @@ MsgSyncHandler
 				
 				// don't bother with this until its a busy channel
 			
-			boolean	record_history = bloom_details.new_message_count >= MAX_MESSAGES;
+			boolean	record_history = bloom_details.new_message_count > MAX_MESSAGES;
 
 			for ( Map<String,Object> m: list ){
 				
@@ -4447,7 +4447,7 @@ MsgSyncHandler
 		request_map.put( "b", bloom.serialiseToMap());
 		request_map.put( "r", rand );
 		request_map.put( "m", message_count );
-		request_map.put( "n", bloom_details.new_message_count );
+		request_map.put( "p", bloom_details.new_message_count );
 			
 		if ( !is_anonymous_chat ){
 			
