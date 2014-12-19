@@ -26,6 +26,9 @@ import java.io.*;
 import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.Base32;
@@ -40,6 +43,7 @@ import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.gudy.azureus2.core3.util.TimerEventPeriodic;
 import org.gudy.azureus2.core3.util.UrlUtils;
+import org.gudy.azureus2.core3.xml.util.XUXmlWriter;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
@@ -299,6 +303,8 @@ RSSToChat
 				String 	source;
 				boolean	is_rss;
 				
+				Pattern	desc_link_pattern = null;
+				
 				if ( rss_node != null && subs_node == null ){
 					
 					SimpleXMLParserDocumentNode url_node = rss_node.getChild( "url" );
@@ -318,6 +324,18 @@ RSSToChat
 						throw( new Exception( "<url> value '" + url_str + "' is invalid" ));
 					}
 					
+					SimpleXMLParserDocumentNode desc_link_node = rss_node.getChild( "dl_link_pattern" );
+
+					if ( desc_link_node != null ){
+						
+						try{
+							desc_link_pattern = Pattern.compile(desc_link_node.getValue().trim(), Pattern.CASE_INSENSITIVE );
+
+						}catch( Throwable e ){
+						
+							throw( new Exception( "<dl_link_pattern> value '" + desc_link_pattern + "' is invalid", e ));
+						}
+					}
 					source 	= url_str;
 					is_rss	= true;
 					
@@ -423,7 +441,7 @@ RSSToChat
 					}
 				}
 				
-				Mapping mapping = new Mapping( source, is_rss, network, key, type, refresh_mins );
+				Mapping mapping = new Mapping( source, is_rss, desc_link_pattern, network, key, type, refresh_mins );
 				
 				log( "    Mapping: " + mapping.getOverallName());
 				
@@ -451,8 +469,56 @@ RSSToChat
 		}
 	}
 	
+	private String
+	extractLinkFromDescription(
+		Pattern		pattern,
+		String		value )
+	{
+		String	desc_dl_link = null;
+		String	desc_fl_link = null;
+				
+		Matcher m = pattern.matcher( value );
+								
+		while( m.find()){
+			
+			String desc_url_str = m.group(1);
+			
+			desc_url_str = XUXmlWriter.unescapeXML( desc_url_str );
+			
+			desc_url_str = UrlUtils.decode( desc_url_str );
+			
+			String lc_desc_url_str = desc_url_str.toLowerCase();
+			
+			try{
+				URL desc_url = new URL(desc_url_str);
+
+				if ( lc_desc_url_str.startsWith( "magnet:" )){
+					
+					desc_dl_link = desc_url.toExternalForm();
+					
+				}else{
+					
+					if ( lc_desc_url_str.contains( ".torrent" )){
+						
+						desc_fl_link = desc_url.toExternalForm();
+					}
+				}
+			}catch( Throwable e ){
+				
+			}
+		}
+		
+		if ( desc_fl_link != null ){
+			
+			return( desc_fl_link );
+		}
+		
+		return( desc_dl_link );
+	}
+	
 	private boolean
 	updateRSS(
+		Mapping			mapping,
 		String			rss_source,
 		ChatInstance	inst,
 		History			history )
@@ -477,7 +543,10 @@ RSSToChat
 						RSSItem i1,
 						RSSItem i2) 
 					{
-						long res = i1.getPublicationDate().getTime() - i2.getPublicationDate().getTime();
+						Date d1 = i1.getPublicationDate();
+						Date d2 = i2.getPublicationDate();
+						
+						long res = (d1==null?0:d1.getTime()) - (d2==null?0:d2.getTime());
 						
 						if ( res < 0 ){
 							return( -1 );
@@ -493,7 +562,9 @@ RSSToChat
 						
 			for ( RSSItem item: items ){
 				
-				long	item_time = item.getPublicationDate().getTime();
+				Date 	item_date = item.getPublicationDate();
+				
+				long	item_time = item_date==null?0:item_date.getTime();
 				
 				if ( item_time > 0 && item_time < history.getLatestPublish()){
 					
@@ -511,6 +582,8 @@ RSSToChat
 				String	dl_link 	= null;
 				String	cdp_link 	= null;
 				
+				String	desc_dl_link	= null;
+
 				long	size 		= -1;
 				long	seeds		= -1;
 				long	leechers	= -1;
@@ -629,6 +702,15 @@ RSSToChat
 								}
 							}
 						}
+						
+					}else if ( lc_child_name.equals( "description" )){
+								
+						Pattern pattern = mapping.desc_link_pattern;
+						
+						if ( pattern != null ){
+						
+							desc_dl_link = extractLinkFromDescription( pattern, value );
+						}
 					}else if ( lc_full_child_name.equals( "vuze:size" )){
 						
 						try{
@@ -662,6 +744,16 @@ RSSToChat
 
 						hash = value;
 					}
+				}
+				
+				if ( desc_dl_link != null ){
+				
+					if ( cdp_link == null && dl_link != null && !desc_dl_link.equals( dl_link )){
+						
+						cdp_link = dl_link;
+					}
+					
+					dl_link = desc_dl_link;
 				}
 				
 				if ( hash == "" && dl_link == null ){
@@ -1018,6 +1110,7 @@ RSSToChat
 		
 		private final String		source;
 		private final boolean		is_rss;
+		private final Pattern		desc_link_pattern;
 		private final int			type;
 		private final String		network;
 		private final String		key;
@@ -1033,17 +1126,19 @@ RSSToChat
 		Mapping(
 			String			_source,
 			boolean			_is_rss,
+			Pattern			_desc_link_pattern,
 			String			_network,
 			String			_key,
 			int				_type,
 			int				_refresh )
 		{
-			source		= _source;
-			is_rss		= _is_rss;
-			network		= _network;
-			key			= _key;
-			type		= _type;
-			refresh		= _refresh;
+			source				= _source;
+			is_rss				= _is_rss;
+			desc_link_pattern	= _desc_link_pattern;
+			network				= _network;
+			key					= _key;
+			type				= _type;
+			refresh				= _refresh;
 			
 			retry_outstanding = true;		// initial load regardless
 		}
@@ -1157,7 +1252,7 @@ RSSToChat
 					try{
 						if ( is_rss ){
 							
-							retry_outstanding = updateRSS( source, chat_instance, history );
+							retry_outstanding = updateRSS( this, source, chat_instance, history );
 							
 						}else{
 							
