@@ -40,7 +40,8 @@ MsgSyncNode
 	private volatile long	last_alive;
 	private volatile int	fail_count;
 	
-	private volatile long	last_tunnel;
+	private volatile DHTPluginContact	rendezvous;
+	private volatile long				last_tunnel;
 	
 	private long			last_message_timestamp;
 	
@@ -96,6 +97,19 @@ MsgSyncNode
 			
 			return( last_message_timestamp );
 		}
+	}
+	
+	protected void
+	setRendezvous(
+		DHTPluginContact		r )
+	{
+		rendezvous = r;
+	}
+	
+	protected DHTPluginContact
+	getRendezvous()
+	{
+		return( rendezvous );
 	}
 	
 	protected long

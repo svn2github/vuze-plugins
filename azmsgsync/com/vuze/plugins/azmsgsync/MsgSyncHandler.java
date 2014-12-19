@@ -69,6 +69,9 @@ import org.gudy.azureus2.core3.util.TimerEventPeriodic;
 import org.gudy.azureus2.plugins.ipc.IPCException;
 
 import com.aelitis.azureus.core.AzureusCoreFactory;
+import com.aelitis.azureus.core.dht.DHT;
+import com.aelitis.azureus.core.dht.nat.DHTNATPuncher;
+import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
 import com.aelitis.azureus.core.security.CryptoECCUtils;
 import com.aelitis.azureus.core.security.CryptoManager;
 import com.aelitis.azureus.core.security.CryptoSTSEngine;
@@ -77,12 +80,14 @@ import com.aelitis.azureus.core.util.average.Average;
 import com.aelitis.azureus.core.util.average.AverageFactory;
 import com.aelitis.azureus.core.util.bloom.BloomFilter;
 import com.aelitis.azureus.core.util.bloom.BloomFilterFactory;
+import com.aelitis.azureus.plugins.dht.DHTPlugin;
 import com.aelitis.azureus.plugins.dht.DHTPluginContact;
 import com.aelitis.azureus.plugins.dht.DHTPluginInterface;
 import com.aelitis.azureus.plugins.dht.DHTPluginOperationAdapter;
 import com.aelitis.azureus.plugins.dht.DHTPluginProgressListener;
 import com.aelitis.azureus.plugins.dht.DHTPluginTransferHandler;
 import com.aelitis.azureus.plugins.dht.DHTPluginValue;
+import com.aelitis.azureus.plugins.dht.impl.DHTPluginContactImpl;
 
 public class 
 MsgSyncHandler 
@@ -2588,7 +2593,12 @@ MsgSyncHandler
 		final MsgSyncNode		node,
 		boolean					short_cache,
 		final Runnable			to_run )
-	{			
+	{		
+		if ( is_anonymous_chat ){
+			
+			return;
+		}
+		
 		long	last_tunnel = node.getLastTunnel();
 		
 		if ( last_tunnel != 0 && SystemTime.getMonotonousTime() - last_tunnel < (short_cache?45*1000:2*60*1000 )){
@@ -2612,20 +2622,41 @@ MsgSyncHandler
 						boolean	worked = false;
 						
 						try{
-							if ( TRACE )trace( "Tunneling to " + node.getName());
+							DHTPluginContact		rendezvous = node.getRendezvous();
+
+							if ( TRACE )trace( "Tunneling to " + node.getName() + ", rendezvous=" + rendezvous );
 							
-							if ( node.getContact().openTunnel() != null ){
+							DHTPluginContact contact = node.getContact();
+							
+							if ( rendezvous != null && contact instanceof DHTPluginContactImpl ){
 								
-								if ( TRACE )trace( "    tunneling to " + node.getName() + " worked" );
-						
-								worked = true;
+								DHTPluginContactImpl impl = (DHTPluginContactImpl)contact;
 								
-								if ( to_run != null ){
+								if ( impl.openTunnel( new DHTPluginContact[]{ rendezvous }, null ) != null ){
+									
+									if ( TRACE )trace( "    tunneling to " + node.getName() + " worked" );
+							
+									worked = true;
+									
+									if ( to_run != null ){
+									
+										to_run.run();
+									}
+								}
+							}else{
 								
-									to_run.run();
+								if ( contact.openTunnel() != null ){
+									
+									if ( TRACE )trace( "    tunneling to " + node.getName() + " worked" );
+							
+									worked = true;
+									
+									if ( to_run != null ){
+									
+										to_run.run();
+									}
 								}
 							}
-							
 						}catch( Throwable e ){
 							
 						}finally{
@@ -4339,7 +4370,7 @@ MsgSyncHandler
 			boolean node_dead = sync_node.getFailCount() > 0 || sync_node.getLastAlive() == 0;
 			
 			if ( node_dead ){
-				
+								
 				boolean	try_tunnel;
 				boolean	force;
 				
@@ -4351,13 +4382,20 @@ MsgSyncHandler
 				}else{
 					
 					force = false;
-					
-					int[] node_counts = getNodeCounts( false );
-					
-					int	total 	= node_counts[0];
-					int live	= node_counts[1];
-					
-					try_tunnel = ( live == 0 ) || ( total <= 5 && live < 2 ) || ( total <= 10 && live < 3 );
+										
+					if ( sync_node.getRendezvous() != null ){
+						
+						try_tunnel = true;
+						
+					}else{
+						
+						int[] node_counts = getNodeCounts( false );
+						
+						int	total 	= node_counts[0];
+						int live	= node_counts[1];
+						
+						try_tunnel = ( live == 0 ) || ( total <= 5 && live < 2 ) || ( total <= 10 && live < 3 );
+					}
 				}
 				
 				if ( try_tunnel ){
@@ -4410,7 +4448,37 @@ MsgSyncHandler
 		request_map.put( "r", rand );
 		request_map.put( "m", message_count );
 		request_map.put( "n", bloom_details.new_message_count );
-				
+			
+		if ( !is_anonymous_chat ){
+			
+			try{
+				if ( dht instanceof DHTPlugin ){
+					
+					DHTPlugin dht_plugin = (DHTPlugin)dht;
+					
+					DHT core_dht = dht_plugin.getDHT( DHTPlugin.NW_MAIN );
+					
+					if ( core_dht != null ){
+						
+						DHTNATPuncher nat_puncher = core_dht.getNATPuncher();
+						
+						if ( nat_puncher != null ){
+							
+							DHTTransportContact rendezvous = nat_puncher.getRendezvous();
+							
+							if ( rendezvous != null ){
+								
+								request_map.put( "z", rendezvous.exportContactToMap());
+							}
+						}
+					}
+				}
+			}catch( Throwable e ){
+					
+				Debug.out( e );
+			}
+		}
+		
 		try{
 			byte[]	sync_data = BEncoder.encode( request_map );
 			
@@ -4887,6 +4955,20 @@ MsgSyncHandler
 						( 	messages_they_have == messages_we_have &&
 							messages_we_have_they_deleted > 0 )){
 					
+					Map<String,Object> rendezvous_map = (Map<String,Object>)request_map.get( "z" );
+
+					if ( rendezvous_map != null ){
+						
+						try{
+							DHTPluginContact rendezvous =  dht.importContact( rendezvous_map );
+							
+							if ( rendezvous != null ){
+								
+								originator_node.setRendezvous( rendezvous );
+							}
+						}catch( Throwable e ){
+						}
+					}
 						// previously thought about returning bloom so and have them push messages to us. However,
 						// if we can get a reply to them with the bloom then we should equally as well be able to 
 						// hit them directly as normal
@@ -4894,12 +4976,12 @@ MsgSyncHandler
 					byte[] bk = originator_node.getContactAddress().getBytes( "UTF-8" );
 					
 					synchronized( biased_node_bloom ){
-						
+												
 						if ( biased_node_in == null && !biased_node_bloom.contains( bk )){
 							
 							biased_node_bloom.add( bk );
 							
-							if ( TRACE )trace( "Proposing biased node_in " + originator_node.getName());
+							if ( TRACE )trace( "Proposing biased node_in " + originator_node.getName() + ", rendezvous=" + rendezvous_map );
 
 							biased_node_in = originator_node;
 						}
