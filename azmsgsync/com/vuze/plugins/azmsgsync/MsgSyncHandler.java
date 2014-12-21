@@ -224,7 +224,7 @@ MsgSyncHandler
 				}
 			};
 			
-	private int								message_mutation_id;
+	private int								message_mutation_id		= 0;	// needs to be zero as tested for
 	private int								message_new_count;
 	
 	private ByteArrayHashMap<String>		message_sigs			= new ByteArrayHashMap<String>();
@@ -291,25 +291,29 @@ MsgSyncHandler
 	private long							private_messaging_secret_getting_last;
 	private boolean							private_messaging_fatal_error;
 	
-	private Map<HashWrapper,Object[]>	secret_activities = new HashMap<HashWrapper,Object[]>();
-	private BloomFilter					secret_activities_bloom = BloomFilterFactory.createAddRemove4Bit( 1024 );
+	private final Map<HashWrapper,Object[]>		secret_activities 		= new HashMap<HashWrapper,Object[]>();
+	private final BloomFilter					secret_activities_bloom = BloomFilterFactory.createAddRemove4Bit( 1024 );
 	
-	private BloomFilter					biased_node_bloom = BloomFilterFactory.createAddOnly( 512 );
+	private final BloomFilter			biased_node_bloom = BloomFilterFactory.createAddOnly( 512 );
 	private volatile MsgSyncNode		biased_node_in;
 	private volatile MsgSyncNode		biased_node_out;
 	
 	private volatile MsgSyncNode		random_liveish_node;
 	
-	private int LIVE_NODE_BLOOM_TIDY_PERIOD			= 60*1000;
-	private int	LIVE_NODE_BLOOM_TIDY_TICKS			= LIVE_NODE_BLOOM_TIDY_PERIOD / MsgSyncPlugin.TIMER_PERIOD;
+	private final int 	LIVE_NODE_BLOOM_TIDY_PERIOD			= 60*1000;
+	private final int	LIVE_NODE_BLOOM_TIDY_TICKS			= LIVE_NODE_BLOOM_TIDY_PERIOD / MsgSyncPlugin.TIMER_PERIOD;
 
+	private final int	SAVE_MESSAGES_PERIOD				= 60*1000;
+	private final int 	SAVE_MESSAGES_TICKS					= SAVE_MESSAGES_PERIOD / MsgSyncPlugin.TIMER_PERIOD;;
+	
 	private long			live_node_counter_bloom_start 	= SystemTime.getMonotonousTime();
 	private long			live_node_counter_last_new		= 0;
 	
-	private BloomFilter		live_node_counter_bloom = BloomFilterFactory.createAddOnly( 1000 );
-	private int				live_node_estimate;
+	private final BloomFilter	live_node_counter_bloom = BloomFilterFactory.createAddOnly( 1000 );
+	private int					live_node_estimate;
 	
 	private boolean			save_messages;
+	private int				save_messages_mutation_id	= message_mutation_id;
 	private boolean			messages_loading;
 	
 	
@@ -793,7 +797,15 @@ MsgSyncHandler
 		
 		if ( b != null ){
 			
-			save_messages = b;
+			if ( save_messages != b ){
+			
+				save_messages = b;
+			
+				if ( !save_messages ){
+				
+					deleteMessages();
+				}
+			}
 		}
 		
 		byte[]	pk 		= (byte[])options.get( "pk" );
@@ -1840,6 +1852,11 @@ MsgSyncHandler
 			checkLiveNodeBloom();
 		}
 		
+		if ( count % SAVE_MESSAGES_TICKS == 0 ){
+
+			saveMessages();
+		}
+		
 			// slower sync rate for anonymous, higher latency/cost 
 		
 		if ( count % ( is_anonymous_chat?2:1)  == 0 ){
@@ -2159,15 +2176,20 @@ MsgSyncHandler
 				}
 				
 				message_sigs.put( signature, "" );
-										
-				ListIterator<MsgSyncMessage> lit = messages.listIterator(messages.size());
 				
-				boolean added = false;
+				int	num_messages = messages.size();
+				
+				ListIterator<MsgSyncMessage> lit = messages.listIterator( num_messages );
+				
+				int		insertion_point = num_messages;
+				boolean	added			= false;
 				
 				int	age_secs = msg.getAgeSecsWhenReceived();
 				
 				while( lit.hasPrevious()){
-					
+						
+					insertion_point--;
+
 					MsgSyncMessage prev  = lit.previous();
 					
 					if ( prev.getAgeSecs() >= age_secs ){
@@ -2179,18 +2201,18 @@ MsgSyncHandler
 						added = true;
 						
 						break;
-					}
+					}			
 				}
 				
 				if ( !added ){
 				
 						// no older messages found, stick it at the front
 					
+					insertion_point = 0;
+					
 					messages.addFirst( msg );
 				}
-				
-				message_mutation_id++;
-				
+								
 				if ( messages.size() > MAX_MESSAGES ){
 											
 					MsgSyncMessage removed = messages.removeFirst();
@@ -2216,9 +2238,16 @@ MsgSyncHandler
 					deleted_messages_inverted_sigs_map.put( new HashWrapper( inv_sig ), "" );
 				}
 				
+				message_mutation_id++;
+
 				if ( msg_source != MS_LOADING ){
 				
-					message_new_count++;
+					if ( insertion_point > num_messages / 2 ){
+						
+							// only count as new if it ain't that old!
+						
+						message_new_count++;
+					}
 				}
 			}
 		}
@@ -4743,6 +4772,8 @@ MsgSyncHandler
 				
 				Number	m_temp = (Number)request_map.get( "m" );
 				
+				//System.out.println( message_new_count + ": " +  m_temp + "/" + request_map.get( "p" ) + "/" + request_map.get( "n" ));
+				
 				int	messages_they_have = m_temp==null?-1:m_temp.intValue();
 				
 				List<MsgSyncNode> caller_nodes = getNodes( uid );
@@ -5121,7 +5152,14 @@ MsgSyncHandler
 												
 												messages_loading = false;
 													
+												boolean was_empty = message_mutation_id == 0;
+												
 												loadMessages( file_name );
+												
+												if ( was_empty ){
+													
+													save_messages_mutation_id = message_mutation_id;
+												}
 											}
 											
 											event[0].cancel();
@@ -5229,17 +5267,20 @@ MsgSyncHandler
 	saveMessages()
 	{
 		if ( save_messages ){
-			
-			File dir = plugin.getPersistDir();
-			
-			File file_name = new File( dir, Base32.encode( user_key ) + (is_anonymous_chat?"a":"p") + ".dat" );
-						
+									
 			synchronized( message_lock ){
 			
 				if ( messages_loading ){
 					
 					return;
 				}
+				
+				if ( save_messages_mutation_id == message_mutation_id ){
+					
+					return;
+				}
+				
+				save_messages_mutation_id = message_mutation_id;
 				
 				Map map = new HashMap();
 
@@ -5300,11 +5341,25 @@ MsgSyncHandler
 					msg_exp.add( m );
 				}
 					
+				File dir = plugin.getPersistDir();
+				
+				File file_name = new File( dir, Base32.encode( user_key ) + (is_anonymous_chat?"a":"p") + ".dat" );
+
 				FileUtil.writeResilientFile( file_name,  map );
 				
 				log( "Saved " + messages.size() + " messages" );
 			}
 		}
+	}
+	
+	private void
+	deleteMessages()
+	{		
+		File dir = plugin.getPersistDir();
+			
+		File file_name = new File( dir, Base32.encode( user_key ) + (is_anonymous_chat?"a":"p") + ".dat" );
+
+		file_name.delete();
 	}
 	
 	protected void
