@@ -36,7 +36,11 @@ import org.gudy.azureus2.ui.swt.plugins.UISWTView;
 import org.gudy.azureus2.ui.swt.plugins.UISWTViewEvent;
 import org.gudy.azureus2.ui.swt.plugins.UISWTViewEventListener;
 
+import com.aelitis.azureus.ui.UIFunctionsManager;
+import com.aelitis.azureus.ui.mdi.MultipleDocumentInterface;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectSash;
+import com.aelitis.azureus.ui.swt.utils.FontUtils;
+import com.aelitis.azureus.ui.swt.views.skin.SBC_PlusFTUX;
 import com.aelitis.azureus.ui.swt.views.skin.sidebar.SideBar;
 import com.appadx.adcontrol.*;
 
@@ -48,6 +52,8 @@ public class PromoView
 	implements UISWTViewEventListener
 {
 	private AdControlSWT adControl;
+
+	private UISWTView view;
 
 	public PromoView() {
 	}
@@ -85,8 +91,7 @@ public class PromoView
 				break;
 
 			case UISWTViewEvent.TYPE_LANGUAGEUPDATE:
-				log("TYPE_LANGUAGEUPDATE Called "
-						+ Locale.getDefault().toString());
+				log("TYPE_LANGUAGEUPDATE Called " + Locale.getDefault().toString());
 				break;
 		}
 		return true;
@@ -94,6 +99,7 @@ public class PromoView
 
 	private void initialize(Composite parent, final UISWTView view) {
 
+		this.view = view;
 		try {
 			PluginConfig config = PromoPlugin.pluginInterface.getPluginconfig();
 			if (!config.getPluginBooleanParameter("resized.once")) {
@@ -120,16 +126,42 @@ public class PromoView
 		fd.left = null;
 		fd.right.offset = -3;
 
-		final Label lbl = new Label(ourParent, SWT.NONE);
-		lbl.setText("x");
-		lbl.setCursor(lbl.getDisplay().getSystemCursor(SWT.CURSOR_HAND));
-		lbl.setLayoutData(fd);
-		lbl.addMouseListener(new MouseListener() {
+		final Label lblClose = new Label(ourParent, SWT.NONE);
+		lblClose.setText("x");
+		lblClose.setCursor(lblClose.getDisplay().getSystemCursor(SWT.CURSOR_HAND));
+		lblClose.setLayoutData(fd);
+		lblClose.addMouseListener(new MouseListener() {
 
 			public void mouseUp(MouseEvent e) {
-				view.closeView();
-				PromoPlugin.pluginInterface.getPluginconfig().setPluginParameter(
-						"enabled", false);
+				temporaryClose();
+			}
+
+			public void mouseDown(MouseEvent e) {
+			}
+
+			public void mouseDoubleClick(MouseEvent e) {
+			}
+		});
+
+		final Label lblText = new Label(ourParent, SWT.NONE);
+		lblText.setText("Plus Users Don't See Ads");
+		lblText.setFont(FontUtils.getFontWithHeight(lblText.getFont(), null, 9));
+		lblText.addMouseListener(new MouseListener() {
+
+			public void mouseUp(MouseEvent e) {
+
+				PromoPlugin.pluginInterface.getUtilities().createThread("LoadPromo",
+						new Runnable() {
+
+							public void run() {
+								try {
+									log("loadclick");
+									adControl.loadAd();
+								} catch (Throwable t) {
+								}
+							}
+						});
+
 			}
 
 			public void mouseDown(MouseEvent e) {
@@ -142,8 +174,16 @@ public class PromoView
 		adControl = new AdControlSWT(ourParent, SWT.NO_SCROLL);
 		fd = Utils.getFilledFormData();
 		fd.height = 254;
-		fd.top = new FormAttachment(lbl, 2);
+		fd.top = new FormAttachment(lblClose, 2);
 		adControl.setLayoutData(fd);
+
+		fd = Utils.getFilledFormData();
+		fd.bottom = new FormAttachment(adControl, -1);
+		fd.top = null;
+		fd.right = null;
+		fd.left.offset = 3;
+		lblText.setLayoutData(fd);
+
 		adControl.addAdControlEventListener(new AdControlEventListener() {
 
 			public void onAdClicked() {
@@ -171,20 +211,22 @@ public class PromoView
 				super.onAdStarted();
 			}
 		});
-		
-		String pubID = PromoPlugin.pluginInterface.getPluginProperties().getProperty("PubID", "mawra2ag1");
-		int reloadTime = Integer.parseInt(PromoPlugin.pluginInterface.getPluginProperties().getProperty("ReloadSecs", "86400"));
+
+		String pubID = PromoPlugin.pluginInterface.getPluginProperties().getProperty(
+				"PubID", "mawra2ag1");
+		int reloadTime = Integer.parseInt(PromoPlugin.pluginInterface.getPluginProperties().getProperty(
+				"ReloadSecs", "86400"));
 		log("pubID len=" + pubID.length() + ";reload in " + reloadTime);
 
 		IAdControlOptions options = adControl.getOptions();
 		options.setPlayerOption(IAdControlOptions.Player.AUTO_MUTE, true);
 		options.setPubID(pubID);
 		options.setPageName("vuze");
-		options.setPubConfigURL("http://vuze-pubcfg.desktopadx.com/service/pubcfg/get.php?id=");   
+		options.setPubConfigURL("http://vuze-pubcfg.desktopadx.com/service/pubcfg/get.php?id=");
 		options.setRequestDomain("btpr.vuze.com");
-		
+
 		options.setPublisherDefaultAdReloadTime(reloadTime);
-		
+
 		PromoPlugin.pluginInterface.getUtilities().createThread("LoadPromo",
 				new Runnable() {
 
@@ -202,7 +244,6 @@ public class PromoView
 								}
 							});
 
-
 							PromoPlugin.logEvent("shown");
 						} catch (AdControlException e1) {
 							//  Bad or missing Publisher Configuration - Connection timed out: connect
@@ -217,6 +258,29 @@ public class PromoView
 					}
 				});
 		adControl.getShell().layout(true, true);
+	}
+
+	protected void temporaryClose() {
+		if (view == null) {
+			return;
+		}
+		view.closeView();
+		if (PromoPlugin.swtInstance == null) {
+			return;
+		}
+		int result = PromoPlugin.swtInstance.promptUser("Get Vuze Plus",
+				"Upgrading to Vuze Plus will remove ads from the client.",
+				new String[] {
+					"Not Now",
+					"Upgrade"
+				}, 1);
+
+		if (result == 1) {
+			SBC_PlusFTUX.setSourceRef("dlg-promo");
+
+			MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
+			mdi.showEntryByID(MultipleDocumentInterface.SIDEBAR_SECTION_PLUS);
+		}
 	}
 
 	protected void log(String string) {

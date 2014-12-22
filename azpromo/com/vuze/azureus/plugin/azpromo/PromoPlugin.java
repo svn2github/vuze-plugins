@@ -52,7 +52,7 @@ public class PromoPlugin
 
 	private static final String VIEWID = "SidebarPromo";
 
-	private UISWTInstance swtInstance = null;
+	public static UISWTInstance swtInstance = null;
 	private BasicPluginConfigModel configModel;
 	
 	public static PluginInterface pluginInterface;
