@@ -123,6 +123,10 @@ TorPlugin
 
 	private SOCKSProxy				socks_proxy;
 	
+	private SOCKSProxy				filtering_proxy;
+	private String					filtering_i2p_host	= "127.0.0.1";
+	private int						filtering_i2p_port;
+	
 	private ControlConnection		current_connection;
 	private AESemaphore 			connection_sem;
 	private long					last_connect_time;
@@ -1584,6 +1588,17 @@ TorPlugin
 		}
 	}
 	
+	private void
+	log(
+		String		str,
+		Throwable	e )
+	{
+		if ( log != null ){
+			
+			log.log( str, e );
+		}
+	}
+	
 	public void
 	unload()
 	{
@@ -1610,6 +1625,13 @@ TorPlugin
 				socks_proxy.destroy();
 				
 				socks_proxy = null;
+			}
+			
+			if ( filtering_proxy != null ){
+				
+				filtering_proxy.destroy();
+				
+				filtering_proxy = null;
 			}
 		}
 		
@@ -2119,7 +2141,7 @@ TorPlugin
 							return( null );
 						}
 						
-						socks_proxy = new SOCKSProxy( reason );
+						socks_proxy = new SOCKSProxy( 0, false, reason );
 					
 					}catch( Throwable e ){
 					
@@ -2220,10 +2242,68 @@ TorPlugin
 	{
 		Map<String,Object>	config = new HashMap<String,Object>();
 		
-		config.put( "socks_host", external_tor?external_socks_host:internal_socks_host );
-		config.put( "socks_port", external_tor?external_socks_port:internal_socks_port );
+		if ( filtering_proxy != null ){
+			
+			config.put( "socks_host", "127.0.0.1" );
+			config.put( "socks_port", filtering_proxy.getPort());
+
+		}else{
+			
+			config.put( "socks_host", external_tor?external_socks_host:internal_socks_host );
+			config.put( "socks_port", external_tor?external_socks_port:internal_socks_port );
+		}
 		
+		config.put( "i2p_socks_host", filtering_i2p_host );
+		config.put( "i2p_socks_port", filtering_i2p_port );
+
 		return( config );
+	}
+	
+	public Map<String,Object>
+	setConfig(
+		Map<String,Object>		config )
+	{
+		String	i2p_host	= (String)config.get( "i2p_socks_host" );
+		Number	i2p_port 	= (Number)config.get( "i2p_socks_port" );
+
+		if ( i2p_port != null ){
+			
+			synchronized( this ){
+		
+				filtering_i2p_port		= i2p_port.intValue();
+				
+				if ( i2p_host != null ){
+					
+					filtering_i2p_host	= i2p_host;
+					
+				}
+				
+				if ( filtering_proxy == null ){
+					
+					int filtering_proxy_last_port = plugin_config.getPluginIntParameter( "filtering.proxy.port", 0 );
+					
+					try{
+						try{
+							filtering_proxy = new SOCKSProxy( filtering_proxy_last_port, true, "Filtering" );
+							
+						}catch( Throwable e ){
+							
+							filtering_proxy = new SOCKSProxy( 0, true, "Filtering for I2P:" + filtering_i2p_port );
+
+							filtering_proxy_last_port = filtering_proxy.getPort();
+							
+							plugin_config.setPluginParameter( "filtering.proxy.port", filtering_proxy_last_port );
+						}
+						
+					}catch( Throwable e ){
+						
+						log( "Failed to start filtering proxy", e );
+					}
+				}
+			}
+		}
+		
+		return( getConfig());
 	}
 	
 	public boolean
@@ -3038,6 +3118,8 @@ TorPlugin
 	SOCKSProxy
 		implements AESocksProxyPlugableConnectionFactory
 	{
+		private final boolean	filtering;
+		
 		private InetAddress local_address;
 		
 		private Set<SOCKSProxyConnection>		connections = new HashSet<SOCKSProxyConnection>();
@@ -3060,13 +3142,17 @@ TorPlugin
 		
 		private
 		SOCKSProxy(
-			String reason )
+			int			_port,
+			boolean		_filtering,
+			String 		_reason )
 		
 			throws AEProxyException
 		{
-			proxy = AESocksProxyFactory.create( 0, 120*1000, 120*1000, this );
+			filtering	= _filtering;
 			
-			log( "Intermediate SOCKS proxy started on port " + proxy.getPort() + " for " + reason );
+			proxy = AESocksProxyFactory.create( _port, 120*1000, 120*1000, this );
+			
+			log( "Intermediate SOCKS proxy started on port " + proxy.getPort() + " for " + _reason + ", filtering=" + filtering );
 		}
 		
 		private int
@@ -3166,38 +3252,78 @@ TorPlugin
 				
 				throws IOException
 			{
-				InetAddress target = address.getAddress();
+				String	proxy_host;
+				int		proxy_port;
 				
-				if ( target == null ){
-					
-					closed( this );
-					
-					throw( new IOException( "Address should be set" ));
-				}
-				
-				String intermediate_host = target.getHostAddress();
-				
-				Object[] entry;
-				
-				synchronized( TorPlugin.this ){
-					
-					entry = intermediate_host_map.get( intermediate_host );
-				}
-				
-				if ( entry == null ){
-					
-					closed( this );
-					
-					throw( new IOException( "Intermediate address not found" ));
-				}
-								
-				final Proxy proxy = new Proxy( Proxy.Type.SOCKS, new InetSocketAddress((String)entry[1], (Integer)entry[2] ));
+				String	final_host;
+				int		final_port;
 
-				int final_port = address.getPort();
-								
-				String final_host = (String)entry[0];
+				if ( filtering ){
+															
+					InetAddress target = address.getAddress();
+					
+					if ( target != null ){
+						
+						closed( this );
+						
+						throw( new IOException( "Address should be unresolved" ));
+					}
+					
+					final_host	= address.getUnresolvedAddress();
+					final_port	= address.getPort();
+
+					if ( final_host.endsWith( ".i2p" )){
+						
+						if ( filtering_i2p_port == 0 ){
+							
+							throw( new IOException( "I2P proxy not set" ));
+						}
+						
+						proxy_host	= filtering_i2p_host;
+						proxy_port	= filtering_i2p_port;
+						
+					}else{
+						
+						proxy_host	= active_socks_host;
+						proxy_port	= active_socks_port;
+					}
+				}else{
+					
+					InetAddress target = address.getAddress();
+					
+					if ( target == null ){
+						
+						closed( this );
+						
+						throw( new IOException( "Address should be set" ));
+					}
+						
+					String intermediate_host = target.getHostAddress();
+
+					Object[] entry;
+					
+					synchronized( TorPlugin.this ){
+						
+						entry = intermediate_host_map.get( intermediate_host );
+					}
+					
+					if ( entry == null ){
+						
+						closed( this );
+						
+						throw( new IOException( "Intermediate address not found" ));
+					}
+					
+					proxy_host 	= (String)entry[1];
+					proxy_port	= (Integer)entry[2];
+										
+					final_host = (String)entry[0];
+					final_port = address.getPort();
+
+					final_host = rewriteHost( final_host, true );
+				}
 				
-				final_host = rewriteHost( final_host, true );
+				final Proxy proxy = new Proxy( Proxy.Type.SOCKS, new InetSocketAddress( proxy_host, proxy_port ));
 						
 				final InetSocketAddress final_address = InetSocketAddress.createUnresolved( final_host, final_port );
 				
