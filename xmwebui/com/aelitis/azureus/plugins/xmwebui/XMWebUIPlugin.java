@@ -1590,7 +1590,9 @@ XMWebUIPlugin
 					}
 				}
 				
-				System.out.println( "unhandled method: " + method + " - " + args );
+				if ( trace_param.getValue() ){
+					log( "unhandled method: " + method + " - " + args );
+				}
 			}
 	
 			return( result );
@@ -2149,7 +2151,9 @@ XMWebUIPlugin
 
 				} else {
 
-					System.out.println("Unhandled session-set field: " + key);
+					if ( trace_param.getValue() ){
+						log("Unhandled session-set field: " + key);
+					}
 				}
 			} catch (Throwable t) {
 				Debug.out(key + ":" + val, t);
@@ -2179,7 +2183,9 @@ XMWebUIPlugin
 
    Response arguments: "path", "name", and "id", holding the torrent ID integer
 		 */
-		System.out.println( "unhandled method: torrent-rename-path - " + args );
+		if ( trace_param.getValue() ){
+			log( "unhandled method: torrent-rename-path - " + args );
+		}
 	}
 
 
@@ -2467,6 +2473,11 @@ XMWebUIPlugin
 
 		// "uploadLimited"       | boolean    true if "uploadLimit" is honored
 		Boolean uploadLimited = getBoolean("uploadLimited", null);
+		
+		// RPC Vuze
+		// "tagAdd"             | array       array of tags to add to torrent
+		List tagAddList = (List) args.get("tagAdd");
+		List tagRemoveList = (List) args.get("tagRemove");
 
 		Long	l_uploaded_ever		= (Long)args.get( "uploadedEver" );
 		Long	l_downloaded_ever 	= (Long)args.get( "downloadedEver" );
@@ -2535,6 +2546,45 @@ XMWebUIPlugin
 					download.setUploadRateLimitBytesPerSecond(0);
 				}			
 				
+				if (tagAddList != null) {
+					TagManager tm = TagManagerFactory.getTagManager();
+
+					if (tm.isEnabled()) {
+
+						TagType tt = tm.getTagType(TagType.TT_DOWNLOAD_MANUAL);
+
+						for (Object oTagToAdd : tagAddList) {
+							if (oTagToAdd instanceof String) {
+								addTagToDownload(download, (String) oTagToAdd, tt);
+							}
+
+						}
+					}
+				}
+				
+				if (tagRemoveList != null) {
+					TagManager tm = TagManagerFactory.getTagManager();
+
+					if (tm.isEnabled()) {
+
+						TagType ttManual = tm.getTagType(TagType.TT_DOWNLOAD_MANUAL);
+						TagType ttCategory = tm.getTagType(TagType.TT_DOWNLOAD_CATEGORY);
+
+						for (Object oTagToAdd : tagRemoveList) {
+							if (oTagToAdd instanceof String) {
+								Tag tag = ttManual.getTag((String) oTagToAdd, true);
+								if (tag != null) {
+									tag.removeTaggable(PluginCoreUtils.unwrap(download));
+								}
+								tag = ttCategory.getTag((String) oTagToAdd, true);
+								if (tag != null) {
+									tag.removeTaggable(PluginCoreUtils.unwrap(download));
+								}
+							}
+
+						}
+					}
+				}
 									
 				DiskManagerFileInfo[] files = download.getDiskManagerFileInfo();
 					
@@ -2678,6 +2728,27 @@ XMWebUIPlugin
 				
 				Debug.out( e );
 			}
+		}
+	}
+
+	private void addTagToDownload(Download download, String tagToAdd, TagType tt) {
+		tagToAdd = tagToAdd.trim();
+
+		if (tagToAdd.length() == 0) {
+			return;
+		}
+
+		Tag tag = tt.getTag(tagToAdd, true);
+		if (tag == null) {
+			try {
+				tag = tt.createTag(tagToAdd, true);
+			} catch (Throwable e) {
+				Debug.out(e);
+			}
+		}
+
+		if (tag != null) {
+			tag.addTaggable(PluginCoreUtils.unwrap(download));
 		}
 	}
 
@@ -3206,30 +3277,7 @@ XMWebUIPlugin
 								
 								for ( String tag_name: vuze_tags ){
 									
-									tag_name = tag_name.trim();
-									
-									if ( tag_name.length() == 0 ){
-										
-										continue;
-									}
-									
-									Tag tag = tt.getTag( tag_name, true );
-									
-									if ( tag == null ){
-										
-										try{
-											tag = tt.createTag( tag_name, true );
-											
-										}catch( Throwable e ){
-											
-											Debug.out( e );
-										}
-									}
-	
-									if ( tag != null ){
-										
-										tag.addTaggable( PluginCoreUtils.unwrap( download ));
-									}
+									addTagToDownload(download, tag_name, tt);
 								}
 							}
 						}				
@@ -4230,7 +4278,9 @@ XMWebUIPlugin
 				value = listTags;
 
 			} else {
-				System.out.println("Unhandled get-torrent field: " + field);
+				if ( trace_param.getValue() ){
+					log("Unhandled get-torrent field: " + field);
+				}
 			}
 
 			if (value != null) {
@@ -4440,6 +4490,7 @@ XMWebUIPlugin
 		{ "uploadRatio", 0.0f },
 		{ "uploadedEver", 0 },
 		{ "webseedsSendingToUs", 0 },
+		{ "torrentFile", "" }
 		};
 		
 		
@@ -4550,8 +4601,9 @@ XMWebUIPlugin
 				torrent.put( field, value );
 				
 			}else{
-				
-				System.out.println( "Unknown field: " + field );
+				if ( trace_param.getValue() ){
+					log( "Unknown field: " + field );
+				}
 			}
 		}
 	}
@@ -6862,7 +6914,9 @@ XMWebUIPlugin
 			Engine 		engine,
 			Result[] 	results)
 		{
-			System.out.println( "results: " + engine.getName() + " - " + results.length );
+			if ( trace_param.getValue() ){
+				log( "results: " + engine.getName() + " - " + results.length );
+			}
 			
 			synchronized( this ){
 
@@ -6884,7 +6938,9 @@ XMWebUIPlugin
 		resultsComplete(
 			Engine 	engine)
 		{
-			System.out.println( "comp: " + engine.getName()); 
+			if ( trace_param.getValue() ){
+				log( "comp: " + engine.getName()); 
+			}
 			
 			synchronized( this ){
 
@@ -6907,7 +6963,9 @@ XMWebUIPlugin
 			Engine 		engine, 
 			Throwable 	cause )
 		{
-			System.out.println( "fail: " + engine.getName()); 
+			if ( trace_param.getValue() ){
+				log( "fail: " + engine.getName()); 
+			}
 			
 			synchronized( this ){
 
