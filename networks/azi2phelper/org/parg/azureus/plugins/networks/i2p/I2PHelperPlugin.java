@@ -81,6 +81,8 @@ import org.gudy.azureus2.core3.util.TorrentUtils;
 import org.gudy.azureus2.core3.util.UrlUtils;
 import org.gudy.azureus2.plugins.PluginAdapter;
 import org.gudy.azureus2.plugins.PluginConfig;
+import org.gudy.azureus2.plugins.PluginEvent;
+import org.gudy.azureus2.plugins.PluginEventListener;
 import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.UnloadablePlugin;
@@ -973,6 +975,44 @@ I2PHelperPlugin
 
 				uri_handler.addListener( magnet_handler );
 				
+				pi.addEventListener(
+						new PluginEventListener()
+						{
+							public void
+							handleEvent(
+								PluginEvent	ev )
+							{
+								int	type = ev.getType();
+								
+								if ( type == PluginEvent.PEV_ALL_PLUGINS_INITIALISED ){
+									
+									PluginInterface[] pis = plugin_interface.getPluginManager().getPluginInterfaces();
+									
+									for ( PluginInterface pi: pis ){
+										
+										String id = pi.getPluginID();
+										
+										if ( id.equals( "aznettorbrowser" )){
+											
+											torBrowserPluginInstalled( pi );
+										}
+									}
+									
+								}else if ( type == PluginEvent.PEV_PLUGIN_INSTALLED ){
+									
+									String id = (String)ev.getValue();
+									
+									if ( id.equals( "aznettorbrowser" )){ 
+										
+										torBrowserPluginInstalled( plugin_interface.getPluginManager().getPluginInterfaceByID( id ));
+									}
+								}else if ( ev.getType() == PluginEvent.PEV_PLUGIN_UNINSTALLED ){
+									
+									String id = (String)ev.getValue();
+								}
+							}
+						});
+
 			}else{
 								
 				log( "Plugin is disabled" );
@@ -990,6 +1030,31 @@ I2PHelperPlugin
 				
 				throw((PluginException)e);
 			}
+		}
+	}
+	
+	private void
+	torBrowserPluginInstalled(
+		PluginInterface pi )
+	{
+		try{
+			PluginInterface tor_pi = plugin_interface.getPluginManager().getPluginInterfaceByID( "aznettor" );
+
+			if ( tor_pi != null ){
+				
+				I2PHelperSocksProxy proxy = getSocksProxy();
+			
+				int	socks_port = proxy.getPort();
+									
+				Map<String,Object>	config = new HashMap<String, Object>();
+					
+				config.put( "i2p_socks_port", socks_port);
+					
+				tor_pi.getIPC().invoke( "setConfig", new Object[]{ config });
+			}
+		}catch( Throwable e ){
+			
+			Debug.out( e );
 		}
 	}
 	
