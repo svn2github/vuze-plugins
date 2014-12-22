@@ -8,7 +8,10 @@ package kazgorColumn;
 
 import java.io.File;
 import java.text.NumberFormat;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Set;
 
 import org.gudy.azureus2.plugins.Plugin;
 import org.gudy.azureus2.plugins.PluginInterface;
@@ -168,81 +171,104 @@ public class ExtraColumns implements Plugin {
 		for (int i = 0; i < COLOR_PARAMETER_KEYS.length; i++) {
 			pluginConfig.getPluginParameter(COLOR_PARAMETER_KEYS[i]).addConfigParameterListener(configParameterListener);
 		}
-
+		
+		Set<String> incomplete_tables = new HashSet<String>( Arrays.asList(
+			new String[]{
+				TableManager.TABLE_MYTORRENTS_INCOMPLETE,
+				TableManager.TABLE_MYTORRENTS_INCOMPLETE_BIG,
+				TableManager.TABLE_MYTORRENTS_ALL_BIG,
+			}));
+		
+		Set<String> complete_tables = new HashSet<String>( Arrays.asList(
+			new String[]{
+				TableManager.TABLE_MYTORRENTS_COMPLETE,
+				TableManager.TABLE_MYTORRENTS_COMPLETE_BIG,
+				TableManager.TABLE_MYTORRENTS_UNOPENED,
+				TableManager.TABLE_MYTORRENTS_UNOPENED_BIG,
+				TableManager.TABLE_MYTORRENTS_ALL_BIG,
+			}));
+		
+		Set<String> all_tables = new HashSet<String>( Arrays.asList(
+			new String[]{
+				TableManager.TABLE_MYTORRENTS_INCOMPLETE,
+				TableManager.TABLE_MYTORRENTS_INCOMPLETE_BIG,
+				TableManager.TABLE_MYTORRENTS_COMPLETE,
+				TableManager.TABLE_MYTORRENTS_COMPLETE_BIG,
+				TableManager.TABLE_MYTORRENTS_ALL_BIG,
+				TableManager.TABLE_MYTORRENTS_UNOPENED,
+				TableManager.TABLE_MYTORRENTS_UNOPENED_BIG,
+			}));
 		
 		// add the columns + listeners
 		TableManager tableManager = pluginInterface.getUIManager().getTableManager();
 		TableColumn kazgorColumn;
 
-		// Torrent Filename - Add to the Complete(Seeding) column 
-		TorrentNameRefreshListener torrentNameRefreshListener = new TorrentNameRefreshListener();
-		kazgorColumn = tableManager.createColumn(TableManager.TABLE_MYTORRENTS_COMPLETE, COLUMNID_TORRENTNAME);
-		kazgorColumn.initialize(TableColumn.ALIGN_LEAD, TableColumn.POSITION_LAST, 150);
-		kazgorColumn.addCellRefreshListener(torrentNameRefreshListener);
-		tableManager.addColumn(kazgorColumn);
+		AverageDownloadSpeedListener 	averageDownloadSpeedListener 	= new AverageDownloadSpeedListener();
+		AverageUploadSpeedListener 		averageUploadSpeedListener 		= new AverageUploadSpeedListener();
 
-		// Torrent Filename - Add to the Incomplete(downloading) column 
-		kazgorColumn = tableManager.createColumn(TableManager.TABLE_MYTORRENTS_INCOMPLETE, COLUMNID_TORRENTNAME);
-		kazgorColumn.initialize(TableColumn.ALIGN_LEAD, TableColumn.POSITION_LAST, 150);
-		kazgorColumn.addCellRefreshListener(torrentNameRefreshListener);
-		tableManager.addColumn(kazgorColumn);
-
-		// ETA for Seeding column to get you to a given ratio 
-		kazgorColumn = tableManager.createColumn(TableManager.TABLE_MYTORRENTS_COMPLETE, COLUMNID_UPETA);
-		kazgorColumn.initialize(TableColumn.ALIGN_TRAIL, TableColumn.POSITION_LAST, 150, TableColumn.INTERVAL_LIVE);
-		kazgorColumn.addCellRefreshListener(new UploadEtaListener());
-		tableManager.addColumn(kazgorColumn);
-
-		// Remaining for Seeding column to get you to a given ratio 
-		kazgorColumn = tableManager.createColumn(TableManager.TABLE_MYTORRENTS_COMPLETE, COLUMNID_REMAINING);
-		kazgorColumn.initialize(TableColumn.ALIGN_TRAIL, TableColumn.POSITION_LAST, 150, TableColumn.INTERVAL_LIVE);
-		kazgorColumn.addCellRefreshListener(new UploadRemainingListener());
-		tableManager.addColumn(kazgorColumn);
-
-		// Remaining % for Seeding column to get you to a given ratio 
-		kazgorColumn = tableManager.createColumn(TableManager.TABLE_MYTORRENTS_COMPLETE, COLUMNID_REMAINING_PERCENT);
-		kazgorColumn.initialize(TableColumn.ALIGN_TRAIL, TableColumn.POSITION_LAST, 80, TableColumn.INTERVAL_LIVE);
-		kazgorColumn.addCellRefreshListener(new UploadRemainingPercentListener());
-		tableManager.addColumn(kazgorColumn);
-
-		// selected files % done column 
-		kazgorColumn = tableManager.createColumn(TableManager.TABLE_MYTORRENTS_INCOMPLETE, COLUMNID_SDONE);
-		kazgorColumn.initialize(TableColumn.ALIGN_TRAIL, TableColumn.POSITION_LAST, 80, TableColumn.INTERVAL_LIVE);
-		kazgorColumn.addCellRefreshListener(new SelectedDoneListener());
-		tableManager.addColumn(kazgorColumn);
-
-		// Target Ratio that should be reached - Add to complete (seeding) columns
-		kazgorColumn = tableManager.createColumn(TableManager.TABLE_MYTORRENTS_COMPLETE, COLUMNID_TARGETRATIO);
-		kazgorColumn.initialize(TableColumn.ALIGN_CENTER, TableColumn.POSITION_LAST, 80, TableColumn.INTERVAL_LIVE);
-		kazgorColumn.addCellRefreshListener(new UploadTargetRatioListener());
-		tableManager.addColumn(kazgorColumn);
-
-		// Average download speed - Add to the Complete(seeding) columns 
-		AverageDownloadSpeedListener averageDownloadSpeedListener = new AverageDownloadSpeedListener();
-		kazgorColumn = tableManager.createColumn(TableManager.TABLE_MYTORRENTS_COMPLETE, COLUMNID_AVG_DOWNLOAD_SPEED);
-		kazgorColumn.initialize(TableColumn.ALIGN_TRAIL, TableColumn.POSITION_LAST, 150); // seeding torrents don't download anymore, so no INTERVAL_LIVE needed here
-		kazgorColumn.addCellRefreshListener(averageDownloadSpeedListener);
-		tableManager.addColumn(kazgorColumn);
-
-		// Average download speed - Add to the Incomplete(downloading) columns 
-		kazgorColumn = tableManager.createColumn(TableManager.TABLE_MYTORRENTS_INCOMPLETE, COLUMNID_AVG_DOWNLOAD_SPEED);
-		kazgorColumn.initialize(TableColumn.ALIGN_TRAIL, TableColumn.POSITION_LAST, 150, TableColumn.INTERVAL_LIVE);
-		kazgorColumn.addCellRefreshListener(averageDownloadSpeedListener);
-		tableManager.addColumn(kazgorColumn);
-
-		// Average upload speed - Add to the Complete(seeding) columns 
-		AverageUploadSpeedListener averageUploadSpeedListener = new AverageUploadSpeedListener();
-		kazgorColumn = tableManager.createColumn(TableManager.TABLE_MYTORRENTS_COMPLETE, COLUMNID_AVG_UPLOAD_SPEED);
-		kazgorColumn.initialize(TableColumn.ALIGN_TRAIL, TableColumn.POSITION_LAST, 150, TableColumn.INTERVAL_LIVE);
-		kazgorColumn.addCellRefreshListener(averageUploadSpeedListener);
-		tableManager.addColumn(kazgorColumn);
-
-		// Average upload speed - Add to the Incomplete(downloading) columns 
-		kazgorColumn = tableManager.createColumn(TableManager.TABLE_MYTORRENTS_INCOMPLETE, COLUMNID_AVG_UPLOAD_SPEED);
-		kazgorColumn.initialize(TableColumn.ALIGN_TRAIL, TableColumn.POSITION_LAST, 150, TableColumn.INTERVAL_LIVE);
-		kazgorColumn.addCellRefreshListener(averageUploadSpeedListener);
-		tableManager.addColumn(kazgorColumn);
-
+			// all
+		
+		for ( String table_id: all_tables ){
+		
+			// Torrent Filename - Add to the Complete(Seeding) and Incomplete(downloading) column 
+			TorrentNameRefreshListener torrentNameRefreshListener = new TorrentNameRefreshListener();
+			kazgorColumn = tableManager.createColumn(table_id, COLUMNID_TORRENTNAME);
+			kazgorColumn.initialize(TableColumn.ALIGN_LEAD, TableColumn.POSITION_LAST, 150);
+			kazgorColumn.addCellRefreshListener(torrentNameRefreshListener);
+			tableManager.addColumn(kazgorColumn);
+	
+	
+			// Average download speed - Add to the Complete(seeding) and Incomplete(downloading) columns 
+			kazgorColumn = tableManager.createColumn(table_id, COLUMNID_AVG_DOWNLOAD_SPEED);
+			kazgorColumn.initialize(TableColumn.ALIGN_TRAIL, TableColumn.POSITION_LAST, 150,complete_tables.contains(table_id)?TableColumn.INTERVAL_INVALID_ONLY:TableColumn.INTERVAL_LIVE); // seeding torrents don't download anymore, so no INTERVAL_LIVE needed here
+			kazgorColumn.addCellRefreshListener(averageDownloadSpeedListener);
+			tableManager.addColumn(kazgorColumn);
+	
+			// Average upload speed - Add to the Complete(seeding) and Incomplete(downloading) columns 
+			kazgorColumn = tableManager.createColumn(table_id, COLUMNID_AVG_UPLOAD_SPEED);
+			kazgorColumn.initialize(TableColumn.ALIGN_TRAIL, TableColumn.POSITION_LAST, 150, TableColumn.INTERVAL_LIVE);
+			kazgorColumn.addCellRefreshListener(averageUploadSpeedListener);
+			tableManager.addColumn(kazgorColumn);
+		}
+		
+			// incomplete
+		
+		for ( String table_id: incomplete_tables ){
+			// selected files % done column 
+			kazgorColumn = tableManager.createColumn(table_id, COLUMNID_SDONE);
+			kazgorColumn.initialize(TableColumn.ALIGN_TRAIL, TableColumn.POSITION_LAST, 80, TableColumn.INTERVAL_LIVE);
+			kazgorColumn.addCellRefreshListener(new SelectedDoneListener());
+			tableManager.addColumn(kazgorColumn);
+		}
+		
+			// complete
+		
+		for ( String table_id: complete_tables ){
+			// ETA for Seeding column to get you to a given ratio 
+			kazgorColumn = tableManager.createColumn(table_id, COLUMNID_UPETA);
+			kazgorColumn.initialize(TableColumn.ALIGN_TRAIL, TableColumn.POSITION_LAST, 150, TableColumn.INTERVAL_LIVE);
+			kazgorColumn.addCellRefreshListener(new UploadEtaListener());
+			tableManager.addColumn(kazgorColumn);
+	
+			// Remaining for Seeding column to get you to a given ratio 
+			kazgorColumn = tableManager.createColumn(table_id, COLUMNID_REMAINING);
+			kazgorColumn.initialize(TableColumn.ALIGN_TRAIL, TableColumn.POSITION_LAST, 150, TableColumn.INTERVAL_LIVE);
+			kazgorColumn.addCellRefreshListener(new UploadRemainingListener());
+			tableManager.addColumn(kazgorColumn);
+	
+			// Remaining % for Seeding column to get you to a given ratio 
+			kazgorColumn = tableManager.createColumn(table_id, COLUMNID_REMAINING_PERCENT);
+			kazgorColumn.initialize(TableColumn.ALIGN_TRAIL, TableColumn.POSITION_LAST, 80, TableColumn.INTERVAL_LIVE);
+			kazgorColumn.addCellRefreshListener(new UploadRemainingPercentListener());
+			tableManager.addColumn(kazgorColumn);
+	
+	
+			// Target Ratio that should be reached - Add to complete (seeding) columns
+			kazgorColumn = tableManager.createColumn(table_id, COLUMNID_TARGETRATIO);
+			kazgorColumn.initialize(TableColumn.ALIGN_CENTER, TableColumn.POSITION_LAST, 80, TableColumn.INTERVAL_LIVE);
+			kazgorColumn.addCellRefreshListener(new UploadTargetRatioListener());
+			tableManager.addColumn(kazgorColumn);
+		}
 		
 		// The magic to open a plugin GUI view -- see, wasn't that easy!
 		// plugin_Interface.getUIManager().getSWTManager().addView((new
@@ -419,7 +445,7 @@ public class ExtraColumns implements Plugin {
 			float remaining = 0;
 			if (filesized_ratio >= uploaded) remaining = filesized_ratio - uploaded;
 
-			double perc = remaining /filesized_ratio;
+			double perc = remaining==0?0:(remaining /filesized_ratio);
 			try {
 				if (perc >= 0.75) cell.setForeground(color75_100);
 				else if ((perc >= 0.50) && (perc < 0.75)) cell.setForeground(color50_75);
