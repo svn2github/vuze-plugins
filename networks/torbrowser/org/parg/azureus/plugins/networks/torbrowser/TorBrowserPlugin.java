@@ -572,6 +572,8 @@ TorBrowserPlugin
 		return( result );
 	}
 	
+	private int	config_last_port = 0;
+	
 	private void
 	checkConfig()
 	
@@ -596,6 +598,13 @@ TorBrowserPlugin
 			throw( new Exception( "Tor Helper Plugin communication failure", e ));
 
 		}
+		
+		if ( config_last_port == socks_port ){
+			
+			return;
+		}
+		
+		config_last_port = socks_port;
 		
 		log( "Tor socks port is " + socks_port );
 		
@@ -916,6 +925,11 @@ TorBrowserPlugin
 				new_launch = browser_instances.size() == 0;
 			}
 
+			if ( new_launch ){
+				
+				checkConfig();
+			}
+			
 			List<String>	cmd_list = new ArrayList<String>();
 		
 			String	browser_root = root.getAbsolutePath();
