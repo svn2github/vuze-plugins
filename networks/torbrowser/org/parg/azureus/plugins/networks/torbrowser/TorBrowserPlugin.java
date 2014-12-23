@@ -601,7 +601,10 @@ TorBrowserPlugin
 		
 		if ( config_last_port == socks_port ){
 			
-			return;
+			// can't see any harm in doing this everytime - deals with the case whereby someone has an old browser hanging around,
+			// starts Vuze and then kills the old browser (which causes the old browser to most likely re-write its config and trash
+			// over the port if different
+			//return;
 		}
 		
 		config_last_port = socks_port;
@@ -989,6 +992,10 @@ TorBrowserPlugin
 				if ( new_window ){
 				
 					cmd_list.add( "-new-window"  );
+					
+				}else{
+					
+					cmd_list.add( "-new-tab"  );
 				}
 		
 				if ( Constants.isWindows ){
