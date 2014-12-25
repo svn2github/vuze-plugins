@@ -1005,11 +1005,12 @@ I2PHelperPlugin
 									if ( id.equals( "aznettorbrowser" )){ 
 										
 										torBrowserPluginInstalled( plugin_interface.getPluginManager().getPluginInterfaceByID( id ));
+										
+									}else if ( id.equals( "aznettor" )){ 
+										
+										torPluginInstalled( plugin_interface.getPluginManager().getPluginInterfaceByID( id ));
 									}
-								}else if ( ev.getType() == PluginEvent.PEV_PLUGIN_UNINSTALLED ){
-									
-									String id = (String)ev.getValue();
-								}
+								}							
 							}
 						});
 
@@ -1034,13 +1035,13 @@ I2PHelperPlugin
 	}
 	
 	private void
-	torBrowserPluginInstalled(
-		PluginInterface pi )
+	torPluginInstalled(
+		PluginInterface tor_plugin_pi )
 	{
 		try{
-			PluginInterface tor_pi = plugin_interface.getPluginManager().getPluginInterfaceByID( "aznettor" );
+			PluginInterface tor_browser_pi = plugin_interface.getPluginManager().getPluginInterfaceByID( "aznettorbrowser" );
 
-			if ( tor_pi != null ){
+			if ( tor_browser_pi != null ){
 				
 				I2PHelperSocksProxy proxy = getSocksProxy();
 			
@@ -1048,9 +1049,34 @@ I2PHelperPlugin
 									
 				Map<String,Object>	config = new HashMap<String, Object>();
 					
-				config.put( "i2p_socks_port", socks_port);
+				config.put( "i2p_socks_port", socks_port );
 					
-				tor_pi.getIPC().invoke( "setConfig", new Object[]{ config });
+				tor_plugin_pi.getIPC().invoke( "setConfig", new Object[]{ config });
+			}
+		}catch( Throwable e ){
+			
+			Debug.out( e );
+		}
+	}
+	
+	private void
+	torBrowserPluginInstalled(
+		PluginInterface tor_browser_pi )
+	{
+		try{
+			PluginInterface tor_plugin_pi = plugin_interface.getPluginManager().getPluginInterfaceByID( "aznettor" );
+
+			if ( tor_plugin_pi != null ){
+				
+				I2PHelperSocksProxy proxy = getSocksProxy();
+			
+				int	socks_port = proxy.getPort();
+									
+				Map<String,Object>	config = new HashMap<String, Object>();
+					
+				config.put( "i2p_socks_port", socks_port );
+					
+				tor_plugin_pi.getIPC().invoke( "setConfig", new Object[]{ config });
 			}
 		}catch( Throwable e ){
 			
@@ -1220,8 +1246,39 @@ I2PHelperPlugin
 				}
 				
 				try{
-					socks_proxy = new I2PHelperSocksProxy( router, socks_port_param.getValue(), socks_allow_public_param.getValue(), I2PHelperPlugin.this );
+					int	explicit_port = socks_port_param.getValue();
+					
+					int	port;
+					
+					if ( explicit_port == 0 ){
+						
+						port = plugin_config.getPluginIntParameter( "azi2phelper.socks.port.last", 0 );
+
+					}else{
+						
+						port = explicit_port;
+					}
+					
+					try{
+						socks_proxy = new I2PHelperSocksProxy( router, port, socks_allow_public_param.getValue(), I2PHelperPlugin.this );
+						
+					}catch( Throwable e ){
+						
+						if ( explicit_port == 0 ){
+							
+							socks_proxy = new I2PHelperSocksProxy( router, 0, socks_allow_public_param.getValue(), I2PHelperPlugin.this );
+							
+						}else{
+							
+							throw( e );
+						}
+					}
 				
+					if ( explicit_port == 0 ){
+						
+						plugin_config.setPluginParameter( "azi2phelper.socks.port.last", socks_proxy.getPort());
+
+					}
 					updatePortInfo();
 					
 				}catch( Throwable e ){
