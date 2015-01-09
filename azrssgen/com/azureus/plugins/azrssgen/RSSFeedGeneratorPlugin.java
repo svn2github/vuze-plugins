@@ -25,6 +25,7 @@ import java.util.*;
 import java.io.*;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
+import java.net.URL;
 
 import org.gudy.azureus2.core3.download.DownloadManager;
 import org.gudy.azureus2.core3.download.DownloadManagerState;
@@ -196,7 +197,29 @@ RSSFeedGeneratorPlugin
 				
 				List<Download>	selected_dls = new ArrayList<Download>();
 				
-				if ( lhs.equals( "cat" ) && gen_cats.getValue()){
+				if ( lhs.equals( "hash" )){
+					
+					try{
+						Download dl = plugin_interface.getDownloadManager().getDownload( Base32.decode( rhs ));
+					
+						Torrent torrent = dl.getTorrent();
+						
+						response.getOutputStream().write( torrent.writeToBEncodedData());
+						
+						response.setContentType( "application/x-bittorrent" );
+						
+						return( true );
+						
+					}catch( Throwable e ){
+					}
+					
+					log.log( "   torrent download failed" );
+					
+					response.setReplyStatus( 404 );
+					
+					return( true );	
+					
+				}else if ( lhs.equals( "cat" ) && gen_cats.getValue()){
 					
 					Download[] downloads = plugin_interface.getDownloadManager().getDownloads();
 					
@@ -213,7 +236,9 @@ RSSFeedGeneratorPlugin
 						
 						String dl_cat = download.getAttribute( ta_category );
 						
-						if ( dl_cat != null && dl_cat.equals( rhs )){
+						if ( 	rhs.equals( "All" ) ||
+								( dl_cat != null && dl_cat.equals( rhs )) ||
+								( dl_cat == null && rhs.equals( "Uncategorized" ))){
 							
 							if ( !TorrentUtils.isReallyPrivate( PluginCoreUtils.unwrap( torrent ))){
 								
@@ -279,10 +304,43 @@ RSSFeedGeneratorPlugin
 						DownloadManager	core_download = PluginCoreUtils.unwrap( download );
 						
 						Torrent torrent = download.getTorrent();
-						
+												
 						pw.println( "<item>" );
 						
 						pw.println( "<title>" + escape( download.getName()) + "</title>" );
+						
+						String magnet_uri = UrlUtils.getMagnetURI( download );
+						
+						String obtained_from = TorrentUtils.getObtainedFrom( core_download.getTorrent());
+						
+						boolean	added_fl = false;
+						
+						if ( obtained_from != null ){
+							
+							try{
+								URL ou = new URL( obtained_from );
+								
+								if ( ou.getProtocol().toLowerCase( Locale.US ).startsWith( "http" )){
+									
+									magnet_uri += "&fl=" + UrlUtils.encode( ou.toExternalForm());
+									
+									added_fl = true;
+								}
+							}catch( Throwable e ){
+								
+							}
+						}
+						
+						if ( !added_fl ){
+						
+							String host = (String)request.getHeaders().get( "host" );
+							
+							String local_fl = "http://" + host + "/?hash=" + Base32.encode( torrent.getHash());
+							
+							magnet_uri += "&fl=" + UrlUtils.encode( local_fl );
+						}
+						
+						pw.println( "<link>" + escape( magnet_uri ) + "</link>" );
 						
 						long added = core_download.getDownloadState().getLongParameter(DownloadManagerState.PARAM_DOWNLOAD_ADDED_TIME);
 						
@@ -290,7 +348,7 @@ RSSFeedGeneratorPlugin
 						
 						pw.println(	"<vuze:size>" + torrent.getSize()+ "</vuze:size>" );
 						pw.println(	"<vuze:assethash>" + Base32.encode( torrent.getHash())+ "</vuze:assethash>" );
-						pw.println( "<vuze:downloadurl>magnet:?xt=urn:btih:" + Base32.encode(torrent.getHash()) + "</vuze:downloadurl>" );
+						pw.println( "<vuze:downloadurl>" + escape( magnet_uri ) + "</vuze:downloadurl>" );
 
 						DownloadScrapeResult scrape = download.getLastScrapeResult();
 						
