@@ -20,12 +20,27 @@
 
 package com.vuze.azureus.plugin.azpromo;
 
+import java.io.File;
+import java.io.FileReader;
+import java.io.FilenameFilter;
 import java.io.InputStream;
+import java.io.LineNumberReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
+import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.internat.MessageText;
+import org.gudy.azureus2.core3.logging.LogAlert;
+import org.gudy.azureus2.core3.logging.Logger;
+import org.gudy.azureus2.core3.util.Constants;
+import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.SystemProperties;
+import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.platform.PlatformManager;
+import org.gudy.azureus2.platform.PlatformManagerCapabilities;
 import org.gudy.azureus2.platform.PlatformManagerFactory;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.config.ConfigParameter;
@@ -92,6 +107,24 @@ public class PromoPlugin
 //  		}
 //		}
 
+		
+		
+		checkDumps();
+		
+		if ( COConfigurationManager.getBooleanParameter( "azpromo.dump.disable.plugin", false )){
+			
+			PluginConfig pc = pluginInterface.getPluginconfig();
+			
+			if ( !pc.getPluginStringParameter( "plugin.info", "" ).equals( "c" )){
+				
+				pc.setPluginParameter( "plugin.info", "c" );
+				
+				logEvent( "crashed" );
+			}
+			
+			return;
+		}
+		
 		UIManager uiManager = pluginInterface.getUIManager();
 		configModel = uiManager.createBasicPluginConfigModel("ConfigView.Section."
 				+ VIEWID);
@@ -215,4 +248,147 @@ public class PromoPlugin
 		PlatformMessenger.pushMessageNow(message, null);
 	}
 
+	
+	private static void
+	checkDumps()
+	{
+		if ( !Constants.isWindows ){
+			
+			return;
+		}
+		
+		try{
+			List<File>	fdirs_to_check = new ArrayList<File>();
+			
+			fdirs_to_check.add( new File( SystemProperties.getApplicationPath()));
+			
+			try{
+				File temp_file = File.createTempFile( "AZU", "tmp" );
+				
+				fdirs_to_check.add( temp_file.getParentFile());
+				
+				temp_file.delete();
+				
+			}catch( Throwable e ){
+				
+			}
+			
+			File	most_recent_dump 	= null;
+			long	most_recent_time	= 0;
+
+			for ( File dir: fdirs_to_check ){
+			
+				if ( dir.canRead()){
+					
+					File[]	files = dir.listFiles(
+							new FilenameFilter() {
+								
+								public boolean 
+								accept(
+									File dir, 
+									String name) 
+								{
+									return( name.startsWith( "hs_err_pid" ) && name.endsWith( ".log" ));
+								}
+							});
+					
+					if ( files != null ){
+						
+						long	now = SystemTime.getCurrentTime();
+						
+						long	one_week_ago = now - 7*24*60*60*1000;
+						
+						for (int i=0;i<files.length;i++){
+							
+							File	f = files[i];
+																						
+							long	last_mod = f.lastModified();
+							
+							if ( last_mod > most_recent_time && last_mod > one_week_ago){
+								
+								most_recent_dump 	= f;
+								most_recent_time	= last_mod;
+							}
+						}
+					}
+				}
+			}
+		
+			if ( most_recent_dump!= null ){
+				
+				long	last_done = COConfigurationManager.getLongParameter( "azpromo.dump.lasttime", 0 ); 
+				
+				if ( last_done < most_recent_time ){
+					
+					COConfigurationManager.setParameter( "azpromo.dump.lasttime", most_recent_time );
+					
+					analyseDump( most_recent_dump );
+				}
+			}
+		}catch( Throwable e ){
+			
+			Debug.printStackTrace(e);
+		}
+	}
+	
+	protected static void
+	analyseDump(
+		File	file )
+	{
+		try{
+			LineNumberReader lnr = new LineNumberReader( new FileReader( file ));
+			
+			try{
+				boolean	av_excep		= false;
+				boolean	swt_excep		= false;
+				boolean	browser_excep	= false;
+							
+				while( true ){
+					
+					String	line = lnr.readLine();
+					
+					if ( line == null ){
+						
+						break;
+					}
+					
+					line = line.toUpperCase(Locale.US);
+					
+					if (line.indexOf( "EXCEPTION_ACCESS_VIOLATION") != -1 ){
+						
+						av_excep	= true;
+						
+					}else if ( line.startsWith( "# C  [SWT-WIN32")){
+						
+							// dll has same name for 32 + 64 bit VMs
+						
+						swt_excep 	= true;
+						
+					}else if ( line.contains( "WEBSITE.PROCESSURLACTION")){
+						
+						browser_excep = true;
+					}
+				}
+				
+				if ( av_excep && swt_excep && browser_excep ){
+					
+					Debug.out( "Hit SWT Browser bug" );
+					
+					COConfigurationManager.setParameter( "azpromo.dump.disable.plugin", true );
+					
+					COConfigurationManager.save();
+				}
+			}finally{
+				
+				lnr.close();
+			}
+		}catch( Throwable e){
+			
+			Debug.printStackTrace( e );
+		}
+	}
+	
+	
+	
+	
 }
