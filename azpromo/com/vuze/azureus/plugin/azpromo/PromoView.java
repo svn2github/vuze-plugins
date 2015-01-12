@@ -265,6 +265,7 @@ public class PromoView
 			return;
 		}
 		view.closeView();
+		PromoPlugin.logEvent("clickx");
 		if (PromoPlugin.swtInstance == null) {
 			return;
 		}
