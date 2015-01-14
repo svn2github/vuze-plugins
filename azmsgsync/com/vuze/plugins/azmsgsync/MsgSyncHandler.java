@@ -98,9 +98,9 @@ MsgSyncHandler
 		// version 3 - increased max msg size from 350 to 600
 		// version 4 - optional reply compression
 	
-	private static final int VERSION	= 4;
+	private static final int VERSION		= 4;
 	
-	private static final int MIN_VERSION	= 2;
+	private static final int MIN_VERSION	= 3;
 	
 	private static final boolean TRACE = System.getProperty( "az.msgsync.trace.enable", "0" ).equals( "1" );
 	
@@ -600,9 +600,7 @@ MsgSyncHandler
 								}
 								
 								Map<String,Object> reply = new HashMap<String, Object>();
-								
-								reply.put( "m", messages.size());
-								
+																
 								int[] node_counts = getNodeCounts( false );
 								
 								int	total 	= node_counts[0];
@@ -611,6 +609,21 @@ MsgSyncHandler
 								reply.put( "t", total );
 								reply.put( "l", live );
 								reply.put( "e", getLiveNodeEstimate());
+								
+								synchronized( message_lock ){
+									
+									int num_messages = messages.size();
+									
+									reply.put( "m", num_messages );
+									
+									if ( num_messages > 0 ){
+										
+										MsgSyncMessage last_message = messages.getLast();
+																				
+										reply.put( "s", last_message.getSignature() );
+										reply.put( "p", last_message.getNode().getPublicKey());
+									}
+								}
 								
 								return( generalMessageEncrypt( BEncoder.encode( reply )));
 								

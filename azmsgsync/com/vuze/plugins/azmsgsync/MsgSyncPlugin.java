@@ -563,6 +563,23 @@ MsgSyncPlugin
 		
 		DHTPluginInterface dht = getDHT( options );
 			
+		long start = SystemTime.getMonotonousTime();
+		
+		while( dht.isInitialising()){
+		
+			if ( SystemTime.getMonotonousTime() - start > 5*60*1000 ){
+				
+				throw( new IPCException( "Timeout waiting for DHT initialisation" ));
+			}
+			
+			try{
+				Thread.sleep(1000);
+				
+			}catch( Throwable e ){
+				
+			}
+		}
+		
 		final AESemaphore	sem = new AESemaphore( "msp:peek" );
 		
 		try{
@@ -583,7 +600,7 @@ MsgSyncPlugin
 						private int	max_messages;
 						private int	max_live;
 						private int	max_estimate;
-						
+												
 						@Override
 						public boolean 
 						dataReceived(
@@ -593,17 +610,33 @@ MsgSyncPlugin
 							int	messages = ((Number)data.get( "m" )).intValue();
 							int	live	 = ((Number)data.get( "l" )).intValue();
 							int	estimate = ((Number)data.get( "e" )).intValue();
-														
+								
+							byte[]	sig	= (byte[])data.get( "s" );
+							byte[]	pk	= (byte[])data.get( "p" );
+									
 							synchronized( reply ){
 								
 								result_count++;
 								
-								max_messages = Math.max( max_messages, messages );
+								boolean more_messages = messages > max_messages;
+								
+								if ( more_messages ){
+									max_messages = messages;
+								}
+								
 								max_live	 = Math.max( max_live, live );
 								max_estimate = Math.max( max_estimate, estimate );
 								
 								reply.put( "m", max_messages );
 								reply.put( "n", Math.max( max_live, max_estimate ));
+								
+								if ( 	sig != null && 
+										pk != null && 
+										( more_messages || !reply.containsKey( "s" ))){
+									
+									reply.put( "s", sig );
+									reply.put( "p", pk );
+								}
 								
 								if ( result_count == 1 ){
 									
@@ -645,9 +678,9 @@ MsgSyncPlugin
 			
 			if ( !sem.reserve( 3*60*1000 )){
 				
-				// limit just in case of madness
+					// limit just in case of madness
 				
-				Debug.out( "Peek didn't complete correctly");
+				Debug.out( "timeout");
 			}
 			
 			synchronized( reply ){
