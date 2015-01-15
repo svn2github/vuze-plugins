@@ -42,6 +42,9 @@ import org.gudy.azureus2.plugins.download.DownloadManagerListener;
 import org.gudy.azureus2.plugins.torrent.TorrentAttribute;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 
+import com.aelitis.azureus.plugins.net.buddy.BuddyPluginBeta;
+import com.aelitis.azureus.plugins.net.buddy.BuddyPluginBeta.ChatMessage;
+import com.aelitis.azureus.plugins.net.buddy.BuddyPluginUtils;
 import com.aelitis.azureus.plugins.rating.RatingPlugin;
 
 public class 
@@ -67,7 +70,8 @@ RatingsUpdater
 	private TorrentAttribute attributeRating;
 	private TorrentAttribute attributeComment;
 	private TorrentAttribute attributeGlobalRating;
-    
+	private TorrentAttribute attributeChatState;
+
   
 	private Map<Download,RatingResults> 	torrentRatings	= new HashMap<Download, RatingResults>();
 
@@ -91,6 +95,7 @@ RatingsUpdater
 	    attributeRating  		= plugin.getPluginInterface().getTorrentManager().getPluginAttribute("rating");
 	    attributeComment		= plugin.getPluginInterface().getTorrentManager().getPluginAttribute("comment");    
 	    attributeGlobalRating  	= plugin.getPluginInterface().getTorrentManager().getPluginAttribute("globalRating");
+	    attributeChatState  	= plugin.getPluginInterface().getTorrentManager().getPluginAttribute("chatState");
 	}
 	  
 	public void 
@@ -709,7 +714,9 @@ RatingsUpdater
 		}
 	}
 
-	
+	private AsyncDispatcher		chat_read_dispatcher 	= new AsyncDispatcher( "Ratings:crd" );
+	private AsyncDispatcher		chat_write_dispatcher 	= new AsyncDispatcher( "Ratings:cwd" );
+
 	
 	private void 
 	readRating(
@@ -739,6 +746,36 @@ RatingsUpdater
 				
 				break;
 			}
+		}
+		
+		if ( BuddyPluginUtils.isBetaChatAvailable()){
+
+			chat_read_dispatcher.dispatch(
+				new AERunnable() {
+					
+					@Override
+					public void 
+					runSupport() 
+					{
+						Map<String,Object> peek_data = BuddyPluginUtils.peekChat( download );
+												
+						Number	message_count 	= (Number)peek_data.get( "m" );
+						Number	node_count 		= (Number)peek_data.get( "n" );
+						
+						if ( message_count != null && node_count != null ){
+							
+							if ( message_count.intValue() > 0 ){
+								
+								BuddyPluginBeta.ChatInstance chat = BuddyPluginUtils.getChat( download );
+			
+								if ( chat != null ){
+									
+									chat.setAutoNotify( true );
+								}
+							}
+						}		
+					}
+				});
 		}
 		
 		final String torrentName = download.getTorrent().getName();
@@ -838,7 +875,7 @@ RatingsUpdater
 			return;
 		}
 		
-		RatingData data = loadRatingsFromDownload( download );
+		final RatingData data = loadRatingsFromDownload( download );
 		
 		int score = data.getScore();
 		
@@ -874,6 +911,113 @@ RatingsUpdater
 				}
 			};
 			
+		if ( BuddyPluginUtils.isBetaChatAvailable()){
+			
+			chat_write_dispatcher.dispatch(
+					new AERunnable() {
+						
+						@Override
+						public void 
+						runSupport() 
+						{
+							final BuddyPluginBeta.ChatInstance chat = BuddyPluginUtils.getChat( download );
+								
+							if ( chat != null ){
+									
+								chat.setAutoNotify( true );
+								
+								String msg = "Rating: " + data.getScore();
+								
+								String comment = data.getComment().trim();
+								
+								if ( comment.length() > 0 ){
+									
+									msg += ", " + comment;
+								}
+								
+								final String f_msg = msg;
+								
+								final Runnable do_write = 
+									new Runnable()
+									{
+										public void
+										run()
+										{		
+											Map<String,Object>	flags 	= new HashMap<String, Object>();
+											
+											flags.put( BuddyPluginBeta.FLAGS_MSG_ORIGIN_KEY, BuddyPluginBeta.FLAGS_MSG_ORIGIN_RATINGS );
+											
+											Map<String,Object>	options = new HashMap<String, Object>();
+											
+											chat.sendMessage( f_msg, flags, options );
+										}
+									};
+								
+								String str = download.getAttribute( attributeChatState );
+
+								boolean	 written = str != null && str.equals( "w" );
+									
+								if ( written ){
+									
+									final TimerEventPeriodic[] event = { null };
+									
+									event[0] = 
+										SimpleTimer.addPeriodicEvent(
+											"Rating:chat:checker",
+											30*1000,
+											new TimerEventPerformer()
+											{
+												private int elapsed_time;
+		
+												public void 
+												perform(
+													TimerEvent e ) 
+												{
+													elapsed_time += 30*1000;
+													
+													List<ChatMessage>	messages = chat.getMessages();
+													
+													if ( messages.size() > 50 || chat.isDestroyed()){
+														
+															// busy, let's not even bother checking 
+														
+														event[0].cancel();
+														
+													}else{
+													
+														for ( ChatMessage message: messages ){
+															
+															if ( message.getParticipant().isMe()){
+																
+																if ( message.getMessage().equals( f_msg )){
+																	
+																	event[0].cancel();
+																	
+																	return;
+																}
+															}
+														}
+														
+														if ( elapsed_time >= 5*60*1000 ){
+															
+															do_write.run();
+															
+															event[0].cancel();
+														}
+													}
+												}
+											});
+								}else{
+									
+									do_write.run();
+									
+									download.setAttribute( attributeChatState, "w" );
+								}
+							}
+						}
+					});
+		}
+		
 		for ( DistributedDatabase database: ddbs ){
 			
 			try{
