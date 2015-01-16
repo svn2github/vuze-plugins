@@ -57,7 +57,7 @@ RatingsUpdater
     private static final int WRITE_DELAY			= 10*1000;
     private static final int READ_DELAY				= 20*1000;
     
-    private static final int READ_BY_HASH_TIMEOUT	= 10*1000;
+    private static final int READ_BY_HASH_TIMEOUT	= 15*1000;
     
     private static final int COMPLETE_DOWNLOAD_LOOKUP_PERIOD 		= 8*60*60*1000;
     private static final int INCOMPLETE_OLD_DOWNLOAD_LOOKUP_PERIOD	= 4*60*60*1000;
@@ -657,6 +657,15 @@ RatingsUpdater
 			
 			DistributedDatabaseKey ddKey = ddb.createKey(KeyGenUtils.buildRatingKey( hash ),"Ratings read: " + hash_str);
 			
+			boolean	is_pub = ddb.getNetwork() == AENetworkClassifier.AT_PUBLIC;
+			
+			int timeout = READ_BY_HASH_TIMEOUT;
+			
+			if ( !is_pub ){
+				
+				timeout *= 2;
+			}
+			
 			ddb.read(
 				new DistributedDatabaseListener() 
 				{
@@ -704,7 +713,7 @@ RatingsUpdater
 							}
 						}
 				}
-			}, ddKey, READ_BY_HASH_TIMEOUT );   
+			}, ddKey, timeout, DistributedDatabase.OP_PRIORITY_HIGH );   
 
 		}catch( Throwable e ){
 
@@ -975,6 +984,10 @@ RatingsUpdater
 												{
 													elapsed_time += 30*1000;
 													
+														// get sync state before messages to things work reliably
+													
+													int	sync_state = chat.getIncomingSyncState();
+													
 													List<ChatMessage>	messages = chat.getMessages();
 													
 													if ( messages.size() > 50 || chat.isDestroyed()){
@@ -984,6 +997,7 @@ RatingsUpdater
 														event[0].cancel();
 														
 													}else{
+													
 													
 														for ( ChatMessage message: messages ){
 															
@@ -998,7 +1012,8 @@ RatingsUpdater
 															}
 														}
 														
-														if ( elapsed_time >= 5*60*1000 ){
+														if ( 	sync_state == 0 ||
+																elapsed_time >= 5*60*1000 ){
 															
 															do_write.run();
 															
