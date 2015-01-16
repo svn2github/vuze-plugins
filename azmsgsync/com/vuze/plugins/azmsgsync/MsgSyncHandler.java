@@ -274,6 +274,9 @@ MsgSyncHandler
 	
 	private long	last_not_delivered_reported;
 		
+	private volatile int		consec_no_more_to_come;
+	private volatile int		last_more_to_come;
+	
 	private final byte[]	general_secret = new byte[16];
 	
 	private byte[]		managing_pk;
@@ -999,6 +1002,48 @@ MsgSyncHandler
 	getDHTCount()
 	{
 		return( last_dht_count );
+	}
+	
+	private int[]	msg_count_cache;
+	private long	msg_count_cache_time;
+
+	public int[]
+	getMessageCounts()
+	{
+		synchronized( message_lock ){
+			
+			long now = SystemTime.getMonotonousTime();
+						
+			if ( msg_count_cache != null && now - msg_count_cache_time < 10*1000 ){
+					
+				return( msg_count_cache );
+			}
+			
+			int	msg_count 	= messages.size();
+			int	out_pending	= getUndeliveredMessageCount();
+			
+			int in_pending;
+			
+			if ( consec_no_more_to_come >= 3 ){
+				
+				in_pending = 0;
+				
+			}else{
+				
+				in_pending = last_more_to_come;
+				
+				if ( in_pending == 0 ){
+					
+					in_pending = -1;	// no stats yet
+				}
+			}
+			
+			msg_count_cache = new int[]{ msg_count, out_pending, in_pending };
+			
+			msg_count_cache_time	= now;
+			
+			return( msg_count_cache );
+		}
 	}
 	
 	private int[]	node_count_cache;
@@ -4630,14 +4675,18 @@ MsgSyncHandler
 						received = 0;
 					}
 					
-					Number x_temp = (Number)reply_map.get( "x" );
+					Number n_more_to_come = (Number)reply_map.get( "x" );
+											
+					int	more_to_come = n_more_to_come==null?0:n_more_to_come.intValue();
 					
-					if ( x_temp != null && received >= 2 ){
+					last_more_to_come = more_to_come;
+					
+					if ( more_to_come > 0 ){
 						
-						int	more_to_come = x_temp.intValue();
+						consec_no_more_to_come = 0;
 						
-						if ( more_to_come > 0 ){
-							
+						if ( received >= 2 ){
+										
 							byte[] bk = sync_node.getContactAddress().getBytes( "UTF-8" );
 							
 							synchronized( biased_node_bloom ){
@@ -4655,6 +4704,9 @@ MsgSyncHandler
 								}
 							}
 						}
+					}else{
+						
+						consec_no_more_to_come++;
 					}
 					
 					Map rln = (Map)reply_map.get( "n" );
@@ -5107,21 +5159,23 @@ MsgSyncHandler
 		listeners.remove( listener );
 	}
 	
-	private boolean
-	hasUndeliveredMessages()
+	private int
+	getUndeliveredMessageCount()
 	{
+		int	result = 0;
+		
 		synchronized( message_lock ){
 			
 			for ( MsgSyncMessage msg: messages ){
 
 				if ( msg.getNode() == my_node && msg.getSeenCount() == 0 ){
 					
-					return( true );
+					result++;
 				}
 			}
 		}
 		
-		return( false );
+		return( result );
 	}
 	
 	private void
@@ -5383,7 +5437,7 @@ MsgSyncHandler
 		
 		if ( linger ){
 			
-			linger = hasUndeliveredMessages();
+			linger = getUndeliveredMessageCount() > 0;
 		}
 		
 		if ( linger ){
@@ -5409,7 +5463,7 @@ MsgSyncHandler
 							{	
 								if ( SystemTime.getMonotonousTime() - start < 60*1000 ){
 									
-									if ( hasUndeliveredMessages()){
+									if ( getUndeliveredMessageCount() > 0 ){
 										
 										return;
 									}

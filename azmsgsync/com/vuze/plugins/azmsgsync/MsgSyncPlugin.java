@@ -990,6 +990,12 @@ MsgSyncPlugin
 		reply.put( "req_out_fail", new Double(req_details[3]));
 		reply.put( "req_out_rate", new Double(req_details[4]));
 
+		int[] msg_counts = handler.getMessageCounts();
+	
+		reply.put( "msg_count", 		msg_counts[0] );
+		reply.put( "msg_out_pending", 	msg_counts[1] );
+		reply.put( "msg_in_pending", 	msg_counts[2] );
+
 		reply.put( "nid", handler.getNodeID());
 		reply.put( "pk", handler.getPublicKey());
 		//reply.put( "address", )	// could block here so ignore for the moment 
