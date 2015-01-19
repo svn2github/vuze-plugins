@@ -227,27 +227,32 @@ UPnPMediaRendererRemote
 			
 			UPnPAction	prepare = connection_manager.getAction( "PrepareForConnection" );
 			
-			UPnPActionInvocation	invoke = prepare.getInvocation();
-			
-			invoke.addArgument( "RemoteProtocolInfo", item.getProtocolInfo( "*" ));
-			invoke.addArgument( "PeerConnectionManager", "" );
-			invoke.addArgument( "PeerConnectionID", "-1" );
-			invoke.addArgument( "Direction", "Input" );
+			if (prepare != null) {
+  			UPnPActionInvocation	invoke = prepare.getInvocation();
+  			
+  			invoke.addArgument( "RemoteProtocolInfo", item.getProtocolInfo( "*" ));
+  			invoke.addArgument( "PeerConnectionManager", "" );
+  			invoke.addArgument( "PeerConnectionID", "-1" );
+  			invoke.addArgument( "Direction", "Input" );
+  
+  			Map	res = invoke.invoke2();
+  			
+  			String	connection_id 	= (String)res.get( "ConnectionID" );
+  			String	av_id			= (String)res.get( "AVTransportID" );
+  			String	rcs_id			= (String)res.get( "RcsID" );
 
-			Map	res = invoke.invoke2();
-			
-			String	connection_id 	= (String)res.get( "ConnectionID" );
-			String	av_id			= (String)res.get( "AVTransportID" );
-			String	rcs_id			= (String)res.get( "RcsID" );
-			
-			current_connection_id	= connection_id;
-			current_av_id			= av_id;
+  			current_connection_id	= connection_id;
+  			current_av_id			= av_id;
+			} else {
+				current_connection_id = "0";
+				current_av_id = "0";
+			}
 			
 			log( "Setting transport URI" );
 
 			UPnPAction set_uri = av_transport.getAction( "SetAVTransportURI" );
 			
-			invoke = set_uri.getInvocation();
+			UPnPActionInvocation invoke = set_uri.getInvocation();
 			
 			String	host = root.getLocalAddress().getHostAddress();
 			
