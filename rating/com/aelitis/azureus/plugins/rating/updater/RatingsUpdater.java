@@ -57,7 +57,7 @@ RatingsUpdater
     private static final int WRITE_DELAY			= 10*1000;
     private static final int READ_DELAY				= 20*1000;
     
-    private static final int READ_BY_HASH_TIMEOUT	= 15*1000;
+    private static final int READ_BY_HASH_TIMEOUT	= 30*1000;
     
     private static final int COMPLETE_DOWNLOAD_LOOKUP_PERIOD 		= 8*60*60*1000;
     private static final int INCOMPLETE_OLD_DOWNLOAD_LOOKUP_PERIOD	= 4*60*60*1000;
