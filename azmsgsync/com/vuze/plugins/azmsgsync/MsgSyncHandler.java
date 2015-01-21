@@ -33,6 +33,7 @@ import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -170,7 +171,7 @@ MsgSyncHandler
 	private final byte[]							user_key;
 	private byte[]									dht_listen_key;
 	private byte[]									dht_call_key;
-	private boolean									checking_dht;
+	private volatile boolean						checking_dht;
 	private long									last_dht_check;
 
 	private byte[]									peek_xfer_key;
@@ -247,8 +248,11 @@ MsgSyncHandler
 		
 	private static final int MAX_CONC_TUNNELS	= 3;
 	
-	private Set<MsgSyncNode> active_syncs		 = new HashSet<MsgSyncNode>();
-	private Set<MsgSyncNode> active_tunnels	 	= new HashSet<MsgSyncNode>();
+	private volatile long			first_sync_attempt_time		= -1;
+	private volatile long			last_successful_sync_time 	= -1;
+	
+	private Set<MsgSyncNode> active_syncs		 	= new HashSet<MsgSyncNode>();
+	private Set<MsgSyncNode> active_tunnels	 		= new HashSet<MsgSyncNode>();
 		
 	private boolean	prefer_live_sync_outstanding;
 
@@ -1034,7 +1038,30 @@ MsgSyncHandler
 				
 				if ( in_pending == 0 ){
 					
-					in_pending = -1;	// no stats yet
+					if ( first_sync_attempt_time == -1 ){
+					
+						in_pending = -1;	// not started the sync process yet
+						
+					}else{
+						
+						if ( last_successful_sync_time == -1 ){
+							
+								// never got a sync reply, wait for a couple mins
+							
+							if ( now - first_sync_attempt_time < 2*60*1000 ){
+								
+								in_pending = -1;
+							}
+						}else{
+							
+								// synced at least once but now things have gone quiet
+							
+							if ( now - last_successful_sync_time < 2*60*1000 ){
+
+								in_pending = -1;
+							}
+						}
+					}
 				}
 			}
 			
@@ -2148,9 +2175,9 @@ MsgSyncHandler
 		
 		boolean management_message = managing_pk != null && Arrays.equals( originator_pk, managing_pk );
 		
-		boolean is_incoming = msg_source == MS_INCOMING || msg_source == MS_LOADING;
+		boolean is_incoming_or_loading = msg_source == MS_INCOMING || msg_source == MS_LOADING;
 		
-		if ( is_incoming ){
+		if ( is_incoming_or_loading ){
 		
 				// reject all messages in read only channels that aren't from the owner
 			
@@ -2178,17 +2205,11 @@ MsgSyncHandler
 			processManagementMessage( msg );
 		}
 		
-		byte[] history = msg.getHistory();
+			// used to do history update (and flood detection) here but moved to after processing so as to only
+			// operate on messages that are considered new (as opposed to possible replays of old messages by nodes
+			// coming online after being dead for a while)
 		
-		if ( msg_source == MS_INCOMING && history.length > 0 ){
-			
-			if ( !historyReceived( originator_pk, history )){
-				
-				msg.setLocalMessage( "Message ignored due to spam/flooding" );
-			}
-		}
-		
-		if ( is_incoming && opt_contact != null ){
+		if ( is_incoming_or_loading && opt_contact != null ){
 			
 				// see if this is a more up-to-date contact address for the contact
 			
@@ -2207,7 +2228,7 @@ MsgSyncHandler
 			}
 		}
 				
-		if ( msg.getMessageType() == MsgSyncMessage.ST_NORMAL_MESSAGE || is_incoming ){
+		if ( msg.getMessageType() == MsgSyncMessage.ST_NORMAL_MESSAGE || is_incoming_or_loading ){
 			
 				// remember message if is it valid or it is incoming - latter is to 
 				// prevent an invalid incoming message from being replayed over and over
@@ -2310,7 +2331,19 @@ MsgSyncHandler
 			}
 		}
 		
-		if ( msg.getMessageType() == MsgSyncMessage.ST_NORMAL_MESSAGE || !is_incoming ){
+			// message accepted, now check flooding
+		
+		byte[] history = msg.getHistory();
+		
+		if ( msg_source == MS_INCOMING && history.length > 0 ){
+			
+			if ( !historyReceived( originator_pk, history )){
+				
+				msg.setLocalMessage( "Message ignored due to spam/flooding" );
+			}
+		}
+		
+		if ( msg.getMessageType() == MsgSyncMessage.ST_NORMAL_MESSAGE || !is_incoming_or_loading ){
 			
 				// we want to deliver any local error responses back to the caller but not
 				// incoming messages that are errors as these are maintained for house
@@ -3436,6 +3469,11 @@ MsgSyncHandler
 			
 			if ( TRACE )trace( "    selected " + (sync_node==null?"none":sync_node.getName()));
 			
+			if ( first_sync_attempt_time == -1 && !checking_dht ){
+				
+				first_sync_attempt_time = SystemTime.getMonotonousTime();
+			}
+			
 			if ( sync_node == null ){
 				
 				return;
@@ -3597,6 +3635,8 @@ MsgSyncHandler
 		private final int				message_count;
 		private final int				new_message_count;
 		
+		private final long				oldest_message_timestamp;
+		
 		private
 		BloomDetails(
 			int									_mutation_id,
@@ -3605,15 +3645,17 @@ MsgSyncHandler
 			ByteArrayHashMap<List<MsgSyncNode>>	_msg_node_map,
 			List<MsgSyncNode>					_all_public_keys,
 			int									_message_count,
-			int									_new_message_count )
+			int									_new_message_count,
+			long								_oldest_message_timestamp )
 		{
-			mutation_id			= _mutation_id;
-			rand				= _rand;
-			bloom				= _bloom;
-			msg_node_map		= _msg_node_map;
-			all_public_keys		= _all_public_keys;
-			message_count		= _message_count;
-			new_message_count	= _new_message_count;
+			mutation_id					= _mutation_id;
+			rand						= _rand;
+			bloom						= _bloom;
+			msg_node_map				= _msg_node_map;
+			all_public_keys				= _all_public_keys;
+			message_count				= _message_count;
+			new_message_count			= _new_message_count;
+			oldest_message_timestamp	= _oldest_message_timestamp;
 		}
 	}
 	
@@ -3642,6 +3684,17 @@ MsgSyncHandler
 					
 
 			message_count = messages.size();
+			
+			long oldest_timestamp;
+			
+			if ( message_count == MAX_MESSAGES ){
+				
+				oldest_timestamp = messages.getFirst().getTimestamp();
+				
+			}else{
+				
+				oldest_timestamp = 0;
+			}
 			
 			for ( int i=0;i<64;i++){
 				
@@ -3769,7 +3822,7 @@ MsgSyncHandler
 				}
 			}
 			
-			last_bloom_details = new BloomDetails( message_mutation_id, rand, bloom, msg_node_map, all_public_keys, message_count, message_new_count );
+			last_bloom_details = new BloomDetails( message_mutation_id, rand, bloom, msg_node_map, all_public_keys, message_count, message_new_count, oldest_timestamp );
 			
 			return( last_bloom_details );
 		}	
@@ -4536,6 +4589,20 @@ MsgSyncHandler
 		request_map.put( "m", message_count );
 		request_map.put( "p", bloom_details.new_message_count );
 			
+		long ot = bloom_details.oldest_message_timestamp;
+		
+		if ( ot > 0 ){
+			
+			long now = SystemTime.getCurrentTime();
+					
+			if ( now > ot ){
+					
+				int	oldest_age_secs = (int) (( now - ot ) / 1000 );
+								
+				request_map.put( "o", oldest_age_secs );
+			}
+		}
+		
 		if ( !is_anonymous_chat ){
 			
 			try{
@@ -4646,6 +4713,8 @@ MsgSyncHandler
 					
 					nodeIsAlive( sync_node );
 
+					last_successful_sync_time = SystemTime.getMonotonousTime();
+					
 					List<Map<String,Object>>	list = (List<Map<String,Object>>)reply_map.get( "m" );
 					
 					if ( list == null ){
@@ -4835,11 +4904,18 @@ MsgSyncHandler
 				
 				status = STATUS_OK;
 				
-				Number	m_temp = (Number)request_map.get( "m" );
+				Number	n_messages_they_have 	= (Number)request_map.get( "m" );
+				Number	n_oldest_age 			= (Number)request_map.get( "o" );
 				
 				//System.out.println( message_new_count + ": " +  m_temp + "/" + request_map.get( "p" ) + "/" + request_map.get( "n" ));
 				
-				int	messages_they_have = m_temp==null?-1:m_temp.intValue();
+				int	messages_they_have 	= n_messages_they_have==null?-1:n_messages_they_have.intValue();
+				int	oldest_age			= n_oldest_age==null?0:n_oldest_age.intValue();
+				
+				if ( oldest_age < 0 ){
+					
+					oldest_age = 0;
+				}
 				
 				List<MsgSyncNode> caller_nodes = getNodes( uid );
 				
@@ -4907,7 +4983,24 @@ MsgSyncHandler
 						
 								// I have it, they don't
 							
-							missing.add( msg );
+								// don't return any messages that are going to be discarded by the
+								// caller as they are older than the oldest message they have and
+								// they have max messages. this helps with users that have been offline
+								// for a while on a reasonably active channel and not yet resynced
+							
+							boolean	too_old = false;
+							
+							if ( oldest_age > 0 ){
+								
+								int	msg_age = msg.getAgeSecs();
+							
+								too_old = msg_age - oldest_age >= 5*60;
+							}
+
+							if ( !too_old ){
+							
+								missing.add( msg );
+							}
 						}
 					}
 					
