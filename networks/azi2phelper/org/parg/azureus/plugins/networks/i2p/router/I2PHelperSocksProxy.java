@@ -62,7 +62,6 @@ import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.torrent.Torrent;
 import org.gudy.azureus2.plugins.torrent.TorrentAnnounceURLListSet;
-import org.omg.CORBA.portable.Delegate;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperAdapter;
 
 import com.aelitis.azureus.core.proxy.AEProxyConnection;
@@ -654,6 +653,8 @@ I2PHelperSocksProxy
 		proxyStateRelayData
 			implements AEProxyState
 		{
+			private static final boolean LOG_CONTENT = false;
+			
 			protected AEProxyConnection		connection;
 			protected ByteBuffer			source_buffer;
 			protected ByteBuffer			target_buffer;
@@ -795,6 +796,10 @@ I2PHelperSocksProxy
 				
 				connection.setTimeStamp();
 			
+				if ( LOG_CONTENT ){
+					System.out.println( new String( target_buffer.array(), target_buffer.arrayOffset(), target_buffer.remaining()));
+				}
+				
 				int written = source_channel.write( target_buffer );
 					
 				trace( "I2PCon: " + getStateName() + " : write -> AZ - " + written );
@@ -907,6 +912,10 @@ I2PHelperSocksProxy
 													
 													String str = new String( array, 0, i+2, "ISO8859-1" );
 
+													if ( LOG_CONTENT ){
+														System.out.println( str );
+													}
+													
 													String[] lines = str.split( "\r\n" );
 													
 													boolean is_http = false;
@@ -1176,6 +1185,10 @@ I2PHelperSocksProxy
 			{
 				
 				try{
+					if ( LOG_CONTENT ){
+						System.out.println( new String( target_buffer.array(), target_buffer.arrayOffset(), target_buffer.remaining()));
+					}
+					
 					int written = source_channel.write( target_buffer );
 						
 					inward_bytes += written;

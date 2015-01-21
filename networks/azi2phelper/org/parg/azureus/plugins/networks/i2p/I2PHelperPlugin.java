@@ -33,6 +33,7 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.Socket;
@@ -134,6 +135,7 @@ import com.aelitis.azureus.core.dht.transport.DHTTransportAlternativeContact;
 import com.aelitis.azureus.core.dht.transport.DHTTransportAlternativeNetwork;
 import com.aelitis.azureus.core.dht.transport.udp.impl.DHTUDPUtils;
 import com.aelitis.azureus.core.networkmanager.NetworkManager;
+import com.aelitis.azureus.core.networkmanager.admin.NetworkAdmin;
 import com.aelitis.azureus.core.proxy.AEProxyAddressMapper;
 import com.aelitis.azureus.core.proxy.AEProxyFactory;
 import com.aelitis.azureus.core.proxy.AEProxyFactory.PluginProxy;
@@ -2250,7 +2252,14 @@ I2PHelperPlugin
 				boolean	ok = false;
 				
 				try{
-					vuze_socket.connect( new InetSocketAddress( "127.0.0.1", target_port));
+					InetAddress bind = NetworkAdmin.getSingleton().getSingleHomedServiceBindAddress();
+					
+					if ( bind == null || bind.isAnyLocalAddress()){
+						
+						bind = InetAddress.getByName( "127.0.0.1" );
+					}
+					
+					vuze_socket.connect( new InetSocketAddress( bind, target_port));
 				
 					vuze_socket.setTcpNoDelay( true );
 					
@@ -2292,7 +2301,7 @@ I2PHelperPlugin
 			}
 		}catch( Throwable e ){
 			
-			e.printStackTrace();
+			Debug.out( e );
 			
 			try{
 				i2p_socket.close();
