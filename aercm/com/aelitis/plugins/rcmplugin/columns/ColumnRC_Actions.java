@@ -42,6 +42,7 @@ import com.aelitis.azureus.ui.UIFunctionsManager;
 import com.aelitis.azureus.ui.common.table.TableColumnCore;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinFactory;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinProperties;
+import com.aelitis.plugins.rcmplugin.RCMPlugin;
 import com.aelitis.plugins.rcmplugin.RelatedContentUISWT;
 
 /**
@@ -212,7 +213,7 @@ public class ColumnRC_Actions
 							
 							rc.setUnread( false );
 							
-							TorrentOpener.openTorrent( UrlUtils.getMagnetURI( hash, rc.getTitle(), rc.getNetworks()));
+							TorrentOpener.openTorrent( RCMPlugin.getMagnetURI( rc ));
 						}
 						
 					} else if (hitUrl.url.equals("search")) {

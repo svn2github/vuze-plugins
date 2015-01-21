@@ -730,4 +730,23 @@ RCMPlugin
 			current_ui.addSearch( hash, new String[]{ AENetworkClassifier.AT_PUBLIC }, name );
 		}
 	}
+	
+	public static String
+	getMagnetURI(
+		RelatedContent		rc )
+	{
+		String uri = UrlUtils.getMagnetURI( rc.getHash(), rc.getTitle(), rc.getNetworks());
+		
+		String[] tags = rc.getTags();
+		
+		if ( tags != null ){
+			
+			for ( String tag: tags ){
+				
+				uri += "&tag=" + UrlUtils.encode( tag );
+			}
+		}
+		
+		return( uri );
+	}
 }

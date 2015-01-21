@@ -42,6 +42,7 @@ import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.plugins.ui.toolbar.UIToolBarItem;
 import org.gudy.azureus2.pluginsimpl.local.PluginInitializer;
 import org.gudy.azureus2.ui.swt.Utils;
+import org.gudy.azureus2.ui.swt.mainwindow.ClipboardCopy;
 import org.gudy.azureus2.ui.swt.views.table.TableViewSWT;
 import org.gudy.azureus2.ui.swt.views.table.TableViewSWTMenuFillListener;
 import org.gudy.azureus2.ui.swt.views.table.impl.TableViewFactory;
@@ -760,8 +761,7 @@ SBC_RCMView
 						
 						SelectedContent sc = new SelectedContent(Base32.encode(rc.getHash()), rc.getTitle());
 						
-						sc.setDownloadInfo(new DownloadUrlInfo(
-								UrlUtils.getMagnetURI(rc.getHash(), rc.getTitle(), rc.getNetworks())));
+						sc.setDownloadInfo(new DownloadUrlInfo(	RCMPlugin.getMagnetURI( rc )));
 						
 						valid.add(sc);
 					}
@@ -1149,6 +1149,16 @@ SBC_RCMView
 					});
 
 					
+					new MenuItem(menu, SWT.SEPARATOR );
+					
+					item = new MenuItem(menu, SWT.PUSH);
+					item.setText(MessageText.getString("rcm.menu.uri"));
+					item.addSelectionListener(new SelectionAdapter() {
+						public void widgetSelected(SelectionEvent e) {
+							
+							ClipboardCopy.copyToClipBoard( RCMPlugin.getMagnetURI(related_content[0]));
+						};
+					});
 					new MenuItem(menu, SWT.SEPARATOR );
 
 					final MenuItem remove_item = new MenuItem(menu, SWT.PUSH);
