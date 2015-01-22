@@ -258,7 +258,7 @@ UPnPMediaRendererRemote
 			
 			invoke.addArgument( "InstanceID", current_av_id );
 			invoke.addArgument( "CurrentURI", item.getURI( host, -1 ));
-			invoke.addArgument( "CurrentURIMetaData", item.getDIDL( host, UPnPMediaServerContentDirectory.CT_DEFAULT ));
+			invoke.addArgument( "CurrentURIMetaData", "NOT_IMPLEMENTED");
 			
 			invoke.invoke();
 			
