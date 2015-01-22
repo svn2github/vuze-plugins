@@ -355,7 +355,7 @@ SBC_RCMView
 		boolean show = ((c.getSeeds() >= minSeeds) || (showUnknownSeeds && c.getSeeds() < 0)) 
 			&& (createdMsAgo == 0 || (SystemTime.getCurrentTime() - c.getPublishDate() < createdMsAgo))
 			&& ((c.getRank() >= minRank))
-			&& ((c.getSize() >= 1024L*1024*minSize))
+			&& (c.getSize()==-1||(c.getSize() >= 1024L*1024*minSize))
 			&& (showIndirect || c.getHash() != null);
 		
 		if ( show ){
@@ -757,7 +757,7 @@ SBC_RCMView
 					
 					last_selected_content.add( rc );
 					
-					if ( rc.getHash() != null ){
+					if ( rc.getHash() != null && rc.getHash().length > 0 ){
 						
 						SelectedContent sc = new SelectedContent(Base32.encode(rc.getHash()), rc.getTitle());
 						
@@ -1159,6 +1159,14 @@ SBC_RCMView
 							ClipboardCopy.copyToClipBoard( RCMPlugin.getMagnetURI(related_content[0]));
 						};
 					});
+					
+					if ( related_content.length==1 ){
+						byte[] hash = related_content[0].getHash();
+						item.setEnabled(hash!=null&&hash.length > 0 );
+					}else{
+						item.setEnabled(false);
+					}
+					
 					new MenuItem(menu, SWT.SEPARATOR );
 
 					final MenuItem remove_item = new MenuItem(menu, SWT.PUSH);

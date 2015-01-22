@@ -209,7 +209,7 @@ public class ColumnRC_Actions
 					if (hitUrl.url.equals("dl")) {
 						byte[]  hash = rc.getHash();
 						
-						if ( hash != null ){
+						if ( hash != null && hash.length > 0 ){
 							
 							rc.setUnread( false );
 							
