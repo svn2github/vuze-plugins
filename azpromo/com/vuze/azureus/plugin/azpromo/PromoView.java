@@ -214,9 +214,11 @@ public class PromoView
 
 		String pubID = PromoPlugin.pluginInterface.getPluginProperties().getProperty(
 				"PubID", "mawra2ag1");
-		int reloadTime = Integer.parseInt(PromoPlugin.pluginInterface.getPluginProperties().getProperty(
-				"ReloadSecs", "86400"));
-		log("pubID len=" + pubID.length() + ";reload in " + reloadTime);
+		
+		//int reloadTime = Integer.parseInt(PromoPlugin.pluginInterface.getPluginProperties().getProperty(
+		//		"ReloadSecs", "86400"));
+		//log("pubID len=" + pubID.length() + ";reload in " + reloadTime);
+		log("pubID len=" + pubID.length());
 
 		IAdControlOptions options = adControl.getOptions();
 		options.setPlayerOption(IAdControlOptions.Player.AUTO_MUTE, true);
@@ -225,7 +227,7 @@ public class PromoView
 		options.setPubConfigURL("http://vuze-pubcfg.desktopadx.com/service/pubcfg/get.php?id=");
 		options.setRequestDomain("btpr.vuze.com");
 
-		options.setPublisherDefaultAdReloadTime(reloadTime);
+		//options.setPublisherDefaultAdReloadTime(reloadTime);
 
 		PromoPlugin.pluginInterface.getUtilities().createThread("LoadPromo",
 				new Runnable() {
