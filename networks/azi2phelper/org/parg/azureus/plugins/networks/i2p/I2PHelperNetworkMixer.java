@@ -129,7 +129,22 @@ I2PHelperNetworkMixer
 		
 		for ( Download download: downloads ){
 			
-			download.addAttributeListener( this, ta_networks, DownloadAttributeListener.WRITTEN );
+			int	existing_state = download.getIntAttribute( ta_mixstate );
+			
+			if ( existing_state == MS_NONE ){
+				
+				if ( PluginCoreUtils.unwrap( download ).getDownloadState().isNetworkEnabled( AENetworkClassifier.AT_I2P )){
+					
+					download.setIntAttribute( ta_mixstate, MS_MANUAL );
+					
+					existing_state = MS_MANUAL;
+				}
+			}
+			
+			if ( existing_state != MS_MANUAL ){
+			
+				download.addAttributeListener( this, ta_networks, DownloadAttributeListener.WRITTEN );
+			}
 		}
 		
 		recheck_timer = 
@@ -172,11 +187,26 @@ I2PHelperNetworkMixer
 	downloadAdded(
 		Download	download )
 	{
-		download.addAttributeListener( this, ta_networks, DownloadAttributeListener.WRITTEN );
-		
-		if ( enabled ){
+		int	existing_state = download.getIntAttribute( ta_mixstate );
+
+		if ( existing_state == MS_NONE ){
 			
-			checkStuff();
+			if ( PluginCoreUtils.unwrap( download ).getDownloadState().isNetworkEnabled( AENetworkClassifier.AT_I2P )){
+				
+				download.setIntAttribute( ta_mixstate, MS_MANUAL );
+				
+				existing_state = MS_MANUAL;
+			}
+		}
+		
+		if ( existing_state != MS_MANUAL ){
+			
+			download.addAttributeListener( this, ta_networks, DownloadAttributeListener.WRITTEN );
+			
+			if ( enabled ){
+				
+				checkStuff();
+			}
 		}
 	}
 	
@@ -430,6 +460,37 @@ I2PHelperNetworkMixer
 			plugin.log( "Netmix: activating " + download.getName());
 			
 			setNetworkState( download, true );
+		}
+	}
+	
+	protected void
+	checkMixState(
+		Download		download )
+	{
+		if ( !enabled ){
+			
+			return;
+		}
+		
+		int download_state = download.getState();
+		
+		if ( 	download_state == Download.ST_ERROR || 
+				download_state == Download.ST_STOPPING || 
+				download_state == Download.ST_STOPPED ){
+			
+			return;
+		}
+		
+		int	existing_state = download.getIntAttribute( ta_mixstate );
+
+		if ( existing_state == MS_NONE ){
+			
+			if ( !PluginCoreUtils.unwrap( download ).getDownloadState().isNetworkEnabled( AENetworkClassifier.AT_I2P )){
+
+				plugin.log( "Netmix: activating " + download.getName() + " on demand" );
+
+				setNetworkState( download, true );
+			}
 		}
 	}
 	

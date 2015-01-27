@@ -1762,7 +1762,7 @@ MsgSyncHandler
 							
 							int	delivery_count 		= msg.getDeliveryCount();
 							
-							boolean	not_seen 		= msg.getSeenCount() == 0;
+							boolean	not_seen 		= msg.getSeenCount() == 0 && msg.getProbablySeenCount() < 5;
 							
 							if ( delivery_count == 0 || not_seen ){
 								
@@ -4974,7 +4974,9 @@ MsgSyncHandler
 						if ( bloom.contains( sig )){
 
 							messages_we_both_have.add( msg );
-
+							
+							msg.probablySeen();
+							
 						}else if ( bloom.contains( del_sig )){
 							
 							messages_we_have_they_deleted++;
@@ -5261,9 +5263,12 @@ MsgSyncHandler
 			
 			for ( MsgSyncMessage msg: messages ){
 
-				if ( msg.getNode() == my_node && msg.getSeenCount() == 0 ){
+				if ( msg.getNode() == my_node ){
 					
-					result++;
+					if ( msg.getSeenCount() == 0 && msg.getProbablySeenCount() < 5 ){
+					
+						result++;
+					}
 				}
 			}
 		}

@@ -241,6 +241,8 @@ I2PHelperMessageHandler
 								
 								torrent_hash = bt_handshake.getDataHash();
 								
+								plugin.checkMixState( torrent_hash );
+								
 							}else if ( message instanceof LTHandshake ){
 								
 								LTMessageEncoder encoder = (LTMessageEncoder)connection.getOutgoingMessageQueue().getEncoder();

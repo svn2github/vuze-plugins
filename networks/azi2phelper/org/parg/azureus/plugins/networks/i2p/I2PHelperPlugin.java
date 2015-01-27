@@ -3594,6 +3594,27 @@ I2PHelperPlugin
 		}
 	}
 	
+	protected void
+	checkMixState(
+		byte[]		hash )
+	{
+		I2PHelperNetworkMixer	mixer = network_mixer;
+		
+		if ( mixer != null ){
+			
+			try{
+				Download download = plugin_interface.getDownloadManager().getDownload( hash );
+			
+				if ( download != null ){
+				
+					mixer.checkMixState( download );
+				}
+			}catch( Throwable e ){
+				
+			}
+		}
+	}
+	
 	private String
 	getOptionsString(
 		Map<String,Object>	opts )

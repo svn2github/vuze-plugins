@@ -42,6 +42,7 @@ MsgSyncMessage
 	private long			time_received;
 	
 	private int				delivery_count;
+	private int				probably_seen_count;
 	private int				seen_count;
 	
 	private byte[]			history;
@@ -180,6 +181,24 @@ MsgSyncMessage
 		synchronized( this ){
 		
 			delivery_count++;
+		}
+	}
+	
+	protected int
+	getProbablySeenCount()
+	{
+		synchronized( this ){
+		
+			return( probably_seen_count );
+		}
+	}
+	
+	protected void
+	probablySeen()
+	{
+		synchronized( this ){
+		
+			probably_seen_count++;
 		}
 	}
 	

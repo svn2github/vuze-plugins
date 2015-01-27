@@ -515,6 +515,26 @@ I2PHelperView
 						view_timer = null;
 					}
 					
+					for ( int i=0;i<dht_views.length;i++){
+						
+						DHTView 	dht_view = dht_views[i];
+						
+						if ( dht_view != null ){
+							
+							dht_view.delete();
+							
+							dht_views[i] = null;
+						}
+						
+						DHTOpsView 	ops_view = ops_views[i];
+						
+						if ( ops_view != null ){
+							
+							ops_view.delete();
+							
+							ops_views[i] = null;
+						}
+					}
 				}finally{
 					
 					UISWTView view = current_view;
