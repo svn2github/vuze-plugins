@@ -28,7 +28,10 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import org.gudy.azureus2.core3.disk.DiskManagerFileInfo;
+import org.gudy.azureus2.core3.disk.DiskManagerFileInfoSet;
 import org.gudy.azureus2.core3.download.DownloadManagerState;
+import org.gudy.azureus2.core3.peer.PEPeerManager;
 import org.gudy.azureus2.core3.util.*;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabase;
@@ -39,6 +42,7 @@ import org.gudy.azureus2.plugins.ddb.DistributedDatabaseValue;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.download.DownloadManager;
 import org.gudy.azureus2.plugins.download.DownloadManagerListener;
+import org.gudy.azureus2.plugins.download.DownloadScrapeResult;
 import org.gudy.azureus2.plugins.torrent.TorrentAttribute;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 
@@ -59,11 +63,14 @@ RatingsUpdater
     
     private static final int READ_BY_HASH_TIMEOUT	= 30*1000;
     
-    private static final int COMPLETE_DOWNLOAD_LOOKUP_PERIOD 		= 8*60*60*1000;
-    private static final int INCOMPLETE_OLD_DOWNLOAD_LOOKUP_PERIOD	= 4*60*60*1000;
-    private static final int INCOMPLETE_DOWNLOAD_LOOKUP_PERIOD 		= 1*60*60*1000;
+    private static final int COMPLETE_DOWNLOAD_LOOKUP_PERIOD 			= 8*60*60*1000;
+    private static final int COMPLETE_DOWNLOAD_NO_SEEDS_LOOKUP_PERIOD 	= 2*60*60*1000;
+    private static final int INCOMPLETE_OLD_DOWNLOAD_LOOKUP_PERIOD		= 4*60*60*1000;
+    private static final int INCOMPLETE_DOWNLOAD_LOOKUP_PERIOD 			= 1*60*60*1000;
     
-    	
+    private static final int TIMER_CHECK_PERIOD		= 2*60*1000;
+    private static final int STALL_TRIGGER_PERIOD	= 15*60*1000;
+    
 	private RatingPlugin 			plugin;
 	private DistributedDatabase 	database_public;  
   	
@@ -71,6 +78,7 @@ RatingsUpdater
 	private TorrentAttribute attributeComment;
 	private TorrentAttribute attributeGlobalRating;
 	private TorrentAttribute attributeChatState;
+	private TorrentAttribute attributeStallState;
 
   
 	private Map<Download,RatingResults> 	torrentRatings	= new HashMap<Download, RatingResults>();
@@ -84,6 +92,10 @@ RatingsUpdater
 	private boolean	write_in_progress;
 	private boolean	read_in_progress;
 	
+	private TimerEventPeriodic		timer;
+	private Object					reseed_bytes_key = new Object();
+	private Object					reseed_asked_key = new Object();
+	
 	private volatile boolean	destroyed;
 	
 	public 
@@ -96,6 +108,7 @@ RatingsUpdater
 	    attributeComment		= plugin.getPluginInterface().getTorrentManager().getPluginAttribute("comment");    
 	    attributeGlobalRating  	= plugin.getPluginInterface().getTorrentManager().getPluginAttribute("globalRating");
 	    attributeChatState  	= plugin.getPluginInterface().getTorrentManager().getPluginAttribute("chatState");
+	    attributeStallState  	= plugin.getPluginInterface().getTorrentManager().getPluginAttribute("stallState");
 	}
 	  
 	public void 
@@ -124,6 +137,33 @@ RatingsUpdater
 								
 								downloadAdded( d, false );
 							}
+							
+							timer = SimpleTimer.addPeriodicEvent(
+								"ratings:checker",
+								TIMER_CHECK_PERIOD,
+								new TimerEventPerformer() {
+									
+									public void 
+									perform(
+										TimerEvent event) 
+									{
+										if ( destroyed ){
+											
+											TimerEventPeriodic t = timer;
+											
+											timer = null;
+											
+											if ( t != null ){
+											
+												t.cancel();
+											}
+											
+											return;
+										}
+										
+										checkStalls();
+									}
+								});
 						}
 					}
 				});  
@@ -137,7 +177,15 @@ RatingsUpdater
 		DownloadManager download_manager = plugin.getPluginInterface().getDownloadManager();
 		
 		download_manager.removeListener( this );
-
+		
+		TimerEventPeriodic t = timer;
+		
+		timer = null;
+		
+		if ( t != null ){
+		
+			t.cancel();
+		}
 	}
 	
 	public void 
@@ -184,6 +232,205 @@ RatingsUpdater
 		}
 	}
 
+	private void
+	checkStalls()
+	{
+		DownloadManager download_manager = plugin.getPluginInterface().getDownloadManager();
+
+		long	now = SystemTime.getMonotonousTime();
+
+		for ( final Download download: download_manager.getDownloads()){
+				
+			boolean	actively_monitoring = false;
+			
+			org.gudy.azureus2.core3.download.DownloadManager core_dm = PluginCoreUtils.unwrap( download );
+
+			try{
+				if ( download.getState() != Download.ST_DOWNLOADING ){
+					
+					continue;
+				}
+								
+				if ( core_dm.getUserData( reseed_asked_key ) != null ){
+					
+					continue;
+				}
+	
+				PEPeerManager pm = core_dm.getPeerManager();
+				
+				if ( pm == null ){
+					
+					continue;
+				}
+				
+				actively_monitoring = true;
+				
+				long downloaded = core_dm.getStats().getTotalDataBytesReceived();
+				
+				long[] old_entry = (long[])core_dm.getUserData( reseed_bytes_key );
+				
+				if ( old_entry == null || old_entry[1] < downloaded ){
+					
+					core_dm.setUserData( reseed_bytes_key, new long[]{ now, downloaded });
+	
+					continue;
+				}
+				
+				long elapsed_since_dl = now - old_entry[0];
+				
+				if ( elapsed_since_dl < STALL_TRIGGER_PERIOD ){
+					
+					continue;
+				}
+				
+					// download made no progress in the last interval
+				
+				DiskManagerFileInfoSet file_set = core_dm.getDiskManagerFileInfoSet();
+				
+				DiskManagerFileInfo[] files = file_set.getFiles();			
+				
+				DiskManagerFileInfo	worst_file 	= null;
+				float				worst_avail	= Float.MAX_VALUE;
+				
+				for ( DiskManagerFileInfo file: files ){
+					
+					if ( ( !file.isSkipped()) && file.getDownloaded() < file.getLength()){
+						
+						float file_avail = pm.getMinAvailability( file.getIndex());
+						
+						if ( file_avail < 1.0 ){
+							
+							if ( file_avail < worst_avail ){
+								
+								worst_avail = file_avail;
+								worst_file	= file;
+							}
+						}
+					}
+				}
+				
+				if ( worst_file != null ){
+					
+					core_dm.setUserData( reseed_asked_key, "" );
+					
+					final String msg_prefix = "Please seed! File '";
+					final String message 	= msg_prefix + worst_file.getTorrentFile().getRelativePath() + "' is stuck with an availability of " + worst_avail;
+					
+					if ( BuddyPluginUtils.isBetaChatAvailable()){
+						
+						chat_write_dispatcher.dispatch(
+								new AERunnable() {
+									
+									@Override
+									public void 
+									runSupport() 
+									{
+										final BuddyPluginBeta.ChatInstance chat = BuddyPluginUtils.getChat( download );
+											
+										if ( chat != null ){
+												
+											chat.setAutoNotify( true );
+											
+											final Runnable do_write = 
+												new Runnable()
+												{
+													public void
+													run()
+													{		
+														Map<String,Object>	flags 	= new HashMap<String, Object>();
+														
+														flags.put( BuddyPluginBeta.FLAGS_MSG_ORIGIN_KEY, BuddyPluginBeta.FLAGS_MSG_ORIGIN_RATINGS );
+														
+														Map<String,Object>	options = new HashMap<String, Object>();
+														
+														chat.sendMessage( message, flags, options );
+													}
+												};
+											
+											String str = download.getAttribute( attributeStallState );
+
+											boolean	 written = str != null && str.equals( "w" );
+												
+											if ( written ){
+												
+												final TimerEventPeriodic[] event = { null };
+												
+												event[0] = 
+													SimpleTimer.addPeriodicEvent(
+														"Rating:chat:checker",
+														30*1000,
+														new TimerEventPerformer()
+														{
+															private int elapsed_time;
+					
+															public void 
+															perform(
+																TimerEvent e ) 
+															{
+																elapsed_time += 30*1000;
+																
+																	// get sync state before messages to things work reliably
+																
+																int	sync_state = chat.getIncomingSyncState();
+																
+																List<ChatMessage>	messages = chat.getMessages();
+																
+																if ( messages.size() > 50 || chat.isDestroyed()){
+																	
+																		// busy, let's not even bother checking 
+																	
+																	event[0].cancel();
+																	
+																}else{
+																
+																
+																	for ( ChatMessage message: messages ){
+																		
+																		if ( message.getParticipant().isMe()){
+																			
+																			if ( message.getMessage().startsWith( msg_prefix )){
+																				
+																				event[0].cancel();
+																				
+																				return;
+																			}
+																		}
+																	}
+																	
+																	if ( 	sync_state == 0 ||
+																			elapsed_time >= 5*60*1000 ){
+																		
+																		do_write.run();
+																		
+																		event[0].cancel();
+																	}
+																}
+															}
+														});
+											}else{
+												
+												do_write.run();
+												
+												download.setAttribute( attributeStallState, "w" );
+											}
+										}
+									}
+								});
+					}
+				}else{
+					
+					actively_monitoring = false;
+				}
+			}finally{
+				
+				if ( !actively_monitoring ){
+					
+					core_dm.setUserData( reseed_bytes_key, null );
+				}
+			}
+		}
+	}
+	
 	private void
 	addForLookup(
 		Download	download,
@@ -282,7 +529,21 @@ RatingsUpdater
 								
 								if ( dl.isComplete( false )){
 									
-									next += COMPLETE_DOWNLOAD_LOOKUP_PERIOD;
+									int delay = COMPLETE_DOWNLOAD_LOOKUP_PERIOD;
+									
+									if ( dl.getState() == Download.ST_STOPPED ){
+									
+										DownloadScrapeResult res = dl.getAggregatedScrapeResult();
+										
+										if ( res != null && res.getSeedCount() == 0 ){
+											
+												// check for possible stalled dl information more frequently
+											
+											delay = COMPLETE_DOWNLOAD_NO_SEEDS_LOOKUP_PERIOD;
+										}
+									}
+									
+									next += delay;
 									
 								}else{
 									
