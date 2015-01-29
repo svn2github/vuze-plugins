@@ -23,7 +23,9 @@
 package com.aelitis.azureus.plugins.rating.updater;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +35,7 @@ import org.gudy.azureus2.core3.disk.DiskManagerFileInfoSet;
 import org.gudy.azureus2.core3.download.DownloadManagerState;
 import org.gudy.azureus2.core3.peer.PEPeerManager;
 import org.gudy.azureus2.core3.util.*;
+import org.gudy.azureus2.plugins.PluginConfig;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabase;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabaseEvent;
@@ -44,9 +47,17 @@ import org.gudy.azureus2.plugins.download.DownloadManager;
 import org.gudy.azureus2.plugins.download.DownloadManagerListener;
 import org.gudy.azureus2.plugins.download.DownloadScrapeResult;
 import org.gudy.azureus2.plugins.torrent.TorrentAttribute;
+import org.gudy.azureus2.plugins.torrent.TorrentManager;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 
+import com.aelitis.azureus.core.content.ContentException;
+import com.aelitis.azureus.core.content.RelatedContent;
+import com.aelitis.azureus.core.content.RelatedContentLookupListener;
+import com.aelitis.azureus.core.content.RelatedContentManager;
+import com.aelitis.azureus.core.util.average.AverageFactory;
+import com.aelitis.azureus.core.util.average.MovingImmediateAverage;
 import com.aelitis.azureus.plugins.net.buddy.BuddyPluginBeta;
+import com.aelitis.azureus.plugins.net.buddy.BuddyPluginBeta.ChatInstance;
 import com.aelitis.azureus.plugins.net.buddy.BuddyPluginBeta.ChatMessage;
 import com.aelitis.azureus.plugins.net.buddy.BuddyPluginUtils;
 import com.aelitis.azureus.plugins.rating.RatingPlugin;
@@ -71,7 +82,9 @@ RatingsUpdater
     private static final int TIMER_CHECK_PERIOD		= 2*60*1000;
     private static final int STALL_TRIGGER_PERIOD	= 15*60*1000;
     
-	private RatingPlugin 			plugin;
+	private final RatingPlugin 		plugin;
+	private final PluginInterface	plugin_interface;
+	
 	private DistributedDatabase 	database_public;  
   	
 	private TorrentAttribute attributeRating;
@@ -102,32 +115,33 @@ RatingsUpdater
 	RatingsUpdater(
 		RatingPlugin _plugin ) 
 	{    
-		plugin = _plugin; 
+		plugin 				= _plugin; 
+		plugin_interface	= plugin.getPluginInterface();
 	   
-	    attributeRating  		= plugin.getPluginInterface().getTorrentManager().getPluginAttribute("rating");
-	    attributeComment		= plugin.getPluginInterface().getTorrentManager().getPluginAttribute("comment");    
-	    attributeGlobalRating  	= plugin.getPluginInterface().getTorrentManager().getPluginAttribute("globalRating");
-	    attributeChatState  	= plugin.getPluginInterface().getTorrentManager().getPluginAttribute("chatState");
-	    attributeStallState  	= plugin.getPluginInterface().getTorrentManager().getPluginAttribute("stallState");
+		TorrentManager tm = plugin_interface.getTorrentManager();
+		
+	    attributeRating  		= tm.getPluginAttribute("rating");
+	    attributeComment		= tm.getPluginAttribute("comment");    
+	    attributeGlobalRating  	= tm.getPluginAttribute("globalRating");
+	    attributeChatState  	= tm.getPluginAttribute("chatState");
+	    attributeStallState  	= tm.getPluginAttribute("stallState");
 	}
 	  
 	public void 
 	initialize() 
 	{
-		plugin.getPluginInterface().getUtilities().createThread(
+		plugin_interface.getUtilities().createThread(
 				"Initializer", 
 				new Runnable() 
 				{
 					public void 
 					run() 
 					{
-						PluginInterface pluginInterface = plugin.getPluginInterface();
-
-						database_public = pluginInterface.getDistributedDatabase();
+						database_public = plugin_interface.getDistributedDatabase();
 
 						if ( !destroyed ){
 							
-							DownloadManager download_manager = pluginInterface.getDownloadManager();
+							DownloadManager download_manager = plugin_interface.getDownloadManager();
 							
 							download_manager.addListener( RatingsUpdater.this, false );
 							
@@ -141,7 +155,18 @@ RatingsUpdater
 							timer = SimpleTimer.addPeriodicEvent(
 								"ratings:checker",
 								TIMER_CHECK_PERIOD,
-								new TimerEventPerformer() {
+								new TimerEventPerformer()
+								{
+									private RelatedContentManager	rcm;
+									
+									{
+										try{
+											rcm = RelatedContentManager.getSingleton();
+											
+										}catch( Throwable e ){
+										
+										}	
+									}
 									
 									public void 
 									perform(
@@ -161,7 +186,7 @@ RatingsUpdater
 											return;
 										}
 										
-										checkStalls();
+										checkStalls( rcm );
 									}
 								});
 						}
@@ -174,7 +199,7 @@ RatingsUpdater
 	{
 		destroyed = true;
 		
-		DownloadManager download_manager = plugin.getPluginInterface().getDownloadManager();
+		DownloadManager download_manager = plugin_interface.getDownloadManager();
 		
 		download_manager.removeListener( this );
 		
@@ -233,201 +258,646 @@ RatingsUpdater
 	}
 
 	private void
-	checkStalls()
+	checkStalls(
+		RelatedContentManager		rcm )
 	{
-		DownloadManager download_manager = plugin.getPluginInterface().getDownloadManager();
+		if ( !rcm.isEnabled()){
+			
+			rcm = null;
+		}
+		
+		DownloadManager download_manager = plugin_interface.getDownloadManager();
 
-		long	now = SystemTime.getMonotonousTime();
+		long	real_now = SystemTime.getCurrentTime();
+		long	mono_now = SystemTime.getMonotonousTime();
 
 		for ( final Download download: download_manager.getDownloads()){
-				
-			boolean	actively_monitoring = false;
-			
+						
 			org.gudy.azureus2.core3.download.DownloadManager core_dm = PluginCoreUtils.unwrap( download );
 
-			try{
-				if ( download.getState() != Download.ST_DOWNLOADING ){
+			if ( download.getState() != Download.ST_DOWNLOADING ){
+				
+				continue;
+			}
+				
+			PEPeerManager pm = core_dm.getPeerManager();
+			
+			if ( pm == null ){
+				
+				continue;
+			}
+			
+			if ( 	download.getFlag( Download.FLAG_METADATA_DOWNLOAD ) ||
+					download.getFlag( Download.FLAG_LOW_NOISE )){
+				
+				continue;
+			}
+
+			checkReseed( mono_now, download, core_dm, pm );
+			
+			if ( rcm != null ){
+				
+				checkAlternativeDownloads( rcm, real_now, mono_now, download, core_dm, pm );
+			}
+		}
+	}
+	
+	private void
+	checkReseed(
+		long												mono_now,
+		final Download										download,
+		org.gudy.azureus2.core3.download.DownloadManager 	core_dm,
+		PEPeerManager										pm )
+	{
+		boolean	actively_monitoring = false;
+
+		try{
+			if ( core_dm.getUserData( reseed_asked_key ) != null ){
+				
+				return;
+			}
+			
+			actively_monitoring = true;
+			
+			long downloaded = core_dm.getStats().getTotalDataBytesReceived();
+			
+			long[] old_entry = (long[])core_dm.getUserData( reseed_bytes_key );
+			
+			if ( old_entry == null || old_entry[1] < downloaded ){
+				
+				core_dm.setUserData( reseed_bytes_key, new long[]{ mono_now, downloaded });
+
+				return;
+			}
+			
+			long elapsed_since_dl = mono_now - old_entry[0];
+			
+			if ( elapsed_since_dl < STALL_TRIGGER_PERIOD ){
+				
+				return;
+			}
+			
+				// download made no progress in the last interval
+			
+			DiskManagerFileInfoSet file_set = core_dm.getDiskManagerFileInfoSet();
+			
+			DiskManagerFileInfo[] files = file_set.getFiles();			
+			
+			DiskManagerFileInfo	worst_file 	= null;
+			float				worst_avail	= Float.MAX_VALUE;
+			
+			for ( DiskManagerFileInfo file: files ){
+				
+				if ( ( !file.isSkipped()) && file.getDownloaded() < file.getLength()){
 					
-					continue;
-				}
+					float file_avail = pm.getMinAvailability( file.getIndex());
+					
+					if ( file_avail < 1.0 ){
+						
+						if ( file_avail < worst_avail ){
+							
+							worst_avail = file_avail;
+							worst_file	= file;
+							
+						}else if ( file_avail == worst_avail ){
+							
+							if ( worst_file != null && worst_file.getLength() < file.getLength()){
 								
-				if ( core_dm.getUserData( reseed_asked_key ) != null ){
-					
-					continue;
+								worst_file = file;
+							}
+						}
+					}
 				}
+			}
+			
+			if ( worst_file != null ){
+				
+				core_dm.setUserData( reseed_asked_key, "" );
+				
+				final String msg_prefix = "Please seed! File '";
+				final String message 	= msg_prefix + worst_file.getTorrentFile().getRelativePath() + "' is stuck with an availability of " + worst_avail;
+				
+				if ( BuddyPluginUtils.isBetaChatAvailable()){
+					
+					chat_write_dispatcher.dispatch(
+							new AERunnable() {
+								
+								@Override
+								public void 
+								runSupport() 
+								{
+									final BuddyPluginBeta.ChatInstance chat = BuddyPluginUtils.getChat( download );
+										
+									if ( chat != null ){
+											
+										chat.setAutoNotify( true );
+										
+										final Runnable do_write = 
+											new Runnable()
+											{
+												public void
+												run()
+												{		
+													Map<String,Object>	flags 	= new HashMap<String, Object>();
+													
+													flags.put( BuddyPluginBeta.FLAGS_MSG_ORIGIN_KEY, BuddyPluginBeta.FLAGS_MSG_ORIGIN_RATINGS );
+													
+													Map<String,Object>	options = new HashMap<String, Object>();
+													
+													chat.sendMessage( message, flags, options );
+												}
+											};
+										
+										String str = download.getAttribute( attributeStallState );
+
+										boolean	 written = str != null && str.equals( "w" );
+											
+										if ( written ){
+											
+											final TimerEventPeriodic[] event = { null };
+											
+											event[0] = 
+												SimpleTimer.addPeriodicEvent(
+													"Rating:chat:checker",
+													30*1000,
+													new TimerEventPerformer()
+													{
+														private int elapsed_time;
+				
+														public void 
+														perform(
+															TimerEvent e ) 
+														{
+															elapsed_time += 30*1000;
+															
+																// get sync state before messages to things work reliably
+															
+															int	sync_state = chat.getIncomingSyncState();
+															
+															List<ChatMessage>	messages = chat.getMessages();
+															
+															if ( chat.isDestroyed()){
+																																
+																event[0].cancel();
+																
+															}else{
+															
+															
+																for ( ChatMessage message: messages ){
+																	
+																	if ( message.getParticipant().isMe()){
+																		
+																		if ( message.getMessage().startsWith( msg_prefix )){
+																			
+																			event[0].cancel();
+																			
+																			return;
+																		}
+																	}
+																}
+																
+																if ( 	sync_state == 0 ||
+																		elapsed_time >= 5*60*1000 ){
+																	
+																	do_write.run();
+																	
+																	event[0].cancel();
+																}
+															}
+														}
+													});
+										}else{
+											
+											do_write.run();
+											
+											download.setAttribute( attributeStallState, "w" );
+										}
+									}
+								}
+							});
+				}
+			}else{
+				
+				actively_monitoring = false;
+			}
+		}finally{
+			
+			if ( !actively_monitoring ){
+				
+				core_dm.setUserData( reseed_bytes_key, null );
+			}
+		}
+	}
 	
-				PEPeerManager pm = core_dm.getPeerManager();
-				
-				if ( pm == null ){
-					
-					continue;
-				}
-				
-				actively_monitoring = true;
-				
-				long downloaded = core_dm.getStats().getTotalDataBytesReceived();
-				
-				long[] old_entry = (long[])core_dm.getUserData( reseed_bytes_key );
-				
-				if ( old_entry == null || old_entry[1] < downloaded ){
-					
-					core_dm.setUserData( reseed_bytes_key, new long[]{ now, downloaded });
+	private static final int ALT_AVAIL_MIN_PERIOD			= 16*60*1000;
+	private static final int ALT_AVAIL_AVERAGE_SPEED_PERIOD	= 16*60*1000;
+	private static final int ALT_AVAIL_RETRY_PERIOD			= 60*60*1000;
 	
-					continue;
-				}
+	private static final long 	ALT_AVAIL_MIN_FILE_SIZE 	= 75*1024*1024L;
+	private static final int	ALT_AVAIL_SLOW_RATE			= 10*1024;
+
+	
+	private static final Object	alt_dl_average_key 		= new Object();
+	private static final Object	alt_dl_done_files_key 	= new Object();
+	private static final Object	alt_dl_done_key 		= new Object();
+		
+	private void
+	checkAlternativeDownloads(
+		RelatedContentManager								rcm,
+		long												real_now,
+		long												mono_now,
+		final Download										download,
+		org.gudy.azureus2.core3.download.DownloadManager 	core_dm,
+		PEPeerManager										pm )
+	{
+		boolean	actively_monitoring = false;
+		
+		try{
+			Long		last_done = (Long)core_dm.getUserData( alt_dl_done_key );
+
+			if ( last_done != null ){
 				
-				long elapsed_since_dl = now - old_entry[0];
-				
-				if ( elapsed_since_dl < STALL_TRIGGER_PERIOD ){
+				if ( real_now - last_done < ALT_AVAIL_RETRY_PERIOD ){
 					
-					continue;
+					return;
 				}
 				
-					// download made no progress in the last interval
+				core_dm.setUserData( alt_dl_average_key, null );
+				core_dm.setUserData( alt_dl_done_files_key, null );
+				core_dm.setUserData( alt_dl_done_key, null );
+			}
+						
+			int	global_down_limit 	= plugin_interface.getPluginconfig().getCoreIntParameter( PluginConfig.CORE_PARAM_INT_MAX_DOWNLOAD_SPEED_KBYTES_PER_SEC );
+
+			if ( global_down_limit > 0 ){
+					
+					// could be smarted about this - we really want to know if the downloads download rate
+					// has been affected by a limit in the last period but this information isn't
+					// readily available...
+				
+				long current_rate = plugin_interface.getDownloadManager().getStats().getSmoothedReceiveRate();
+				
+					// bail if we're currently near the limit
+				
+				if ( current_rate >= global_down_limit - 5*1024 ){
+										
+					return;
+				}
+			}
+			
+			int	dl_limit = download.getDownloadRateLimitBytesPerSecond();
+			
+			if ( dl_limit < 0 || ( dl_limit > 0 && dl_limit < ALT_AVAIL_SLOW_RATE + 5*1024 )){
+				
+				return;
+			}
+			
+			actively_monitoring = true;
+			
+			long downloaded = core_dm.getStats().getTotalDataBytesReceived();
+	
+			Object[] info =  (Object[])core_dm.getUserData( alt_dl_average_key );
+			
+			if ( info == null ){
+				
+				MovingImmediateAverage av = AverageFactory.MovingImmediateAverage( ALT_AVAIL_AVERAGE_SPEED_PERIOD / TIMER_CHECK_PERIOD );
+				
+				core_dm.setUserData( alt_dl_average_key, new Object[]{ av, downloaded });
+				
+				return;
+			}
+			
+			MovingImmediateAverage 	average = (MovingImmediateAverage)info[0];
+			long					last_dl	= (Long)info[1];
+			
+			long	diff = downloaded - last_dl;
+			
+			if ( diff < 0 ){
+				
+				diff = 0;
+			}
+			
+			long bytes_per_period = (long)average.update( diff );
+			
+			info[1] = downloaded;
+			
+			long bytes_per_second = bytes_per_period/(TIMER_CHECK_PERIOD/1000);
+						
+			long added_time = core_dm.getDownloadState().getLongParameter( DownloadManagerState.PARAM_DOWNLOAD_ADDED_TIME );
+			
+			if ( real_now - added_time < ALT_AVAIL_MIN_PERIOD ){
+				
+				return;
+			}
+			
+			if ( average.getSampleCount() < average.getPeriods()){
+								
+				return;
+			}
+	
+			
+			if ( bytes_per_second <= ALT_AVAIL_SLOW_RATE ){
 				
 				DiskManagerFileInfoSet file_set = core_dm.getDiskManagerFileInfoSet();
 				
 				DiskManagerFileInfo[] files = file_set.getFiles();			
+					
+				DiskManagerFileInfo	file_to_check 		= null;
+				long				file_to_check_size	= 0;
 				
-				DiskManagerFileInfo	worst_file 	= null;
-				float				worst_avail	= Float.MAX_VALUE;
+				int					possible_files		= 0;
+				
+				List<Integer>	done_files = (List<Integer>)core_dm.getUserData( alt_dl_done_files_key );
+				
+				if ( done_files == null ){
+					
+					done_files = new ArrayList<Integer>();
+					
+					core_dm.setUserData( alt_dl_done_files_key, done_files );
+				}
 				
 				for ( DiskManagerFileInfo file: files ){
 					
-					if ( ( !file.isSkipped()) && file.getDownloaded() < file.getLength()){
+					long	file_size = file.getLength();
+					
+					if ((!file.isSkipped()) && file.getDownloaded() < file_size ){
 						
-						float file_avail = pm.getMinAvailability( file.getIndex());
-						
-						if ( file_avail < 1.0 ){
+						if ( file_size >= ALT_AVAIL_MIN_FILE_SIZE ){
 							
-							if ( file_avail < worst_avail ){
+							Integer	file_index = file.getIndex();
+							
+							if ( !done_files.contains( file_index )){
 								
-								worst_avail = file_avail;
-								worst_file	= file;
+								possible_files++;
+								
+								if ( file_size > file_to_check_size ){
+									
+									file_to_check 		= file;
+									file_to_check_size	= file_size;
+								}
 							}
 						}
 					}
 				}
 				
-				if ( worst_file != null ){
+				if ( file_to_check == null ){
 					
-					core_dm.setUserData( reseed_asked_key, "" );
+					core_dm.setUserData( alt_dl_done_key, real_now );
 					
-					final String msg_prefix = "Please seed! File '";
-					final String message 	= msg_prefix + worst_file.getTorrentFile().getRelativePath() + "' is stuck with an availability of " + worst_avail;
+				}else{
+					
+					done_files.add( file_to_check.getIndex());
+					
+					if ( possible_files == 1 || done_files.size() >= 3 ){
+						
+						core_dm.setUserData( alt_dl_done_key, real_now );
+					}
 					
 					if ( BuddyPluginUtils.isBetaChatAvailable()){
-						
-						chat_write_dispatcher.dispatch(
-								new AERunnable() {
-									
-									@Override
-									public void 
-									runSupport() 
-									{
-										final BuddyPluginBeta.ChatInstance chat = BuddyPluginUtils.getChat( download );
-											
-										if ( chat != null ){
-												
-											chat.setAutoNotify( true );
-											
-											final Runnable do_write = 
-												new Runnable()
-												{
-													public void
-													run()
-													{		
-														Map<String,Object>	flags 	= new HashMap<String, Object>();
-														
-														flags.put( BuddyPluginBeta.FLAGS_MSG_ORIGIN_KEY, BuddyPluginBeta.FLAGS_MSG_ORIGIN_RATINGS );
-														
-														Map<String,Object>	options = new HashMap<String, Object>();
-														
-														chat.sendMessage( message, flags, options );
-													}
-												};
-											
-											String str = download.getAttribute( attributeStallState );
 
-											boolean	 written = str != null && str.equals( "w" );
-												
-											if ( written ){
-												
-												final TimerEventPeriodic[] event = { null };
-												
-												event[0] = 
-													SimpleTimer.addPeriodicEvent(
-														"Rating:chat:checker",
-														30*1000,
-														new TimerEventPerformer()
+						final DiskManagerFileInfo	target_file = file_to_check;
+						
+						try{
+							rcm.lookupContent(
+								target_file.getLength(),
+								core_dm.getDownloadState().getNetworks(),
+								new RelatedContentLookupListener() 
+								{
+									private List<RelatedContent>	content = new ArrayList<RelatedContent>();
+									
+									public void 
+									lookupStart() 
+									{
+									}
+									
+									public void 
+									lookupFailed(
+										ContentException 	error ) 
+									{
+									}
+									
+									public void 
+									lookupComplete() 
+									{
+										altContentFound( download, target_file, content );
+									}
+									
+									public void 
+									contentFound(
+										RelatedContent[] new_content ) 
+									{
+										synchronized( content ){
+										
+											content.addAll( Arrays.asList( new_content ));
+										}
+										
+									}
+								});
+						}catch( Throwable e ){
+						}
+					}
+				}
+			}
+		}catch( Throwable e ){
+			
+			Debug.out( e );
+			
+		}finally{
+			
+			if ( !actively_monitoring ){
+				
+				core_dm.setUserData( alt_dl_average_key, null );
+			}
+		}
+	}
+	
+	private void
+	altContentFound(
+		final Download				download,
+		final DiskManagerFileInfo	file,
+		List<RelatedContent>		_contents )
+	{
+		final List<RelatedContent> contents = new ArrayList<RelatedContent>( _contents );
+		
+		byte[] dl_hash = download.getTorrentHash();
+		
+		Iterator<RelatedContent> it = contents.iterator();
+			
+		while( it.hasNext()){
+			
+			RelatedContent content = it.next();
+			
+			byte[] hash = content.getHash();
+			
+			if ( hash == null || Arrays.equals( hash, dl_hash )){
+				
+				it.remove();
+			}
+		}
+		
+		if ( contents.size() == 0 ){
+			
+			return;
+		}
+		
+		chat_write_dispatcher.dispatch(
+			new AERunnable() 
+			{	
+				@Override
+				public void 
+				runSupport() 
+				{
+					final ChatInstance chat = BuddyPluginUtils.getChat( download );
+											
+					if ( chat != null ){
+							
+						chat.setAutoNotify( true );
+													
+						final TimerEventPeriodic[] event = { null };
+						
+						event[0] = 
+							SimpleTimer.addPeriodicEvent(
+								"Rating:chat:checker",
+								30*1000,
+								new TimerEventPerformer()
+								{
+									private int elapsed_time;
+
+									public void 
+									perform(
+										TimerEvent e ) 
+									{
+										elapsed_time += 30*1000;
+										
+											// get sync state before messages to things work reliably
+										
+										int	sync_state = chat.getIncomingSyncState();
+																				
+										if ( chat.isDestroyed()){
+																											
+											event[0].cancel();
+											
+										}else{
+										
+											if ( 	sync_state == 0 ||
+													elapsed_time >= 5*60*1000 ){
+																								
+												event[0].cancel();
+											
+												chat_write_dispatcher.dispatch(
+													new AERunnable() {
+														
+														@Override
+														public void 
+														runSupport() 
 														{
-															private int elapsed_time;
-					
-															public void 
-															perform(
-																TimerEvent e ) 
-															{
-																elapsed_time += 30*1000;
-																
-																	// get sync state before messages to things work reliably
-																
-																int	sync_state = chat.getIncomingSyncState();
-																
-																List<ChatMessage>	messages = chat.getMessages();
-																
-																if ( messages.size() > 50 || chat.isDestroyed()){
-																	
-																		// busy, let's not even bother checking 
-																	
-																	event[0].cancel();
-																	
-																}else{
-																
-																
-																	for ( ChatMessage message: messages ){
-																		
-																		if ( message.getParticipant().isMe()){
-																			
-																			if ( message.getMessage().startsWith( msg_prefix )){
-																				
-																				event[0].cancel();
-																				
-																				return;
-																			}
-																		}
-																	}
-																	
-																	if ( 	sync_state == 0 ||
-																			elapsed_time >= 5*60*1000 ){
-																		
-																		do_write.run();
-																		
-																		event[0].cancel();
-																	}
-																}
-															}
-														});
-											}else{
-												
-												do_write.run();
-												
-												download.setAttribute( attributeStallState, "w" );
+															altContentWrite( chat, download, file, contents );
+														}
+													});
 											}
 										}
 									}
 								});
 					}
-				}else{
-					
-					actively_monitoring = false;
 				}
-			}finally{
+			});
+	}
+	
+	private void
+	altContentWrite(
+		ChatInstance			chat,
+		Download				download,
+		DiskManagerFileInfo		file,
+		List<RelatedContent>	contents )
+	{
+		List<ChatMessage>	messages = chat.getMessages();
+		
+		Map<String,String>	msg_map = new HashMap<String, String>();
+		
+		for ( RelatedContent rc: contents ){
+			
+			byte[]	hash = rc.getHash();
+			
+			String uri = UrlUtils.getMagnetURI( hash, rc.getTitle(), rc.getNetworks());
+			
+			String[] tags = rc.getTags();
+			
+			if ( tags != null ){
 				
-				if ( !actively_monitoring ){
+				for ( String tag: tags ){
 					
-					core_dm.setUserData( reseed_bytes_key, null );
+					uri += "&tag=" + UrlUtils.encode( tag );
 				}
 			}
+			
+			uri += "[[$dn]]";
+			
+			String file_str;
+			
+			if ( download.getDiskManagerFileCount() == 1 ){
+			
+				file_str = "this file";
+				
+			}else{
+			
+				file_str = "file '" + file.getTorrentFile().getRelativePath() + "'";
+			}
+			
+			String msg = "Download " + uri + " may also contain " + file_str;
+			
+			String 	suffix = "";
+			String	separator	= "";
+			
+			if ( rc.getSeeds() >= 0 ){
+				suffix += "seeds=" + rc.getSeeds();
+				separator = ", ";
+			}
+			if ( rc.getLeechers() >= 0 ){
+				suffix +=separator + "peers=" + rc.getLeechers();
+				separator = ", ";
+			}		
+			if ( rc.getSize() > 0){
+				suffix +=separator + "size=" + DisplayFormatters.formatByteCountToKiBEtc( rc.getSize());
+				separator = ", ";
+			}
+			
+			if ( suffix.length() > 0 ){
+				
+				msg += " (" + suffix + ")";
+			}
+			
+			msg_map.put( Base32.encode( hash ), msg );
+		}
+		
+		for ( ChatMessage message: messages ){
+			
+			if ( msg_map.size() == 0 ){
+				
+				return;
+			}
+			
+			String chat_msg = message.getMessage();
+			
+			Iterator<String> it = msg_map.keySet().iterator();
+			
+			while( it.hasNext()){
+				
+				if ( chat_msg.contains( it.next())){
+					
+					it.remove();
+				}
+			}
+		}
+		
+		Map<String,Object>	flags 	= new HashMap<String, Object>();
+		
+		flags.put( BuddyPluginBeta.FLAGS_MSG_ORIGIN_KEY, BuddyPluginBeta.FLAGS_MSG_ORIGIN_RATINGS );
+		
+		Map<String,Object>	options = new HashMap<String, Object>();
+		
+		for ( String msg: msg_map.values()){
+			
+			chat.sendMessage( msg, flags, options );
 		}
 	}
 	
