@@ -1061,23 +1061,10 @@ RelatedContentUISWT
 			return;
 		}
 
-		TableManager	table_manager = plugin_interface.getUIManager().getTableManager();
+		MenuManager mm = plugin_interface.getUIManager().getMenuManager();
 
-		String[]	download_table_ids = {
-				TableManager.TABLE_MYTORRENTS_INCOMPLETE,
-				TableManager.TABLE_MYTORRENTS_COMPLETE,
-				TableManager.TABLE_MYTORRENTS_ALL_BIG,
-				TableManager.TABLE_MYTORRENTS_COMPLETE_BIG,
-				TableManager.TABLE_MYTORRENTS_INCOMPLETE_BIG,
-				TableManager.TABLE_MYTORRENTS_UNOPENED,
-				TableManager.TABLE_MYTORRENTS_UNOPENED_BIG,
-		};
 				
-		for (int i = 0; i < download_table_ids.length; i++){ 
-			
-			String table_id = download_table_ids[i];
-			
-			TableContextMenuItem mi_rel = table_manager.addContextMenuItem( table_id, "rcm.contextmenu.lookupassoc");
+			MenuItem mi_rel = mm.addMenuItem(MenuManager.MENU_DOWNLOAD_CONTEXT, "rcm.contextmenu.lookupassoc");
 		
 			torrent_menus.add( mi_rel );
 			
@@ -1098,11 +1085,9 @@ RelatedContentUISWT
 						MenuItem 	menu, 
 						Object 		target) 
 					{
-						TableRow[]	rows = (TableRow[])target;
+						Download[]	rows = (Download[])target;
 						
-						for ( TableRow row: rows ){
-							
-							Download download = (Download)row.getDataSource();
+						for ( Download download: rows ){
 							
 							explicitSearch( download );
 						}
@@ -1111,7 +1096,8 @@ RelatedContentUISWT
 				
 			mi_rel.addMultiListener( listener );
 						
-			TableContextMenuItem mi_size = table_manager.addContextMenuItem( table_id, "rcm.contextmenu.lookupsize");
+			MenuItem mi_size = mm.addMenuItem(MenuManager.MENU_DOWNLOAD_CONTEXT, "rcm.contextmenu.lookupsize");
+		
 			
 			torrent_menus.add( mi_size );
 			
@@ -1132,13 +1118,11 @@ RelatedContentUISWT
 						MenuItem 	menu, 
 						Object 		data )
 					{
-						TableRow[]	rows = (TableRow[])data;
+						Download[]	rows = (Download[])data;
 						
 						int	num_ok = 0;
 						
-						for ( TableRow row: rows ){
-							
-							Download dl = (Download)row.getDataSource();
+						for ( Download dl: rows ){
 							
 							if ( dl.getDiskManagerFileCount() == 1 ){
 							
@@ -1149,7 +1133,7 @@ RelatedContentUISWT
 							}
 						}
 						
-						menu.setEnabled( num_ok > 0 );
+						menu.setVisible( num_ok > 0 );
 					}
 				});
 			
@@ -1161,11 +1145,9 @@ RelatedContentUISWT
 						MenuItem 	menu, 
 						Object 		target) 
 					{
-						TableRow[]	rows = (TableRow[])target;
+						Download[]	rows = (Download[])target;
 						
-						for ( TableRow row: rows ){
-							
-							Download dl = (Download)row.getDataSource();
+						for ( Download dl: rows ){
 							
 							if ( dl.getDiskManagerFileCount() == 1 ){
 								
@@ -1179,8 +1161,9 @@ RelatedContentUISWT
 						}
 					}
 				});
-		}
 		
+		TableManager	table_manager = plugin_interface.getUIManager().getTableManager();
+
 		String[]	file_table_ids = {
 				TableManager.TABLE_TORRENT_FILES,
 		};
