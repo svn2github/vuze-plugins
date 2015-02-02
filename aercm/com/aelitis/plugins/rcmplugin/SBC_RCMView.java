@@ -30,16 +30,19 @@ import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.layout.*;
 import org.eclipse.swt.program.Program;
 import org.eclipse.swt.widgets.*;
+
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.config.ParameterListener;
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.*;
+import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.UIPluginViewToolBarListener;
 import org.gudy.azureus2.plugins.ui.tables.TableColumn;
 import org.gudy.azureus2.plugins.ui.tables.TableColumnCreationListener;
 import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.plugins.ui.toolbar.UIToolBarItem;
+import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.gudy.azureus2.pluginsimpl.local.PluginInitializer;
 import org.gudy.azureus2.ui.swt.Utils;
 import org.gudy.azureus2.ui.swt.mainwindow.ClipboardCopy;
@@ -470,6 +473,14 @@ SBC_RCMView
 					new TableColumnCreationListener() {
 						public void tableColumnCreated(TableColumn column) {
 							new ColumnRC_Created(column);
+						}
+					});
+		tableManager.registerColumn(
+				RelatedContent.class, 
+				ColumnRC_ChangedLocallyAgo.COLUMN_ID,
+					new TableColumnCreationListener() {
+						public void tableColumnCreated(TableColumn column) {
+							new ColumnRC_ChangedLocallyAgo(column);
 						}
 					});
 		tableManager.registerColumn(
@@ -1113,8 +1124,12 @@ SBC_RCMView
 						
 						assoc_item.setEnabled( false );
 					}
-
+					
 					MenuItem item;
+
+					
+					new MenuItem(menu, SWT.SEPARATOR );
+
 					item = new MenuItem(menu, SWT.PUSH);
 					item.setText(MessageText.getString("rcm.menu.google.hash"));
 					item.addSelectionListener(new SelectionAdapter() {
@@ -1148,7 +1163,17 @@ SBC_RCMView
 						};
 					});
 
-					
+					item = new MenuItem(menu, SWT.PUSH);
+					item.setText(MessageText.getString("rcm.menu.bis"));
+					item.addSelectionListener(new SelectionAdapter() {
+						public void widgetSelected(SelectionEvent e) {
+							String s = related_content[0].getTitle();
+							s = s.replaceAll("[-_]", " ");
+							String URL = "http://www.bing.com/images/search?q=" + UrlUtils.encode(s);
+							launchURL(URL);
+						};
+					});
+
 					new MenuItem(menu, SWT.SEPARATOR );
 					
 					item = new MenuItem(menu, SWT.PUSH);
@@ -1280,6 +1305,7 @@ SBC_RCMView
 	public void filterSet(String filter) {
 	}
 
+	// @see org.gudy.azureus2.plugins.ui.toolbar.UIToolBarActivationListener#toolBarItemActivated(com.aelitis.azureus.ui.common.ToolBarItem, long, java.lang.Object)
 	public boolean 
 	toolBarItemActivated(
 		ToolBarItem item, 
