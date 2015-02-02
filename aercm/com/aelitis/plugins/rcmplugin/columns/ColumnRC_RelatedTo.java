@@ -18,11 +18,21 @@
 
 package com.aelitis.plugins.rcmplugin.columns;
 
-import com.aelitis.azureus.core.content.RelatedContent;
-import com.aelitis.azureus.ui.common.table.TableColumnCore;
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.events.SelectionAdapter;
+import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.widgets.MenuItem;
 
+import com.aelitis.azureus.core.content.RelatedContent;
+import com.aelitis.azureus.ui.UIFunctions;
+import com.aelitis.azureus.ui.common.table.TableColumnCore;
+import com.aelitis.azureus.ui.swt.UIFunctionsManagerSWT;
+
+import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.plugins.download.Download;
+import org.gudy.azureus2.plugins.ui.menus.MenuItemListener;
 import org.gudy.azureus2.plugins.ui.tables.*;
+import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 
 /**
  * @author TuxPaper
@@ -47,6 +57,27 @@ public class ColumnRC_RelatedTo
 		if ( column instanceof TableColumnCore ){
 			((TableColumnCore)column).setUseCoreDataSource( true );
 		}
+		
+		TableContextMenuItem item = column.addContextMenuItem("rcm.menu.openRelatedDM");
+		
+		
+		item.addListener(new MenuItemListener() {
+
+			public void selected(org.gudy.azureus2.plugins.ui.menus.MenuItem menu,
+					Object target) {
+				if (target instanceof RelatedContent) {
+					RelatedContent rc = (RelatedContent) target;
+
+					Download relatedToDownload = rc.getRelatedToDownload();
+					if (relatedToDownload != null) {
+						UIFunctionsManagerSWT.getUIFunctionsSWT().openView(
+								UIFunctions.VIEW_DM_DETAILS,
+								PluginCoreUtils.unwrap(relatedToDownload));
+					}
+				}
+			};
+		});
+
 	}
 
 	public void refresh(TableCell cell) {
