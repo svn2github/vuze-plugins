@@ -244,9 +244,25 @@ UPnPMediaRendererRemote
   			current_connection_id	= connection_id;
   			current_av_id			= av_id;
 			} else {
+				UPnPAction actionConnectionIDs = connection_manager.getAction("GetCurrentConnectionIDs");
+				if (actionConnectionIDs != null) {
+					Map res = actionConnectionIDs.getInvocation().invoke2();
+					
+	  			String	connection_ids 	= (String)res.get( "ConnectionIDs" );
+
+	  			if (connection_ids != null) {
+	  				current_connection_id = connection_ids.split(",")[0]; 
+	  			}
+				}
+			}
+
+			if (current_connection_id == null) {
 				current_connection_id = "0";
+			}
+			if (current_av_id == null) {
 				current_av_id = "0";
 			}
+
 			
 			log( "Setting transport URI" );
 
