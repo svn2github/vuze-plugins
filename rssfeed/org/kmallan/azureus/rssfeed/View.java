@@ -24,6 +24,7 @@ import org.eclipse.swt.custom.*;
 import org.eclipse.swt.events.*;
 import org.eclipse.swt.graphics.*;
 import org.eclipse.swt.layout.*;
+import org.eclipse.swt.program.Program;
 import org.eclipse.swt.widgets.*;
 import org.gudy.azureus2.core3.config.*;
 import org.gudy.azureus2.core3.internat.MessageText;
@@ -62,7 +63,7 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
   public Composite filtParamComp, filtSpecificTVShow, filtSpecificOther, filtSpecificNone;
   public Table filtTable;
   private ToolItem btnFiltUp, btnFiltAdd, btnFiltCopy, btnFiltRemove, btnFiltDown;
-  private Button btnFiltStoreDir, btnFiltAccept, btnFiltReset, btnFiltCancel;
+  private Button btnFiltStoreDir, btnFiltFileBrowse, btnFiltFileEdit, btnFiltAccept, btnFiltReset, btnFiltCancel;
 
   public Composite urlParamComp, urlOptCompCustReferer, urlOptCompCookie, urlOptCompNone;
   public Table urlTable;
@@ -73,7 +74,7 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
 
   public Composite filtRatesCustom, filtRatesNone;
   public Text filtName, filtStoreDir, filtExpression, filtRateUpload, filtRateDownload, filtCategory, filtStartSeason, filtStartEpisode, filtEndSeason, filtEndEpisode, filtTestMatch, filtMinTorrentSize, filtMaxTorrentSize;
-  public Button filtIsRegex, filtMatchTitle, filtMatchLink, filtMoveTop, filtRateUseCustom, filtRename, filtRenameEppTitle, filtDisable, filtCleanup, filtEnabled, filtSmartHist;
+  public Button filtIsRegex, filtIsFilename, filtMatchTitle, filtMatchLink, filtMoveTop, filtRateUseCustom, filtRename, filtRenameEppTitle, filtDisable, filtCleanup, filtEnabled, filtSmartHist;
   public Combo filtState, filtPriority, filtType, filtMode, filtFeed;
 
   public Text urlName, urlLocation;
@@ -422,7 +423,30 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
     btnFiltStoreDir.addListener(SWT.Selection, this);
 
     setupLabel(filtParamComp, "RSSFeed.Options.Filter.filtExpression", 75);
-    (filtExpression = new Text(filtParamComp, SWT.BORDER)).setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+    Composite filtExpressionComp = setupComposite(filtParamComp, setupGridLayout(3, 0, 0, 0, 0), GridData.FILL_HORIZONTAL);
+    (filtExpression = new Text(filtExpressionComp, SWT.BORDER)).setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+    filtExpression.addModifyListener(new ModifyListener() {
+      public void modifyText(ModifyEvent modifyEvent) {
+        if (btnFiltFileEdit != null) {
+          btnFiltFileEdit.setEnabled(new File(filtExpression.getText()).exists());
+        }
+      }
+    });
+    btnFiltFileBrowse = new Button(filtExpressionComp, SWT.PUSH);
+    layoutData = new GridData();
+    layoutData.widthHint = 52;
+    layoutData.heightHint = 28;
+    btnFiltFileBrowse.setLayoutData(layoutData);
+    btnFiltFileBrowse.setText("...");
+    btnFiltFileBrowse.addListener(SWT.Selection, this);
+
+    btnFiltFileEdit = new Button(filtExpressionComp, SWT.PUSH);
+    layoutData = new GridData();
+    layoutData.widthHint = 52;
+    layoutData.heightHint = 28;
+    btnFiltFileEdit.setLayoutData(layoutData);
+    Messages.setLanguageText(btnFiltFileEdit, "RSSFeed.Options.Filter.Options.filtFileEdit");
+    btnFiltFileEdit.addListener(SWT.Selection, this);
 
     setupLabel(filtParamComp, "RSSFeed.Options.Filter.Options", 75);
     Composite options = setupComposite(filtParamComp, setupGridLayout(2, 0, 0, 0, 0), -1);
@@ -431,6 +455,11 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
     layoutData = new GridData();
     layoutData.horizontalSpan = 2;
     filtIsRegex.setLayoutData(layoutData);
+    filtIsFilename = new Button(options, SWT.CHECK);
+    Messages.setLanguageText(filtIsFilename, "RSSFeed.Options.Filter.Options.filtIsFilename");
+    layoutData = new GridData();
+    layoutData.horizontalSpan = 2;
+    filtIsFilename.setLayoutData(layoutData);
     filtMatchTitle = new Button(options, SWT.CHECK);
     Messages.setLanguageText(filtMatchTitle, "RSSFeed.Options.Filter.Options.filtMatch.Title");
     filtMatchLink = new Button(options, SWT.CHECK);
@@ -1014,6 +1043,7 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
 	  tmpBean.setExpression(item.getExpression());
 	  tmpBean.setFeed(item.getFeed());
 	  tmpBean.setIsRegex(item.getIsRegex());
+	  tmpBean.setIsFilename(item.getIsFilename());
 	  tmpBean.setMoveTop(item.getMoveTop());
 	  tmpBean.setPriority(item.getPriority());
 	  tmpBean.setRateDownload(item.getRateDownload());
@@ -1142,6 +1172,25 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
     String savePath = dDialog.open();
     if(savePath == null) return;
     itemStoreDir.setText(savePath);
+  }
+
+  private void updateFilterFile() {
+    FileDialog dDialog = new FileDialog(shell, SWT.SYSTEM_MODAL);
+    final String text = filtExpression.getText();
+    if(text.length() > 0) {
+      if (new File(text).exists()) {
+        dDialog.setFilterPath(text);
+      }
+    }
+    dDialog.setText(filtName.getText() + " - Select Filter File");
+    String savePath = dDialog.open();
+    if(savePath == null) return;
+    filtExpression.setText(savePath);
+    filtIsFilename.setSelection(true);
+  }
+
+  private void editFilterFile() {
+    Program.launch(filtExpression.getText());
   }
 
   public void urlParamShow() {
@@ -1914,6 +1963,10 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
       urlCancel();
     } else if(src == btnFiltStoreDir) {
       updateStoreDirLoc(shell, filtStoreDir);
+    } else if(src == btnFiltFileBrowse) {
+      updateFilterFile();
+    } else if(src == btnFiltFileEdit) {
+      editFilterFile();
     } else if(src == filtRateUseCustom) {
       urlSetRates();
     } else if(src == btnFiltAccept) {

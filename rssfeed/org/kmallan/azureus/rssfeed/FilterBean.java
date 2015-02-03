@@ -21,7 +21,7 @@ package org.kmallan.azureus.rssfeed;
 
 import org.gudy.azureus2.plugins.download.Download;
 
-import java.io.Serializable;
+import java.io.*;
 import java.util.regex.*;
 
 public class FilterBean implements Serializable {
@@ -31,7 +31,7 @@ public class FilterBean implements Serializable {
   private String name, storeDir, expression, category, type, mode;
   private int state, priority, rateUpload, rateDownload, startSeason, startEpisode, endSeason, endEpisode;
   private long filtId, urlId = 0;
-  private boolean isRegex, matchTitle, matchLink, moveTop, customRate, renameFile, renameIncEpisode, disableAfter, cleanFile, enabled;
+  private boolean isRegex, isFilename, matchTitle, matchLink, moveTop, customRate, renameFile, renameIncEpisode, disableAfter, cleanFile, enabled;
   private boolean smartHistory = true;
 
   private String exprLower;
@@ -50,6 +50,9 @@ public class FilterBean implements Serializable {
   public static Pattern epnnnn_nnnn = Pattern.compile("(.*?)" + "([0-9]+)([0-9]{2})[\\-\\+]([0-9]+)([0-9]{2})" + ".*?");
   public static Pattern epnnnn_nn = Pattern.compile("(.*?)" + "([0-9]+)([0-9]{2})[\\-\\+]([0-9]{2})" + ".*?");
   public static Pattern epnnnn = Pattern.compile("(.*?)" + "([0-9]+)([0-9]{2})" + ".*?");
+
+  // Proper torrents are published if originals are bad.
+  public static Pattern properPattern = Pattern.compile("\\bproper\\b");
 
   public FilterBean() {
     filtId = System.currentTimeMillis();
@@ -105,6 +108,13 @@ public class FilterBean implements Serializable {
 
   public void setIsRegex(boolean isRegex) {
     this.isRegex = isRegex;
+  }
+  public boolean getIsFilename() {
+    return isFilename;
+  }
+
+  public void setIsFilename(boolean isFilename) {
+    this.isFilename = isFilename;
   }
 
   public boolean getMatchTitle() {
@@ -328,33 +338,35 @@ public class FilterBean implements Serializable {
     if(!m.matches()) return null;
 
     showTitle = stringClean(m.group(1));
+    final int end = m.end(m.groupCount());
+    final boolean isProper = properPattern.matcher(str.substring(end)).find();
 
     switch(m.groupCount()) {
       case 3:
         seasonStart = Integer.parseInt(m.group(2));
         episodeStart = Integer.parseInt(m.group(3));
-        e = new Episode(showTitle, seasonStart, episodeStart);
+        e = new Episode(showTitle, seasonStart, episodeStart, isProper);
         break;
       case 4:
         seasonStart = Integer.parseInt(m.group(2));
         episodeStart = Integer.parseInt(m.group(3));
         seasonEnd = Integer.parseInt(m.group(2));
         episodeEnd = Integer.parseInt(m.group(4));
-        e = new Episode(showTitle, seasonStart, episodeStart, seasonEnd, episodeEnd);
+        e = new Episode(showTitle, seasonStart, episodeStart, seasonEnd, episodeEnd, isProper);
         break;
       case 5:
         seasonStart = Integer.parseInt(m.group(2));
         episodeStart = Integer.parseInt(m.group(3));
         seasonEnd = Integer.parseInt(m.group(4));
         episodeEnd = Integer.parseInt(m.group(5));
-        e = new Episode(showTitle, seasonStart, episodeStart, seasonEnd, episodeEnd);
+        e = new Episode(showTitle, seasonStart, episodeStart, seasonEnd, episodeEnd, isProper);
         break;
     }
 
     return e;
   }
 
-  private static String stringClean(String str) {
+  public static String stringClean(String str) {
     str = str.replaceAll("[ \\._\\-]+", " ");
     str = str.replaceAll("\\[.*\\]", "");
     str = str.trim();
@@ -371,17 +383,60 @@ public class FilterBean implements Serializable {
   }
 
   private boolean match(String matchee) {
-    if(getIsRegex()){
-      if ( exprPat == null ){
-    	  return( false );	// invalid expression, always fail
-      }
-      Matcher m = exprPat.matcher(matchee.toLowerCase());
-      return m.matches();
+    if (getIsFilename()) {
+      return matchFromFile(matchee);
     } else {
-      if(matchee.toLowerCase().indexOf(exprLower) >= 0) return true;
+      if(getIsRegex()){
+        if ( exprPat == null ){
+          return( false );	// invalid expression, always fail
+        }
+        Matcher m = exprPat.matcher(matchee.toLowerCase());
+        return m.find();
+      } else {
+        if(matchee.toLowerCase().contains(exprLower)) return true;
+      }
     }
     return false;
   }
+
+  private boolean matchFromFile(String matchee) {
+    try {
+      final BufferedReader in = new BufferedReader(new InputStreamReader(new FileInputStream(expression)));
+      try {
+        while (true) {
+          final String line = in.readLine();
+          if (line == null) {
+            break;
+          }
+          if (line.trim().length() == 0) {
+            continue;
+          }
+          final boolean isMatch;
+          if (getIsRegex()) {
+            try {
+              final Pattern pattern = Pattern.compile(line.toLowerCase());
+              isMatch = pattern.matcher(matchee).find();
+            } catch (PatternSyntaxException e) {
+              continue;
+            }
+          } else {
+            isMatch = line.toLowerCase().contains(matchee);
+          }
+          if (isMatch) {
+            return true;
+          }
+        }
+      } finally {
+        in.close();
+      }
+    } catch (FileNotFoundException e) {
+      return false;
+    } catch (IOException e) {
+      return false;
+    }
+    return false;
+  }
+
 
   public boolean getUseSmartHistory() {
     if("TVShow".equalsIgnoreCase(type)) return smartHistory;

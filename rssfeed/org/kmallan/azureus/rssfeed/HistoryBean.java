@@ -28,7 +28,9 @@ public class HistoryBean implements Serializable, Comparable {
 
   private String fileData, location, filtType, filtName;
   private long histId, filtId;
+  private String showTitle;
   private int seasonStart, seasonEnd, episodeStart, episodeEnd;
+  private boolean proper;
 
   public HistoryBean() {
     histId = System.currentTimeMillis();
@@ -71,7 +73,7 @@ public class HistoryBean implements Serializable, Comparable {
   public boolean setSeason(String str) {
     Pattern lmp = Pattern.compile("(ht|f)tp:.*/(.*?)");
     Matcher lmm = lmp.matcher(str);
-    if(lmm.matches()) {
+    if (lmm.matches()) {
       str = lmm.group(2);
     }
 
@@ -87,7 +89,12 @@ public class HistoryBean implements Serializable, Comparable {
     if(!m.matches()) m = FilterBean.epnnnn.matcher(str);
     if(!m.matches()) return false;
 
-    switch(m.groupCount()) {
+
+    setShowTitle(FilterBean.stringClean(m.group(1)));
+    final int end = m.end(m.groupCount());
+    setProper(FilterBean.properPattern.matcher(str.substring(end)).find());
+
+    switch (m.groupCount()) {
       case 3:
         setSeasonStart(Integer.parseInt(m.group(2)));
         setEpisodeStart(Integer.parseInt(m.group(3)));
@@ -110,6 +117,22 @@ public class HistoryBean implements Serializable, Comparable {
         return false;
     }
     return true;
+  }
+
+  public String getShowTitle() {
+    return showTitle;
+  }
+
+  public void setShowTitle(String showTitle) {
+    this.showTitle = showTitle;
+  }
+
+  public boolean isProper() {
+    return proper;
+  }
+
+  public void setProper(boolean proper) {
+    this.proper = proper;
   }
 
   public int getSeasonStart() {

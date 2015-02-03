@@ -1,5 +1,6 @@
 RSSFEED CHANGELOG - Changes by parg@users.soruceforge.net
 ---------------------------------------------
+1.4.13 - option to load filter expressions from a file [Alon Albert]
 1.4.12 - option to try and use plugin proxy
 1.4.11 - Fixed magnet based downloading when magnet has tracker entries
 1.4.10.1 - fixed class loader issue in json-io

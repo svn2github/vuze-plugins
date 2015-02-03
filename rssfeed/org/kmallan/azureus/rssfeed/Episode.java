@@ -23,30 +23,32 @@ public class Episode {
 
   public int seasonStart, seasonEnd, episodeStart, episodeEnd;
   public String showTitle = "";
+  private boolean proper;
 
-  public Episode(int season, int episode) {
-    setEpisode(season, episode, season, episode);
+  public Episode(int season, int episode, boolean proper) {
+    setEpisode(season, episode, season, episode, proper);
   }
 
-  public Episode(String title, int season, int episode) {
+  public Episode(String title, int season, int episode, boolean proper) {
     showTitle = title;
-    setEpisode(season, episode, season, episode);
+    setEpisode(season, episode, season, episode, proper);
   }
 
-  public Episode(int sStart, int eStart, int sEnd, int eEnd) {
-    setEpisode(sStart, eStart, sEnd, eEnd);
+  public Episode(int sStart, int eStart, int sEnd, int eEnd, boolean proper) {
+    setEpisode(sStart, eStart, sEnd, eEnd, proper);
   }
 
-  public Episode(String title, int sStart, int eStart, int sEnd, int eEnd) {
+  public Episode(String title, int sStart, int eStart, int sEnd, int eEnd, boolean proper) {
     showTitle = title;
-    setEpisode(sStart, eStart, sEnd, eEnd);
+    setEpisode(sStart, eStart, sEnd, eEnd, proper);
   }
 
-  private void setEpisode(int sStart, int eStart, int sEnd, int eEnd) {
+  private void setEpisode(int sStart, int eStart, int sEnd, int eEnd, boolean proper) {
     seasonStart = sStart;
     episodeStart = eStart;
     seasonEnd = sEnd;
     episodeEnd = eEnd;
+    this.proper = proper;
   }
 
   public boolean isFrom(int season, int episode) {
@@ -64,6 +66,10 @@ public class Episode {
   public boolean inRange(int sStart, int eStart, int sEnd, int eEnd) {
     if((isFrom(sStart, eStart)) && (isUpto(sEnd, eEnd))) return true;
     return false;
+  }
+
+  public boolean isProper() {
+    return proper;
   }
 
   public String toString() {

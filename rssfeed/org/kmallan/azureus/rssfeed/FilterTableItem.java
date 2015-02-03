@@ -63,6 +63,7 @@ public class FilterTableItem extends TableItem {
     view.filtStoreDir.setText(data.getStoreDir());
     view.filtExpression.setText(data.getExpression());
     view.filtIsRegex.setSelection(data.getIsRegex());
+    view.filtIsFilename.setSelection(data.getIsFilename());
     view.filtMatchTitle.setSelection(data.getMatchTitle());
     view.filtMatchLink.setSelection(data.getMatchLink());
     view.filtMoveTop.setSelection(data.getMoveTop());
@@ -139,6 +140,7 @@ public class FilterTableItem extends TableItem {
     data.setStoreDir(view.filtStoreDir.getText());
     data.setExpression(view.filtExpression.getText());
     data.setIsRegex(view.filtIsRegex.getSelection());
+    data.setIsFilename(view.filtIsFilename.getSelection());
     data.setMatchTitle(view.filtMatchTitle.getSelection());
     data.setMatchLink(view.filtMatchLink.getSelection());
     data.setMoveTop(view.filtMoveTop.getSelection());

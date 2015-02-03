@@ -477,16 +477,25 @@ public class Scheduler extends TimerTask {
               state = ListBean.DOWNLOAD_HIST;
               break;
             }
-            if(e != null && histBean.getFiltID() == filterBean.getID() && histBean.getSeasonStart() >= 0 && filterBean.getUseSmartHistory()) {
-              int seasonStart = histBean.getSeasonStart();
-              int episodeStart = histBean.getEpisodeStart();
-              int seasonEnd = histBean.getSeasonEnd();
-              int episodeEnd = histBean.getEpisodeEnd();
-              Plugin.debugOut(e + " vs s" + seasonStart + "e" + episodeStart + " - s" + seasonEnd + "e" + episodeEnd);
-              if(e.inRange(seasonStart, episodeStart, seasonEnd, episodeEnd)) {
-                Plugin.debugOut("found filter and episode match: " + e);
-                state = ListBean.DOWNLOAD_HIST;
-                break;
+
+            if(e != null && histBean.getSeasonStart() >= 0 && filterBean.getUseSmartHistory()) {
+              final String showTitle = histBean.getShowTitle();
+
+              // Old history beans may not have set showTitle so keep using the old way of matching
+              if (showTitle == null ? (histBean.getFiltID() == filterBean.getID()) : showTitle.equalsIgnoreCase(e.showTitle)) {
+                // "Proper" episode is not skipped unless history is also proper
+                if (histBean.isProper() || !e.isProper()) {
+                  int seasonStart = histBean.getSeasonStart();
+                  int episodeStart = histBean.getEpisodeStart();
+                  int seasonEnd = histBean.getSeasonEnd();
+                  int episodeEnd = histBean.getEpisodeEnd();
+                  Plugin.debugOut(e + " vs s" + seasonStart + "e" + episodeStart + " - s" + seasonEnd + "e" + episodeEnd);
+                  if(e.inRange(seasonStart, episodeStart, seasonEnd, episodeEnd)) {
+                    Plugin.debugOut("found filter and episode match: " + e);
+                    state = ListBean.DOWNLOAD_HIST;
+                    break;
+                  }
+                }
               }
             }
           }
