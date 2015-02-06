@@ -39,17 +39,20 @@ public class FilterBean implements Serializable {
 
   private long	minTorrentSize;
   private long  maxTorrentSize;
-  
-  public static Pattern epsnnenn_snnenn = Pattern.compile("(.*?)" + "s([0-9]+)e([0-9]+)[\\-\\+]s([0-9]+)e([0-9]+)" + ".*?");
-  public static Pattern epsnnenn_enn = Pattern.compile("(.*?)" + "s([0-9]+)e([0-9]+)[\\-\\+]e([0-9]+)" + ".*?");
-  public static Pattern epsnnenn_nn = Pattern.compile("(.*?)" + "s([0-9]+)e([0-9]+)[\\-\\+]([0-9]+)" + ".*?");
-  public static Pattern epsnnenn = Pattern.compile("(.*?)" + "s([0-9]+)e([0-9]+)" + ".*?");
-  public static Pattern epnnxnn_nnxnn = Pattern.compile("(.*?)" + "([0-9]+)x([0-9]+)[\\-\\+]([0-9]+)x([0-9]+)" + ".*?");
-  public static Pattern epnnxnn_nn = Pattern.compile("(.*?)" + "([0-9]+)x([0-9]+)[\\-\\+]([0-9]+)" + ".*?");
-  public static Pattern epnnxnn = Pattern.compile("(.*?)" + "([0-9]+)x([0-9]+)" + ".*?");
-  public static Pattern epnnnn_nnnn = Pattern.compile("(.*?)" + "([0-9]+)([0-9]{2})[\\-\\+]([0-9]+)([0-9]{2})" + ".*?");
-  public static Pattern epnnnn_nn = Pattern.compile("(.*?)" + "([0-9]+)([0-9]{2})[\\-\\+]([0-9]{2})" + ".*?");
-  public static Pattern epnnnn = Pattern.compile("(.*?)" + "([0-9]+)([0-9]{2})" + ".*?");
+
+  private static final Pattern[] episodePatterns = new Pattern[] {
+      Pattern.compile("(.*?)" + "s([0-9]+)e([0-9]+)[\\-\\+]s([0-9]+)e([0-9]+)" + ".*?"),
+      Pattern.compile("(.*?)" + "s([0-9]+)e([0-9]+)[\\-\\+]e([0-9]+)" + ".*?"),
+      Pattern.compile("(.*?)" + "s([0-9]+)e([0-9]+)[\\-\\+]([0-9]+)" + ".*?"),
+      Pattern.compile("(.*?)" + "s([0-9]+)e([0-9]+)" + ".*?"),
+      Pattern.compile("(.*?)" + "([0-9]+)x([0-9]+)[\\-\\+]([0-9]+)x([0-9]+)" + ".*?"),
+      Pattern.compile("(.*?)" + "([0-9]+)x([0-9]+)[\\-\\+]([0-9]+)" + ".*?"),
+      Pattern.compile("(.*?)" + "([0-9]+)x([0-9]+)" + ".*?"),
+      Pattern.compile("(.*?)" + "([0-9]+)([0-9]{2})[\\-\\+]([0-9]+)([0-9]{2})" + ".*?"),
+      Pattern.compile("(.*?)" + "([0-9]+)([0-9]{2})[\\-\\+]([0-9]{2})" + ".*?"),
+      Pattern.compile("(.*?)" + "([0-9]+) - ([0-9]+)" + ".*?"),
+      Pattern.compile("(.*?)" + "([0-9]+)([0-9]{2})" + ".*?"),
+  };
 
   // Proper torrents are published if originals are bad.
   public static Pattern properPattern = Pattern.compile("\\bproper\\b");
@@ -325,17 +328,14 @@ public class FilterBean implements Serializable {
     int seasonStart, seasonEnd, episodeStart, episodeEnd;
     Episode e = null;
 
-    Matcher m = epsnnenn_snnenn.matcher(str);
-    if(!m.matches()) m = epsnnenn_enn.matcher(str);
-    if(!m.matches()) m = epsnnenn_nn.matcher(str);
-    if(!m.matches()) m = epsnnenn.matcher(str);
-    if(!m.matches()) m = epnnxnn_nnxnn.matcher(str);
-    if(!m.matches()) m = epnnxnn_nn.matcher(str);
-    if(!m.matches()) m = epnnxnn.matcher(str);
-    if(!m.matches()) m = epnnnn_nnnn.matcher(str);
-    if(!m.matches()) m = epnnnn_nn.matcher(str);
-    if(!m.matches()) m = epnnnn.matcher(str);
-    if(!m.matches()) return null;
+    Matcher m = null;
+    for (Pattern pattern : episodePatterns) {
+      m = pattern.matcher(str);
+      if (m.matches()) {
+        break;
+      }
+    }
+    if (m == null || !m.matches()) return null;
 
     showTitle = stringClean(m.group(1));
     final int end = m.end(m.groupCount());

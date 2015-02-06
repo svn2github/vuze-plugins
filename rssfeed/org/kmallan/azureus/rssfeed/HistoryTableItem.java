@@ -66,21 +66,22 @@ public class HistoryTableItem extends TableItem {
     setText(1, data.getFileData());
     setText(2, data.getLocation());
 
-    String output = "";
+    StringBuilder output = new StringBuilder();
     if(data.getFiltID() != 0) {
-      output = "Filter Matched";
-      if(data.getFiltName() != null) output += ": '" + data.getFiltName() + "'";
+      output.append("Filter Matched");
+      if(data.getFiltName() != null) output.append(String.format(": '%s'", data.getFiltName()));
+      output.append(" Type: ").append(data.getFiltType());
       if(data.getSeasonStart() >= 0) {
-        output += " Type: TVShow - Ep " + Integer.toString(data.getSeasonStart()) + "x" + Integer.toString(data.getEpisodeStart());
+        output.append(String.format(" - %s Ep %dx%d", data.getShowTitle(), data.getSeasonStart(), data.getEpisodeStart()));
         if(data.getSeasonEnd() > data.getSeasonStart())
-          output += "-" + Integer.toString(data.getSeasonEnd()) + "x" + Integer.toString(data.getEpisodeEnd());
+          output.append(String.format("-%dx%d", data.getSeasonEnd(), data.getEpisodeEnd()));
         else if(data.getEpisodeEnd() > data.getEpisodeStart())
-          output += "-" + Integer.toString(data.getEpisodeEnd());
+          output.append("-").append(data.getEpisodeEnd());
       }
     } else {
-      output = "Manual Download";
+      output.append("Manual Download");
     }
-    setText(3, output);
+    setText(3, output.toString());
   }
 
   public void remove() {

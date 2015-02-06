@@ -1129,7 +1129,7 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
     if(filter != null) {
       tmpBean.setFilter(filter);
       if("TVShow".equalsIgnoreCase(filter.getType())) {
-        if(!tmpBean.setSeason(listBean.getName().toLowerCase())) tmpBean.setSeason(listBean.getName().toLowerCase());
+        if(!tmpBean.setSeason(listBean.getName().toLowerCase())) tmpBean.setSeason(listBean.getLocation().toLowerCase());
       }
     } // else manual download
 

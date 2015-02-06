@@ -71,51 +71,18 @@ public class HistoryBean implements Serializable, Comparable {
   }
 
   public boolean setSeason(String str) {
-    Pattern lmp = Pattern.compile("(ht|f)tp:.*/(.*?)");
-    Matcher lmm = lmp.matcher(str);
-    if (lmm.matches()) {
-      str = lmm.group(2);
+    final Episode episode = FilterBean.getSeason(str);
+
+    if (episode == null) {
+      return false;
     }
 
-    Matcher m = FilterBean.epsnnenn_snnenn.matcher(str);
-    if(!m.matches()) m = FilterBean.epsnnenn_enn.matcher(str);
-    if(!m.matches()) m = FilterBean.epsnnenn_nn.matcher(str);
-    if(!m.matches()) m = FilterBean.epsnnenn.matcher(str);
-    if(!m.matches()) m = FilterBean.epnnxnn_nnxnn.matcher(str);
-    if(!m.matches()) m = FilterBean.epnnxnn_nn.matcher(str);
-    if(!m.matches()) m = FilterBean.epnnxnn.matcher(str);
-    if(!m.matches()) m = FilterBean.epnnnn_nnnn.matcher(str);
-    if(!m.matches()) m = FilterBean.epnnnn_nn.matcher(str);
-    if(!m.matches()) m = FilterBean.epnnnn.matcher(str);
-    if(!m.matches()) return false;
-
-
-    setShowTitle(FilterBean.stringClean(m.group(1)));
-    final int end = m.end(m.groupCount());
-    setProper(FilterBean.properPattern.matcher(str.substring(end)).find());
-
-    switch (m.groupCount()) {
-      case 3:
-        setSeasonStart(Integer.parseInt(m.group(2)));
-        setEpisodeStart(Integer.parseInt(m.group(3)));
-        setSeasonEnd(Integer.parseInt(m.group(2)));
-        setEpisodeEnd(Integer.parseInt(m.group(3)));
-        break;
-      case 4:
-        setSeasonStart(Integer.parseInt(m.group(2)));
-        setEpisodeStart(Integer.parseInt(m.group(3)));
-        setSeasonEnd(Integer.parseInt(m.group(2)));
-        setEpisodeEnd(Integer.parseInt(m.group(4)));
-        break;
-      case 5:
-        setSeasonStart(Integer.parseInt(m.group(2)));
-        setEpisodeStart(Integer.parseInt(m.group(3)));
-        setSeasonEnd(Integer.parseInt(m.group(4)));
-        setEpisodeEnd(Integer.parseInt(m.group(5)));
-        break;
-      default:
-        return false;
-    }
+    setShowTitle(episode.showTitle);
+    setProper(episode.isProper());
+    setSeasonStart(episode.seasonStart);
+    setSeasonEnd(episode.seasonEnd);
+    setEpisodeStart(episode.episodeStart);
+    setEpisodeEnd(episode.episodeEnd);
     return true;
   }
 
