@@ -122,6 +122,16 @@ public class PromoPlugin
 			return;
 		}
 		
+		if ( COConfigurationManager.getBooleanParameter( "Beta Programme Enabled" )){
+		
+				// no ads for beta users unless testing with explicit pubid
+			
+			if ( pluginInterface.getPluginProperties().getProperty( "PubID", "" ) == "" ){
+			
+				return;
+			}
+		}
+		
 		UIManager uiManager = pluginInterface.getUIManager();
 		configModel = uiManager.createBasicPluginConfigModel("ConfigView.Section."
 				+ VIEWID);
