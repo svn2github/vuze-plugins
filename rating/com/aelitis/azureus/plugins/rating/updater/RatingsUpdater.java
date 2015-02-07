@@ -869,6 +869,8 @@ RatingsUpdater
 			msg_map.put( Base32.encode( hash ), msg );
 		}
 		
+		boolean has_info = false;
+		
 		for ( ChatMessage message: messages ){
 			
 			if ( msg_map.size() == 0 ){
@@ -877,6 +879,11 @@ RatingsUpdater
 			}
 			
 			String chat_msg = message.getMessage();
+			
+			if ( chat_msg.contains( "http://wiki.vuze.com/w/Swarm_Merging" )){
+				
+				has_info = true;
+			}
 			
 			Iterator<String> it = msg_map.keySet().iterator();
 			
@@ -898,6 +905,11 @@ RatingsUpdater
 		for ( String msg: msg_map.values()){
 			
 			chat.sendMessage( msg, flags, options );
+		}
+		
+		if ( !has_info ){
+		
+			chat.sendMessage( "See http://wiki.vuze.com/w/Swarm_Merging[[Swarm%20Merging]] for help", options);
 		}
 	}
 	
