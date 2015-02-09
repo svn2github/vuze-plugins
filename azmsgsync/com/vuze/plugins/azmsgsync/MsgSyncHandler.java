@@ -2238,7 +2238,7 @@ MsgSyncHandler
 			synchronized( message_lock ){
 			
 				if ( message_sigs.containsKey( signature )){
-					
+										
 					return( false );
 				}
 				
@@ -2250,7 +2250,7 @@ MsgSyncHandler
 				}
 				
 				if ( deleted_messages_inverted_sigs_map.containsKey( new HashWrapper( inv_signature ))){
-					
+										
 					return( false );
 				}
 				
@@ -2296,27 +2296,36 @@ MsgSyncHandler
 											
 					MsgSyncMessage removed = messages.removeFirst();
 						
-					byte[]	sig = removed.getSignature();
+					byte[]	removed_sig = removed.getSignature();
 					
-					message_sigs.remove( sig );
+					message_sigs.remove( removed_sig );
 					
 					if ( removed == msg ){
-					
+											
 							// not added after all
+						
+						if ( deleted_messages_inverted_sigs_map.size() < MAX_DELETED_MESSAGES ){
+							
+								// prevent further replay
+							
+							deleted_messages_inverted_sigs_map.put( new HashWrapper( inv_signature ), "" );
+							
+							message_mutation_id++;
+						}
 						
 						return( false );
 					}
 					
-					byte[] inv_sig = sig.clone();
+					byte[] removed_inv_sig = removed_sig.clone();
 					
-					for ( int j=0;j<inv_sig.length;j++){
+					for ( int j=0;j<removed_inv_sig.length;j++){
 						
-						inv_sig[j] ^= 0xff; 
+						removed_inv_sig[j] ^= 0xff; 
 					}
 					
-					deleted_messages_inverted_sigs_map.put( new HashWrapper( inv_sig ), "" );
+					deleted_messages_inverted_sigs_map.put( new HashWrapper( removed_inv_sig ), "" );
 				}
-				
+								
 				message_mutation_id++;
 
 				if ( msg_source != MS_LOADING ){
