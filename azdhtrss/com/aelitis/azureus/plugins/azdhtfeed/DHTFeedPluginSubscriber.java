@@ -235,6 +235,15 @@ DHTFeedPluginSubscriber
 				try{
 					DownloadManager	download_manager = plugin_interface.getDownloadManager();
 						
+					Download existing_download = download_manager.getDownload( t.getHash());
+					
+					if ( existing_download != null ){
+						
+							// possible that it already got added but it never got fixed up properly
+						
+						desc_download[0] = existing_download;
+					}
+						
 					ResourceDownloaderFactory rdf = plugin_interface.getUtilities().getResourceDownloaderFactory();
 					
 					DownloadWillBeAddedListener dwbal = 
@@ -259,7 +268,7 @@ DHTFeedPluginSubscriber
 								}
 							}
 						};
-				
+					
 					try{
 						download_manager.addDownloadWillBeAddedListener( dwbal );
 					
