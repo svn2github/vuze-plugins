@@ -799,10 +799,11 @@ RatingsUpdater
 									}
 								});
 						
-						try{
-							if ( BuddyPluginUtils.isBetaChatAnonAvailable()){
-								
-								final ChatInstance stats_chat = BuddyPluginUtils.getChat( AENetworkClassifier.AT_I2P, "Statistics: Files: Duplicates" );
+						if ( Constants.isCVSVersion()){
+							
+							try{
+									
+								final ChatInstance stats_chat = BuddyPluginUtils.getChat( chat.getNetwork(), "Statistics: Files: Duplicates" );
 								
 								if ( stats_chat != null ){
 									
@@ -811,7 +812,7 @@ RatingsUpdater
 									flags.put( BuddyPluginBeta.FLAGS_MSG_ORIGIN_KEY, BuddyPluginBeta.FLAGS_MSG_ORIGIN_RATINGS );
 									
 									Map<String,Object>	options = new HashMap<String, Object>();
-
+	
 									stats_chat.sendMessage( String.valueOf( file.getLength()), flags, options );
 									
 									SimpleTimer.addEvent(
@@ -825,9 +826,8 @@ RatingsUpdater
 											}
 										});
 								}
+							}catch( Throwable e ){
 							}
-						}catch( Throwable e ){
-							
 						}
 					}
 				}
