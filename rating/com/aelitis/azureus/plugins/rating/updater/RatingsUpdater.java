@@ -798,6 +798,37 @@ RatingsUpdater
 										}
 									}
 								});
+						
+						try{
+							if ( BuddyPluginUtils.isBetaChatAnonAvailable()){
+								
+								final ChatInstance stats_chat = BuddyPluginUtils.getChat( AENetworkClassifier.AT_I2P, "Statistics: Files: Duplicates" );
+								
+								if ( stats_chat != null ){
+									
+									Map<String,Object>	flags 	= new HashMap<String, Object>();
+									
+									flags.put( BuddyPluginBeta.FLAGS_MSG_ORIGIN_KEY, BuddyPluginBeta.FLAGS_MSG_ORIGIN_RATINGS );
+									
+									Map<String,Object>	options = new HashMap<String, Object>();
+
+									stats_chat.sendMessage( String.valueOf( file.getLength()), flags, options );
+									
+									SimpleTimer.addEvent(
+										"Rating:chat:closer",
+										15*60*1000,
+										new TimerEventPerformer(){
+											
+											public void perform(TimerEvent event){
+											
+												stats_chat.destroy();
+											}
+										});
+								}
+							}
+						}catch( Throwable e ){
+							
+						}
 					}
 				}
 			});
