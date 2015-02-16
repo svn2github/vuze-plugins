@@ -125,6 +125,7 @@ import org.parg.azureus.plugins.networks.i2p.snarkdht.NodeInfo;
 import org.parg.azureus.plugins.networks.i2p.swt.I2PHelperView;
 import org.parg.azureus.plugins.networks.i2p.tracker.I2PDHTTrackerPlugin;
 import org.parg.azureus.plugins.networks.i2p.tracker.I2PHelperTracker;
+import org.parg.azureus.plugins.networks.i2p.util.I2PHelperHostnameService;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTAZClient;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTTransportContactI2P;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT;
@@ -315,7 +316,8 @@ I2PHelperPlugin
 	
 	private static DDBTestXFer	test_xfer = new DDBTestXFer();
 	
-		
+	private I2PHelperHostnameService	hostname_service;
+	
 	private volatile boolean	unloaded;
 	
 	public void
@@ -343,6 +345,8 @@ I2PHelperPlugin
 				
 				throw( new PluginException( "Another instance of Vuze is running, can't initialize plugin" ));
 			}
+
+			hostname_service = new I2PHelperHostnameService( plugin_dir );
 			
 			loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
 			
@@ -2172,6 +2176,7 @@ I2PHelperPlugin
 		}
 	}
 	
+	@Override
 	public void 
 	outgoingConnection(
 		I2PSocket i2p_socket )
@@ -2193,6 +2198,7 @@ I2PHelperPlugin
 		}
 	}
 	
+	@Override
 	public void 
 	incomingConnection(
 		I2PSocket i2p_socket )
@@ -2200,6 +2206,14 @@ I2PHelperPlugin
 		throws Exception 
 	{
 		forwardSocket( i2p_socket, true, COConfigurationManager.getIntParameter( "TCP.Listen.Port" ));
+	}
+	
+	@Override
+	public String 
+	lookup(
+		String address ) 
+	{
+		return( hostname_service.lookup( address ));
 	}
 	
 	private void
@@ -3881,6 +3895,14 @@ I2PHelperPlugin
 				
 				public PluginInterface
 				getPluginInterface()
+				{
+					return( null );
+				}
+				
+				@Override
+				public String 
+				lookup(
+					String address ) 
 				{
 					return( null );
 				}

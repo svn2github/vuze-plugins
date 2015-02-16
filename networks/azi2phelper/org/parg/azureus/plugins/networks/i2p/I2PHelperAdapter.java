@@ -71,4 +71,8 @@ I2PHelperAdapter
 		I2PSocket		socket )
 		
 		throws Exception;
+	
+	public String
+	lookup(
+		String	address );
 }

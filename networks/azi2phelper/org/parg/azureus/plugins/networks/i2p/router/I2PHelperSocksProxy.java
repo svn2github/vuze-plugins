@@ -63,6 +63,8 @@ import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.torrent.Torrent;
 import org.gudy.azureus2.plugins.torrent.TorrentAnnounceURLListSet;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperAdapter;
+import org.parg.azureus.plugins.networks.i2p.I2PHelperAltNetHandler;
+import org.parg.azureus.plugins.networks.i2p.util.I2PHelperHostnameService;
 
 import com.aelitis.azureus.core.proxy.AEProxyConnection;
 import com.aelitis.azureus.core.proxy.AEProxyException;
@@ -298,6 +300,15 @@ I2PHelperSocksProxy
 				if ( address.endsWith( ".b32.i2p" )){
 					
 					remote_dest = socket_manager.getSession().lookupDest( address, 30*1000 );
+					
+				}else{
+					
+					String b32 = adapter.lookup( address );
+				
+					if ( b32 != null ){
+						
+						remote_dest = socket_manager.getSession().lookupDest( b32, 30*1000 );
+					}
 				}
 			}
 			

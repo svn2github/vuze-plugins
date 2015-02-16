@@ -14,6 +14,7 @@
         <javaElement handleIdentifier="=azi2phelper/&lt;org.parg.azureus.plugins.networks.i2p.vuzedht"/>
         <javaElement handleIdentifier="=azi2phelper/&lt;org.parg.azureus.plugins.networks.i2p.tracker"/>
         <javaElement handleIdentifier="=azi2phelper/&lt;org.parg.azureus.plugins.networks.i2p.plugindht"/>
+        <javaElement handleIdentifier="=azi2phelper/&lt;org.parg.azureus.plugins.networks.i2p.util"/>
         <javaElement handleIdentifier="=azi2phelper/&lt;org.parg.azureus.plugins.networks.i2p.internat"/>
         <javaElement handleIdentifier="=azi2phelper/&lt;org.parg.azureus.plugins.networks.i2p.snarkdht"/>
         <javaElement handleIdentifier="=azi2phelper/&lt;org.parg.azureus.plugins.networks.i2p"/>

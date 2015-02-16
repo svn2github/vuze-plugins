@@ -368,7 +368,12 @@ I2PHelperRouter
 			router_props.put( "router.outboundPool.length", 2 );
 			router_props.put( "router.outboundPool.lengthVariance", 0 );
 			router_props.put( "router.outboundPool.quantity", 2 );
-									
+					
+			if ( is_bootstrap_node ){
+			
+				router_props.put( "router.floodfillParticipant", false );
+			}
+			
 			I2PHelperUtils.normalizeProperties( router_props );
 			
 			I2PHelperUtils.writeProperties( router_config, router_props );
