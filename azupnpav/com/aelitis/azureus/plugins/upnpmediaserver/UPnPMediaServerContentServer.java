@@ -590,6 +590,7 @@ outer:
 		private boolean		action_is_download;
 		
 		private volatile DiskManagerRequest	active_request;
+		private UPnPMediaRendererRemote remoteRenderer;
 		
 		protected
 		processor(
@@ -602,6 +603,10 @@ outer:
 			processor_num	= _processor_num;
 			
 			last_write_time	= plugin_interface.getUtilities().getCurrentSystemTime();
+
+			// Note: We may want to refind renderer later, just in case the it isn't
+			// registered yet
+			remoteRenderer = plugin.findRendererByIP(ip);
 		}
 
 		protected String
@@ -1553,7 +1558,16 @@ outer:
 				writeb( "contentFeatures.dlna.org: DLNA.ORG_PN=" + PN + ";DLNA.ORG_OP=01;DLNA.ORG_CI=1;DLNA.ORG_FLAGS=01700000000000000000000000000000" + NL );
 				writeb( "transferMode.dlna.org: Streaming" + NL );
 
-				writeb( "Content-Type: " + item.getContentType() + NL );
+				String[] content_types = item.getContentTypes();
+				String content_type = null;
+				if (content_types.length > 1 && remoteRenderer != null) {
+					content_type = remoteRenderer.calculateContentType(content_types);
+				}
+				if (content_type == null) {
+					content_type = content_types[0];
+				}
+				
+				writeb( "Content-Type: " + content_type + NL );
 
 				long date = item.getDateMillis();
 				

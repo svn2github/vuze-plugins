@@ -32,16 +32,11 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.net.Inet4Address;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.NetworkInterface;
-import java.net.Socket;
-import java.net.URL;
-import java.net.URLEncoder;
+import java.net.*;
 import java.util.*;
 
 import org.gudy.azureus2.core3.config.COConfigurationManager;
+import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.*;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.disk.DiskManagerFileInfo;
@@ -58,9 +53,7 @@ import org.gudy.azureus2.plugins.tracker.web.TrackerWebContext;
 import org.gudy.azureus2.plugins.tracker.web.TrackerWebPageGenerator;
 import org.gudy.azureus2.plugins.tracker.web.TrackerWebPageRequest;
 import org.gudy.azureus2.plugins.tracker.web.TrackerWebPageResponse;
-import org.gudy.azureus2.plugins.ui.UIInstance;
-import org.gudy.azureus2.plugins.ui.UIManager;
-import org.gudy.azureus2.plugins.ui.UIManagerListener;
+import org.gudy.azureus2.plugins.ui.*;
 import org.gudy.azureus2.plugins.ui.components.UITextField;
 import org.gudy.azureus2.plugins.ui.config.ActionParameter;
 import org.gudy.azureus2.plugins.ui.config.BooleanParameter;
@@ -72,9 +65,7 @@ import org.gudy.azureus2.plugins.ui.config.ParameterListener;
 import org.gudy.azureus2.plugins.ui.config.PasswordParameter;
 import org.gudy.azureus2.plugins.ui.config.StringListParameter;
 import org.gudy.azureus2.plugins.ui.config.StringParameter;
-import org.gudy.azureus2.plugins.ui.menus.MenuItem;
-import org.gudy.azureus2.plugins.ui.menus.MenuItemFillListener;
-import org.gudy.azureus2.plugins.ui.menus.MenuItemListener;
+import org.gudy.azureus2.plugins.ui.menus.*;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.plugins.ui.tables.TableContextMenuItem;
@@ -98,18 +89,13 @@ import com.aelitis.azureus.core.content.AzureusContentDirectoryManager;
 import com.aelitis.azureus.core.content.AzureusContentDownload;
 import com.aelitis.azureus.core.content.AzureusContentFile;
 import com.aelitis.azureus.core.content.AzureusContentFilter;
+import com.aelitis.azureus.core.devices.*;
 import com.aelitis.azureus.core.util.CopyOnWriteList;
 import com.aelitis.azureus.core.util.UUIDGenerator;
 import com.aelitis.azureus.plugins.upnp.UPnPMapping;
 import com.aelitis.azureus.plugins.upnp.UPnPPlugin;
 import com.aelitis.azureus.plugins.upnpmediaserver.ui.UPnPMediaServerUI;
-import com.aelitis.net.upnp.UPnP;
-import com.aelitis.net.upnp.UPnPAdapter;
-import com.aelitis.net.upnp.UPnPFactory;
-import com.aelitis.net.upnp.UPnPListener;
-import com.aelitis.net.upnp.UPnPRootDevice;
-import com.aelitis.net.upnp.UPnPSSDP;
-import com.aelitis.net.upnp.UPnPSSDPListener;
+import com.aelitis.net.upnp.*;
 import com.aelitis.azureus.plugins.upnpmediaserver.UPnPMediaServerContentDirectory.*;
 
 public class 
@@ -212,7 +198,7 @@ UPnPMediaServer
 		
 	private BasicPluginConfigModel 	config_model;
 	private BasicPluginViewModel	view_model;
-	private List					menus = new ArrayList();
+	private List<MenuItem> menus = new ArrayList<MenuItem>();
 	private UTTimer					timer2;
 	private UTTimerEvent 			timer2_event;
 	private UTTimer					timer3;
@@ -264,6 +250,8 @@ UPnPMediaServer
 	private Object	startup_lock	= new Object();
 	private boolean	starting		= false;
 	private AESemaphore			startup_sem = new AESemaphore( "UPnPMediaServer:Startup" );
+
+	protected UIInstance uiInstance;
 	
 	public void
 	initialize(
@@ -689,6 +677,7 @@ UPnPMediaServer
 					UIAttached(
 						UIInstance		instance )
 					{
+						uiInstance = instance;
 						if ( instance.getUIType() == UIInstance.UIT_SWT ){	
 					
 							ui_manager.removeUIListener( this );
@@ -1048,42 +1037,54 @@ UPnPMediaServer
 					
 				// top level menus
 					
-			MenuItemFillListener fillTopMenu = new MenuItemFillListener() {
-				public void menuWillBeShown(MenuItem menu, Object data) {
-					menu.removeAllChildItems();
-					fillSubMenu((TableContextMenuItem) menu);
+			MenuBuilder fillTopMenu = new MenuBuilder() {
+				// @see org.gudy.azureus2.plugins.ui.menus.MenuBuilder#buildSubmenu(org.gudy.azureus2.plugins.ui.menus.MenuItem, java.lang.Object)
+				public void buildSubmenu(MenuItem menu, Object target) {
+					fillSubMenu(menu);
 				}
 			};
-					
-			TableContextMenuItem menu_item_itorrents;
-			if ( DISABLE_MENUS_FOR_INCOMPLETE ){
-				menu_item_itorrents = null;
-			}else{
-				menu_item_itorrents = tableManager.addContextMenuItem(TableManager.TABLE_MYTORRENTS_INCOMPLETE, "upnpmediaserver.contextmenu");
-				menus.add( menu_item_itorrents );
+
+			MenuManager mm = plugin_interface.getUIManager().getMenuManager();
+			
+			String[] menuContexts = {
+				MenuManager.MENU_DOWNLOAD_CONTEXT,
+				MenuManager.MENU_FILE_CONTEXT
+			};
+			
+			for (String menuContext : menuContexts) {
+				MenuItem menu_item_mediaserver = mm.addMenuItem(menuContext,
+						"upnpmediaserver.contextmenu");
+				menus.add(menu_item_mediaserver);
+				menu_item_mediaserver.setStyle(MenuItem.STYLE_MENU);
+				menu_item_mediaserver.addFillListener(new MenuItemFillListener() {
+					public void menuWillBeShown(MenuItem menu, Object data) {
+						boolean visible = false;
+						if (data instanceof Download[]) {
+							Download[] downloads = (Download[]) data;
+							if (downloads.length == 1
+									&& (!DISABLE_MENUS_FOR_INCOMPLETE || downloads[0].isComplete())) {
+								visible = true;
+							}
+						} else if (data instanceof DiskManagerFileInfo[]) {
+							DiskManagerFileInfo[] fileInfos = (DiskManagerFileInfo[]) data;
+							try {
+								if (fileInfos.length == 1
+										&& (!DISABLE_MENUS_FOR_INCOMPLETE || fileInfos[0].getDownload().isComplete())) {
+									visible = true;
+								}
+							} catch (DownloadException e) {
+							}
+						}
+						menu.setVisible(visible);
+					}
+				});
+				menu_item_mediaserver.setSubmenuBuilder(fillTopMenu);
 			}
-			TableContextMenuItem menu_item_ctorrents 	= tableManager.addContextMenuItem(TableManager.TABLE_MYTORRENTS_COMPLETE, "upnpmediaserver.contextmenu");
-			menus.add( menu_item_ctorrents );
-			TableContextMenuItem menu_item_files 		= tableManager.addContextMenuItem(TableManager.TABLE_TORRENT_FILES, "upnpmediaserver.contextmenu");
-			menus.add( menu_item_files );
-			
-				// set menu style
-			
-			if ( menu_item_itorrents != null ){
-				menu_item_itorrents.setStyle(TableContextMenuItem.STYLE_MENU);
-				menu_item_itorrents.addFillListener(fillTopMenu);
-			}
-			menu_item_ctorrents.setStyle(TableContextMenuItem.STYLE_MENU);
-			menu_item_ctorrents.addFillListener(fillTopMenu);
-			menu_item_files.setStyle(TableContextMenuItem.STYLE_MENU);
-			menu_item_files.addFillListener(fillTopMenu);
-			
-			
 		}
 	}
 
-	protected void fillSubMenu(TableContextMenuItem parentMenu) {
-		TableManager tableManager = plugin_interface.getUIManager().getTableManager();
+	protected void fillSubMenu(MenuItem menu) {
+		MenuManager mm = plugin_interface.getUIManager().getMenuManager();
 
 		MenuItemFillListener	menu_fill_simple_listener = 
 				new MenuItemFillListener()
@@ -1095,18 +1096,12 @@ UPnPMediaServer
 					{
 						Object	obj = null;
 						
-						if ( _target instanceof TableRow ){
+						if ( _target instanceof Object[] ){
 							
-							obj = ((TableRow)_target).getDataSource();
+							obj = ((Object []) _target)[0];
 		
 						}else{
-							
-							TableRow[] rows = (TableRow[])_target;
-						     
-							if ( rows.length > 0 ){
-							
-								obj = rows[0].getDataSource();
-							}
+							obj = _target;
 						}
 						
 						if ( obj == null ){
@@ -1130,7 +1125,7 @@ UPnPMediaServer
 								return;
 							}
 
-						}else{
+						}else if (obj instanceof DiskManagerFileInfo){
 							
 							file = (DiskManagerFileInfo)obj;
 							
@@ -1148,80 +1143,6 @@ UPnPMediaServer
 			
 		// play
 		
-		MenuItemListener	menu_listener = 
-			new MenuItemListener()
-			{
-				public void
-				selected(
-					MenuItem		_menu,
-					Object			_target )
-				{
-					Object	obj = ((TableRow)_target).getDataSource();
-					
-					if ( obj == null ){
-						
-						return;
-					}
-					
-					Download				download;
-					DiskManagerFileInfo		file;
-					
-					if ( obj instanceof Download ){
-					
-						download = (Download)obj;
-	
-						file	= download.getDiskManagerFileInfo()[0];
-					
-					}else{
-						
-						file = (DiskManagerFileInfo)obj;
-						
-						try{
-							download	= file.getDownload();
-							
-						}catch( DownloadException e ){	
-							
-							Debug.printStackTrace(e);
-							
-							return;
-						}
-					}
-					
-					String	id = content_directory.createResourceID( download.getTorrent().getHash(), file );
-					
-					System.out.println( "play: " + id );
-
-					UPnPMediaServerContentDirectory.contentItem item = content_directory.getContentFromResourceID( id );
-					
-					if ( item != null ){
-						
-						Iterator	it;
-						
-						synchronized( renderers ){
-							
-							it = new HashSet( renderers ).iterator();
-						}
-							
-						while( it.hasNext()){
-								
-							UPnPMediaRenderer	renderer = (UPnPMediaRenderer)it.next();
-							
-							if ( !renderer.isBusy()){
-								
-								int	stream_id;
-								
-								synchronized( UPnPMediaServer.this ){
-									
-									stream_id	= stream_id_next++;
-								}
-								
-								renderer.play( item, stream_id );
-							}
-						}
-					}
-				}
-			};
-			
 			MenuItemListener	menu_listener_play_external = 
 				new MenuItemListener()
 				{
@@ -1230,19 +1151,18 @@ UPnPMediaServer
 						MenuItem		_menu,
 						Object			_target )
 					{
-						Object	obj = ((TableRow)_target).getDataSource();
-						
-						if ( obj == null ){
+
+						if ( _target == null ){
 							
 							return;
 						}
 						
 						try{
-							play(obj);
+							play(_target);
 							
 						}catch( IPCException e ){
 							
-							log( "Failed to play '" + obj + "'", e );
+							log( "Failed to play '" + _target + "'", e );
 						}
 						
 					}
@@ -1250,100 +1170,18 @@ UPnPMediaServer
 
 			// create play-external items
 		
-		TableContextMenuItem menup = tableManager.addContextMenuItem(parentMenu, "upnpmediaserver.contextmenu.playExternal" );
+		MenuItem menup = mm.addMenuItem(menu, "upnpmediaserver.contextmenu.playExternal" );
 
 			// create play items
 		
-		TableContextMenuItem menuPlay = tableManager.addContextMenuItem(parentMenu, "upnpmediaserver.contextmenu.play" );
-	
-		MenuItemFillListener	menu_fill_listener = 
-			new MenuItemFillListener()
-			{
-				public void
-				menuWillBeShown(
-					MenuItem	menu,
-					Object		_target )
-				{
-					Object	obj = null;
-					
-					if ( _target instanceof TableRow ){
-						
-						obj = ((TableRow)_target).getDataSource();
-	
-					}else{
-						
-						TableRow[] rows = (TableRow[])_target;
-						     
-						if ( rows.length > 0 ){
-						
-							obj = rows[0].getDataSource();
-						}
-					}
-					
-					if ( obj == null ){
-						
-						menu.setEnabled( false );
-
-						return;
-					}
-					
-					Download				download;
-					DiskManagerFileInfo		file;
-					
-					if ( obj instanceof Download ){
-					
-						download = (Download)obj;
-
-						if ( DISABLE_MENUS_FOR_INCOMPLETE && !download.isComplete()){
-							
-							menu.setEnabled( false );
-
-							return;
-						}
-
-					}else{
-						
-						file = (DiskManagerFileInfo)obj;
-						
-						if ( DISABLE_MENUS_FOR_INCOMPLETE && file.getDownloaded() != file.getLength()){
-							
-							menu.setEnabled( false );
-
-							return;
-						}
-					}
-					
-					synchronized( renderers ){
-						
-						boolean	enabled = false;
-						
-						Iterator	it = renderers.iterator();
-						
-						while( it.hasNext()){
-							
-							UPnPMediaRenderer	renderer = (UPnPMediaRenderer)it.next();
-							
-							if ( !renderer.isBusy()){
-								
-								enabled	= true;
-								break;
-							}
-						}
-						
-						menu.setEnabled( enabled );
-					}
-				}
-			};
-		
-		menuPlay.addListener( menu_listener );
-		menuPlay.addFillListener( menu_fill_listener );
+		buildPlayOnRenderersMenuItems(mm, menu);
 		
 		menup.addListener( menu_listener_play_external );
 		menup.addFillListener( menu_fill_simple_listener );
 	
 		// copy to clip
 	
-		menu_listener = 
+		MenuItemListener menu_listener = 
 			new MenuItemListener()
 			{
 				public void
@@ -1351,25 +1189,23 @@ UPnPMediaServer
 					MenuItem		_menu,
 					Object			_target )
 				{
-					Object	obj = ((TableRow)_target).getDataSource();
-					
-					if ( obj == null ){
+					if ( _target == null ){
 						
 						return;
 					}
 					
-					Download				download;
-					DiskManagerFileInfo		file;
+					Download				download = null;
+					DiskManagerFileInfo		file = null;
 					
-					if ( obj instanceof Download ){
+					if ( _target instanceof Download ){
 					
-						download = (Download)obj;
+						download = (Download)_target;
 	
 						file	= download.getDiskManagerFileInfo()[0];
 					
-					}else{
+					}else if (_target instanceof DiskManagerFileInfo){
 						
-						file = (DiskManagerFileInfo)obj;
+						file = (DiskManagerFileInfo)_target;
 						
 						try{
 							download	= file.getDownload();
@@ -1380,6 +1216,10 @@ UPnPMediaServer
 							
 							return;
 						}
+					}
+					
+					if (download == null) {
+						return;
 					}
 					
 					String	id = content_directory.createResourceID( download.getTorrent().getHash(), file );
@@ -1403,20 +1243,205 @@ UPnPMediaServer
 				}
 			};
 			
-		TableContextMenuItem menuClip = tableManager.addContextMenuItem(parentMenu, 	"upnpmediaserver.contextmenu.toclipboard" );
+		MenuItem menuClip = mm.addMenuItem(menu, 	"upnpmediaserver.contextmenu.toclipboard" );
 		menuClip.addFillListener( menu_fill_simple_listener );
 		menuClip.addListener( menu_listener );
 
-		TableContextMenuItem menuClipPublic = tableManager.addContextMenuItem(parentMenu, 	"upnpmediaserver.contextmenu.publictoclipboard" );
+		MenuItem menuClipPublic = mm.addMenuItem(menu, 	"upnpmediaserver.contextmenu.publictoclipboard" );
 		menuClipPublic.addFillListener( menu_fill_simple_listener );
 		menuClipPublic.addListener( menu_listener );
 		menuClipPublic.setData("Global");
 		
-		TableContextMenuItem menuClipLocal = tableManager.addContextMenuItem(parentMenu, 	"upnpmediaserver.contextmenu.localtoclipboard" );
+		MenuItem menuClipLocal = mm.addMenuItem(menu, 	"upnpmediaserver.contextmenu.localtoclipboard" );
 		menuClipLocal.addFillListener( menu_fill_simple_listener );
 		menuClipLocal.addListener( menu_listener );
 		menuClipLocal.setData("Local");
 		
+	}
+
+	private void buildPlayOnRenderersMenuItems(MenuManager menuManager,
+			MenuItem menu) {
+
+		MenuItemListener menuPlayOnRenderer_listener = new MenuItemListener() {
+			public void selected(MenuItem _menu, Object _target) {
+
+				if (_target == null) {
+
+					return;
+				}
+
+				Download download = null;
+				DiskManagerFileInfo file = null;
+
+				if (_target instanceof Download) {
+
+					download = (Download) _target;
+
+					file = download.getDiskManagerFileInfo()[0];
+
+				} else if (_target instanceof DiskManagerFileInfo) {
+
+					file = (DiskManagerFileInfo) _target;
+
+					try {
+						download = file.getDownload();
+
+					} catch (DownloadException e) {
+
+						Debug.printStackTrace(e);
+
+						return;
+					}
+				}
+				
+				if (download == null) {
+					return;
+				}
+
+				String id = content_directory.createResourceID(
+						download.getTorrent().getHash(), file);
+
+				System.out.println("play: " + id);
+
+				UPnPMediaServerContentDirectory.contentItem item = content_directory.getContentFromResourceID(id);
+
+				if (item != null) {
+
+					UPnPMediaRenderer renderer = (UPnPMediaRenderer) _menu.getData();
+
+					if (renderer != null && !renderer.isBusy()) {
+
+						int stream_id;
+
+						synchronized (UPnPMediaServer.this) {
+
+							stream_id = stream_id_next++;
+						}
+
+						renderer.play(item, stream_id, new UPnPMediaServerErrorListener() {
+							public void upnpSoapException(UPnPException e) {
+								if (e.fault != null && e.fault.length() > 0) {
+									uiInstance.promptUser("Play Error", e.fault_code + ": "
+											+ e.fault, new String[] {
+										"Ok"
+									}, 0);
+									return;
+								} else if (e.resp_doc != null) {
+									// could do something here
+								}
+								uiInstance.promptUser("Play Error", e.getMessage(), new String[] { "Ok" }, 0);
+							}
+						});
+					}
+				}
+			}
+		};
+
+		MenuItemFillListener menuPlayOnRenderer_fill_listener = new MenuItemFillListener() {
+			public void menuWillBeShown(MenuItem menu, Object _target) {
+				Object obj = null;
+
+				if (_target instanceof Object[]) {
+					obj = ((Object[]) _target)[0];
+				} else {
+					obj = _target;
+				}
+
+				if (obj == null) {
+
+					menu.setEnabled(false);
+
+					return;
+				}
+
+				Download download;
+				DiskManagerFileInfo file;
+
+				if (obj instanceof Download) {
+
+					download = (Download) obj;
+
+					if (DISABLE_MENUS_FOR_INCOMPLETE && !download.isComplete()) {
+
+						menu.setEnabled(false);
+
+						return;
+					}
+
+				} else {
+
+					file = (DiskManagerFileInfo) obj;
+
+					if (DISABLE_MENUS_FOR_INCOMPLETE
+							&& file.getDownloaded() != file.getLength()) {
+
+						menu.setEnabled(false);
+
+						return;
+					}
+				}
+
+				UPnPMediaRenderer renderer = (UPnPMediaRenderer) menu.getData();
+
+				boolean enabled = false;
+
+				if (renderer != null) {
+					if (!renderer.isBusy()) {
+
+						enabled = true;
+					}
+
+					if (renderer instanceof UPnPMediaRendererRemote) {
+						UPnPMediaRendererRemote rendererRemote = (UPnPMediaRendererRemote) renderer;
+						UPnPRootDevice device = rendererRemote.getDevice();
+						String friendlyName = device.getDevice().getFriendlyName();
+						if (friendlyName != null) {
+							String resourceKey = menu.getResourceKey();
+							String defaultTitle = MessageText.getString(resourceKey);
+							menu.setText(defaultTitle + " " + friendlyName);
+						}
+					}
+				}
+
+				menu.setEnabled(enabled);
+			}
+		};
+
+		synchronized (renderers) {
+
+			for (UPnPMediaRenderer renderer : renderers) {
+				if (renderer.isBusy()) {
+					continue;
+				}
+				
+				MenuItem menuPlayOnRenderer = menuManager.addMenuItem(menu,
+						"upnpmediaserver.contextmenu.play");
+
+				if (renderer instanceof UPnPMediaRendererRemote) {
+					UPnPMediaRendererRemote rendererRemote = (UPnPMediaRendererRemote) renderer;
+					UPnPRootDevice rootDevice = rendererRemote.getDevice();
+					UPnPDevice uPnPDevice = rootDevice.getDevice();
+					
+					DeviceManager deviceManager = DeviceManagerFactory.getSingleton();
+					Device device = deviceManager.findDevice(uPnPDevice);
+					if (device != null) {
+						String imageID = device.getImageID();
+						if (imageID != null && imageID.startsWith("http")) {
+							try {
+								menuPlayOnRenderer.setGraphic(new GraphicURI(new URI(imageID)));
+							} catch (URISyntaxException e) {
+							}
+						}
+					}
+				}
+
+				menuPlayOnRenderer.setData(renderer);
+
+				menuPlayOnRenderer.addListener(menuPlayOnRenderer_listener);
+				menuPlayOnRenderer.addFillListener(menuPlayOnRenderer_fill_listener);
+
+			}
+		}
 	}
 
 	public void
@@ -1455,7 +1480,7 @@ UPnPMediaServer
 			
 			for (int i=0;i<menus.size();i++){
 				
-				((TableContextMenuItem)menus.get(i)).remove();
+				menus.get(i).remove();
 			}
 			
 			if ( upnp != null && upnp_listener != null ){
@@ -1594,6 +1619,32 @@ UPnPMediaServer
 			
 			renderers.remove( renderer );
 		}
+	}
+	
+	public UPnPMediaRendererRemote findRendererByIP(String ip) {
+		synchronized( renderers ){
+			for (UPnPMediaRenderer renderer : renderers) {
+				if (renderer instanceof UPnPMediaRendererRemote) {
+					UPnPMediaRendererRemote rendererRemote = (UPnPMediaRendererRemote) renderer;
+					UPnPRootDevice rootDevice = rendererRemote.getDevice();
+					UPnPDevice uPnPDevice = rootDevice.getDevice();
+
+					DeviceManager deviceManager = DeviceManagerFactory.getSingleton();
+					Device device = deviceManager.findDevice(uPnPDevice);
+					if (device != null) {
+						InetAddress address = device.getAddress();
+						if (address != null) {
+							String remoteIP = address.getHostAddress();
+							if (remoteIP.equals(ip)) {
+								System.out.println("FOUND IT " + ip);
+								return rendererRemote;
+							}
+						}
+					}
+				}
+			}
+		}
+		return null;
 	}
 	
 	protected List<AzureusContentFilter>
@@ -1847,8 +1898,8 @@ UPnPMediaServer
 		}
 	}
 
-	public String
-	getMimeType(
+	public String[]
+	getMimeTypes(
 		DiskManagerFileInfo	file )
 	
 		throws IPCException
@@ -1861,7 +1912,7 @@ UPnPMediaServer
 			if ( item != null ){
 
 				try{
-					return( item.getContentType());
+					return( item.getContentTypes());
 
 				}catch( Throwable e ){
 
@@ -1869,7 +1920,7 @@ UPnPMediaServer
 				}
 			}
 			
-			return "";
+			return new String[] { "" };
 			
 		} catch (Throwable t) {
 			
@@ -3337,6 +3388,11 @@ UPnPMediaServer
 			throw( new IPCException( "Media server UI not bound" ));
 		}
 		
+		if (obj instanceof TableRow) {
+			TableRow row = (TableRow) obj;
+			obj = row.getDataSource();
+		}
+		
 		if ( obj instanceof Download ){
 		
 			download = (Download)obj;
@@ -3387,11 +3443,11 @@ UPnPMediaServer
 			File playList;
 			String playCode;
 			
-			String content_type = item.getContentType();
-			boolean isQuickTime = content_type.equals("video/quicktime");
+			List content_types = Arrays.asList(item.getContentTypes());
+			boolean isQuickTime = content_types.contains("video/quicktime");
 			boolean forceWMP = false;
-			if ((plugin_interface.getUtilities().isOSX() && (content_type.equals("video/mpeg")
-					|| isQuickTime || content_type.equals("video/x-ms-wmv")))
+			if ((plugin_interface.getUtilities().isOSX() && (content_types.contains("video/mpeg")
+					|| isQuickTime || content_types.contains("video/x-ms-wmv")))
 					|| (isQuickTime && quickTimeAvail)) {
 				
 				File playLists = new File(user_dir, "playlists");

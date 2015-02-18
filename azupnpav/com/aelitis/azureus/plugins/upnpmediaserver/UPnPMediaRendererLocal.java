@@ -25,6 +25,8 @@ package com.aelitis.azureus.plugins.upnpmediaserver;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.ipc.IPCInterface;
 
+import com.aelitis.azureus.plugins.upnpmediaserver.UPnPMediaServerContentDirectory.contentItem;
+
 public class 
 UPnPMediaRendererLocal 
 	implements UPnPMediaRenderer
@@ -75,6 +77,15 @@ UPnPMediaRendererLocal
 			
 			Debug.printStackTrace(e);
 		}
+	}
+	
+	public void
+	play(
+			contentItem item, 
+			int stream_id,
+			UPnPMediaServerErrorListener error_listener) 
+	{
+		play(item, stream_id);
 	}
 	
 	public void 

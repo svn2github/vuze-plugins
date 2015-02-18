@@ -24,15 +24,12 @@ package com.aelitis.azureus.plugins.upnpmediaserver;
 
 import java.util.*;
 
-import org.gudy.azureus2.core3.util.AESemaphore;
-import org.gudy.azureus2.core3.util.AEThread;
-import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.*;
 
-import com.aelitis.net.upnp.UPnPAction;
-import com.aelitis.net.upnp.UPnPActionInvocation;
-import com.aelitis.net.upnp.UPnPRootDevice;
-import com.aelitis.net.upnp.UPnPRootDeviceListener;
-import com.aelitis.net.upnp.UPnPService;
+import com.aelitis.azureus.core.devices.Device;
+import com.aelitis.azureus.core.devices.DeviceManager;
+import com.aelitis.azureus.core.devices.DeviceManagerFactory;
+import com.aelitis.net.upnp.*;
 
 public class 
 UPnPMediaRendererRemote 
@@ -49,6 +46,7 @@ UPnPMediaRendererRemote
 	private String	current_av_id;
 	
 	private AESemaphore	action_sem	= new AESemaphore( "UPnPMediaRenderer:action", 1 );
+	private String[] sinkProtocols;
 	
 	protected
 	UPnPMediaRendererRemote(
@@ -84,21 +82,7 @@ UPnPMediaRendererRemote
 				
 				connection_manager = service;
 		
-				try{
-					UPnPAction	get_info = connection_manager.getAction( "GetProtocolInfo" );
-					
-					UPnPActionInvocation	invoke = get_info.getInvocation();
-					
-					Map	res = invoke.invoke2();
-				
-					String	source 	= (String)res.get( "Source" );
-					String	sink	= (String)res.get( "Sink" );
-
-					log( "    sink protocols: " + sink );
-					
-				}catch( Throwable e ){
-					
-				}
+				fillSinkProtocolList();
 				
 			}else if ( service_type.equals( "urn:schemas-upnp-org:service:AVTransport:1" )){
 				
@@ -111,6 +95,36 @@ UPnPMediaRendererRemote
 		root.addListener( this );
 	}
 	
+	private void fillSinkProtocolList() {
+		try{
+			action_sem.reserve();
+		
+			UPnPAction info = connection_manager.getAction( "GetProtocolInfo" );
+			
+			UPnPActionInvocation invoke = info.getInvocation();
+			
+			Map	res = invoke.invoke2();
+			
+			String	sink 	= (String)res.get( "Sink" );
+			//String	source 	= (String)res.get( "Source" );
+			
+			sinkProtocols = sink.split(",");
+
+		}catch( Throwable e ){
+			
+			sinkProtocols = new String[0];
+			
+			log( "getSupportedSourceProtocols failed: " + e.getMessage());
+			
+			Debug.printStackTrace(e);
+			
+		}finally{
+			
+			action_sem.release();
+		}
+		
+	}
+
 	protected UPnPRootDevice
 	getDevice()
 	{
@@ -124,18 +138,33 @@ UPnPMediaRendererRemote
 	{
 		destroy();
 	}
-	
+
 	public void
 	play(
 		final UPnPMediaServerContentDirectory.contentItem	item,
 		final int											stream_id )
+	{
+		play(item, stream_id, null);
+	}
+
+	public void
+	play(
+		final UPnPMediaServerContentDirectory.contentItem	item,
+		final int											stream_id,
+		final UPnPMediaServerErrorListener error_listener)
 	{
 		new AEThread( "UPnPMediaRenderer:play", true )
 		{
 			public void 
 			runSupport()
 			{
-				playSupport( item, stream_id );
+				try {
+					playSupport( item, stream_id );
+				} catch (UPnPException e) {
+					if (error_listener != null) {
+						error_listener.upnpSoapException(e);
+					}
+				}
 			}
 		}.start();
 	}
@@ -144,6 +173,7 @@ UPnPMediaRendererRemote
 	playSupport(
 		UPnPMediaServerContentDirectory.contentItem		item,
 		int												stream_id )
+	throws UPnPException
 	{
 		try{
 			action_sem.reserve();
@@ -220,30 +250,38 @@ UPnPMediaRendererRemote
 				log( "Can't play on '" + name + "' as no connection manager or av transport" );
 				
 				return;
-			}else{
-				
-				log( "Preparing for connection to '" + name + "'" );
 			}
+				
+			log( "Preparing for connection to '" + name + "'" );
 			
 			UPnPAction	prepare = connection_manager.getAction( "PrepareForConnection" );
 			
 			if (prepare != null) {
-  			UPnPActionInvocation	invoke = prepare.getInvocation();
-  			
-  			invoke.addArgument( "RemoteProtocolInfo", item.getProtocolInfo( "*" ));
-  			invoke.addArgument( "PeerConnectionManager", "" );
-  			invoke.addArgument( "PeerConnectionID", "-1" );
-  			invoke.addArgument( "Direction", "Input" );
-  
-  			Map	res = invoke.invoke2();
-  			
-  			String	connection_id 	= (String)res.get( "ConnectionID" );
-  			String	av_id			= (String)res.get( "AVTransportID" );
-  			String	rcs_id			= (String)res.get( "RcsID" );
-
-  			current_connection_id	= connection_id;
-  			current_av_id			= av_id;
-			} else {
+				String[] contentTypes = item.getContentTypes();
+				String contentType = calculateContentType(contentTypes);
+				if (contentType != null) {
+  				try {
+      			UPnPActionInvocation	invoke = prepare.getInvocation();
+      			
+      			invoke.addArgument( "RemoteProtocolInfo", item.getProtocolInfo(contentType, "*" ));
+      			invoke.addArgument( "PeerConnectionManager", "" );
+      			invoke.addArgument( "PeerConnectionID", "-1" );
+      			invoke.addArgument( "Direction", "Input" );
+      
+      			Map	res = invoke.invoke2();
+      			
+      			String	connection_id 	= (String)res.get( "ConnectionID" );
+      			String	av_id			= (String)res.get( "AVTransportID" );
+      			String	rcs_id			= (String)res.get( "RcsID" );
+    
+      			current_connection_id	= connection_id;
+      			current_av_id			= av_id;
+  				} catch (Exception e) {
+  					log(e.toString());
+  				}
+				}
+			} 
+			if (current_connection_id == null) {
 				UPnPAction actionConnectionIDs = connection_manager.getAction("GetCurrentConnectionIDs");
 				if (actionConnectionIDs != null) {
 					Map res = actionConnectionIDs.getInvocation().invoke2();
@@ -274,7 +312,12 @@ UPnPMediaRendererRemote
 			
 			invoke.addArgument( "InstanceID", current_av_id );
 			invoke.addArgument( "CurrentURI", item.getURI( host, -1 ));
-			invoke.addArgument( "CurrentURIMetaData", "NOT_IMPLEMENTED");
+			//invoke.addArgument( "CurrentURIMetaData", "NOT_IMPLEMENTED");
+			String didl = item.getDIDL(host, stream_id);
+			invoke.addArgument(
+					"CurrentURIMetaData",
+					"&lt;DIDL-Lite xmlns=&quot;urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/&quot; xmlns:dc=&quot;http://purl.org/dc/elements/1.1/&quot; xmlns:upnp=&quot;urn:schemas-upnp-org:metadata-1-0/upnp/&quot;&gt;&lt;item id=&quot;0&quot;&gt;"
+							+ plugin.escapeXML(didl) + "&lt;/item&gt;&lt;/DIDL-Lite&gt;");
 			
 			invoke.invoke();
 			
@@ -297,10 +340,22 @@ UPnPMediaRendererRemote
 			
 			Debug.printStackTrace(e);
 			
+			if (e instanceof UPnPException) {
+				throw (UPnPException) e;
+			}
+			
 		}finally{
 			
 			action_sem.release();
 		}
+	}
+	
+	public String[] getSupportedSourceProtocols() {
+		if (sinkProtocols != null) {
+			return sinkProtocols;
+		}
+		
+		return new String[0];
 	}
 	
 	public boolean
@@ -322,5 +377,17 @@ UPnPMediaRendererRemote
 		String	str )
 	{
 		plugin.log( "Renderer: " + str );
+	}
+
+	public String calculateContentType(String[] contentTypes) {
+		String[] protocols = getSupportedSourceProtocols();
+		for (String type : contentTypes) {
+			for (String protocol : protocols) {
+				if (protocol.startsWith(type, 11)) {
+					return type;
+				}
+			}
+		}
+		return null;
 	}
 }

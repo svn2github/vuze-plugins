@@ -22,6 +22,8 @@
 
 package com.aelitis.azureus.plugins.upnpmediaserver;
 
+import com.aelitis.azureus.plugins.upnpmediaserver.UPnPMediaServerContentDirectory.contentItem;
+
 public interface 
 UPnPMediaRenderer 
 {
@@ -32,7 +34,13 @@ UPnPMediaRenderer
 	play(
 		UPnPMediaServerContentDirectory.contentItem		item,
 		int												stream_id );
-	
+
+	public void 
+	play(
+			contentItem item, 
+			int stream_id,
+			UPnPMediaServerErrorListener error_listener);
+
 	public void
 	destroy();
 }

@@ -114,12 +114,12 @@ UPnPMediaServerContentDirectory
 		{ "lsf",  "video/x-la-asf", 			CONTENT_VIDEO },
 		{ "lsx",  "video/x-la-asf", 			CONTENT_VIDEO },
 		{ "movie","video/x-sgi-movie", 			CONTENT_VIDEO },
-		{ "mkv",  "video/x-matroska", 			CONTENT_VIDEO },
+		{ "mkv",  "video/x-matroska", "video/x-mkv", CONTENT_VIDEO },
 		{ "mp4",  "video/mp4", 					CONTENT_VIDEO },
 		{ "mpg4", "video/mp4", 					CONTENT_VIDEO },
 		{ "flv",  "video/x-flv", 				CONTENT_VIDEO },
 		{ "ts",   "video/MP2T", 				CONTENT_VIDEO },
-		{ "m4v",  "video/m4v", 					CONTENT_VIDEO },
+		{ "m4v",  "video/m4v", "video/mp4",	CONTENT_VIDEO },
 		{ "mts",  "video/MP2T", 				CONTENT_VIDEO },
 		{ "m2ts", "video/MP2T", 				CONTENT_VIDEO },
 		
@@ -1801,7 +1801,7 @@ UPnPMediaServerContentDirectory
 		
 		private boolean		valid;
 				
-		private String		content_type;
+		private String[]		content_types;
 		private String		item_class;
 		
 		protected 
@@ -1821,17 +1821,20 @@ UPnPMediaServerContentDirectory
 				DiskManagerFileInfo		file = content_file.getFile();
 										
 				String	file_name = file.getFile().getName();
+				String extension = FileUtil.getExtension(file_name);
 										
-				int	pos = file_name.lastIndexOf('.');
-				
-				if ( pos != -1 && !file_name.endsWith( "." )){
+				if (extension.length() > 1) {
 					
-					String[]	entry = (String[])ext_lookup_map.get( file_name.substring( pos+1 ).toLowerCase( MessageText.LOCALE_ENGLISH ));
+					String[]	entry = ext_lookup_map.get( extension.substring(1).toLowerCase( MessageText.LOCALE_ENGLISH ));
 				
 					if ( entry != null ){
 						
-						content_type	= entry[1];
-						item_class		= entry[2];
+						int num_types = entry.length - 2;
+						
+						content_types	= new String[num_types];
+						System.arraycopy(entry, 1, content_types, 0, num_types);
+
+						item_class		= entry[entry.length - 1];
 						
 						valid	= true;
 					}
@@ -1839,7 +1842,7 @@ UPnPMediaServerContentDirectory
 				
 				if ( !valid ){
 					
-					content_type	= "unknown/unknown";
+					content_types	= new String[] { "unknown/unknown" };
 					item_class		= CONTENT_UNKNOWN;
 				}
 			}finally{
@@ -2081,6 +2084,7 @@ UPnPMediaServerContentDirectory
 		
 		protected String
 		getProtocolInfo(
+			String content_type,
 			String	attributes )
 		{
 			return( "http-get:*:" + content_type + ":" + attributes );
@@ -2169,9 +2173,13 @@ UPnPMediaServerContentDirectory
 			int			client_type,
 			String		protocol_info_attributes )
 		{
+			String	resource = "";
+
+			for (String content_type : content_types) {
 			LinkedHashMap<String,String>	attributes = new LinkedHashMap<String,String>();
 			
-			attributes.put( "protocolInfo", getProtocolInfo( protocol_info_attributes ));
+				
+			attributes.put( "protocolInfo", getProtocolInfo( content_type, protocol_info_attributes ));
 			attributes.put( "size", String.valueOf( getFile().getLength()));
 			
 			if ( item_class.equals( CONTENT_VIDEO )){
@@ -2215,7 +2223,7 @@ UPnPMediaServerContentDirectory
 				}
 			}
 			
-			String	resource = "<res ";
+			resource += "<res ";
 			
 			Iterator<String>	it = attributes.keySet().iterator();
 			
@@ -2227,6 +2235,7 @@ UPnPMediaServerContentDirectory
 			}
 			
 			resource += ">" + getURI( host, -1 ) + "</res>";
+			}
 			
 			return( resource );
 		}
@@ -2313,10 +2322,10 @@ UPnPMediaServerContentDirectory
 			return( item_class );
 		}
 		
-		protected String
-		getContentType()
+		protected String[]
+		getContentTypes()
 		{
-			return( content_type );
+			return( content_types );
 		}
 		
 		protected void
@@ -2366,7 +2375,7 @@ UPnPMediaServerContentDirectory
 		print(
 			String	indent )
 		{
-			log( indent + getTitle() + ", id=" + getID() + ", class=" + item_class + ", type=" + content_type );
+			log( indent + getTitle() + ", id=" + getID() + ", class=" + item_class + ", type=" + Arrays.toString(content_types) );
 		}
 	}
 
