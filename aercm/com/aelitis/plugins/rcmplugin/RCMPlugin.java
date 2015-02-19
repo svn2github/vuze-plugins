@@ -650,6 +650,16 @@ RCMPlugin
 	
 		throws IPCException
 	{
+		lookupBySize( size, new String[]{ AENetworkClassifier.AT_PUBLIC });
+	}
+	
+	public void
+	lookupBySize(
+		final long		size,
+		final String[]	networks )
+	
+		throws IPCException
+	{
 		RelatedContentUI current_ui = ui;
 		
 		if ( current_ui == null ){
@@ -674,7 +684,7 @@ RCMPlugin
 							
 								current_ui.setUIEnabled( true );
 								
-								current_ui.addSearch( size );
+								current_ui.addSearch( size, networks );
 							}
 						}
 					}
@@ -683,13 +693,24 @@ RCMPlugin
 			
 			current_ui.setUIEnabled( true );
 			
-			current_ui.addSearch( size );
+			current_ui.addSearch( size, networks );
 		}
 	}
 	
 	public void
 	lookupByHash(
 		final byte[]	hash,
+		final String	name )
+	
+		throws IPCException
+	{
+		lookupByHash( hash, new String[]{ AENetworkClassifier.AT_PUBLIC }, name );
+	}
+
+	public void
+	lookupByHash(
+		final byte[]	hash,
+		final String[]	networks,
 		final String	name )
 	
 		throws IPCException
@@ -718,7 +739,7 @@ RCMPlugin
 							
 								current_ui.setUIEnabled( true );
 								
-								current_ui.addSearch( hash, new String[]{ AENetworkClassifier.AT_PUBLIC }, name );
+								current_ui.addSearch( hash, networks, name );
 							}
 						}
 					}
@@ -727,7 +748,7 @@ RCMPlugin
 			
 			current_ui.setUIEnabled( true );
 			
-			current_ui.addSearch( hash, new String[]{ AENetworkClassifier.AT_PUBLIC }, name );
+			current_ui.addSearch( hash, networks, name );
 		}
 	}
 	

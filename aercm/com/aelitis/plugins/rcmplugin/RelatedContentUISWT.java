@@ -1149,13 +1149,20 @@ RelatedContentUISWT
 						
 						for ( Download dl: rows ){
 							
+							String[] networks = PluginCoreUtils.unwrap( dl ).getDownloadState().getNetworks();
+							
+							if ( networks == null || networks.length == 0 ){
+								
+								networks = new String[]{ AENetworkClassifier.AT_PUBLIC };
+							}
+							
 							if ( dl.getDiskManagerFileCount() == 1 ){
 								
 								long len = dl.getDiskManagerFileInfo(0).getLength();
 								
 								if ( len >= RelatedContentManager.FILE_ASSOC_MIN_SIZE ){
 
-									explicitSearch( len );
+									explicitSearch( len, networks );
 								}
 							}
 						}
@@ -1227,7 +1234,20 @@ RelatedContentUISWT
 							
 							if ( file.getLength() >= RelatedContentManager.FILE_ASSOC_MIN_SIZE ){
 							
-								explicitSearch( file.getLength());
+								String[] networks = null;
+								
+								try{
+									networks = PluginCoreUtils.unwrap( file.getDownload()).getDownloadState().getNetworks();
+									
+								}catch( Throwable e ){
+								}
+								
+								if ( networks == null || networks.length == 0 ){
+									
+									networks = new String[]{ AENetworkClassifier.AT_PUBLIC };
+								}
+								
+								explicitSearch( file.getLength(), networks );
 							}
 						}
 					}
@@ -1244,9 +1264,10 @@ RelatedContentUISWT
 	
 	protected void
 	explicitSearch(
-		long			file_size )
+		long			file_size,
+		String[]		networks )
 	{
-		addSearch( file_size );
+		addSearch( file_size, networks );
 	}
 	
 	protected void
@@ -1519,6 +1540,24 @@ RelatedContentUISWT
 									
 									if ( value != null && value.length() > 0 ){
 										
+										value = value.trim();
+										
+										String[] networks = new String[]{ AENetworkClassifier.AT_PUBLIC };
+										
+										String[] bits = value.split( ":", 2 );
+										
+										if ( bits.length == 2 ){
+											
+											String net = AENetworkClassifier.internalise( bits[0].trim() );
+											
+											if ( net != null ){
+												
+												networks[0] = net;
+												
+												value = bits[1].trim();
+											}
+										}
+										
 										byte[] hash = UrlUtils.decodeSHA1Hash( value.trim());
 										
 										if ( hash == null ){
@@ -1550,13 +1589,14 @@ RelatedContentUISWT
 										}
 										if ( hash != null ){
 										
-											addSearch( hash, new String[]{ AENetworkClassifier.AT_PUBLIC }, ByteFormatter.encodeString( hash ));
+											addSearch( hash, networks, ByteFormatter.encodeString( hash ));
 											
 											ok = true;
 										}
 									}
 									
 									if ( !ok ){
+										
 										MessageBox mb = new MessageBox( Utils.findAnyShell(), SWT.ICON_ERROR | SWT.OK);
 										
 										mb.setText( MessageText.getString( "rcm.menu.findbyhash.invalid.title" ));
@@ -1599,12 +1639,28 @@ RelatedContentUISWT
 										
 										value = value.replaceAll( ",", "" ).trim();
 										
+										String[] networks = new String[]{ AENetworkClassifier.AT_PUBLIC };
+										
+										String[] bits = value.split( ":" );
+										
+										if ( bits.length == 2 ){
+											
+											String net = AENetworkClassifier.internalise( bits[0].trim() );
+											
+											if ( net != null ){
+												
+												networks[0] = net;
+												
+												value = bits[1].trim();
+											}
+										}
+										
 										try{
 											long	file_size = Long.parseLong( value );
 										
 											if ( file_size >= RelatedContentManager.FILE_ASSOC_MIN_SIZE ){
 												
-												addSearch( file_size );
+												addSearch( file_size, networks );
 											
 												ok = true;
 											}
@@ -1801,7 +1857,8 @@ RelatedContentUISWT
 	
 	public void
 	addSearch(
-		final long 			file_size )
+		final long 			file_size,
+		final String[]		networks )
 	{
 		final String name = MessageText.getString( "rcm.label.filesize" ) + ": " + file_size;
 		
@@ -1814,7 +1871,7 @@ RelatedContentUISWT
 				
 				if (  existing_si == null ){
 		
-					final RCMItem new_si = new RCMItemContent( dummy_hash, new String[]{ AENetworkClassifier.AT_PUBLIC }, file_size );
+					final RCMItem new_si = new RCMItemContent( dummy_hash, networks, file_size );
 					
 					rcm_item_map.put( dummy_hash, new_si );
 					
