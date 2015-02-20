@@ -807,6 +807,8 @@ RatingsUpdater
 								
 								if ( stats_chat != null ){
 									
+									stats_chat.setSharedNickname( false );
+									
 									Map<String,Object>	flags 	= new HashMap<String, Object>();
 									
 									flags.put( BuddyPluginBeta.FLAGS_MSG_ORIGIN_KEY, BuddyPluginBeta.FLAGS_MSG_ORIGIN_RATINGS );
@@ -1541,22 +1543,25 @@ RatingsUpdater
 					runSupport() 
 					{
 						Map<String,Object> peek_data = BuddyPluginUtils.peekChat( download );
-												
-						Number	message_count 	= (Number)peek_data.get( "m" );
-						Number	node_count 		= (Number)peek_data.get( "n" );
-						
-						if ( message_count != null && node_count != null ){
 							
-							if ( message_count.intValue() > 0 ){
+						if ( peek_data != null ){
+							
+							Number	message_count 	= (Number)peek_data.get( "m" );
+							Number	node_count 		= (Number)peek_data.get( "n" );
+							
+							if ( message_count != null && node_count != null ){
 								
-								BuddyPluginBeta.ChatInstance chat = BuddyPluginUtils.getChat( download );
-			
-								if ( chat != null ){
+								if ( message_count.intValue() > 0 ){
 									
-									chat.setAutoNotify( true );
+									BuddyPluginBeta.ChatInstance chat = BuddyPluginUtils.getChat( download );
+				
+									if ( chat != null ){
+										
+										chat.setAutoNotify( true );
+									}
 								}
-							}
-						}		
+							}	
+						}
 					}
 				});
 		}
