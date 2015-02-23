@@ -26,33 +26,38 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.io.*;
 
+import org.parg.azureus.plugins.networks.i2p.I2PHelperPlugin;
+
 import net.i2p.data.Base32;
 import net.i2p.data.Destination;
 
 public class 
 I2PHelperHostnameService 
 {
-	private File		hosts;
+	private I2PHelperPlugin		plugin;
+	private File				hosts;
 	
 	private Map<String,String>	cache = new HashMap<String, String>();
 	
 	public
 	I2PHelperHostnameService(
-		File		plugin_dir )
+		I2PHelperPlugin		_plugin,
+		File				plugin_dir )
 	{
-		hosts = new File( plugin_dir, "i2hostetag.b32.txt" );
+		plugin	= _plugin;
+		hosts 	= new File( plugin_dir, "i2hostetag.b32.txt" );
 	}
 
 	public String
 	lookup(
-		String 	hostname )
+		String 	_hostname )
 	{
 		if ( !hosts.exists()){
 			
 			return( null );
 		}
 		
-		hostname = hostname.toLowerCase( Locale.US );
+		String hostname = _hostname.toLowerCase( Locale.US );
 			
 		if ( !hostname.endsWith( ".i2p" )){
 			
@@ -101,6 +106,8 @@ I2PHelperHostnameService
 								String result = bits[1] + ".b32.i2p";
 								
 								cache.put( hostname, result );
+								
+								plugin.log( "Resolved " + _hostname + " to " + result );
 								
 								return( result );
 							}

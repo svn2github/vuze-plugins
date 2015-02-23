@@ -345,8 +345,6 @@ I2PHelperPlugin
 				
 				throw( new PluginException( "Another instance of Vuze is running, can't initialize plugin" ));
 			}
-
-			hostname_service = new I2PHelperHostnameService( plugin_dir );
 			
 			loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
 			
@@ -389,7 +387,9 @@ I2PHelperPlugin
 							}
 						}
 					});
-					
+				
+			hostname_service = new I2PHelperHostnameService( this, plugin_dir );
+
 			plugin_config = plugin_interface.getPluginconfig();
 						
 			config_model = ui_manager.createBasicPluginConfigModel( "plugins", "azi2phelper.name" );
