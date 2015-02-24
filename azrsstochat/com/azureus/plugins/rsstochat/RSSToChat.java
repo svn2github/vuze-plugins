@@ -28,11 +28,9 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
 
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.Base32;
-import org.gudy.azureus2.core3.util.ByteArrayHashMap;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.DisplayFormatters;
 import org.gudy.azureus2.core3.util.FileUtil;
@@ -303,7 +301,8 @@ RSSToChat
 				String 	source;
 				boolean	is_rss;
 				
-				Pattern	desc_link_pattern = null;
+				Pattern	desc_link_pattern 	= null;
+				String	link_type			= "magnet";
 				
 				if ( rss_node != null && subs_node == null ){
 					
@@ -349,7 +348,21 @@ RSSToChat
 					}
 
 					String name = name_node.getValue().trim();
+					
+					SimpleXMLParserDocumentNode link_type_node = subs_node.getChild( "link_type" );
 
+					if ( link_type_node != null ){
+													
+						link_type = link_type_node.getValue().trim().toLowerCase( Locale.US );
+						
+						if ( link_type.equals( "hash" ) || link_type.equals( "details_url") || link_type.equals( "download_url")){
+							
+						}else{
+						
+							throw( new Exception( "<link_type> value '" + link_type + "' is invalid" ));
+						}
+					}
+					
 					source 	= name;
 					is_rss	= false;
 				}else{
@@ -441,7 +454,7 @@ RSSToChat
 					}
 				}
 				
-				Mapping mapping = new Mapping( source, is_rss, desc_link_pattern, network, key, type, refresh_mins );
+				Mapping mapping = new Mapping( source, is_rss, desc_link_pattern, link_type, network, key, type, refresh_mins );
 				
 				log( "    Mapping: " + mapping.getOverallName());
 				
@@ -800,6 +813,7 @@ RSSToChat
 	
 	private boolean
 	updateSubscription(
+		Mapping			mapping,
 		String			subscription_name,
 		ChatInstance	chat,
 		History			history )
@@ -917,20 +931,48 @@ RSSToChat
 					long	size 		= (Long)props.get( SearchResult.PR_SIZE );
 					long	seeds		= (Long)props.get( SearchResult.PR_SEED_COUNT );
 					long	leechers	= (Long)props.get( SearchResult.PR_LEECHER_COUNT );
-													
-					if ( hash == "" && dl_link == null ){
 						
-						continue;
+					if ( mapping.link_type.equals( "details_url" ) || mapping.link_type.equals( "download_url" )){
+						
+						if ( mapping.link_type.equals( "details_url" )){
+							
+							if ( cdp_link == null ){
+								
+								continue;
+							}
+							
+							dl_link = null;
+							
+						}else{
+							
+							if ( dl_link == null ){
+								
+								continue;
+							}
+						}
+						
+						String magnet = buildMagnetHead( dl_link, "", title );
+						
+						magnet = buildMagnetTail(magnet, dl_link, cdp_link, title, size, result_time, seeds, leechers );
+							
+						chat.sendMessage( magnet, new HashMap<String, Object>());
+						
+					}else{
+						
+						if ( hash == "" && dl_link == null ){
+							
+							continue;
+						}
+							
+						int	length_rem = MAX_MESSAGE_SIZE;
+						
+						String magnet = buildMagnetHead( dl_link, hash, title );
+						
+						magnet = buildMagnetTail(magnet, dl_link, cdp_link, title, size, result_time, seeds, leechers );
+						
+						chat.sendMessage( magnet, new HashMap<String, Object>());
 					}
-						
-					int	length_rem = MAX_MESSAGE_SIZE;
 					
-					String magnet = buildMagnetHead( dl_link, hash, title );
-					
-					magnet = buildMagnetTail(magnet, dl_link, cdp_link, title, size, result_time, seeds, leechers );
-						
-					chat.sendMessage( magnet, new HashMap<String, Object>());
-
 					history.setPublished( history_key, result_time );
 					
 					posted++;
@@ -1111,6 +1153,7 @@ RSSToChat
 		private final String		source;
 		private final boolean		is_rss;
 		private final Pattern		desc_link_pattern;
+		private final String		link_type;
 		private final int			type;
 		private final String		network;
 		private final String		key;
@@ -1127,6 +1170,7 @@ RSSToChat
 			String			_source,
 			boolean			_is_rss,
 			Pattern			_desc_link_pattern,
+			String			_link_type,
 			String			_network,
 			String			_key,
 			int				_type,
@@ -1135,6 +1179,7 @@ RSSToChat
 			source				= _source;
 			is_rss				= _is_rss;
 			desc_link_pattern	= _desc_link_pattern;
+			link_type			= _link_type;
 			network				= _network;
 			key					= _key;
 			type				= _type;
@@ -1256,7 +1301,7 @@ RSSToChat
 							
 						}else{
 							
-							retry_outstanding = updateSubscription( source, chat_instance, history );
+							retry_outstanding = updateSubscription( this, source, chat_instance, history );
 						}
 					}finally{
 						
