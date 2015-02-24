@@ -819,7 +819,7 @@ RatingsUpdater
 									
 									SimpleTimer.addEvent(
 										"Rating:chat:closer",
-										15*60*1000,
+										SystemTime.getCurrentTime() + 15*60*1000,
 										new TimerEventPerformer(){
 											
 											public void perform(TimerEvent event){
@@ -933,6 +933,10 @@ RatingsUpdater
 		
 		flags.put( BuddyPluginBeta.FLAGS_MSG_ORIGIN_KEY, BuddyPluginBeta.FLAGS_MSG_ORIGIN_RATINGS );
 		
+			// update oneday to use constants
+		
+		flags.put( "f", 1 );
+
 		Map<String,Object>	options = new HashMap<String, Object>();
 		
 		for ( String msg: msg_map.values()){

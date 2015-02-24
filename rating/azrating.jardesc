@@ -11,13 +11,11 @@
         </sealing>
     </manifest>
     <selectedElements exportClassFiles="true" exportJavaFiles="true" exportOutputFolder="false">
-        <file path="/azrating/changelog.txt"/>
-        <javaElement handleIdentifier="=azrating/&lt;com.aelitis.azureus.plugins.rating.internat"/>
-        <javaElement handleIdentifier="=azrating/&lt;com.aelitis.azureus.plugins.rating"/>
         <javaElement handleIdentifier="=azrating/&lt;com.aelitis.azureus.plugins.rating.ui"/>
-        <file path="/azrating/plugin.properties"/>
-        <javaElement handleIdentifier="=azrating/&lt;com.aelitis.azureus.plugins.rating.ui.icons"/>
         <javaElement handleIdentifier="=azrating/&lt;com.aelitis.azureus.plugins.rating.updater"/>
+        <file path="/azrating/plugin.properties"/>
+        <javaElement handleIdentifier="=azrating/&lt;com.aelitis.azureus.plugins.rating"/>
+        <javaElement handleIdentifier="=azrating/&lt;com.aelitis.azureus.plugins.rating.internat"/>
+        <javaElement handleIdentifier="=azrating/&lt;com.aelitis.azureus.plugins.rating.ui.icons"/>
     </selectedElements>
-    <fatjar builder="org.eclipse.jdt.ui.plain_jar_builder" launchConfig=""/>
 </jardesc>
