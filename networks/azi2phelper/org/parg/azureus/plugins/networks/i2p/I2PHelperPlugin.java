@@ -32,6 +32,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -60,6 +61,8 @@ import net.i2p.client.streaming.I2PSocketOptions;
 import net.i2p.data.Base32;
 import net.i2p.data.Base64;
 import net.i2p.data.Destination;
+import net.i2p.util.NativeBigInteger;
+import net.i2p.util.NativeBigInteger.ModPowLimiter;
 
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.torrent.TOTorrent;
@@ -184,6 +187,48 @@ I2PHelperPlugin
 		    
         UDPReceiver - hacked in a sleep(1000) after detection of exception on reading socket to avoid 100% CPU issue
         // 0.9.16 has some core changes to hopefully prevent this, so no hack required!
+        
+        	NativeBigInteger: added some temporary load limit support
+        	
+            public interface
+		    ModPowLimiter
+		    {
+		    	public void
+		    	handleCall(
+		    		long		start,
+		    		long		end );
+		    }
+		    
+		    private static volatile ModPowLimiter	mod_pow_limiter = 
+		    		new ModPowLimiter() {
+						
+						@Override
+						public void handleCall(long start,long end) {
+						}
+					}; 
+		    
+			public static void
+			setModPowLimiter(
+				ModPowLimiter	l )
+			{
+				mod_pow_limiter = l;
+			}
+			
+		    @Override
+		    public BigInteger modPow(BigInteger exponent, BigInteger m) {
+		        // jbigi.c convert_j2mp() and convert_mp2j() do NOT currently support negative numbers
+		        // Where negative or zero values aren't legal in modPow() anyway, avoid native,
+		        // as the Java code will throw an exception rather than silently fail
+		    	BigInteger result;
+		    	long start = System.nanoTime();
+		        if (_nativeOk && signum() >= 0 && exponent.signum() >= 0 && m.signum() > 0)
+		        	result = new NativeBigInteger(nativeModPow(toByteArray(), exponent.toByteArray(), m.toByteArray()));
+		        else
+		            result = super.modPow(exponent, m);
+		        
+		        mod_pow_limiter.handleCall( start, System.nanoTime());
+		        return( result );
+		    }
 	*/
 	
 	private static final String	BOOTSTRAP_SERVER = "http://i2pboot.vuze.com:60000/?getNodes=true";
@@ -349,6 +394,86 @@ I2PHelperPlugin
 			loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
 			
 			log	= plugin_interface.getLogger().getTimeStampedChannel( "I2PHelper");
+			
+			NativeBigInteger.setModPowLimiter(
+					new NativeBigInteger.ModPowLimiter()
+					{
+						private final int num_processors = Math.max( 1, Runtime.getRuntime().availableProcessors());
+						
+						private final int	ms_total = 1000*num_processors;
+						private final int	ms_avail = ms_total/10;	// allowable cpu
+						
+						private long	call_time;
+						private long	call_count;
+						
+						private long	current_sleep = -1;
+						private long	last_logged_sleep;
+						
+						@Override
+						public void 
+						handleCall(
+							long 	start,
+							long	end )
+						{
+							synchronized( this ){
+								
+								call_count++;
+								
+								call_time	+= end - start;
+								
+								long	sleep;
+								
+								if ( current_sleep == -1 || call_count == 1000 ){
+																
+									long average = (call_time/call_count)/1000000;
+									
+									if ( average == 0 ){
+										
+										average = 1;
+									}
+									
+									long calls_per_sec = ms_avail/average;
+									
+									sleep = 1000/calls_per_sec;
+									
+									if ( sleep <= 0 ){
+										
+										sleep = 1;
+										
+									}else if ( sleep > 100 ){
+										
+										sleep = 100;
+									}
+									
+									if ( call_count == 1000 ){
+										
+										call_time 	= 0;
+										call_count	= 0;
+										
+										current_sleep = sleep;
+										
+										if ( sleep != last_logged_sleep ){
+										
+											last_logged_sleep = sleep;
+											
+											log( "CPU throttle=" + sleep + "ms" );
+										}
+									}
+								}else{
+									
+									sleep = current_sleep;
+								}
+																														
+								try{
+									Thread.sleep( sleep );
+									
+								}catch( Throwable e ){
+									
+								}
+							}
+						}
+					});
+				
 			
 			final UIManager	ui_manager = plugin_interface.getUIManager();
 
