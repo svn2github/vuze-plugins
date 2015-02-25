@@ -68,9 +68,11 @@ import org.gudy.azureus2.plugins.ui.config.StringParameter;
 import org.gudy.azureus2.plugins.ui.menus.*;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
-import org.gudy.azureus2.plugins.ui.tables.TableContextMenuItem;
 import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.plugins.ui.tables.TableRow;
+import org.gudy.azureus2.plugins.ui.toolbar.UIToolBarActivationListener;
+import org.gudy.azureus2.plugins.ui.toolbar.UIToolBarItem;
+import org.gudy.azureus2.plugins.ui.toolbar.UIToolBarManager;
 import org.gudy.azureus2.plugins.utils.DelayedTask;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.gudy.azureus2.plugins.utils.PowerManagementListener;
@@ -90,6 +92,7 @@ import com.aelitis.azureus.core.content.AzureusContentDownload;
 import com.aelitis.azureus.core.content.AzureusContentFile;
 import com.aelitis.azureus.core.content.AzureusContentFilter;
 import com.aelitis.azureus.core.devices.*;
+import com.aelitis.azureus.core.devices.impl.DeviceUPnPImpl;
 import com.aelitis.azureus.core.util.CopyOnWriteList;
 import com.aelitis.azureus.core.util.UUIDGenerator;
 import com.aelitis.azureus.plugins.upnp.UPnPMapping;
@@ -97,10 +100,11 @@ import com.aelitis.azureus.plugins.upnp.UPnPPlugin;
 import com.aelitis.azureus.plugins.upnpmediaserver.ui.UPnPMediaServerUI;
 import com.aelitis.net.upnp.*;
 import com.aelitis.azureus.plugins.upnpmediaserver.UPnPMediaServerContentDirectory.*;
+import com.aelitis.azureus.ui.common.ToolBarItem;
 
 public class 
 UPnPMediaServer 
-	implements UnloadablePlugin, AzureusContentDirectoryListener, PowerManagementListener
+	implements UnloadablePlugin, AzureusContentDirectoryListener, PowerManagementListener, UIDataSourceListener
 {
 	private static final int		HTTP_PORT_DEFAULT				= 6901;
 	
@@ -681,7 +685,9 @@ UPnPMediaServer
 						if ( instance.getUIType() == UIInstance.UIT_SWT ){	
 					
 							ui_manager.removeUIListener( this );
-							
+
+							ui_manager.addDataSourceListener(UPnPMediaServer.this, false);
+
 							log( "SWT user interface bound" );
 							
 							try{
@@ -1276,8 +1282,8 @@ UPnPMediaServer
 				if (_target instanceof Download) {
 
 					download = (Download) _target;
-
-					file = download.getDiskManagerFileInfo()[0];
+					
+					file = download.getPrimaryFile();
 
 				} else if (_target instanceof DiskManagerFileInfo) {
 
@@ -1297,43 +1303,11 @@ UPnPMediaServer
 				if (download == null) {
 					return;
 				}
+				
+				UPnPMediaRenderer renderer = (UPnPMediaRenderer) _menu.getData();
 
-				String id = content_directory.createResourceID(
-						download.getTorrent().getHash(), file);
+				playOnRenderer(renderer, download, file);
 
-				System.out.println("play: " + id);
-
-				UPnPMediaServerContentDirectory.contentItem item = content_directory.getContentFromResourceID(id);
-
-				if (item != null) {
-
-					UPnPMediaRenderer renderer = (UPnPMediaRenderer) _menu.getData();
-
-					if (renderer != null && !renderer.isBusy()) {
-
-						int stream_id;
-
-						synchronized (UPnPMediaServer.this) {
-
-							stream_id = stream_id_next++;
-						}
-
-						renderer.play(item, stream_id, new UPnPMediaServerErrorListener() {
-							public void upnpSoapException(UPnPException e) {
-								if (e.fault != null && e.fault.length() > 0) {
-									uiInstance.promptUser("Play Error", e.fault_code + ": "
-											+ e.fault, new String[] {
-										"Ok"
-									}, 0);
-									return;
-								} else if (e.resp_doc != null) {
-									// could do something here
-								}
-								uiInstance.promptUser("Play Error", e.getMessage(), new String[] { "Ok" }, 0);
-							}
-						});
-					}
-				}
 			}
 		};
 
@@ -1444,6 +1418,67 @@ UPnPMediaServer
 		}
 	}
 
+	protected void playOnRenderer(UPnPMediaRenderer renderer, Download download,
+			DiskManagerFileInfo file) {
+		
+		byte[] hash;
+		
+		try {
+			hash = file.getDownloadHash();
+		} catch (DownloadException e1) {
+			if (download == null) {
+				return;
+			}
+			hash = download.getTorrentHash();
+		}
+		String id = content_directory.createResourceID(hash, file);
+
+		System.out.println("play: " + id);
+
+		UPnPMediaServerContentDirectory.contentItem item = content_directory.getContentFromResourceID(id);
+
+		if (item != null) {
+
+			if (renderer != null && !renderer.isBusy()) {
+
+				int stream_id;
+
+				synchronized (UPnPMediaServer.this) {
+
+					stream_id = stream_id_next++;
+				}
+
+				renderer.play(item, stream_id, new UPnPMediaServerErrorListener() {
+					public void upnpSoapException(UPnPException e) {
+						String title = MessageText.getString("upnpmediaserver.playto.error.title");
+						if (e.fault != null && e.fault.length() > 0) {
+							uiInstance.promptUser(title, e.fault_code + ": " + e.fault,
+									new String[] {
+										"Ok"
+									}, 0);
+							return;
+						} else if (e.resp_doc != null) {
+							// could do something here
+						}
+						Throwable cause = e.getCause();
+						if (cause instanceof SocketTimeoutException) {
+							uiInstance.promptUser(
+									title,
+									MessageText.getString("upnpmediaserver.playto.error.timeout"),
+									new String[] {
+										"Ok"
+									}, 0);
+							return;
+						}
+						uiInstance.promptUser(title, e.getMessage(), new String[] {
+							"Ok"
+						}, 0);
+					}
+				});
+			}
+		}
+	}
+
 	public void
 	unload()
 	{
@@ -1512,6 +1547,15 @@ UPnPMediaServer
 				}
 			}
 			
+			
+			UIToolBarManager tbm = uiInstance.getToolBarManager();
+			if (tbm != null) {
+  			for (UPnPMediaRenderer renderer : renderers) {
+					tbm.removeToolBarItem("" + renderer.hashCode());
+  			}
+			}
+
+			
 			Set<UPnPMediaRenderer> rends;
 			
 			synchronized( renderers ){
@@ -1541,7 +1585,14 @@ UPnPMediaServer
 			if ( plugin_interface != null ){
 			
 				plugin_interface.getUtilities().removePowerManagementListener( this );
+
+				UIManager	ui_manager = plugin_interface.getUIManager();
+				if (ui_manager != null) {
+					ui_manager.removeDataSourceListener(this);
+				}
 			}
+			
+
 
 		}catch( Throwable e ){
 			
@@ -1619,8 +1670,132 @@ UPnPMediaServer
 			
 			renderers.remove( renderer );
 		}
+		UIToolBarManager tbm = uiInstance.getToolBarManager();
+		tbm.removeToolBarItem("" + renderer.hashCode());
 	}
-	
+
+	protected void 
+	addRenderer(
+			final UPnPMediaRenderer new_renderer)
+	{
+		synchronized (renderers) {
+
+			renderers.add( new_renderer );
+		}
+		
+		UIManager	ui_manager = plugin_interface.getUIManager();
+		
+		UIToolBarManager tbm = uiInstance.getToolBarManager();
+		final UIToolBarItem toolBarItem = tbm.createToolBarItem("" + new_renderer.hashCode());
+		dataSourceChanged(ui_manager.getDataSource()); // sets enabled
+		toolBarItem.setDefaultActivationListener(new UIToolBarActivationListener() {
+			public boolean toolBarItemActivated(ToolBarItem item, long activationType,
+					Object datasource) {
+
+				Object singleDS = null;
+				
+				if (datasource instanceof Object[]) {
+					if (((Object[]) datasource).length == 1) {
+						singleDS = ((Object[]) datasource)[0];
+					} else {
+						return false;
+					}
+				} else if (datasource != null) {
+					singleDS = datasource;
+				}
+
+				Download download = null;
+				DiskManagerFileInfo file = null;
+
+				if (singleDS instanceof Download) {
+					download = (Download) singleDS;
+					file	= download.getDiskManagerFileInfo()[0];
+				} else if (singleDS instanceof DiskManagerFileInfo) {
+
+					file = (DiskManagerFileInfo) singleDS;
+				
+					try{
+						download	= file.getDownload();
+						
+					}catch( DownloadException e ){	
+						return false;
+					}
+				} else if (singleDS instanceof TranscodeFile) {
+					try{
+						file = ((TranscodeFile) singleDS).getTargetFile();
+						download	= file.getDownload();
+						
+					}catch( Exception e ){	
+					}
+				} else {
+					return false;
+				}
+					
+
+				playOnRenderer(new_renderer, download, file);
+
+				return true;
+			}
+		});
+		toolBarItem.setImageID("image.sidebar.device.samsung.big");
+		
+    if (new_renderer instanceof UPnPMediaRendererRemote) {
+    	UPnPMediaRendererRemote rendererRemote = (UPnPMediaRendererRemote) new_renderer;
+
+			UPnPRootDevice rootDevice = rendererRemote.getDevice();
+			final UPnPDevice upnpDevice = rootDevice.getDevice();
+
+    	// set tooltip
+    	toolBarItem.setToolTip("Play to " + upnpDevice.getFriendlyName());
+
+			final DeviceManager deviceManager = DeviceManagerFactory.getSingleton();
+			Device device = deviceManager.findDevice(upnpDevice);
+			if (device != null) {
+				String imageID = device.getImageID();
+				if (imageID != null) {
+					toolBarItem.setImageID(imageID);
+				}
+			} else {
+				deviceManager.addListener(new DeviceManagerListener() {
+					
+					public void deviceRemoved(Device device) {
+					}
+					
+					public void deviceManagerLoaded() {
+					}
+					
+					public void deviceChanged(Device device) {
+						checkForImage(device);
+					}
+					
+					public void deviceAttentionRequest(Device device) {
+					}
+					
+					public void deviceAdded(Device device) {
+						checkForImage(device);
+					}
+					
+					public void checkForImage(Device device) {
+						if (device instanceof DeviceUPnPImpl) {
+							DeviceUPnPImpl deviceUPnP = (DeviceUPnPImpl) device;
+							UPnPDevice uPnPDevice2 = deviceUPnP.getUPnPDevice();
+							if (upnpDevice.equals(uPnPDevice2)) {
+								deviceManager.removeListener(this);
+								String imageID = device.getImageID();
+								if (imageID != null) {
+									toolBarItem.setImageID(imageID);
+								}
+							}
+						}
+					}
+				});
+			}
+    }
+    
+
+		tbm.addToolBarItem(toolBarItem);
+	}
+
 	public UPnPMediaRendererRemote findRendererByIP(String ip) {
 		synchronized( renderers ){
 			for (UPnPMediaRenderer renderer : renderers) {
@@ -1750,14 +1925,12 @@ UPnPMediaServer
 		IPCInterface	callback )
 	{
 		UPnPMediaRendererLocal	renderer = new UPnPMediaRendererLocal( this, callback );
-		
-		synchronized( renderers ){
-			
-			renderers.add( renderer );
-		}
-		
+
+		addRenderer(renderer);
+
 		return( renderer.getID());
 	}
+	
 	
 	public long
 	getStreamBufferBytes(
@@ -2539,7 +2712,7 @@ UPnPMediaServer
 									
 									new_renderer = new UPnPMediaRendererRemote( UPnPMediaServer.this, device );
 									
-									renderers.add( new_renderer );
+									addRenderer(new_renderer);
 								}
 								
 								if ( unloaded && new_renderer != null ){
@@ -3975,6 +4148,42 @@ UPnPMediaServer
 			throws IOException
 		{
 			os.write( str.getBytes( "UTF-8" ));
+		}
+	}
+
+	// @see org.gudy.azureus2.plugins.ui.UIDataSourceListener#dataSourceChanged(java.lang.Object)
+	public void dataSourceChanged(Object datasource) {
+		if (uiInstance == null) {
+			return;
+		}
+		UIToolBarManager tbm = uiInstance.getToolBarManager();
+		boolean enable = true;
+		
+		Object singleDS = null;
+		
+		if (datasource instanceof Object[]) {
+			if (((Object[]) datasource).length == 1) {
+				singleDS = ((Object[]) datasource)[0];
+			} else {
+				enable = false;
+			}
+		} else if (datasource != null) {
+			singleDS = datasource;
+		}
+		
+		enable = (singleDS instanceof Download) 
+				|| (singleDS instanceof DiskManagerFileInfo)
+				|| (singleDS instanceof TranscodeFile);
+
+		synchronized( renderers ){
+
+			for (UPnPMediaRenderer renderer : renderers) {
+				UIToolBarItem toolBarItem = tbm.getToolBarItem("" + renderer.hashCode());
+				if (toolBarItem != null) {
+					toolBarItem.setState(enable ? UIToolBarItem.STATE_ENABLED : 0);
+				}
+				
+			}
 		}
 	}
 }
