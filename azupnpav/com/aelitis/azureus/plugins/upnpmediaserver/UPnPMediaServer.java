@@ -1688,6 +1688,7 @@ UPnPMediaServer
 		UIToolBarManager tbm = uiInstance.getToolBarManager();
 		final UIToolBarItem toolBarItem = tbm.createToolBarItem("" + new_renderer.hashCode());
 		dataSourceChanged(ui_manager.getDataSource()); // sets enabled
+		toolBarItem.setGroupID("players");
 		toolBarItem.setDefaultActivationListener(new UIToolBarActivationListener() {
 			public boolean toolBarItemActivated(ToolBarItem item, long activationType,
 					Object datasource) {
