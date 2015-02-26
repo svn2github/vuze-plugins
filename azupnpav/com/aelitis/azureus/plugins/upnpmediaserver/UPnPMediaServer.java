@@ -1391,6 +1391,7 @@ UPnPMediaServer
 				MenuItem menuPlayOnRenderer = menuManager.addMenuItem(menu,
 						"upnpmediaserver.contextmenu.play");
 
+				/* Menu Graphic Disabled: It can be HUUUGE and there is no scaling :(
 				if (renderer instanceof UPnPMediaRendererRemote) {
 					UPnPMediaRendererRemote rendererRemote = (UPnPMediaRendererRemote) renderer;
 					UPnPRootDevice rootDevice = rendererRemote.getDevice();
@@ -1408,6 +1409,7 @@ UPnPMediaServer
 						}
 					}
 				}
+				*/
 
 				menuPlayOnRenderer.setData(renderer);
 
@@ -1812,7 +1814,6 @@ UPnPMediaServer
 						if (address != null) {
 							String remoteIP = address.getHostAddress();
 							if (remoteIP.equals(ip)) {
-								System.out.println("FOUND IT " + ip);
 								return rendererRemote;
 							}
 						}
