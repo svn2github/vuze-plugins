@@ -226,12 +226,18 @@ UPnPMediaRendererRemote
 					try{
 						UPnPAction	complete = connection_manager.getAction( "ConnectionComplete" );
 	
-						UPnPActionInvocation invoke	= complete.getInvocation();
-						
-						invoke.addArgument( "ConnectionID", current_connection_id );
-	
-						invoke.invoke();
-						
+						if ( complete != null ){
+							
+							UPnPActionInvocation invoke	= complete.getInvocation();
+							
+							invoke.addArgument( "ConnectionID", current_connection_id );
+		
+							invoke.invoke();
+							
+						}else{
+							
+							log( "    No complete action available" );
+						}
 					}catch( Throwable e ){
 						
 					}
