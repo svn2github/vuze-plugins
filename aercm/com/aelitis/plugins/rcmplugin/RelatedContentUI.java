@@ -52,5 +52,10 @@ RelatedContentUI
 		String			name );
 
 	public void
+	addSearch(
+		String			expression,
+		String[]		networks );
+	
+	public void
 	destroy();
 }

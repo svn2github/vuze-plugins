@@ -63,6 +63,10 @@ import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.tables.TableContextMenuItem;
 import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.plugins.ui.tables.TableRow;
+import org.gudy.azureus2.plugins.utils.search.SearchInstance;
+import org.gudy.azureus2.plugins.utils.search.SearchObserver;
+import org.gudy.azureus2.plugins.utils.search.SearchProvider;
+import org.gudy.azureus2.plugins.utils.search.SearchResult;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.gudy.azureus2.ui.swt.SimpleTextEntryWindow;
 import org.gudy.azureus2.ui.swt.Utils;
@@ -1686,6 +1690,55 @@ RelatedContentUISWT
 						}
 					});
 			
+			menu_item = menu_manager.addMenuItem( parent_id, "rcm.menu.findbyexpr" );
+			
+			menu_item.addListener( 
+					new MenuItemListener() 
+					{
+						public void 
+						selected(
+							MenuItem menu, Object target ) 
+						{
+							SimpleTextEntryWindow entryWindow = new SimpleTextEntryWindow(
+									"rcm.menu.findbyexpr.title", "rcm.menu.findbyexpr.msg" );
+							
+							entryWindow.prompt(new UIInputReceiverListener() {
+								public void UIInputReceiverClosed(UIInputReceiver entryWindow) {
+									if (!entryWindow.hasSubmittedInput()) {
+										return;
+									}
+									
+									String value = entryWindow.getSubmittedInput();
+									
+									boolean	ok = false;
+									
+									if ( value != null && value.length() > 0 ){
+										
+										value = value.replaceAll( ",", "" ).trim();
+										
+										String[] networks = new String[]{ AENetworkClassifier.AT_PUBLIC };
+										
+										String[] bits = value.split( ":" );
+										
+										if ( bits.length == 2 ){
+											
+											String net = AENetworkClassifier.internalise( bits[0].trim() );
+											
+											if ( net != null ){
+												
+												networks[0] = net;
+												
+												value = bits[1].trim();
+											}
+										}
+																						
+										addSearch( value, networks );
+									}
+								}
+							}); 	
+						}
+					});
+			
 			menu_item = menu_manager.addMenuItem( parent_id, "sep1" );
 
 			menu_item.setStyle( MenuItem.STYLE_SEPARATOR );
@@ -1808,7 +1861,7 @@ RelatedContentUISWT
 									return;
 								}
 								
-								RCMView view = new RCMView( SIDEBAR_SECTION_RELATED_CONTENT, name );
+								RCMView view = new RCMView( SIDEBAR_SECTION_RELATED_CONTENT, name + getNetworkString( networks ));
 								
 								new_si.setView( view );
 								
@@ -1831,6 +1884,8 @@ RelatedContentUISWT
 						}
 					});
 			}else{
+					
+				existing_si.search();
 				
 				Utils.execSWTThread(
 						new Runnable()
@@ -1865,7 +1920,9 @@ RelatedContentUISWT
 		try{
 			synchronized( this ){
 				
-				final byte[]	dummy_hash = String.valueOf( file_size ).getBytes( "UTF-8" );
+				final String net_str = getNetworkString( networks );
+				
+				final byte[]	dummy_hash = (String.valueOf( file_size ) + net_str ).getBytes( "UTF-8" );
 				
 				final RCMItem existing_si = rcm_item_map.get( dummy_hash );
 				
@@ -1888,7 +1945,7 @@ RelatedContentUISWT
 										return;
 									}
 									
-									RCMView view = new RCMView( SIDEBAR_SECTION_RELATED_CONTENT, name );
+									RCMView view = new RCMView( SIDEBAR_SECTION_RELATED_CONTENT, name + getNetworkString( networks ) );
 									
 									new_si.setView( view );
 									
@@ -1904,9 +1961,53 @@ RelatedContentUISWT
 									
 									new_si.setMdiEntry(entry);
 									
-									if (entry instanceof SideBarEntrySWT) {
+									if (entry instanceof SideBarEntrySWT){
+										
 										new_si.setTreeItem( ((SideBarEntrySWT)entry).getTreeItem() );
 									}
+									
+									if ( net_str.length() > 0 ){
+										
+										UIManager			ui_manager = plugin_interface.getUIManager();
+	
+										MenuManager menu_manager = ui_manager.getMenuManager();
+	
+										MenuItem menu_item = menu_manager.addMenuItem( "sidebar." + key, "label.public" );
+	
+										menu_item.addListener(
+											new MenuItemListener() 
+											{
+												public void
+												selected(
+													MenuItem			menu,
+													Object 				target )
+												{
+													addSearch( file_size, new String[]{ AENetworkClassifier.AT_PUBLIC });
+												}
+											});
+										
+										menu_item = menu_manager.addMenuItem( "sidebar." + key, "sep" );
+
+										menu_item.setStyle(MenuItem.STYLE_SEPARATOR );
+									}
+									
+									UIManager			ui_manager = plugin_interface.getUIManager();
+									
+									MenuManager menu_manager = ui_manager.getMenuManager();
+
+									MenuItem menu_item = menu_manager.addMenuItem( "sidebar." + key, "rcm.menu.searchmore" );
+
+									menu_item.addListener(
+										new MenuItemListener() 
+										{
+											public void
+											selected(
+												MenuItem			menu,
+												Object 				target )
+											{
+												addSearch( file_size, networks );
+											}
+										});
 									
 									new_si.activate();
 								}
@@ -1914,6 +2015,8 @@ RelatedContentUISWT
 						});
 				}else{
 					
+					existing_si.search();
+
 					Utils.execSWTThread(
 							new Runnable()
 							{
@@ -1941,6 +2044,114 @@ RelatedContentUISWT
 		}
 	}
 	
+	public void
+	addSearch(
+		final String 		expression,
+		final String[]		networks )
+	{
+		final String name = "'" + expression + "'";
+		
+		try{
+			synchronized( this ){
+				
+				final String net_str = getNetworkString( networks );
+				
+				final byte[]	dummy_hash = (name + net_str ).getBytes( "UTF-8" );
+				
+				final RCMItem existing_si = rcm_item_map.get( dummy_hash );
+				
+				if (  existing_si == null ){
+		
+					final RCMItem new_si = new RCMItemContent( dummy_hash, networks, expression );
+					
+					rcm_item_map.put( dummy_hash, new_si );
+					
+					Utils.execSWTThread(
+						new Runnable()
+						{
+							public void
+							run()
+							{
+								synchronized( RelatedContentUISWT.this ){
+	
+									if ( new_si.isDestroyed()){
+										
+										return;
+									}
+									
+									RCMView view = new RCMView( SIDEBAR_SECTION_RELATED_CONTENT, name + getNetworkString( networks ) );
+									
+									new_si.setView( view );
+									
+									String key = "RCM_" + ByteFormatter.encodeString( dummy_hash );
+									
+									MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
+									
+									MdiEntry	entry = mdi.createEntryFromSkinRef(
+											SIDEBAR_SECTION_RELATED_CONTENT,
+											key, "rcmview",
+											view.getTitle(),
+											view, null, true, null );
+									
+									new_si.setMdiEntry(entry);
+									
+									if (entry instanceof SideBarEntrySWT){
+										
+										new_si.setTreeItem( ((SideBarEntrySWT)entry).getTreeItem() );
+									}
+									
+									UIManager			ui_manager = plugin_interface.getUIManager();
+									
+									MenuManager menu_manager = ui_manager.getMenuManager();
+
+									MenuItem menu_item = menu_manager.addMenuItem( "sidebar." + key, "rcm.menu.searchmore" );
+
+									menu_item.addListener(
+										new MenuItemListener() 
+										{
+											public void
+											selected(
+												MenuItem			menu,
+												Object 				target )
+											{
+												addSearch( expression, networks );
+											}
+										});
+									
+									new_si.activate();
+								}
+							}
+						});
+				}else{
+					
+					existing_si.search();
+
+					Utils.execSWTThread(
+							new Runnable()
+							{
+								public void
+								run()
+								{
+									ViewTitleInfoManager.refreshTitleInfo( existing_si.getView());
+									
+									MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
+									MdiEntry mainEntry = mdi.getEntry(SIDEBAR_SECTION_RELATED_CONTENT );
+									
+									if ( mainEntry != null ){
+										
+										ViewTitleInfoManager.refreshTitleInfo( mainEntry.getViewTitleInfo());
+									}
+									
+									existing_si.activate();
+								}
+							});
+				}
+			}
+		}catch( Throwable e ){
+			
+			Debug.out( e );
+		}
+	}
 	
 	protected class
 	MainViewInfo
@@ -2036,6 +2247,37 @@ RelatedContentUISWT
 		}
 	}
 		
+	private String
+	getNetworkString(
+		String[]		networks )
+	{
+		if ( networks == null || networks.length == 0 ){
+			
+			return( "" );
+			
+		}else if ( networks.length == 1 ){
+			
+			if ( networks[0] != AENetworkClassifier.AT_PUBLIC ){
+				
+				return( " [" + networks[0] + "]" );
+				
+			}else{
+				
+				return( "" );
+			}
+		}else{
+	
+			String str = "";
+			
+			for ( String net: networks ){
+				
+				str += (str.length()==0?"":",") + net;
+			}
+			
+			return( " [" + str + "]" );
+		}
+	}
+	
 	private void
 	lookupSubscriptions()
 	{
@@ -2171,6 +2413,9 @@ RelatedContentUISWT
 		public void
 		activate();
 		
+		public void
+		search();
+		
 		public boolean
 		isDestroyed();
 	}
@@ -2181,6 +2426,8 @@ RelatedContentUISWT
 	{	
 		private byte[]				hash;
 		private long				file_size;
+		private String				expression;
+		
 		private String[]			networks;
 		
 		private RCMView				view;
@@ -2196,7 +2443,9 @@ RelatedContentUISWT
 		
 		private CopyOnWriteList<RelatedContentEnumeratorListener>	listeners = new CopyOnWriteList<RelatedContentEnumeratorListener>();
 		
-		private boolean	lookup_complete;
+		private ByteArrayHashMap<String>	uniques = new ByteArrayHashMap<String>();
+		
+		private int		lookup_starts;
 		
 		protected
 		RCMItemContent(
@@ -2218,6 +2467,17 @@ RelatedContentUISWT
 			file_size	= _file_size;
 		}
 		
+		protected
+		RCMItemContent(
+			byte[]		_hash,
+			String[]	_networks,
+			String		_expression )
+		{
+			hash		= _hash;
+			networks	= _networks;
+			expression	= _expression;
+		}
+		
 		public void
 		setMdiEntry(
 			MdiEntry _sb_entry )
@@ -2233,10 +2493,16 @@ RelatedContentUISWT
 				spinner = sb_entry.addVitalityImage( SPINNER_IMAGE_ID );
 			}
 			
+			search();
+		}
+		
+		public void
+		search()
+		{
 			try{
 				lookupStarts();
 				
-				RelatedContentLookupListener listener =
+				final RelatedContentLookupListener listener =
 					new RelatedContentLookupListener()
 					{
 						public void
@@ -2248,22 +2514,50 @@ RelatedContentUISWT
 						contentFound(
 							RelatedContent[]	content )
 						{
+							List<RelatedContent>	content_new = new ArrayList<RelatedContent>( content.length );
+							
 							synchronized( RCMItemContent.this ){
 							
-								if ( !destroyed ){
+								if ( destroyed ){
 								
-									for ( RelatedContent c: content ){
+									return;
+								}
+								
+								for ( RelatedContent c: content ){
 									
-										if ( !content_list.contains( c )){
+									if ( !content_list.contains( c )){
+																			
+										byte[] hash = c.getHash();
 										
+										if ( hash == null ){
+											
+											hash = c.getTitle().getBytes();
+										}
+																					
+										if ( uniques.put( hash, "" ) == null ){
+
+											content_new.add( c );
+											
 											content_list.add( c );
 										}
 									}
 								}
 							}
 							
+							int	num_new = content_new.size();
+								
+							if ( num_new == 0 ){
+									
+								return;
+							}
+								
+							if ( num_new != content.length ){
+									
+								content = content_new.toArray( new RelatedContent[content_new.size()]); 
+							}
+								
 							updateNumUnread();
-							
+													
 							for ( RelatedContentEnumeratorListener listener: listeners ){
 								
 								try{
@@ -2279,11 +2573,6 @@ RelatedContentUISWT
 						public void
 						lookupComplete()
 						{	
-							synchronized( RCMItemContent.this ){
-								
-								lookup_complete = true;
-							}
-							
 							lookupEnds();
 						}
 						
@@ -2295,8 +2584,54 @@ RelatedContentUISWT
 						}
 					};
 					
-				if ( file_size == 0 ){
 				
+					
+				if ( expression != null ){
+					
+					Map<String,Object>	parameters = new HashMap<String, Object>();
+					
+					parameters.put( SearchProvider.SP_SEARCH_TERM, expression );
+					
+					manager.searchRCM(
+						parameters, 
+						new SearchObserver() {
+							
+							public void 
+							resultReceived(
+								SearchInstance 		search, 
+								SearchResult 		search_result ) 
+							{
+								SearchRelatedContent result = new SearchRelatedContent( search_result );
+								
+								listener.contentFound( new RelatedContent[]{ result });
+							}
+							
+							public Object 
+							getProperty(
+								int property ) 
+							{
+								return null;
+							}
+							
+							public void 
+							complete() 
+							{
+								listener.lookupComplete();
+							}
+							
+							public void 
+							cancelled() 
+							{
+								listener.lookupComplete();
+							}
+						});
+					
+				}else if ( file_size != 0 ){
+				
+					manager.lookupContent( file_size, networks, listener );
+
+				}else{
+					
 					manager.lookupContent( hash, networks, listener );
 					
 					SubscriptionManager subs_man = SubscriptionManagerFactory.getSingleton();
@@ -2457,19 +2792,10 @@ RelatedContentUISWT
 							{
 								
 							}
-						});
-					
-				}else{
-					
-					manager.lookupContent( file_size, networks, listener );
+						});					
 				}
 			}catch( Throwable e ){
-				
-				synchronized( RCMItemContent.this ){
-
-					lookup_complete = true;
-				}
-				
+								
 				Debug.out( e );
 				
 				lookupEnds();
@@ -2557,10 +2883,10 @@ RelatedContentUISWT
 			 
 			synchronized( this ){
 				
-				if ( !lookup_complete ){
+				//if ( lookup_starts > 0 ){
 					
 					listeners.add( listener );
-				}
+				//}
 				
 				already_found = content_list.toArray( new RelatedContent[ content_list.size()]);
 			}
@@ -2599,13 +2925,29 @@ RelatedContentUISWT
 		protected void
 		lookupStarts()
 		{
-			showIcon( spinner, null );
+			synchronized( this ){
+				
+				lookup_starts++;
+				
+				if ( lookup_starts == 1 ){
+			
+					showIcon( spinner, null );
+				}
+			}
 		}
 		
 		protected void
 		lookupEnds()
 		{
-			hideIcon( spinner );
+			synchronized( this ){
+				
+				lookup_starts--;
+				
+				if ( lookup_starts <= 0 ){
+			
+					hideIcon( spinner );
+				}
+			}
 		}
 		
 		public boolean
@@ -2828,6 +3170,12 @@ RelatedContentUISWT
 			
 			spinner = sb_entry.addVitalityImage( SPINNER_IMAGE_ID );
 
+			search();
+		}
+		
+		public void
+		search()
+		{
 			try{
 				showIcon( spinner, null );
 						
@@ -3037,10 +3385,11 @@ RelatedContentUISWT
 			 
 			synchronized( this ){
 				
-				if ( !lookup_complete ){
+				//if ( !lookup_complete ){
 					
 					listeners.add( listener );
-				}
+				//}
+				
 				
 				already_found = content_list.toArray( new RelatedContent[ content_list.size()]);
 			}
@@ -3198,7 +3547,140 @@ RelatedContentUISWT
 		{
 		}
 	}
+	
+		// duplicated from RelatedContentManager - remove sometime!
+	
+	protected static final byte		NET_NONE	= 0x00;
+	protected static final byte		NET_PUBLIC	= 0x01;
+	protected static final byte		NET_I2P		= 0x02;
+	protected static final byte		NET_TOR		= 0x04;
+	
+	protected static byte
+	convertNetworks(
+		String[]		networks )
+	{
+		byte	nets = NET_NONE;
 
+		for ( int i=0;i<networks.length;i++ ){
+			
+			String n = networks[i];
+			
+			if (n.equalsIgnoreCase( AENetworkClassifier.AT_PUBLIC )){
+				
+				nets |= NET_PUBLIC;
+				
+			}else if ( n.equalsIgnoreCase( AENetworkClassifier.AT_I2P )){
+				
+				nets |= NET_I2P;
+				
+			}else if ( n.equalsIgnoreCase( AENetworkClassifier.AT_TOR )){
+				
+				nets |= NET_TOR;
+			}
+		}
+		
+		return( nets );
+	}
+	
+	public static class
+	SearchRelatedContent
+		extends RelatedContent
+	{
+		private int		rank;
+		private boolean	unread	= true;
+		
+		private
+		SearchRelatedContent(
+			SearchResult	sr )
+		{
+			super( 
+				(String)sr.getProperty( SearchResult.PR_NAME ),
+				(byte[])sr.getProperty( SearchResult.PR_HASH ),
+				null,	// tracker
+				(byte[])sr.getProperty( RelatedContentManager.RCM_SEARCH_PROPERTY_TRACKER_KEYS ),
+				(byte[])sr.getProperty( RelatedContentManager.RCM_SEARCH_PROPERTY_WEB_SEED_KEYS ),
+				(String[])sr.getProperty( RelatedContentManager.RCM_SEARCH_PROPERTY_TAGS ),
+				convertNetworks((String[])sr.getProperty( RelatedContentManager.RCM_SEARCH_PROPERTY_NETWORKS )),
+				(Long)sr.getProperty( SearchResult.PR_SIZE ),
+				getDate( sr ),
+				getSeedsLeechers( sr ),
+				(byte)ContentNetwork.CONTENT_NETWORK_UNKNOWN );
+			
+			Long l_rank = (Long)sr.getProperty( SearchResult.PR_RANK );
+			
+			if ( l_rank != null ){
+				
+				rank = l_rank.intValue();
+			}
+		}
+		
+		private static int
+		getDate(
+			SearchResult		sr )
+		{
+			Date date = (Date)sr.getProperty( SearchResult.PR_PUB_DATE );
+			
+			if ( date == null ){
+				
+				return(0);
+			}
+			
+			return((int)(date.getTime()/(60*60*1000)));	
+		}
+		
+		private static int
+		getSeedsLeechers(
+			SearchResult		sr )
+		{
+			int seeds 		= ((Long)sr.getProperty( SearchResult.PR_SEED_COUNT )).intValue();
+			int leechers 	= ((Long)sr.getProperty( SearchResult.PR_LEECHER_COUNT )).intValue();
+			
+			return( seeds << 16 | leechers );
+		}
+		
+		public int
+		getRank()
+		{
+			return( rank );
+		}
+
+		public int 
+		getLevel() 
+		{
+			return( 0 );
+		}
+		
+		public boolean 
+		isUnread() 
+		{
+			return( unread );
+		}
+		
+		public void 
+		setUnread(
+			boolean _unread )
+		{
+			unread	= _unread;
+		}
+		
+		public Download
+		getRelatedToDownload()
+		{
+			return( null );
+		}
+
+		public int 
+		getLastSeenSecs() 
+		{
+			return 0;
+		}
+		
+		public void 
+		delete() 
+		{
+		}
+	}
+	
 	private class 
 	ImageLabel 
 		extends Canvas implements PaintListener
