@@ -363,6 +363,10 @@ I2PHelperPlugin
 	
 	private I2PHelperHostnameService	hostname_service;
 	
+	private static final int CPU_THROTTLE_DEFAULT	= 5;
+	
+	private int cpu_throttle_factor;
+	
 	private volatile boolean	unloaded;
 	
 	public void
@@ -400,8 +404,10 @@ I2PHelperPlugin
 					{
 						private final int num_processors = Math.max( 1, Runtime.getRuntime().availableProcessors());
 						
-						private final int	ms_total = 1000*num_processors;
-						private final int	ms_avail = ms_total/10;	// allowable cpu
+						private final int ms_total = 1000*num_processors;
+						
+						private long	start_time;
+						private int		last_tf;
 						
 						private long	call_time;
 						private long	call_count;
@@ -417,7 +423,28 @@ I2PHelperPlugin
 						{
 							synchronized( this ){
 								
+								if ( cpu_throttle_factor != last_tf ){
+									
+									call_time			= 0;
+									call_count			= 0;
+									current_sleep		= -1;
+									last_logged_sleep 	= 0;
+									
+									last_tf = cpu_throttle_factor;
+								}
+								
+								if ( last_tf <= 0 ){
+									
+									return;
+									
+								}
+								
 								call_count++;
+								
+								if ( call_count == 1 ){
+									
+									start_time = SystemTime.getMonotonousTime();
+								}
 								
 								call_time	+= end - start;
 								
@@ -432,6 +459,8 @@ I2PHelperPlugin
 										average = 1;
 									}
 									
+									int ms_avail = ms_total/last_tf;	// allowable cpu
+
 									long calls_per_sec = ms_avail/average;
 									
 									sleep = 1000/calls_per_sec;
@@ -447,6 +476,15 @@ I2PHelperPlugin
 									
 									if ( call_count == 1000 ){
 										
+										long	elapsed_sec = (SystemTime.getMonotonousTime() - start_time)/1000;
+										
+										if ( elapsed_sec == 0 ){
+											
+											elapsed_sec = 1;
+										}
+										
+										long call_per_sec = call_count /elapsed_sec;
+										
 										call_time 	= 0;
 										call_count	= 0;
 										
@@ -456,7 +494,7 @@ I2PHelperPlugin
 										
 											last_logged_sleep = sleep;
 											
-											log( "CPU throttle=" + sleep + "ms" );
+											log( "CPU throttle: factor=" + cpu_throttle_factor + "+" + call_per_sec + "/s -> " + sleep + "ms" );
 										}
 									}
 								}else{
@@ -819,6 +857,21 @@ I2PHelperPlugin
 			
 			final BooleanParameter always_socks = config_model.addBooleanParameter2( "azi2phelper.socks.always", "azi2phelper.socks.always", false );
 		
+			final IntParameter 	cpu_throttle	= config_model.addIntParameter2( "azi2phelper.cpu.throttle", "azi2phelper.cpu.throttle", CPU_THROTTLE_DEFAULT, 0, 100 );
+
+			cpu_throttle.addListener(
+					new ParameterListener() 
+					{
+						public void 
+						parameterChanged(
+							Parameter param ) 
+						{
+							cpu_throttle_factor = cpu_throttle.getValue();
+						}
+					});
+			
+			cpu_throttle_factor = cpu_throttle.getValue();
+			
 			final BooleanParameter ext_i2p_param 		= config_model.addBooleanParameter2( "azi2phelper.use.ext", "azi2phelper.use.ext", false );
 			
 			final StringParameter 	ext_i2p_host_param 		= config_model.addStringParameter2( "azi2phelper.use.ext.host", "azi2phelper.use.ext.host", "127.0.0.1" ); 
@@ -828,7 +881,7 @@ I2PHelperPlugin
 				"azi2phelper.internals.group",
 				new Parameter[]{ 
 						i2p_address_param, new_id, change_id, int_port_param, ext_port_param, socks_port_param, socks_allow_public_param,
-						port_info_param, use_upnp, always_socks, ext_i2p_param, ext_i2p_host_param, ext_i2p_port_param });
+						port_info_param, use_upnp, always_socks, cpu_throttle, ext_i2p_param, ext_i2p_host_param, ext_i2p_port_param });
 			
 			
 			final StringParameter 	command_text_param = config_model.addStringParameter2( "azi2phelper.cmd.text", "azi2phelper.cmd.text", "" );
@@ -911,6 +964,7 @@ I2PHelperPlugin
 							port_info_param.setEnabled( plugin_enabled );
 							use_upnp.setEnabled( enabled_not_ext );
 							always_socks.setEnabled( plugin_enabled);
+							cpu_throttle.setEnabled( enabled_not_ext );
 							
 							ext_i2p_param.setEnabled( plugin_enabled );
 							ext_i2p_host_param.setEnabled( plugin_enabled && !enabled_not_ext );
