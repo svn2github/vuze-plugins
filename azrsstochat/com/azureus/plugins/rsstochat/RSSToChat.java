@@ -387,19 +387,23 @@ RSSToChat
 				
 				String network_str = net_node.getValue().trim();
 				
-				String network;
+				String[] networks;
 				
 				if ( network_str.equalsIgnoreCase( "public" )){
 					
-					network = AENetworkClassifier.AT_PUBLIC;
+					networks = new String[]{ AENetworkClassifier.AT_PUBLIC };
 					
 				}else if ( network_str.equalsIgnoreCase( "anonymous" )){
 					
-					network = AENetworkClassifier.AT_I2P;
+					networks = new String[]{ AENetworkClassifier.AT_I2P };
+
+				}else if ( network_str.equalsIgnoreCase( "both" )){
+					
+					networks = new String[]{ AENetworkClassifier.AT_PUBLIC, AENetworkClassifier.AT_I2P };
 					
 				}else{
 					
-					throw( new Exception( "<network> must be either 'public' or 'anonymous'" ));
+					throw( new Exception( "<network> must be either 'public', 'anonymous' or 'both'" ));
 				}
 				
 				String key = key_node.getValue().trim();
@@ -454,11 +458,14 @@ RSSToChat
 					}
 				}
 				
-				Mapping mapping = new Mapping( source, is_rss, desc_link_pattern, link_type, network, key, type, refresh_mins );
-				
-				log( "    Mapping: " + mapping.getOverallName());
-				
-				loaded_mappings.add( mapping );
+				for ( String network: networks ){
+					
+					Mapping mapping = new Mapping( source, is_rss, desc_link_pattern, link_type, network, key, type, refresh_mins );
+					
+					log( "    Mapping: " + mapping.getOverallName());
+					
+					loaded_mappings.add( mapping );
+				}
 			}
 		
 			
