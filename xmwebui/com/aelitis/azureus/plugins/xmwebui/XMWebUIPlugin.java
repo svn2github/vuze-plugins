@@ -79,6 +79,9 @@ import org.json.simple.JSONObject;
 
 import com.aelitis.azureus.core.AzureusCore;
 import com.aelitis.azureus.core.AzureusCoreFactory;
+import com.aelitis.azureus.core.content.ContentException;
+import com.aelitis.azureus.core.content.RelatedAttributeLookupListener;
+import com.aelitis.azureus.core.content.RelatedContentManager;
 import com.aelitis.azureus.core.metasearch.*;
 import com.aelitis.azureus.core.pairing.PairingManager;
 import com.aelitis.azureus.core.pairing.PairingManagerFactory;
@@ -160,7 +163,7 @@ XMWebUIPlugin
     
     private boolean	view_mode;
     
-    private BooleanParameter trace_param;
+    BooleanParameter trace_param;
     private BooleanParameter hide_ln_param;
     
     private TorrentAttribute	t_id;
@@ -180,7 +183,8 @@ XMWebUIPlugin
     
     private Map<String,Map<Long,String>>	session_torrent_info_cache = new HashMap<String,Map<Long,String>>();
     
-    private Map<String,SearchInstance>	active_searches = new HashMap<String, XMWebUIPlugin.SearchInstance>();
+    private Map<String,SearchInstance>	active_searches = new HashMap<String, SearchInstance>();
+    private Map<String,TagSearchInstance>	active_tagsearches = new HashMap<String, TagSearchInstance>();
     
     private Object			lifecycle_lock = new Object();
     private int 			lifecycle_state = 0;
@@ -1129,6 +1133,7 @@ XMWebUIPlugin
 		String session_id = getSessionID(request);
 		String header_session_id = (String) headers.get(
 				"X-Transmission-Session-Id");
+
 		if (header_session_id == null) {
 			header_session_id = (String) headers.get(
 					"x-transmission-session-id");
@@ -1138,6 +1143,8 @@ XMWebUIPlugin
 					(String) headers.get("cookie"),
 					"X-Transmission-Session-Id");
 		}
+
+		System.out.println("header_session_id=" + header_session_id);
 
 		if (header_session_id == null) {
 			return false;
@@ -1457,105 +1464,23 @@ XMWebUIPlugin
 			}else if ( method.equals( "tags-get-list" )){
 				// Vuze RPC v3
 				method_Tags_Get_List(args, result);
-	
+
+			}else if ( method.equals( "tags-lookup-start" )){
+
+				method_Tags_Lookup_Start(args, result);
+
+			}else if ( method.equals( "tags-lookup-get-results" )){
+
+				method_Tags_Lookup_Get_Results(args, result);
+
 			}else if ( method.equals( "vuze-search-start" )){
 				
-				MetaSearchManager ms_manager = MetaSearchManagerFactory.getSingleton();
+				method_Vuze_Search_Start(args, result);
 				
-				MetaSearch ms = ms_manager.getMetaSearch();
-				
-				List<SearchParameter>	sps = new ArrayList<SearchParameter>();
-				
-				String expression = (String)args.get( "expression" );
-				
-				if ( expression == null ){
-					
-					throw( new IOException( "Search expression missing" ));
-				}
-				
-				sps.add( new SearchParameter( "s", expression ));
-				
-				SearchParameter[] parameters = sps.toArray( new SearchParameter[ sps.size()]);
-	
-				Map<String,String>	context = new HashMap();
-				
-				context.put( Engine.SC_SOURCE, 	"xmwebui" );
-				
-				context.put( Engine.SC_REMOVE_DUP_HASH, "true" );
-				
-		 		Engine[] engines = ms_manager.getMetaSearch().getEngines( true, true );
-	
-		 		if ( engines.length == 0 ){
-		 			
-		 			throw( new IOException( "No search templates available" ));
-		 		}
-		 		
-		 		SearchInstance search_instance = new SearchInstance( engines );
-		 		
-		 		engines = 
-		 			ms.search( 
-		 				engines, 
-		 				search_instance,
-		 				parameters, 
-		 				null,
-		 				context, 
-		 				100 );
-		 		
-		 		if ( engines.length == 0 ){
-		 			
-		 			throw( new IOException( "No search templates available" ));
-		 		}
-		 		
-		 		synchronized( active_searches ){
-		 			
-		 			active_searches.put(search_instance.getSID(), search_instance );
-		 		}
-		 		
-		 		search_instance.setEngines( engines );
-		 		
-		 		result.put( "sid", search_instance.getSID());
-		 		
-		 		List<Map>	l_engines = new ArrayList<Map>();
-		 		
-		 		result.put( "engines", l_engines );
-		 		
-		 		for ( Engine engine: engines ){
-		 			
-		 			JSONObject map = new JSONObject();
-		 			
-		 			l_engines.add( map );
-		 			
-		 	 		map.put("name", engine.getName() );			
-		 	 		map.put("id", engine.getUID());
-		 	 		map.put("favicon", engine.getIcon());
-		 	 		map.put("dl_link_css", engine.getDownloadLinkCSS());
-		 	 		map.put("selected", Engine.SEL_STATE_STRINGS[ engine.getSelectionState()]);
-		 	 		map.put("type", Engine.ENGINE_SOURCE_STRS[ engine.getSource()]);
-		 		}
 			}else if ( method.equals( "vuze-search-get-results" )){
 										
-				String sid = (String)args.get( "sid" );
-				
-				if ( sid == null ){
-					
-					throw( new IOException( "SID missing" ));
-				}	
-							
-				synchronized( active_searches ){
-					
-					SearchInstance search_instance = active_searches.get( sid );
-					
-					if ( search_instance != null ){
-						
-						if ( search_instance.getResults( result )){
-							
-							active_searches.remove( sid );
-						}
-					}else{
-						
-						throw( new IOException( "SID not found - already complete?" ));
-					}
-				}
+				method_Vuze_Search_Get_Results(args, result);
+
 			}else if ( method.equals( "vuze-lifecycle" )){
 	
 				processVuzeLifecycle( args, result );
@@ -1609,6 +1534,160 @@ XMWebUIPlugin
 	}
 
 	
+	private void method_Tags_Lookup_Start(Map args, Map result) {
+		Object ids = args.get("ids");
+		
+		TagSearchInstance tagSearchInstance = new TagSearchInstance();
+
+		try {
+			List<String> listDefaultNetworks = new ArrayList<String>();
+			for (int i = 0; i < AENetworkClassifier.AT_NETWORKS.length; i++) {
+
+				String nn = AENetworkClassifier.AT_NETWORKS[i];
+
+				String config_name = "Network Selection Default." + nn;
+				boolean enabled = COConfigurationManager.getBooleanParameter(
+						config_name, false);
+				if (enabled) {
+					listDefaultNetworks.add(nn);
+				}
+			}
+
+			org.gudy.azureus2.plugins.download.DownloadManager dlm = plugin_interface.getDownloadManager();
+			String[] networks;
+			if (ids instanceof List) {
+				List idList = (List) ids;
+				for (Object id : idList) {
+					if (id instanceof String) {
+						String hash = (String) id;
+						byte[] hashBytes = ByteFormatter.decodeString(hash);
+						Download download = dlm.getDownload(hashBytes);
+						
+						DownloadManager dm = PluginCoreUtils.unwrap(download);
+						if (dm != null) {
+							networks = dm.getDownloadState().getNetworks();
+						} else {
+							networks = listDefaultNetworks.toArray(new String[0]);
+						}
+						
+						tagSearchInstance.addSearch(hash, hashBytes, networks);
+						synchronized (active_tagsearches) {
+							active_tagsearches.put(tagSearchInstance.getID(), tagSearchInstance);
+						}
+					}
+				}
+
+			}
+		} catch (Throwable t) {
+
+		}
+
+		result.put("id", tagSearchInstance.getID());
+	}
+
+	private void method_Tags_Lookup_Get_Results(Map args, Map result)
+			throws IOException {
+		String id = (String) args.get("id");
+
+		if (id == null) {
+			throw (new IOException("ID missing"));
+		}
+
+		synchronized (active_tagsearches) {
+			TagSearchInstance search_instance = active_tagsearches.get(id);
+
+			if (search_instance != null) {
+				if (search_instance.getResults(result)) {
+					active_tagsearches.remove(id);
+				}
+			} else {
+				throw (new IOException("ID not found - already complete?"));
+			}
+		}
+	}
+
+
+	private void method_Vuze_Search_Get_Results(Map args, Map result)
+			throws IOException {
+		String sid = (String) args.get("sid");
+
+		if (sid == null) {
+			throw (new IOException("SID missing"));
+		}
+
+		synchronized (active_searches) {
+			SearchInstance search_instance = active_searches.get(sid);
+
+			if (search_instance != null) {
+				if (search_instance.getResults(result)) {
+					active_searches.remove(sid);
+				}
+			} else {
+				throw (new IOException("SID not found - already complete?"));
+			}
+		}
+	}
+
+	private void method_Vuze_Search_Start(Map args, Map result)
+			throws IOException {
+		String expression = (String) args.get("expression");
+		
+		if (expression == null) {
+			throw (new IOException("Search expression missing"));
+		}
+
+		MetaSearchManager ms_manager = MetaSearchManagerFactory.getSingleton();
+		MetaSearch ms = ms_manager.getMetaSearch();
+		List<SearchParameter> sps = new ArrayList<SearchParameter>();
+
+		sps.add(new SearchParameter("s", expression));
+
+		SearchParameter[] parameters = sps.toArray(new SearchParameter[sps.size()]);
+
+		Map<String, String> context = new HashMap();
+		context.put(Engine.SC_SOURCE, "xmwebui");
+		context.put(Engine.SC_REMOVE_DUP_HASH, "true");
+
+		Engine[] engines = ms_manager.getMetaSearch().getEngines(true, true);
+
+		if (engines.length == 0) {
+			throw (new IOException("No search templates available"));
+		}
+
+		SearchInstance search_instance = new SearchInstance(this, engines);
+
+		engines = ms.search(engines, search_instance, parameters, null, context,
+				100);
+
+		if (engines.length == 0) {
+			throw (new IOException("No search templates available"));
+		}
+
+		synchronized (active_searches) {
+			active_searches.put(search_instance.getSID(), search_instance);
+		}
+
+		search_instance.setEngines(engines);
+
+		result.put("sid", search_instance.getSID());
+
+		List<Map> l_engines = new ArrayList<Map>();
+		result.put("engines", l_engines);
+
+		for (Engine engine : engines) {
+			JSONObject map = new JSONObject();
+
+			l_engines.add(map);
+
+			map.put("name", engine.getName());
+			map.put("id", engine.getUID());
+			map.put("favicon", engine.getIcon());
+			map.put("dl_link_css", engine.getDownloadLinkCSS());
+			map.put("selected", Engine.SEL_STATE_STRINGS[engine.getSelectionState()]);
+			map.put("type", Engine.ENGINE_SOURCE_STRS[engine.getSource()]);
+		}
+	}
+
 	private void method_Tags_Get_List(Map args, Map result) {
 		List<Map<String, Object>> listTags = new ArrayList<Map<String,Object>>();
 
@@ -2554,8 +2633,8 @@ XMWebUIPlugin
 						TagType tt = tm.getTagType(TagType.TT_DOWNLOAD_MANUAL);
 
 						for (Object oTagToAdd : tagAddList) {
-							if (oTagToAdd instanceof String) {
-								addTagToDownload(download, (String) oTagToAdd, tt);
+							if (oTagToAdd != null) {
+								addTagToDownload(download, oTagToAdd, tt);
 							}
 
 						}
@@ -2731,20 +2810,26 @@ XMWebUIPlugin
 		}
 	}
 
-	private void addTagToDownload(Download download, String tagToAdd, TagType tt) {
-		tagToAdd = tagToAdd.trim();
+	private void addTagToDownload(Download download, Object tagToAdd, TagType tt) {
+		Tag tag = null;
+		if (tagToAdd instanceof String) {
+			String tagNameToAdd = (String) tagToAdd;
+			tagToAdd = tagNameToAdd.trim();
 
-		if (tagToAdd.length() == 0) {
-			return;
-		}
-
-		Tag tag = tt.getTag(tagToAdd, true);
-		if (tag == null) {
-			try {
-				tag = tt.createTag(tagToAdd, true);
-			} catch (Throwable e) {
-				Debug.out(e);
+			if (tagNameToAdd.length() == 0) {
+				return;
 			}
+			tag = tt.getTag(tagNameToAdd, true);
+
+			if (tag == null) {
+				try {
+					tag = tt.createTag(tagNameToAdd, true);
+				} catch (Throwable e) {
+					Debug.out(e);
+				}
+			}
+		} else if (tagToAdd instanceof Number) {
+			tag = tt.getTag(((Number) tagToAdd).intValue());
 		}
 
 		if (tag != null) {
@@ -3517,7 +3602,7 @@ XMWebUIPlugin
 
 		torrent_details.put("id", new Long(getID(download, true)));
 		torrent_details.put("name", escapeXML(download.getName()));
-		torrent_details.put("hashString",
+		torrent_details.put(TransmissionVars.FIELD_TORRENT_HASH,
 				ByteFormatter.encodeString(download.getTorrentHash()));
 
 		result.put("torrent-added", torrent_details);
@@ -3851,7 +3936,7 @@ XMWebUIPlugin
 
 				value = torrentGet_fileStats(download, file_fields, args);
 
-			} else if (field.equals("hashString")) {
+			} else if (field.equals(TransmissionVars.FIELD_TORRENT_HASH)) {
 				// RPC v0
 				// hashString                  | string                      | tr_info
 				value = ByteFormatter.encodeString(t.getHash());
@@ -4458,7 +4543,7 @@ XMWebUIPlugin
 		{ "eta", TransmissionVars.TR_ETA_NOT_AVAIL },
 		//{ "fileStats", "" },
 		//{ "files", "" },
-		//{ "hashString", "" },
+		//{ TransmissionVars.FIELD_TORRENT_HASH, "" },
 		{ "haveUnchecked", 0 },
 		//{ "haveValid", "" },
 		//{ "id", "" },
@@ -4532,7 +4617,7 @@ XMWebUIPlugin
 
 				value = torrentGet_fileStats_stub(download_stub, file_fields, args);
 
-			}else if ( field.equals( "hashString" )){
+			}else if ( field.equals( TransmissionVars.FIELD_TORRENT_HASH )){
 				
 				value = ByteFormatter.encodeString( download_stub.getTorrentHash());
 				
@@ -6754,252 +6839,6 @@ XMWebUIPlugin
 	//////////////////////////////////////////////////////////////////////////////
 	
 	private class
-	SearchInstance
-		implements ResultListener
-	{
-		private String	sid;
-		private long	start_time = SystemTime.getMonotonousTime();
-		
-		private Map<String,List>	engine_results = new HashMap<String, List>();
-		
-		private 
-		SearchInstance(
-			Engine[]	engines )
-		{
-			byte[]	bytes = new byte[16];
-			
-			RandomUtils.nextSecureBytes( bytes );
-			
-			sid = Base32.encode( bytes );
-			
-			for ( Engine e: engines ){
-				
-				engine_results.put( e.getUID(), new ArrayList());
-			}
-		}
-		
-		private String
-		getSID()
-		{
-			return( sid );
-		}
-		
-		private void
-		setEngines(
-			Engine[]		engines )
-		{
-				// trim back in case active engines changed
-			
-			Set<String>	active_engines = new HashSet<String>();
-			
-			for ( Engine e: engines ){
-				
-				active_engines.add( e.getUID());
-			}
-			
-			synchronized( this ){
-			
-				Iterator<String>	it = engine_results.keySet().iterator();
-				
-				while( it.hasNext()){
-					
-					if ( !active_engines.contains( it.next())){
-						
-						it.remove();
-					}
-				}
-			}
-		}
-		
-		private boolean
-		getResults(
-			Map	result )
-		{
-			result.put( "sid", sid );
-			
-			List<Map>	engines = new ArrayList<Map>();
-			
-			result.put( "engines", engines );
-			
-			synchronized( this ){
-				
-				boolean	all_complete = true;
-				
-				for ( Map.Entry<String, List> entry: engine_results.entrySet()){
-					
-					Map m = new HashMap();
-					
-					engines.add( m );
-					
-					m.put( "id", entry.getKey());
-					
-					List results = entry.getValue();
-					
-					Iterator<Object>	it = results.iterator();
-					
-					boolean	engine_complete = false;
-					
-					while( it.hasNext()){
-						
-						Object obj = it.next();
-						
-						if ( obj instanceof Boolean ){
-							
-							engine_complete = true;
-							
-							break;
-							
-						}else if ( obj instanceof Throwable ){
-														
-							m.put( "error", Debug.getNestedExceptionMessage((Throwable)obj));
-							
-						}else{
-							
-							it.remove();
-							
-							Result[] sr = (Result[])obj;
-							
-							List l_sr = (List)m.get( "results" );
-							
-							if ( l_sr == null ){
-								
-								l_sr = new ArrayList();
-								
-								m.put( "results", l_sr );
-							}
-							
-							for ( Result r: sr ){
-								
-								l_sr.add( r.toJSONMap());
-							}
-						}
-					}
-				
-					m.put( "complete", engine_complete );
-					
-					if ( !engine_complete ){
-						
-						all_complete = false;
-					}
-				}
-				
-				result.put( "complete", all_complete );
-				
-				return( all_complete );
-			}
-		}
-		
-		private long
-		getAge()
-		{
-			return( SystemTime.getMonotonousTime() - start_time );
-		}
-		
-		public void 
-		contentReceived(
-			Engine 		engine, 
-			String 		content )
-		{
-		}
-		
-		public void 
-		matchFound( 
-			Engine 		engine, 
-			String[] 	fields )
-		{
-		}
-		
-		public void 
-		resultsReceived(
-			Engine 		engine,
-			Result[] 	results)
-		{
-			if ( trace_param.getValue() ){
-				log( "results: " + engine.getName() + " - " + results.length );
-			}
-			
-			synchronized( this ){
-
-				List list = engine_results.get( engine.getUID());
-				
-				if ( list != null ){
-					
-					if ( list.size() > 0 && list.get( list.size()-1) instanceof Boolean ){
-						
-					}else{
-					
-						list.add( results );
-					}
-				}
-			}
-		}
-		
-		public void 
-		resultsComplete(
-			Engine 	engine)
-		{
-			if ( trace_param.getValue() ){
-				log( "comp: " + engine.getName()); 
-			}
-			
-			synchronized( this ){
-
-				List list = engine_results.get( engine.getUID());
-				
-				if ( list != null ){
-					
-					if ( list.size() > 0 && list.get( list.size()-1) instanceof Boolean ){
-
-					}else{
-						
-						list.add( true );
-					}
-				}
-			}
-		}
-		
-		public void 
-		engineFailed(
-			Engine 		engine, 
-			Throwable 	cause )
-		{
-			if ( trace_param.getValue() ){
-				log( "fail: " + engine.getName()); 
-			}
-			
-			synchronized( this ){
-
-				List list = engine_results.get( engine.getUID());
-				
-				if ( list != null ){
-					
-					if ( list.size() > 0 && list.get( list.size()-1) instanceof Boolean ){
-
-					}else{
-						
-						list.add( cause );
-						list.add( true );
-					}
-				}
-			}
-		}
-			
-		public void 
-		engineRequiresLogin(
-			Engine 		engine, 
-			Throwable 	cause )
-		{
-			engineFailed( engine, cause );
-		}
-		
-		private String
-		getString()
-		{
-			return( sid );
-		}
-	}
-	
-	private class
 	RecentlyRemovedData
 	{
 		private final long			id;
@@ -7251,5 +7090,11 @@ XMWebUIPlugin
 		{
 			
 		}
+	}
+	
+	@Override
+	protected void log(String str) {
+		// TODO Auto-generated method stub
+		super.log(str);
 	}
 }

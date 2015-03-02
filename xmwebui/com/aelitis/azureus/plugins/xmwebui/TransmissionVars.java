@@ -275,6 +275,8 @@ public class TransmissionVars
 
 	public static final String FIELD_TORRENT_DATE_ADDED = "addedDate";
 
+	public static final String FIELD_TORRENT_HASH = "hashString";
+
 	//////////////////////////////////////////////////////////////////////////////
 
 	public static final String TR_SESSION_STATS_ACTIVE_TORRENT_COUNT = "activeTorrentCount";
