@@ -19,7 +19,9 @@
 
 package org.kmallan.azureus.rssfeed;
 
+import org.apache.commons.lang.Entities;
 import org.eclipse.swt.graphics.Color;
+import org.gudy.azureus2.core3.util.Debug;
 import org.w3c.dom.*;
 import org.xml.sax.*;
 
@@ -362,7 +364,44 @@ public class Scheduler extends TimerTask {
 				}
 			});
       
-      feed = docBuild.parse(xmlTmp);
+      try{
+    	feed = docBuild.parse(xmlTmp);
+    	  
+      }catch( Exception e ){
+    	  
+    	feed = null;
+    	  
+		String msg = Debug.getNestedExceptionMessage( e );
+		
+		if (	( msg.contains( "entity" ) && msg.contains( "was referenced" )) ||
+				msg.contains( "entity reference" )){
+			
+			FileInputStream fis = new FileInputStream( xmlTmp );
+			
+			try{
+				
+				 feed = docBuild.parse( new EntityFudger( fis ));
+				 
+			}catch( Throwable f ){
+				
+			}finally{
+				
+				fis.close();
+			}
+		}
+		
+		if ( feed == null ){
+			if ( e instanceof ParserConfigurationException ){
+				throw((ParserConfigurationException)e);
+			}else if ( e instanceof SAXException ){
+				throw((SAXException)e);
+			}else if ( e instanceof IOException ){
+				throw((IOException)e);
+			}else{
+				throw( new IOException( msg ));
+			}
+		}
+      }
       
       xmlTmp.delete(); 
       downloader.done();
@@ -562,6 +601,254 @@ public class Scheduler extends TimerTask {
     listBeans.add(listBean);
 
     return listBean;
+  }
+  
+  private static class
+  EntityFudger
+  	extends InputStream
+  {
+  	private InputStream		is;
+  	    
+  	char[]	buffer		= new char[16];
+  	int		buffer_pos	= 0;
+  	
+  	char[] 	insertion		= new char[16];
+  	int		insertion_pos	= 0;
+  	int		insertion_len	= 0;
+  	
+  	public
+  	EntityFudger(
+  		InputStream		_is )
+  	{
+  		is		= _is;
+  	}
+  	
+  	@Override
+  	public int 
+  	read() 
+  		throws IOException 
+  	{
+  		if ( insertion_len > 0 ){
+  			
+  			int	result = insertion[ insertion_pos++ ]&0xff;
+  		
+  			if ( insertion_pos == insertion_len ){
+  				
+   				insertion_pos	= 0;
+   				insertion_len	= 0;
+  			}
+  			
+  			return( result );
+  		}
+  		
+  		while( true ){
+  			
+	     		int	b = is.read();
+	     		
+	     		if ( b < 0 ){
+	     			
+	     				// end of file
+	     			
+	     			if ( buffer_pos == 0 ){
+	     			
+	     				return( b );
+	     				
+	     			}else if ( buffer_pos == 1 ){
+	     				
+	     				buffer_pos = 0;
+	     				
+	     				return( buffer[0]&0xff );
+	     				
+	     			}else{
+	     				
+	     				System.arraycopy( buffer, 1, insertion, 0, buffer_pos - 1 );
+	     				
+	     				insertion_len 	= buffer_pos - 1;
+	     				insertion_pos	= 0;
+	     				
+	     				buffer_pos = 0;
+	     				
+	     				return( buffer[0]&0xff );
+	     			}
+	     		}
+	     		
+	     			// normal byte
+	     		
+	     		if ( buffer_pos == 0 ){
+	     			
+	     			if ( b == '&' ){
+	     				
+	     				buffer[ buffer_pos++ ] = (char)b;
+	     				
+	     			}else{
+	     				
+	     				return( b );
+	     			}
+	     			
+	     		}else{
+	     			
+	     			if ( buffer_pos == buffer.length-1 ){
+	     				
+	     					// buffer's full, give up
+	     				
+	     				buffer[ buffer_pos++ ] = (char)b;
+	     				
+	     				System.arraycopy( buffer, 0, insertion, 0, buffer_pos );
+	     				
+	     				buffer_pos		= 0;
+	     				insertion_pos	= 0;
+	     				insertion_len	= buffer_pos;
+	     				
+	     				return( insertion[insertion_pos++] );
+	     				
+	     			}else{
+	     				
+		     			if ( b == ';' ){
+		     				
+		     					// got some kind of reference mebe
+		     				
+		     				buffer[ buffer_pos++ ] = (char)b;
+		     				
+		     				String	ref = new String( buffer, 1, buffer_pos-2 ).toLowerCase( Locale.US );
+		     				
+		     				String	replacement;
+		     				
+		     				if ( 	ref.equals( "amp") 		|| 
+		     						ref.equals( "lt" ) 		|| 
+		     						ref.equals( "gt" ) 		|| 
+		     						ref.equals( "quot" )	|| 
+		     						ref.equals( "apos" ) 	||
+		     						ref.startsWith( "#" )){
+		     					
+		     					replacement = new String( buffer, 0, buffer_pos );
+		     					
+		     				}else{
+		     							     							     					
+			     				int num = Entities.HTML40.entityValue( ref );
+			     					
+		     					if ( num != -1 ){
+		     					
+		     						replacement = "&#" + num + ";";
+		     						
+		     					}else{
+		     						
+		     						replacement = new String( buffer, 0, buffer_pos );
+		     					}
+		     				}
+		     				
+		     				char[] chars = replacement.toCharArray();
+		     				
+		     				System.arraycopy( chars, 0, insertion, 0, chars.length );
+		     				
+		     				buffer_pos		= 0;
+		     				insertion_pos	= 0;
+		     				insertion_len	= chars.length;
+		     				
+		     				return( insertion[insertion_pos++] );
+		     				
+		     			}else{
+		     				
+	     					buffer[ buffer_pos++ ] = (char)b;
+
+		     				char c = (char)b;
+		     				
+		     				if ( !Character.isLetterOrDigit( c )){
+		     						     					
+		     						// handle naked &
+		     					
+		     					if ( buffer_pos == 2 && buffer[0] == '&'){
+		     						
+		     						char[] chars = "&amp;".toCharArray();
+		     						
+		     						System.arraycopy( chars, 0, insertion, 0, chars.length );
+		     						
+		     						buffer_pos		= 0;
+		     						insertion_pos	= 0;
+		     						insertion_len	= chars.length;
+		     						
+		     							// don't forget the char we just read
+		     						
+		     						insertion[insertion_len++] = (char)b;
+		     						
+		     						return( insertion[insertion_pos++] );
+		     						
+		     					}else{
+		     						
+		     							// not a valid entity reference
+		     						
+		    	     				System.arraycopy( buffer, 0, insertion, 0, buffer_pos );
+		    	     				
+		    	     				buffer_pos		= 0;
+		    	     				insertion_pos	= 0;
+		    	     				insertion_len	= buffer_pos;
+		    	     				
+		    	     				return( insertion[insertion_pos++] );
+		     					}
+		     				}
+		     			}
+	     			}
+	     		}
+  		}
+  	}
+
+  	public void 
+  	close() 
+  			
+  		throws IOException
+  	{
+  		is.close();
+  	}
+
+  	public long 
+  	skip(
+  		long n )
+  		
+  		throws IOException
+  	{
+  			// meh, vague attempt here
+  		
+  		if ( insertion_len > 0 ){
+  			
+  				// buffer is currently empty, shove remaining into buffer to unify processing
+  			
+  			int	rem = insertion_len - insertion_pos;
+  			
+  			System.arraycopy( insertion, insertion_pos, buffer, 0, rem );
+  			
+  			insertion_pos 	= 0;
+  			insertion_len	= 0;
+  			
+  			buffer_pos = rem;
+  		}
+  		    		
+  		if ( n <= buffer_pos ){
+  			
+  				// skip is <= buffer contents
+  			
+  			int	rem = buffer_pos - (int)n;
+  			
+    			System.arraycopy( buffer, (int)n, insertion, 0, rem );
+
+    			insertion_pos	= 0;
+    			insertion_len 	= rem;
+    			
+    			return( n );
+  		}
+  		
+  		int	to_skip = buffer_pos;
+  		
+  		buffer_pos	= 0;
+  		
+  		return( is.skip( n - to_skip ) + to_skip );
+  	}
+
+  	public int 
+  	available()
+  	
+  		throws IOException
+  	{
+   		return( buffer_pos + is.available());
+  	}
   }
 }
 
