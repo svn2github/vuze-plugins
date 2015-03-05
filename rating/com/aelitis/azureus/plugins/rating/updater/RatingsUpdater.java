@@ -24,6 +24,8 @@ package com.aelitis.azureus.plugins.rating.updater;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -271,6 +273,8 @@ RatingsUpdater
 		long	real_now = SystemTime.getCurrentTime();
 		long	mono_now = SystemTime.getMonotonousTime();
 
+		List<Download> interesting = new ArrayList<Download>(10);
+		
 		for ( final Download download: download_manager.getDownloads()){
 						
 			org.gudy.azureus2.core3.download.DownloadManager core_dm = PluginCoreUtils.unwrap( download );
@@ -292,8 +296,37 @@ RatingsUpdater
 				
 				continue;
 			}
+			
+			interesting.add( download );
+		}
+		
+		Collections.sort(
+			interesting,
+			new Comparator<Download>()
+			{
+				public int 
+				compare(
+					Download o1, 
+					Download o2) 
+				{
+					return( o1.getPosition() - o2.getPosition());
+				}
+			});
+		
+		for ( int i=0;i<interesting.size();i++){
+		
+			Download	download = interesting.get( i );
+					
+			org.gudy.azureus2.core3.download.DownloadManager core_dm = PluginCoreUtils.unwrap( download );
 
-			checkReseed( mono_now, download, core_dm, pm );
+			PEPeerManager pm = core_dm.getPeerManager();
+			
+			if ( pm == null ){
+				
+				continue;
+			}
+			
+			checkReseed( mono_now, interesting, i, download, core_dm, pm );
 			
 			if ( rcm != null ){
 				
@@ -305,6 +338,8 @@ RatingsUpdater
 	private void
 	checkReseed(
 		long												mono_now,
+		List<Download>										interesting,
+		int													interesting_index,
 		final Download										download,
 		org.gudy.azureus2.core3.download.DownloadManager 	core_dm,
 		PEPeerManager										pm )
@@ -335,6 +370,24 @@ RatingsUpdater
 			if ( elapsed_since_dl < STALL_TRIGGER_PERIOD ){
 				
 				return;
+			}
+			
+				// check that either this is at the top of the download queue or that all prior to 
+				// it have been flagged as stuck already as they are higher priority and will be 
+				// stealing download capacity
+			
+			for ( int i=0;i<interesting_index;i++){
+				
+				Download prev = interesting.get( i );
+				
+				org.gudy.azureus2.core3.download.DownloadManager core_prev = PluginCoreUtils.unwrap( prev );
+
+				if ( core_prev.getUserData( reseed_asked_key ) == null ){
+
+						// bail for the moment, we'll get back here later if needed
+					
+					return;
+				}
 			}
 			
 				// download made no progress in the last interval
@@ -375,7 +428,7 @@ RatingsUpdater
 				core_dm.setUserData( reseed_asked_key, "" );
 				
 				final String msg_prefix = "Please seed! File '";
-				final String message 	= msg_prefix + worst_file.getTorrentFile().getRelativePath() + "' is stuck with an availability of " + worst_avail;
+				final String message 	= msg_prefix + worst_file.getTorrentFile().getRelativePath() + "' is stuck with an availability of " + worst_avail + ".";
 				
 				if ( BuddyPluginUtils.isBetaChatAvailable()){
 					
