@@ -780,7 +780,8 @@ SBC_RCMView
 				
 				ISelectedContent[] sels = valid.toArray( new ISelectedContent[valid.size()] );
 				
-				SelectedContentManager.changeCurrentlySelectedContent( "IconBarEnabler", sels, null );
+				SelectedContentManager.changeCurrentlySelectedContent("IconBarEnabler",
+						sels, tv_related_content);
 				
 				UIFunctions uiFunctions = UIFunctionsManager.getUIFunctions();
 				if (uiFunctions != null) {
