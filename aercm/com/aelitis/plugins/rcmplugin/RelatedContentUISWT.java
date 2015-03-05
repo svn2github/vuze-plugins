@@ -49,7 +49,6 @@ import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.disk.DiskManagerFileInfo;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.torrent.Torrent;
-import org.gudy.azureus2.plugins.ui.Graphic;
 import org.gudy.azureus2.plugins.ui.UIInputReceiver;
 import org.gudy.azureus2.plugins.ui.UIInputReceiverListener;
 import org.gudy.azureus2.plugins.ui.UIInstance;
@@ -70,10 +69,7 @@ import org.gudy.azureus2.plugins.utils.search.SearchResult;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.gudy.azureus2.ui.swt.SimpleTextEntryWindow;
 import org.gudy.azureus2.ui.swt.Utils;
-import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
-import org.gudy.azureus2.ui.swt.plugins.UISWTView;
-import org.gudy.azureus2.ui.swt.plugins.UISWTViewEvent;
-import org.gudy.azureus2.ui.swt.plugins.UISWTViewEventListener;
+import org.gudy.azureus2.ui.swt.plugins.*;
 import org.gudy.azureus2.ui.swt.shells.CoreWaiterSWT;
 import org.gudy.azureus2.ui.swt.shells.CoreWaiterSWT.TriggerInThread;
 import org.gudy.azureus2.ui.swt.shells.MessageBoxShell;
@@ -83,6 +79,8 @@ import com.aelitis.azureus.core.AzureusCoreRunningListener;
 import com.aelitis.azureus.core.cnetwork.ContentNetwork;
 import com.aelitis.azureus.core.content.*;
 import com.aelitis.azureus.core.subs.*;
+import com.aelitis.azureus.core.tag.Tag;
+import com.aelitis.azureus.core.tag.TagType;
 import com.aelitis.azureus.core.util.CopyOnWriteList;
 import com.aelitis.azureus.ui.UIFunctions;
 import com.aelitis.azureus.ui.UIFunctionsManager;
@@ -161,6 +159,8 @@ RelatedContentUISWT
 
 	
 	private volatile boolean	destroyed = false;
+
+	private UISWTGraphic menu_icon;
 
 	private 
 	RelatedContentUISWT(
@@ -592,12 +592,18 @@ RelatedContentUISWT
 	{
 		final MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
 		if (plugin.isRCMEnabled() && enable_ui.getValue()) {
+
+			if ( swarm_image != null && !swarm_image.isDisposed() && menu_icon == null){
+				menu_icon = swt_ui.createGraphic( swarm_image );
+			}
+
+
 			mdi.loadEntryByID(SIDEBAR_SECTION_RELATED_CONTENT, false, true, null);
-			hookMyTorrentMenus(true);
+			hookMenus(true);
 			hookSubViews(true);
 		} else {
 			mdi.closeEntry(SIDEBAR_SECTION_RELATED_CONTENT);
-			hookMyTorrentMenus(false);
+			hookMenus(false);
 			hookSubViews(false);
 		}
 
@@ -1045,7 +1051,7 @@ RelatedContentUISWT
 	}
 	
 	protected void
-	hookMyTorrentMenus(
+	hookMenus(
 		boolean enable )
 	{
 		if ( enable && torrent_menus.size() > 0 ) {
@@ -1066,6 +1072,42 @@ RelatedContentUISWT
 		}
 
 		MenuManager mm = plugin_interface.getUIManager().getMenuManager();
+		
+		MenuItem mi_searchtag = mm.addMenuItem(MenuManager.MENU_TAG_CONTEXT, "rcm.contextmenu.searchtag");
+		torrent_menus.add( mi_searchtag );
+
+		mi_searchtag.setGraphic(menu_icon);
+		mi_searchtag.addFillListener(new MenuItemFillListener() {
+			public void menuWillBeShown(MenuItem menu, Object target) {
+				boolean enable = false;
+				if (target instanceof Tag[]) {
+					Tag[] tags = (Tag[]) target;
+
+					for (Tag tag : tags) {
+						if (tag.getTagType().getTagType() == TagType.TT_DOWNLOAD_MANUAL) {
+							enable = true;
+							break;
+						}
+					}
+				}
+				menu.setVisible(enable);
+			}
+		});
+		mi_searchtag.addMultiListener(new MenuItemListener() {
+			public void selected(MenuItem menu, Object target) {
+				if (!(target instanceof Tag[])) {
+					return;
+				}
+				Tag[] tags = (Tag[]) target;
+
+				String[] networks = AENetworkClassifier.getDefaultNetworks();
+
+				for (Tag tag : tags) {
+					addSearch("tag:" + tag.getTagName(true), networks);
+				}
+			}
+		});
+		
 
 				
 			MenuItem mi_rel = mm.addMenuItem(MenuManager.MENU_DOWNLOAD_CONTEXT, "rcm.contextmenu.lookupassoc");
@@ -1074,12 +1116,7 @@ RelatedContentUISWT
 			
 			mi_rel.setStyle( TableContextMenuItem.STYLE_PUSH );
 
-			if ( swarm_image != null && !swarm_image.isDisposed()){
-				
-				Graphic menu_icon = swt_ui.createGraphic( swarm_image );
-
-				mi_rel.setGraphic( menu_icon );
-			}
+			mi_rel.setGraphic( menu_icon );
 			
 			MenuItemListener listener = 
 				new MenuItemListener()
@@ -1089,6 +1126,9 @@ RelatedContentUISWT
 						MenuItem 	menu, 
 						Object 		target) 
 					{
+						if (!(target instanceof Download[])) {
+							return;
+						}
 						Download[]	rows = (Download[])target;
 						
 						for ( Download download: rows ){
@@ -1107,12 +1147,7 @@ RelatedContentUISWT
 			
 			mi_size.setStyle( TableContextMenuItem.STYLE_PUSH );
 
-			if ( swarm_image != null && !swarm_image.isDisposed()){
-				
-				Graphic menu_icon = swt_ui.createGraphic( swarm_image );
-
-				mi_size.setGraphic( menu_icon );
-			}
+			mi_size.setGraphic( menu_icon );
 				
 			mi_size.addFillListener(
 				new MenuItemFillListener()
@@ -1189,12 +1224,7 @@ RelatedContentUISWT
 			
 			mi.setStyle( TableContextMenuItem.STYLE_PUSH );
 
-			if ( swarm_image != null && !swarm_image.isDisposed()){
-				
-				Graphic menu_icon = swt_ui.createGraphic( swarm_image );
-
-				mi.setGraphic( menu_icon );
-			}
+			mi.setGraphic( menu_icon );
 			
 			mi.addFillListener(
 				new MenuItemFillListener()
