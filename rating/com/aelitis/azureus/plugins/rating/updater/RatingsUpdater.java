@@ -35,6 +35,7 @@ import java.util.Map;
 import org.gudy.azureus2.core3.disk.DiskManagerFileInfo;
 import org.gudy.azureus2.core3.disk.DiskManagerFileInfoSet;
 import org.gudy.azureus2.core3.download.DownloadManagerState;
+import org.gudy.azureus2.core3.peer.PEPeer;
 import org.gudy.azureus2.core3.peer.PEPeerManager;
 import org.gudy.azureus2.core3.util.*;
 import org.gudy.azureus2.plugins.PluginConfig;
@@ -45,6 +46,7 @@ import org.gudy.azureus2.plugins.ddb.DistributedDatabaseKey;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabaseListener;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabaseValue;
 import org.gudy.azureus2.plugins.download.Download;
+import org.gudy.azureus2.plugins.download.DownloadAnnounceResult;
 import org.gudy.azureus2.plugins.download.DownloadManager;
 import org.gudy.azureus2.plugins.download.DownloadManagerListener;
 import org.gudy.azureus2.plugins.download.DownloadScrapeResult;
@@ -93,7 +95,6 @@ RatingsUpdater
 	private TorrentAttribute attributeComment;
 	private TorrentAttribute attributeGlobalRating;
 	private TorrentAttribute attributeChatState;
-	private TorrentAttribute attributeStallState;
 
   
 	private Map<Download,RatingResults> 	torrentRatings	= new HashMap<Download, RatingResults>();
@@ -126,7 +127,6 @@ RatingsUpdater
 	    attributeComment		= tm.getPluginAttribute("comment");    
 	    attributeGlobalRating  	= tm.getPluginAttribute("globalRating");
 	    attributeChatState  	= tm.getPluginAttribute("chatState");
-	    attributeStallState  	= tm.getPluginAttribute("stallState");
 	}
 	  
 	public void 
@@ -390,6 +390,68 @@ RatingsUpdater
 				}
 			}
 			
+			List<PEPeer> peers = pm.getPeers();
+			
+			boolean	has_connected_peers = false;
+			
+			for ( PEPeer peer: peers ){
+				
+				if ( peer.getPeerState() == PEPeer.TRANSFERING ){
+					
+					has_connected_peers = true;
+					
+					break;
+				}
+			}
+			
+				// if we're connected to peers and stuck then report
+			
+			if ( !has_connected_peers ){
+				
+					// sanity check - user may have well seeded torrent but borked network
+				
+				DownloadScrapeResult sr = download.getAggregatedScrapeResult();
+				
+				boolean	poor_swarm = false;
+				
+				if ( sr != null && sr.getResponseType() == DownloadScrapeResult.RT_SUCCESS ){
+					
+					int seeds_peers = sr.getSeedCount() + sr.getNonSeedCount();
+					
+					if ( seeds_peers > 16 ){
+						
+						actively_monitoring = false;
+						
+						return;
+					}
+					
+					poor_swarm = true;
+				}
+				
+				DownloadAnnounceResult ar = download.getLastAnnounceResult();
+				
+				if ( ar != null && ar.getResponseType() == DownloadAnnounceResult.RT_SUCCESS ){
+					
+					int seeds_peers = ar.getSeedCount() + ar.getNonSeedCount();
+					
+					if ( seeds_peers > 16 ){
+						
+						actively_monitoring = false;
+						
+						return;
+					}
+					
+					poor_swarm = true;
+				}
+				
+				if ( !poor_swarm ){
+					
+						// don't know swarm state yet so don't know whether to report or not
+					
+					return;
+				}
+			}
+			
 				// download made no progress in the last interval
 			
 			DiskManagerFileInfoSet file_set = core_dm.getDiskManagerFileInfoSet();
@@ -428,7 +490,9 @@ RatingsUpdater
 				core_dm.setUserData( reseed_asked_key, "" );
 				
 				final String msg_prefix = "Please seed! File '";
-				final String message 	= msg_prefix + worst_file.getTorrentFile().getRelativePath() + "' is stuck with an availability of " + worst_avail + ".";
+				final String file_name	= worst_file.getTorrentFile().getRelativePath();
+				
+				final String message 	= msg_prefix + file_name + "' is stuck with an availability of " + worst_avail + "!";
 				
 				if ( BuddyPluginUtils.isBetaChatAvailable()){
 					
@@ -445,62 +509,55 @@ RatingsUpdater
 											
 										chat.setAutoNotify( true );
 										
-										final Runnable do_write = 
-											new Runnable()
-											{
-												public void
-												run()
-												{		
-													Map<String,Object>	flags 	= new HashMap<String, Object>();
-													
-													flags.put( BuddyPluginBeta.FLAGS_MSG_ORIGIN_KEY, BuddyPluginBeta.FLAGS_MSG_ORIGIN_RATINGS );
-													
-													Map<String,Object>	options = new HashMap<String, Object>();
-													
-													chat.sendMessage( message, flags, options );
-												}
-											};
+										final TimerEventPeriodic[] event = { null };
 										
-										String str = download.getAttribute( attributeStallState );
-
-										boolean	 written = str != null && str.equals( "w" );
-											
-										if ( written ){
-											
-											final TimerEventPeriodic[] event = { null };
-											
-											event[0] = 
-												SimpleTimer.addPeriodicEvent(
-													"Rating:chat:checker",
-													30*1000,
-													new TimerEventPerformer()
+										event[0] = 
+											SimpleTimer.addPeriodicEvent(
+												"Rating:chat:checker",
+												30*1000,
+												new TimerEventPerformer()
+												{
+													private int elapsed_time;
+			
+													public void 
+													perform(
+														TimerEvent e ) 
 													{
-														private int elapsed_time;
-				
-														public void 
-														perform(
-															TimerEvent e ) 
-														{
-															elapsed_time += 30*1000;
+														elapsed_time += 30*1000;
+														
+															// get sync state before messages to things work reliably
+														
+														int	sync_state = chat.getIncomingSyncState();
+														
+														List<ChatMessage>	messages = chat.getMessages();
+														
+														if ( chat.isDestroyed()){
+																															
+															event[0].cancel();
 															
-																// get sync state before messages to things work reliably
+														}else{
+														
+															long now = SystemTime.getCurrentTime();
 															
-															int	sync_state = chat.getIncomingSyncState();
-															
-															List<ChatMessage>	messages = chat.getMessages();
-															
-															if ( chat.isDestroyed()){
-																																
-																event[0].cancel();
+															for ( ChatMessage message: messages ){
 																
-															}else{
-															
-															
-																for ( ChatMessage message: messages ){
+																String msg = message.getMessage();
+																
+																if ( message.getParticipant().isMe()){
 																	
-																	if ( message.getParticipant().isMe()){
+																	if ( msg.startsWith( msg_prefix )){
 																		
-																		if ( message.getMessage().startsWith( msg_prefix )){
+																		event[0].cancel();
+																		
+																		return;
+																	}
+																}else{
+																	
+																		// someone else recently reported?
+																	
+																	if ( msg.startsWith( msg_prefix ) && msg.contains( file_name )){
+																	
+																		if ( now - message.getTimeStamp() < 12*60*60*1000 ){
 																			
 																			event[0].cancel();
 																			
@@ -508,23 +565,24 @@ RatingsUpdater
 																		}
 																	}
 																}
+															}
+															
+															if ( 	sync_state == 0 ||
+																	elapsed_time >= 5*60*1000 ){
 																
-																if ( 	sync_state == 0 ||
-																		elapsed_time >= 5*60*1000 ){
-																	
-																	do_write.run();
-																	
-																	event[0].cancel();
-																}
+																event[0].cancel();
+
+																Map<String,Object>	flags 	= new HashMap<String, Object>();
+																
+																flags.put( BuddyPluginBeta.FLAGS_MSG_ORIGIN_KEY, BuddyPluginBeta.FLAGS_MSG_ORIGIN_RATINGS );
+																
+																Map<String,Object>	options = new HashMap<String, Object>();
+																
+																chat.sendMessage( message, flags, options );																
 															}
 														}
-													});
-										}else{
-											
-											do_write.run();
-											
-											download.setAttribute( attributeStallState, "w" );
-										}
+													}
+												});
 									}
 								}
 							});
