@@ -21,26 +21,18 @@
 package com.aelitis.plugins.rcmplugin;
 
 import java.util.*;
+import java.util.List;
 
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.PaintEvent;
-import org.eclipse.swt.events.PaintListener;
-import org.eclipse.swt.events.SelectionEvent;
-import org.eclipse.swt.events.SelectionAdapter;
+import org.eclipse.swt.events.*;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.FormLayout;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.RowLayout;
-import org.eclipse.swt.widgets.Button;
-import org.eclipse.swt.widgets.Canvas;
-import org.eclipse.swt.widgets.Composite;
-import org.eclipse.swt.widgets.Event;
-import org.eclipse.swt.widgets.Listener;
-import org.eclipse.swt.widgets.MessageBox;
-import org.eclipse.swt.widgets.TreeItem;
-import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.widgets.*;
+
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.*;
@@ -49,10 +41,7 @@ import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.disk.DiskManagerFileInfo;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.torrent.Torrent;
-import org.gudy.azureus2.plugins.ui.UIInputReceiver;
-import org.gudy.azureus2.plugins.ui.UIInputReceiverListener;
-import org.gudy.azureus2.plugins.ui.UIInstance;
-import org.gudy.azureus2.plugins.ui.UIManager;
+import org.gudy.azureus2.plugins.ui.*;
 import org.gudy.azureus2.plugins.ui.config.*;
 import org.gudy.azureus2.plugins.ui.menus.MenuItem;
 import org.gudy.azureus2.plugins.ui.menus.MenuItemFillListener;
@@ -62,10 +51,7 @@ import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.tables.TableContextMenuItem;
 import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.plugins.ui.tables.TableRow;
-import org.gudy.azureus2.plugins.utils.search.SearchInstance;
-import org.gudy.azureus2.plugins.utils.search.SearchObserver;
-import org.gudy.azureus2.plugins.utils.search.SearchProvider;
-import org.gudy.azureus2.plugins.utils.search.SearchResult;
+import org.gudy.azureus2.plugins.utils.search.*;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.gudy.azureus2.ui.swt.SimpleTextEntryWindow;
 import org.gudy.azureus2.ui.swt.Utils;
@@ -147,7 +133,6 @@ RelatedContentUISWT
 	private MenuItem		root_menu;
 	
 	private Image			swarm_image;
-	private Image[]			vitality_images;
 	
 	private List<MenuItem>	torrent_menus = new ArrayList<MenuItem>();
 		
@@ -311,8 +296,6 @@ RelatedContentUISWT
 		
 		swarm_image = swt_ui.loadImage( "org/gudy/azureus2/ui/icons/rcm.png" );
 	
-		vitality_images = ImageLoader.getInstance().getImages( SPINNER_IMAGE_ID );
-
 		MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
 		
 		if ( mdi != null ){
@@ -650,7 +633,7 @@ RelatedContentUISWT
 								
 								if ( subview != null ){
 									
-									subview.initialise((Composite)event.getData());
+									subview.initialise((Composite)event.getData(), swarm_image);
 								}
 		
 								break;
@@ -703,7 +686,7 @@ RelatedContentUISWT
 		}
 	}
 	
-	private class
+	private static class
 	SubViewHolder
 	{
 		private SWTSkin				skin;
@@ -721,6 +704,8 @@ RelatedContentUISWT
 		private Download			current_dl;
 		private DiskManagerFileInfo	current_file;
 		
+		private Image[]			vitality_images;
+		private Image swarm_image;
 		
 		private
 		SubViewHolder(
@@ -731,9 +716,15 @@ RelatedContentUISWT
 		
 		private void
 		initialise(
-			Composite		parent )
+			Composite		parent,
+			Image swarm_image)
 		{		
-			Composite header = new Composite( parent, SWT.NULL );
+			
+			this.swarm_image = swarm_image;
+			vitality_images = ImageLoader.getInstance().getImages( SPINNER_IMAGE_ID );
+
+
+			Composite header = new Composite( parent, SWT.NONE );
 			
 			RowLayout header_layout = new RowLayout();
 			
@@ -925,7 +916,7 @@ RelatedContentUISWT
 			
 			if ( current_data_source != null ){
 				
-				current_data_source.destroy( false );
+				current_data_source.destroy();
 			}
 			
 			final SWTSkinObject so = skin.getSkinObjectByID( "rcmsubskinview" );
@@ -1045,7 +1036,12 @@ RelatedContentUISWT
 			
 			if ( current_data_source != null ){
 				
-				current_data_source.destroy( false );
+				current_data_source.destroy();
+			}
+			
+			if (vitality_images != null) {
+				vitality_images = null;
+				ImageLoader.getInstance().releaseImage( SPINNER_IMAGE_ID );
 			}
 		}
 	}
@@ -1904,6 +1900,12 @@ RelatedContentUISWT
 										view.getTitle(),
 										view, null, true, null );
 								
+								entry.addListener(new MdiChildCloseListener() {
+									public void mdiChildEntryClosed(MdiEntry parent, MdiEntry child,
+											boolean user) {
+										removeFromItemMap(hash);
+									}
+								});
 								new_si.setMdiEntry(entry);
 								if (entry instanceof SideBarEntrySWT) {
 									new_si.setTreeItem( ((SideBarEntrySWT)entry).getTreeItem() );
@@ -1991,6 +1993,13 @@ RelatedContentUISWT
 									
 									new_si.setMdiEntry(entry);
 									
+									entry.addListener(new MdiChildCloseListener() {
+										public void mdiChildEntryClosed(MdiEntry parent, MdiEntry child,
+												boolean user) {
+											removeFromItemMap(dummy_hash);
+										}
+									});
+
 									if (entry instanceof SideBarEntrySWT){
 										
 										new_si.setTreeItem( ((SideBarEntrySWT)entry).getTreeItem() );
@@ -2123,6 +2132,12 @@ RelatedContentUISWT
 											view.getTitle(),
 											view, null, true, null );
 									
+									entry.addListener(new MdiChildCloseListener() {
+										public void mdiChildEntryClosed(MdiEntry parent, MdiEntry child,
+												boolean user) {
+											removeFromItemMap(dummy_hash);
+										}
+									});
 									new_si.setMdiEntry(entry);
 									
 									if (entry instanceof SideBarEntrySWT){
@@ -2350,6 +2365,13 @@ RelatedContentUISWT
 										view.getTitle(),
 										view, null, true, null );
 								
+								entry.addListener(new MdiChildCloseListener() {
+									public void mdiChildEntryClosed(MdiEntry parent, MdiEntry child,
+											boolean user) {
+										removeFromItemMap(subs_hash);
+									}
+								});
+
 								new_si.setMdiEntry(entry);
 								
 								if (entry instanceof SideBarEntrySWT){
@@ -2450,7 +2472,7 @@ RelatedContentUISWT
 		isDestroyed();
 	}
 	
-	public class
+	public static class
 	RCMItemContent
 		implements RCMItem
 	{	
@@ -2476,6 +2498,9 @@ RelatedContentUISWT
 		private ByteArrayHashMap<String>	uniques = new ByteArrayHashMap<String>();
 		
 		private int		lookup_starts;
+		
+		private AsyncDispatcher	async_dispatcher = new AsyncDispatcher();
+
 		
 		protected
 		RCMItemContent(
@@ -2615,6 +2640,7 @@ RelatedContentUISWT
 					};
 					
 				
+				RelatedContentManager manager = RelatedContentManager.getSingleton();
 					
 				if ( expression != null ){
 					
@@ -2991,26 +3017,17 @@ RelatedContentUISWT
 			MdiEntry entry,
 			boolean userClosed )
 		{
-			destroy( true );
+			destroy();
 		}
 		
 		protected void
-		destroy(
-			boolean	remove_from_item_map )
+		destroy()
 		{
 			synchronized( this ){
 			
 				content_list.clear();
 				
 				destroyed = true;
-			}
-			
-			if ( remove_from_item_map ){
-			
-				synchronized( RelatedContentUISWT.this ){
-					
-					rcm_item_map.remove( hash );
-				}
 			}
 		}
 		
@@ -3026,7 +3043,7 @@ RelatedContentUISWT
 		}
 	}
 	
-	public class
+	public static class
 	RCMItemSubView
 		extends RCMItemContent
 	{
@@ -3143,7 +3160,7 @@ RelatedContentUISWT
 		complete();
 	}
 	
-	public class
+	public static class
 	RCMItemSubViewEmpty
 		extends RCMItemSubView
 	{
@@ -3497,7 +3514,7 @@ RelatedContentUISWT
 		}
 	}
 	
-	public class
+	public static class
 	SubsRelatedContent
 		extends RelatedContent
 	{
@@ -3612,6 +3629,13 @@ RelatedContentUISWT
 		return( nets );
 	}
 	
+	public void removeFromItemMap(byte[] hash) {
+		synchronized( RelatedContentUISWT.this ){
+			
+			rcm_item_map.remove( hash );
+		}
+	}
+
 	public static class
 	SearchRelatedContent
 		extends RelatedContent
@@ -3711,7 +3735,7 @@ RelatedContentUISWT
 		}
 	}
 	
-	private class 
+	private static class 
 	ImageLabel 
 		extends Canvas implements PaintListener
 	{
