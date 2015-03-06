@@ -698,6 +698,59 @@ RCMPlugin
 	}
 	
 	public void
+	lookupByExpression(
+		String expression )
+	
+		throws IPCException
+	{
+		lookupByExpression( expression, new String[]{ AENetworkClassifier.AT_PUBLIC });
+	}
+	
+	public void
+	lookupByExpression(
+		final String 	expression,
+		final String[]	networks )
+	
+		throws IPCException
+	{
+		RelatedContentUI current_ui = ui;
+		
+		if ( current_ui == null ){
+			
+			throw( new IPCException( "UI not bound" ));
+		}
+		
+		if ( !hasFTUXBeenShown() || !isRCMEnabled()){
+			
+			current_ui.showFTUX(
+				new UserPrompterResultListener()
+				{
+					public void 
+					prompterClosed(
+						int result) 
+					{
+						if ( isRCMEnabled()){
+							
+							RelatedContentUI current_ui = ui;
+							
+							if ( current_ui != null ){
+							
+								current_ui.setUIEnabled( true );
+								
+								current_ui.addSearch( expression, networks );
+							}
+						}
+					}
+				});
+		}else{
+			
+			current_ui.setUIEnabled( true );
+			
+			current_ui.addSearch( expression, networks );
+		}
+	}
+	
+	public void
 	lookupByHash(
 		final byte[]	hash,
 		final String	name )
