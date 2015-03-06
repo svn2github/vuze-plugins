@@ -92,7 +92,6 @@ import com.aelitis.azureus.core.content.AzureusContentDownload;
 import com.aelitis.azureus.core.content.AzureusContentFile;
 import com.aelitis.azureus.core.content.AzureusContentFilter;
 import com.aelitis.azureus.core.devices.*;
-import com.aelitis.azureus.core.devices.impl.DeviceUPnPImpl;
 import com.aelitis.azureus.core.util.CopyOnWriteList;
 import com.aelitis.azureus.core.util.UUIDGenerator;
 import com.aelitis.azureus.plugins.upnp.UPnPMapping;
@@ -1779,8 +1778,8 @@ UPnPMediaServer
 					}
 					
 					public void checkForImage(Device device) {
-						if (device instanceof DeviceUPnPImpl) {
-							DeviceUPnPImpl deviceUPnP = (DeviceUPnPImpl) device;
+						if (device instanceof DeviceUPnP) {
+							DeviceUPnP deviceUPnP = (DeviceUPnP) device;
 							UPnPDevice uPnPDevice2 = deviceUPnP.getUPnPDevice();
 							if (upnpDevice.equals(uPnPDevice2)) {
 								deviceManager.removeListener(this);
