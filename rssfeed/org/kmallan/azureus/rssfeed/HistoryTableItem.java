@@ -71,12 +71,16 @@ public class HistoryTableItem extends TableItem {
       output.append("Filter Matched");
       if(data.getFiltName() != null) output.append(String.format(": '%s'", data.getFiltName()));
       output.append(" Type: ").append(data.getFiltType());
-      if(data.getSeasonStart() >= 0) {
-        output.append(String.format(" - %s Ep %dx%d", data.getShowTitle(), data.getSeasonStart(), data.getEpisodeStart()));
-        if(data.getSeasonEnd() > data.getSeasonStart())
-          output.append(String.format("-%dx%d", data.getSeasonEnd(), data.getEpisodeEnd()));
-        else if(data.getEpisodeEnd() > data.getEpisodeStart())
-          output.append("-").append(data.getEpisodeEnd());
+      if ("TVShow".equalsIgnoreCase(data.getFiltType())) {
+        if(data.getSeasonStart() >= 0) {
+          output.append(String.format(" - %s Ep %dx%d", data.getTitle(), data.getSeasonStart(), data.getEpisodeStart()));
+          if(data.getSeasonEnd() > data.getSeasonStart())
+            output.append(String.format("-%dx%d", data.getSeasonEnd(), data.getEpisodeEnd()));
+          else if(data.getEpisodeEnd() > data.getEpisodeStart())
+            output.append("-").append(data.getEpisodeEnd());
+        }
+      } else if ("Movie".equalsIgnoreCase(data.getFiltType())) {
+        output.append(String.format(" - %s (%d)", data.getTitle(), data.getYear()));
       }
     } else {
       output.append("Manual Download");

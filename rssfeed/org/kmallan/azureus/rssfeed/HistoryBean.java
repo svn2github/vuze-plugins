@@ -28,7 +28,8 @@ public class HistoryBean implements Serializable, Comparable {
 
   private String fileData, location, filtType, filtName;
   private long histId, filtId;
-  private String showTitle;
+  private String title;
+  private int year;
   private int seasonStart, seasonEnd, episodeStart, episodeEnd;
   private boolean proper;
 
@@ -77,7 +78,7 @@ public class HistoryBean implements Serializable, Comparable {
       return false;
     }
 
-    setShowTitle(episode.showTitle);
+    setTitle(episode.showTitle);
     setProper(episode.isProper());
     setSeasonStart(episode.seasonStart);
     setSeasonEnd(episode.seasonEnd);
@@ -86,12 +87,33 @@ public class HistoryBean implements Serializable, Comparable {
     return true;
   }
 
-  public String getShowTitle() {
-    return showTitle;
+  public boolean setMovie(String str) {
+    final Movie movie = FilterBean.getMovie(str);
+//    final Movie movie = null;
+    if (movie != null) {
+      setTitle(movie.getTitle());
+      setYear(movie.getYear());
+      setProper(movie.isProper());
+      return true;
+    }
+    return false;
   }
 
-  public void setShowTitle(String showTitle) {
-    this.showTitle = showTitle;
+
+  public String getTitle() {
+    return title;
+  }
+
+  public void setTitle(String title) {
+    this.title = title;
+  }
+
+  public int getYear() {
+    return year;
+  }
+
+  public void setYear(int year) {
+    this.year = year;
   }
 
   public boolean isProper() {

@@ -60,7 +60,7 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
   public Composite optParamComp;
   private ScrolledComposite optParamScrollComp;
 
-  public Composite filtParamComp, filtSpecificTVShow, filtSpecificOther, filtSpecificNone;
+  public Composite filtParamComp, filtSpecificTVShow, filtSpecificOther;
   public Table filtTable;
   private ToolItem btnFiltUp, btnFiltAdd, btnFiltCopy, btnFiltRemove, btnFiltDown;
   private Button btnFiltStoreDir, btnFiltFileBrowse, btnFiltFileEdit, btnFiltAccept, btnFiltReset, btnFiltCancel;
@@ -566,6 +566,7 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
     layoutData.widthHint = 200;
     filtType.setLayoutData(layoutData);
     filtType.add(MessageText.getString("RSSFeed.Options.Filter.filtType.TVShow"));
+    filtType.add(MessageText.getString("RSSFeed.Options.Filter.filtType.Movie"));
     filtType.add(MessageText.getString("RSSFeed.Options.Filter.filtType.Other"));
     filtType.add(MessageText.getString("RSSFeed.Options.Filter.filtType.None"));
     filtType.select(0);
@@ -622,15 +623,6 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
     setupLabel(filtSpecificOther, "RSSFeed.Options.Filter.Other.Options", 75);
     filtDisable = new Button(filtSpecificOther, SWT.CHECK);
     Messages.setLanguageText(filtDisable, "RSSFeed.Options.Filter.Other.Options.Disable");
-
-    // Options Folder - Filter Params - None Specific
-    filtSpecificNone = new Composite(filtSpecific, SWT.NULL);
-    layout = setupGridLayout(1, 0, 0, 0, 0);
-    layoutData = new GridData(GridData.FILL_HORIZONTAL);
-    layoutData.heightHint = 1;
-    filtSpecificNone.setLayout(layout);
-    filtSpecificNone.setLayoutData(layoutData);
-    new Label(filtSpecificNone, SWT.NULL);
 
     // Options Folder - Filter Params - End Specific
     filtChooseSpecific(filtType.getSelectionIndex());
@@ -1130,6 +1122,8 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
       tmpBean.setFilter(filter);
       if("TVShow".equalsIgnoreCase(filter.getType())) {
         if(!tmpBean.setSeason(listBean.getName().toLowerCase())) tmpBean.setSeason(listBean.getLocation().toLowerCase());
+      } else if ("Movie".equalsIgnoreCase(filter.getType())) {
+        if(!tmpBean.setMovie(listBean.getName().toLowerCase())) tmpBean.setMovie(listBean.getLocation().toLowerCase());
       }
     } // else manual download
 
@@ -1346,10 +1340,6 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
         layoutData = new GridData();
         layoutData.heightHint = 0;
         filtSpecificOther.setLayoutData(layoutData);
-        filtSpecificNone.setVisible(false);
-        layoutData = new GridData();
-        layoutData.heightHint = 0;
-        filtSpecificNone.setLayoutData(layoutData);
         layoutData = new GridData(GridData.FILL_HORIZONTAL);
         filtSpecificTVShow.setLayoutData(layoutData);
         filtSpecificTVShow.setVisible(true);
@@ -1359,10 +1349,6 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
         layoutData = new GridData();
         layoutData.heightHint = 0;
         filtSpecificTVShow.setLayoutData(layoutData);
-        filtSpecificNone.setVisible(false);
-        layoutData = new GridData();
-        layoutData.heightHint = 0;
-        filtSpecificNone.setLayoutData(layoutData);
         layoutData = new GridData(GridData.FILL_HORIZONTAL);
         filtSpecificOther.setLayoutData(layoutData);
         filtSpecificOther.setVisible(true);
@@ -1376,10 +1362,15 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
         layoutData = new GridData();
         layoutData.heightHint = 0;
         filtSpecificOther.setLayoutData(layoutData);
-        layoutData = new GridData(GridData.FILL_HORIZONTAL);
-        layoutData.heightHint = 1;
-        filtSpecificNone.setLayoutData(layoutData);
-        filtSpecificNone.setVisible(true);
+      case 3:
+        filtSpecificTVShow.setVisible(false);
+        layoutData = new GridData();
+        layoutData.heightHint = 0;
+        filtSpecificTVShow.setLayoutData(layoutData);
+        filtSpecificOther.setVisible(false);
+        layoutData = new GridData();
+        layoutData.heightHint = 0;
+        filtSpecificOther.setLayoutData(layoutData);
     }
 
     optParamScrollComp.setMinSize(optParamComp.computeSize(SWT.DEFAULT, SWT.DEFAULT));

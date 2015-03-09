@@ -40,6 +40,9 @@ public class FilterBean implements Serializable {
   private long	minTorrentSize;
   private long  maxTorrentSize;
 
+  // Most movie torrents will follow the naming convention <title><delimiters><year>
+  public static Pattern moviePattern = Pattern.compile("^(.*)[._\\-\\s]+\\(?(\\d{4})");
+
   private static final Pattern[] episodePatterns = new Pattern[] {
       Pattern.compile("(.*?)" + "s([0-9]+)e([0-9]+)[\\-\\+]s([0-9]+)e([0-9]+)" + ".*?"),
       Pattern.compile("(.*?)" + "s([0-9]+)e([0-9]+)[\\-\\+]e([0-9]+)" + ".*?"),
@@ -319,10 +322,7 @@ public class FilterBean implements Serializable {
   }
 
   public static Episode getSeason(String str) {
-    str = str.toLowerCase();
-    Pattern lmp = Pattern.compile("(ht|f)tp:.*/(.*?)");
-    Matcher lmm = lmp.matcher(str);
-    if(lmm.matches()) str = lmm.group(2); // strip if url
+    str = cleanupUrl(str.toLowerCase());
 
     String showTitle = "";
     int seasonStart, seasonEnd, episodeStart, episodeEnd;
@@ -364,6 +364,30 @@ public class FilterBean implements Serializable {
     }
 
     return e;
+  }
+
+  public static Movie getMovie(String str) {
+    final Matcher m = moviePattern.matcher(cleanupUrl(str.toLowerCase()));
+    if(!m.find()) {
+      Plugin.debugOut("No match: " + str);
+      return null;
+    }
+
+    final String title = stringClean(m.group(1));
+    final int year = Integer.parseInt(m.group(2));
+    final int end = m.end(m.groupCount());
+    final boolean isProper = properPattern.matcher(str.substring(end)).find();
+
+    final Movie movie = new Movie(title, year, isProper);
+    Plugin.debugOut("Matched movie: " + movie);
+    return movie;
+  }
+
+  private static String cleanupUrl(String str) {
+    Pattern lmp = Pattern.compile("(ht|f)tp:.*/(.*?)");
+    Matcher lmm = lmp.matcher(str);
+    if(lmm.matches()) str = lmm.group(2); // strip if url
+    return str;
   }
 
   public static String stringClean(String str) {

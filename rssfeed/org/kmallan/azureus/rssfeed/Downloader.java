@@ -266,8 +266,20 @@ public class Downloader extends InputStream {
 							  state = DOWNLOADER_NOTMODIFIED;
 							  return;
 						  } else if((response != HttpURLConnection.HTTP_ACCEPTED) && (response != HttpURLConnection.HTTP_OK)) {
-							  error("Bad response for '" + url.toString() + "': " + Integer.toString(response) + " " + ((HttpURLConnection)con).getResponseMessage());
-							  return;
+                              if (response == HttpURLConnection.HTTP_MOVED_PERM || response == HttpURLConnection.HTTP_MOVED_TEMP) {
+                                final String location = con.getHeaderField("Location");
+                                Plugin.debugOut("Redirected: " + _urlStr + " -> " + location);
+                                if (location != null && !location.equals(_urlStr)) {
+                                  init(location, accept, referer, cookie, lastModSince, oldEtag);
+                                } else {
+                                  error("Suspicious redirect: " + location);
+                                }
+                                return;
+                              } else {
+                                error("Bad response for '" + url.toString() + "': " + Integer.toString(
+                                    response) + " " + ((HttpURLConnection) con).getResponseMessage());
+                                return;
+                              }
 						  }
 						  contentType = con.getContentType();
 						  lastModified = con.getLastModified();

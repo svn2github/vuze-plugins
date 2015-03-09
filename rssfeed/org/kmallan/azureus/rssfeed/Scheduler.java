@@ -496,14 +496,27 @@ public class Scheduler extends TimerTask {
         }
       }
       Episode e = null;
+      Movie m = null;
       final FilterBean filterBean = curFilter;
-      if(filterBean != null && "TVShow".equalsIgnoreCase(filterBean.getType())) {
-        try {
-          e = FilterBean.getSeason(titleTest);
-        } catch (Exception ee) {}
-        try {
-          if(e == null) e = FilterBean.getSeason(linkTest);
-        } catch (Exception ee) {}
+      if (filterBean != null) {
+        if ("TVShow".equalsIgnoreCase(filterBean.getType())) {
+          try {
+            e = FilterBean.getSeason(titleTest);
+          } catch (Exception ee) {
+          }
+          try {
+            if (e == null) {
+              e = FilterBean.getSeason(linkTest);
+            }
+          } catch (Exception ee) {
+          }
+        } else if ("Movie".equalsIgnoreCase(filterBean.getType())) {
+          m = FilterBean.getMovie(titleTest);
+          if (m == null) {
+            m = FilterBean.getMovie(linkTest);
+          }
+          Plugin.debugOut("Download is a movie: " + m);
+        }
       }
 
       if(state == ListBean.DOWNLOAD_INCL) {
@@ -518,7 +531,7 @@ public class Scheduler extends TimerTask {
             }
 
             if(e != null && histBean.getSeasonStart() >= 0 && filterBean.getUseSmartHistory()) {
-              final String showTitle = histBean.getShowTitle();
+              final String showTitle = histBean.getTitle();
 
               // Old history beans may not have set showTitle so keep using the old way of matching
               if (showTitle == null ? (histBean.getFiltID() == filterBean.getID()) : showTitle.equalsIgnoreCase(e.showTitle)) {
@@ -535,6 +548,11 @@ public class Scheduler extends TimerTask {
                     break;
                   }
                 }
+              }
+            } else if (m != null && m.getTitle().equals(histBean.getTitle()) && m.getYear() == histBean.getYear()) {
+              if (histBean.isProper() || !m.isProper()) {
+                Plugin.debugOut("found movie match: " + m);
+                state = ListBean.DOWNLOAD_HIST;
               }
             }
           }
