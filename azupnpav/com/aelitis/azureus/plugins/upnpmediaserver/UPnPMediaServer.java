@@ -681,6 +681,7 @@ UPnPMediaServer
 						UIInstance		instance )
 					{
 						uiInstance = instance;
+						
 						if ( instance.getUIType() == UIInstance.UIT_SWT ){	
 					
 							ui_manager.removeUIListener( this );
@@ -1451,12 +1452,15 @@ UPnPMediaServer
 
 				renderer.play(item, stream_id, new UPnPMediaServerErrorListener() {
 					public void upnpSoapException(UPnPException e) {
+						if ( uiInstance == null ){
+							return;
+						}
 						String title = MessageText.getString("upnpmediaserver.playto.error.title");
 						if (e.fault != null && e.fault.length() > 0) {
 							uiInstance.promptUser(title, e.fault_code + ": " + e.fault,
 									new String[] {
-										"Ok"
-									}, 0);
+									"Ok"
+							}, 0);
 							return;
 						} else if (e.resp_doc != null) {
 							// could do something here
@@ -1548,12 +1552,13 @@ UPnPMediaServer
 				}
 			}
 			
-			
-			UIToolBarManager tbm = uiInstance.getToolBarManager();
-			if (tbm != null) {
-  			for (UPnPMediaRenderer renderer : renderers) {
-					tbm.removeToolBarItem("" + renderer.hashCode());
-  			}
+			if ( uiInstance != null ){
+				UIToolBarManager tbm = uiInstance.getToolBarManager();
+				if (tbm != null) {
+		  			for (UPnPMediaRenderer renderer : renderers) {
+							tbm.removeToolBarItem("" + renderer.hashCode());
+		  			}
+				}
 			}
 
 			
@@ -1671,8 +1676,16 @@ UPnPMediaServer
 			
 			renderers.remove( renderer );
 		}
-		UIToolBarManager tbm = uiInstance.getToolBarManager();
-		tbm.removeToolBarItem("" + renderer.hashCode());
+		
+		if ( uiInstance != null ){
+			
+			UIToolBarManager tbm = uiInstance.getToolBarManager();
+			
+			if ( tbm != null ){
+			
+				tbm.removeToolBarItem("" + renderer.hashCode());
+			}
+		}
 	}
 
 	protected void 
@@ -1686,7 +1699,19 @@ UPnPMediaServer
 		
 		UIManager	ui_manager = plugin_interface.getUIManager();
 		
+		if ( uiInstance == null ){
+
+			return;
+		}
+		
+		
 		UIToolBarManager tbm = uiInstance.getToolBarManager();
+		
+		if ( tbm == null ){
+			
+			return;
+		}
+		
 		final UIToolBarItem toolBarItem = tbm.createToolBarItem("" + new_renderer.hashCode());
 		dataSourceChanged(ui_manager.getDataSource()); // sets enabled
 		toolBarItem.setGroupID("players");
@@ -1792,7 +1817,7 @@ UPnPMediaServer
 					}
 				});
 			}
-    }
+    	}
     
 
 		tbm.addToolBarItem(toolBarItem);
@@ -4157,7 +4182,6 @@ UPnPMediaServer
 		if (uiInstance == null) {
 			return;
 		}
-		UIToolBarManager tbm = uiInstance.getToolBarManager();
 		boolean enable = true;
 		
 		Object singleDS = null;
@@ -4176,6 +4200,11 @@ UPnPMediaServer
 				|| (singleDS instanceof DiskManagerFileInfo)
 				|| (singleDS instanceof TranscodeFile);
 
+		UIToolBarManager tbm = uiInstance.getToolBarManager();
+
+		if ( tbm == null ){
+			return;
+		}
 		synchronized( renderers ){
 
 			for (UPnPMediaRenderer renderer : renderers) {
