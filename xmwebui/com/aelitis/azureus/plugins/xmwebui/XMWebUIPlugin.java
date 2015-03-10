@@ -1144,7 +1144,7 @@ XMWebUIPlugin
 					"X-Transmission-Session-Id");
 		}
 
-		System.out.println("header_session_id=" + header_session_id);
+		//System.out.println("header_session_id=" + header_session_id);
 
 		if (header_session_id == null) {
 			return false;
