@@ -32,7 +32,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -62,7 +61,6 @@ import net.i2p.data.Base32;
 import net.i2p.data.Base64;
 import net.i2p.data.Destination;
 import net.i2p.util.NativeBigInteger;
-import net.i2p.util.NativeBigInteger.ModPowLimiter;
 
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.torrent.TOTorrent;
@@ -229,6 +227,15 @@ I2PHelperPlugin
 		        mod_pow_limiter.handleCall( start, System.nanoTime());
 		        return( result );
 		    }
+		    
+		
+		Router Console app
+		Fix the loading 
+		
+		LocalClientAppsJob - replace system class - 2 places
+                _cl = LoadClientAppsJob.class.getClassLoader(); // PARG ClassLoader.getSystemClassLoader();
+                cl = LoadClientAppsJob.class.getClassLoader(); // PARG ClassLoader.getSystemClassLoader();
+
 	*/
 	
 	private static final String	BOOTSTRAP_SERVER = "http://i2pboot.vuze.com:60000/?getNodes=true";
