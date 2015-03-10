@@ -115,10 +115,15 @@ I2PHelperRouterDHT
 	initialiseDHT(
 		String			i2p_host,
 		int				i2p_port,
+		String			name,
 		Properties		sm_properties )
 		
 		throws Exception
 	{
+		sm_properties = new Properties( sm_properties );
+		
+		sm_properties.setProperty( "outbound.nickname", "Vuze DHT: " + name ); 
+
 		try{
 			synchronized( init_lock ){
 			

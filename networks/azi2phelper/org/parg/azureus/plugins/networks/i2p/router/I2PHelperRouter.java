@@ -76,8 +76,23 @@ I2PHelperRouter
 	public static final String	PARAM_SHARE_PERCENT			= "azi2phelper.share.percent";
 	public static final int		PARAM_SHARE_PERCENT_DEFAULT	= 25;
 	
+	public static final String	PARAM_INBOUND_HOPS				= "azi2phelper.inbound.hops";
+	public static final int		PARAM_INBOUND_HOPS_DEFAULT		= 3;	// increased from 2 on 2015/03/09
+	
+	public static final String	PARAM_INBOUND_QUANTITY			= "azi2phelper.inbound.quantity";
+	public static final int		PARAM_INBOUND_QUANTITY_DEFAULT	= 4;
+	
+	public static final String	PARAM_OUTBOUND_HOPS				= "azi2phelper.outbound.hops";
+	public static final int		PARAM_OUTBOUND_HOPS_DEFAULT		= 3;	// increased from 2 on 2015/03/09
+
+	public static final String	PARAM_OUTBOUND_QUANTITY			= "azi2phelper.outbound.quantity";
+	public static final int		PARAM_OUTBOUND_QUANTITY_DEFAULT	= 4;
+
+	
 	public static final int		DHT_MIX			= 0;
 	public static final int		DHT_NON_MIX		= 1;
+	
+	private static final String[]	DHT_NAMES = { "Mixed", "Pure" };
 	
 	private static final boolean	FULL_STATS = false;
 
@@ -156,6 +171,22 @@ I2PHelperRouter
 			
 			def = PARAM_SHARE_PERCENT_DEFAULT;
 			
+		}else if ( name == PARAM_INBOUND_HOPS ){
+			
+			def = PARAM_INBOUND_HOPS_DEFAULT;
+			
+		}else if ( name == PARAM_INBOUND_QUANTITY ){
+			
+			def = PARAM_INBOUND_QUANTITY_DEFAULT;
+			
+		}else if ( name == PARAM_OUTBOUND_HOPS ){
+			
+			def = PARAM_OUTBOUND_HOPS_DEFAULT;
+			
+		}else if ( name == PARAM_OUTBOUND_QUANTITY ){
+			
+			def = PARAM_OUTBOUND_QUANTITY_DEFAULT;
+			
 		}else{
 			
 			Debug.out( "Unknown parameter: " + name );
@@ -172,6 +203,13 @@ I2PHelperRouter
 			
 			return( def );
 		}
+	}
+	
+	private String
+	getIntegerParameterAsString(
+		String	name )
+	{
+		return( String.valueOf( getIntegerParameter( name )));
 	}
 	
 	private void
@@ -222,12 +260,6 @@ I2PHelperRouter
 		props.put( "i2np.bandwidth.outboundKBytesPerSecond", base_out );	
 		
 		props.put( "router.sharePercentage", share_pct );
-	}
-	
-	public Map<String,Object>
-	getProperties()
-	{
-		return( router_properties );
 	}
 	
 	public void
@@ -296,12 +328,14 @@ I2PHelperRouter
         
         opts.setProperty( "i2p.streaming.disableRejectLogging", "false");
         opts.setProperty( "i2cp.dontPublishLeaseSet", "false" );
-        opts.setProperty( "inbound.length", "2" );
+        opts.setProperty( "inbound.length", getIntegerParameterAsString( PARAM_INBOUND_HOPS ));
+        opts.setProperty( "inbound.quantity", getIntegerParameterAsString( PARAM_INBOUND_QUANTITY )); 
         opts.setProperty( "inbound.lengthVariance", "0" );
-        opts.setProperty( "outbound.length", "2" ); 
+        opts.setProperty( "outbound.nickname", "Vuze" ); 
+        opts.setProperty( "outbound.length", getIntegerParameterAsString( PARAM_OUTBOUND_HOPS )); 
+        opts.setProperty( "outbound.quantity",  getIntegerParameterAsString( PARAM_OUTBOUND_QUANTITY ));
         opts.setProperty( "outbound.lengthVariance", "0" ); 
-        opts.setProperty( "inbound.quantity", "4" ); 
-        opts.setProperty( "outbound.quantity", "4" );
+
 	}
 	
 	private void
@@ -536,7 +570,7 @@ I2PHelperRouter
 	{
 			// second DHT is lazy initialised if/when selected
 		
-		dhts[DHT_MIX].initialiseDHT( i2p_host, i2p_port, sm_properties );
+		dhts[DHT_MIX].initialiseDHT( i2p_host, i2p_port, DHT_NAMES[DHT_MIX], sm_properties );
 	}
 	
 	public I2PHelperRouterDHT
@@ -626,7 +660,7 @@ I2PHelperRouter
 		if ( !dht.isDHTInitialised()){
 				
 			try{
-				dht.initialiseDHT( i2p_host, i2p_port, sm_properties );
+				dht.initialiseDHT( i2p_host, i2p_port, DHT_NAMES[DHT_NON_MIX], sm_properties );
 					
 			}catch( Throwable e ){
 			}
@@ -651,7 +685,7 @@ I2PHelperRouter
 		if ( !dht.isDHTInitialised()){
 			
 			try{
-				dht.initialiseDHT( i2p_host, i2p_port, sm_properties );
+				dht.initialiseDHT( i2p_host, i2p_port, DHT_NAMES[index], sm_properties );
 				
 			}catch( Throwable e ){
 			}
@@ -1066,7 +1100,11 @@ I2PHelperRouter
 		        	InputStream is = new FileInputStream( dest_key_file );
 		        	
 			    	try{
-			    		sm = I2PSocketManagerFactory.createManager( is, i2p_host, i2p_port, sm_properties );
+			    		Properties sm_props = new Properties( sm_properties );
+			    		
+			    		sm_props.setProperty( "outbound.nickname", "Vuze: " + server_id ); 
+			    		
+			    		sm = I2PSocketManagerFactory.createManager( is, i2p_host, i2p_port, sm_props );
 			    	
 			    	}finally{
 			    		

@@ -575,35 +575,7 @@ I2PHelperPlugin
 			final IntParameter up_limit_param 		= config_model.addIntParameter2( I2PHelperRouter.PARAM_SEND_KBS, I2PHelperRouter.PARAM_SEND_KBS, I2PHelperRouter.PARAM_SEND_KBS_DEFAULT, 0, Integer.MAX_VALUE );
 			final IntParameter down_limit_param 	= config_model.addIntParameter2( I2PHelperRouter.PARAM_RECV_KBS, I2PHelperRouter.PARAM_RECV_KBS, I2PHelperRouter.PARAM_RECV_KBS_DEFAULT, 0, Integer.MAX_VALUE );
 			final IntParameter share_percent_param 	= config_model.addIntParameter2( I2PHelperRouter.PARAM_SHARE_PERCENT, I2PHelperRouter.PARAM_SHARE_PERCENT, I2PHelperRouter.PARAM_SHARE_PERCENT_DEFAULT, 10, 100 );
-
-			final Map<String,Object>	router_properties = new HashMap<String, Object>();
-			
-			ParameterListener rate_change_listener = 
-				new ParameterListener()
-				{
-					public void 
-					parameterChanged(
-						Parameter param) 
-					{
-						router_properties.put( I2PHelperRouter.PARAM_SEND_KBS, up_limit_param.getValue());
-						router_properties.put( I2PHelperRouter.PARAM_RECV_KBS, down_limit_param.getValue());
-						router_properties.put( I2PHelperRouter.PARAM_SHARE_PERCENT, share_percent_param.getValue());
-
-						I2PHelperRouter current_router = router;
 						
-						if ( current_router != null ){
-							
-							current_router.updateProperties();
-						}
-					}
-				};
-			
-			rate_change_listener.parameterChanged( null );
-			
-			up_limit_param.addListener( rate_change_listener );
-			down_limit_param.addListener( rate_change_listener );
-			share_percent_param.addListener( rate_change_listener );
-			
 			ParameterListener link_listener = 
 				new ParameterListener()
 				{
@@ -717,6 +689,8 @@ I2PHelperPlugin
 			
 			i2p_address_param 	= config_model.addInfoParameter2( "azi2phelper.i2p.address", getMessageText( "azi2phelper.i2p.address.pending" ));
 			
+			i2p_address_param.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
+			
 			final ActionParameter new_id = config_model.addActionParameter2( "azi2phelper.new.identity", "azi2phelper.new.identity.button" );
 			
 			new_id.addListener(
@@ -784,11 +758,74 @@ I2PHelperPlugin
 			}
 						
 			int_port_param 		= config_model.addIntParameter2( "azi2phelper.internal.port", "azi2phelper.internal.port", 0 );
+			
+			int_port_param.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
+
 			ext_port_param	 	= config_model.addIntParameter2( "azi2phelper.external.port", "azi2phelper.external.port", 0 );
+			
+			ext_port_param.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
+			
+			final InfoParameter tunnel_info_param = config_model.addInfoParameter2( "azi2phelper.tunnel.info", "" );
+			
+			tunnel_info_param.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
+		
+			final IntParameter in_hops_param 		= config_model.addIntParameter2( I2PHelperRouter.PARAM_INBOUND_HOPS, I2PHelperRouter.PARAM_INBOUND_HOPS, I2PHelperRouter.PARAM_INBOUND_HOPS_DEFAULT, 0, 4 );
+			final IntParameter in_quant_param 		= config_model.addIntParameter2( I2PHelperRouter.PARAM_INBOUND_QUANTITY, I2PHelperRouter.PARAM_INBOUND_QUANTITY, I2PHelperRouter.PARAM_INBOUND_QUANTITY_DEFAULT, 1, 6 );
+			final IntParameter out_hops_param 		= config_model.addIntParameter2( I2PHelperRouter.PARAM_OUTBOUND_HOPS, I2PHelperRouter.PARAM_OUTBOUND_HOPS, I2PHelperRouter.PARAM_OUTBOUND_HOPS_DEFAULT, 0, 4 );
+			final IntParameter out_quant_param 		= config_model.addIntParameter2( I2PHelperRouter.PARAM_OUTBOUND_QUANTITY, I2PHelperRouter.PARAM_OUTBOUND_QUANTITY, I2PHelperRouter.PARAM_OUTBOUND_QUANTITY_DEFAULT, 1, 6 );
+
+			in_hops_param.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
+			in_quant_param.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
+			out_hops_param.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
+			out_quant_param.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
+			
+			final Map<String,Object>	router_properties = new HashMap<String, Object>();
+			
+			ParameterListener rate_change_listener = 
+				new ParameterListener()
+				{
+					public void 
+					parameterChanged(
+						Parameter param) 
+					{
+						router_properties.put( I2PHelperRouter.PARAM_SEND_KBS, up_limit_param.getValue());
+						router_properties.put( I2PHelperRouter.PARAM_RECV_KBS, down_limit_param.getValue());
+						router_properties.put( I2PHelperRouter.PARAM_SHARE_PERCENT, share_percent_param.getValue());
+
+						router_properties.put( I2PHelperRouter.PARAM_INBOUND_HOPS, in_hops_param.getValue());
+						router_properties.put( I2PHelperRouter.PARAM_INBOUND_QUANTITY, in_quant_param.getValue());
+						router_properties.put( I2PHelperRouter.PARAM_OUTBOUND_HOPS, out_hops_param.getValue());
+						router_properties.put( I2PHelperRouter.PARAM_OUTBOUND_QUANTITY, out_quant_param.getValue());
+
+						I2PHelperRouter current_router = router;
+						
+						if ( current_router != null ){
+							
+							current_router.updateProperties();
+						}
+					}
+				};
+			
+			rate_change_listener.parameterChanged( null );
+
+			up_limit_param.addListener( rate_change_listener );
+			down_limit_param.addListener( rate_change_listener );
+			share_percent_param.addListener( rate_change_listener );
+
+				// these require a restart but whatever
+			
+			in_hops_param.addListener( rate_change_listener );
+			in_quant_param.addListener( rate_change_listener );
+			out_hops_param.addListener( rate_change_listener );
+			out_quant_param.addListener( rate_change_listener );
+			
+			
 			socks_port_param 	= config_model.addIntParameter2( "azi2phelper.socks.port", "azi2phelper.socks.port", 0 );
-			
+			socks_port_param.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
+
 			socks_allow_public_param = config_model.addBooleanParameter2( "azi2phelper.socks.allow.public", "azi2phelper.socks.allow.public", false );
-			
+			socks_allow_public_param.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
+
 			int	int_port = int_port_param.getValue();
 			
 			boolean port_changed = false;
@@ -813,8 +850,7 @@ I2PHelperPlugin
 			}
 			
 			active_int_port	= int_port;
-
-			
+		
 			int	ext_port = ext_port_param.getValue();
 			
 			if ( ext_port == 0 ){
@@ -850,6 +886,7 @@ I2PHelperPlugin
 			}
 			
 			port_info_param = config_model.addInfoParameter2( "azi2phelper.port.info", "" );
+			port_info_param.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
 
 			updatePortInfo();
 			
@@ -873,19 +910,30 @@ I2PHelperPlugin
 			cpu_throttle_factor = cpu_throttle.getValue();
 			
 			final BooleanParameter ext_i2p_param 		= config_model.addBooleanParameter2( "azi2phelper.use.ext", "azi2phelper.use.ext", false );
-			
-			final StringParameter 	ext_i2p_host_param 		= config_model.addStringParameter2( "azi2phelper.use.ext.host", "azi2phelper.use.ext.host", "127.0.0.1" ); 
-			final IntParameter 		ext_i2p_port_param 		= config_model.addIntParameter2( "azi2phelper.use.ext.port", "azi2phelper.use.ext.port", 7654 ); 
+			ext_i2p_param.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
+
+			final StringParameter 	ext_i2p_host_param 		= config_model.addStringParameter2( "azi2phelper.use.ext.host", "azi2phelper.use.ext.host", "127.0.0.1" );
+			ext_i2p_host_param.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
+
+			final IntParameter 		ext_i2p_port_param 		= config_model.addIntParameter2( "azi2phelper.use.ext.port", "azi2phelper.use.ext.port", 7654 );
+			ext_i2p_port_param.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
+
 			
 			config_model.createGroup( 
 				"azi2phelper.internals.group",
 				new Parameter[]{ 
-						i2p_address_param, new_id, change_id, int_port_param, ext_port_param, socks_port_param, socks_allow_public_param,
+						i2p_address_param, new_id, change_id, int_port_param, ext_port_param,
+						tunnel_info_param, in_hops_param, in_quant_param, out_hops_param, out_quant_param,
+						socks_port_param, socks_allow_public_param,
 						port_info_param, use_upnp, always_socks, cpu_throttle, ext_i2p_param, ext_i2p_host_param, ext_i2p_port_param });
 			
 			
 			final StringParameter 	command_text_param = config_model.addStringParameter2( "azi2phelper.cmd.text", "azi2phelper.cmd.text", "" );
+			command_text_param.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
+
 			final ActionParameter	command_exec_param = config_model.addActionParameter2( "azi2phelper.cmd.act1", "azi2phelper.cmd.act2" );
+			command_exec_param.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
+
 			
 			command_exec_param.addListener(
 				new ParameterListener() 
@@ -958,9 +1006,18 @@ I2PHelperPlugin
 							
 							i2p_address_param.setEnabled( plugin_enabled );
 							new_id.setEnabled( plugin_enabled );
+							change_id.setEnabled( plugin_enabled );
 							int_port_param.setEnabled( enabled_not_ext );
 							ext_port_param.setEnabled( enabled_not_ext);
+							
+							tunnel_info_param.setEnabled( plugin_enabled );
+							in_hops_param.setEnabled( plugin_enabled );
+							in_quant_param.setEnabled( plugin_enabled );
+							out_hops_param.setEnabled( plugin_enabled );
+							out_quant_param.setEnabled( plugin_enabled );
+							
 							socks_port_param.setEnabled( plugin_enabled );
+							socks_allow_public_param.setEnabled( plugin_enabled );
 							port_info_param.setEnabled( plugin_enabled );
 							use_upnp.setEnabled( enabled_not_ext );
 							always_socks.setEnabled( plugin_enabled);
