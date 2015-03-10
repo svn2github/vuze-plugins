@@ -20,6 +20,7 @@
 
 package com.aelitis.plugins.rcmplugin;
 
+import java.io.UnsupportedEncodingException;
 import java.util.*;
 import java.util.List;
 
@@ -602,6 +603,7 @@ RelatedContentUISWT
 			TableManager.TABLE_MYTORRENTS_INCOMPLETE,
 			TableManager.TABLE_MYTORRENTS_INCOMPLETE_BIG,
 			TableManager.TABLE_MYTORRENTS_COMPLETE,
+			"TagsView"
 		};
 		
 		if ( enable ){
@@ -694,10 +696,12 @@ RelatedContentUISWT
 		
 		private Download			dl 		= null;
 		private DiskManagerFileInfo	dl_file = null;
+		private String[] search_strings;
 
 		private boolean				related_mode = true;
 
 		private ImageLabel			status_img_label;
+		private Label status_label;
 		private Button[]			buttons;
 		
 		private boolean 			current_rm;
@@ -736,7 +740,9 @@ RelatedContentUISWT
 			header.setLayoutData( new GridData( GridData.FILL_HORIZONTAL));
 			
 			status_img_label = new ImageLabel( header, swarm_image );
-									
+
+			status_label = new Label(header, SWT.NONE);
+			
 			final Button button_related = new Button( header, SWT.RADIO );
 			
 			button_related.setText( MessageText.getString( "rcm.subview.relto" ));
@@ -759,7 +765,7 @@ RelatedContentUISWT
 						doSearch();
 					}
 				};
-				
+
 			button_related.addListener( SWT.Selection, but_list );
 			button_size.addListener( SWT.Selection, but_list );
 			
@@ -767,6 +773,7 @@ RelatedContentUISWT
 			
 			buttons[0].setEnabled( dl != null );
 			buttons[1].setEnabled( dl_file != null );
+  				
 			
 			Composite skin_area = new Composite( parent, SWT.NULL );
 			
@@ -798,6 +805,7 @@ RelatedContentUISWT
 		{									
 			dl 		= null;
 			dl_file = null;
+			search_strings = null;
 			
 			if ( obj instanceof Object[]){
 				
@@ -812,6 +820,13 @@ RelatedContentUISWT
 					}else if ( ds[0] instanceof DiskManagerFileInfo ){
 						
 						dl_file = (DiskManagerFileInfo)ds[0];
+					}else if (ds[0] instanceof Tag) {
+						search_strings = new String[ds.length];
+						for (int i = 0; i < ds.length; i++) {
+							Tag tag = (Tag) ds[i];
+
+							search_strings[i] = "tag:" + tag.getTagName(true);
+						}
 					}
 				}
 			}else{
@@ -867,6 +882,12 @@ RelatedContentUISWT
 					public void 
 					run() 
 					{
+						boolean isSearch = search_strings != null;
+						buttons[0].setVisible(!isSearch);
+						buttons[1].setVisible(!isSearch);
+						status_label.setText(isSearch ? Arrays.toString(search_strings) : "");
+						
+						status_label.getParent().layout();
 						if ( buttons != null ){
 							
 							if ( related_mode ){
@@ -894,7 +915,7 @@ RelatedContentUISWT
 		{	
 			if ( current_rm == related_mode && current_dl == dl ){
 				
-				if ( current_file == null && dl_file == null ){
+				if ( current_file == null && dl_file == null  && search_strings == null){
 					
 					return;
 					
@@ -937,8 +958,21 @@ RelatedContentUISWT
 											
 				new_subview = new RCMItemSubView(dl.getTorrent().getHash(), networks, file_size );
 												
-			}else{
+			}else if (search_strings != null){
+				String[] networks = AENetworkClassifier.getDefaultNetworks();
+
+				String name = Arrays.toString(search_strings);
+				String net_str = getNetworkString( networks );
 				
+				try {
+					byte[]	dummy_hash = (name + net_str ).getBytes( "UTF-8" );
+
+					new_subview = new RCMItemSubView(dummy_hash, networks, search_strings );
+				} catch (UnsupportedEncodingException e) {
+					return;
+				}
+				
+			} else {
 				new_subview = new RCMItemSubViewEmpty();
 			}
 			
@@ -2101,7 +2135,7 @@ RelatedContentUISWT
 				
 				if (  existing_si == null ){
 		
-					final RCMItem new_si = new RCMItemContent( dummy_hash, networks, expression );
+					final RCMItem new_si = new RCMItemContent( dummy_hash, networks, new String[] { expression });
 					
 					rcm_item_map.put( dummy_hash, new_si );
 					
@@ -2292,7 +2326,7 @@ RelatedContentUISWT
 		}
 	}
 		
-	private String
+	private static String
 	getNetworkString(
 		String[]		networks )
 	{
@@ -2478,7 +2512,8 @@ RelatedContentUISWT
 	{	
 		private byte[]				hash;
 		private long				file_size;
-		private String				expression;
+		private String[]				expressions;
+		private int expressions_searching;
 		
 		private String[]			networks;
 		
@@ -2526,11 +2561,11 @@ RelatedContentUISWT
 		RCMItemContent(
 			byte[]		_hash,
 			String[]	_networks,
-			String		_expression )
+			String[]		_expressions )
 		{
 			hash		= _hash;
 			networks	= _networks;
-			expression	= _expression;
+			expressions	= _expressions;
 		}
 		
 		public void
@@ -2642,45 +2677,86 @@ RelatedContentUISWT
 				
 				RelatedContentManager manager = RelatedContentManager.getSingleton();
 					
-				if ( expression != null ){
+				if ( expressions != null ){
 					
-					Map<String,Object>	parameters = new HashMap<String, Object>();
-					
-					parameters.put( SearchProvider.SP_SEARCH_TERM, expression );
-					
-					manager.searchRCM(
-						parameters, 
-						new SearchObserver() {
-							
-							public void 
-							resultReceived(
-								SearchInstance 		search, 
-								SearchResult 		search_result ) 
-							{
-								SearchRelatedContent result = new SearchRelatedContent( search_result );
-								
-								listener.contentFound( new RelatedContent[]{ result });
-							}
-							
-							public Object 
-							getProperty(
-								int property ) 
-							{
-								return null;
-							}
-							
-							public void 
-							complete() 
-							{
-								listener.lookupComplete();
-							}
-							
-							public void 
-							cancelled() 
-							{
-								listener.lookupComplete();
-							}
-						});
+					expressions_searching = expressions.length;
+					for (String expression : expressions) {
+						
+  					Map<String,Object>	parameters = new HashMap<String, Object>();
+  					
+  					parameters.put( SearchProvider.SP_SEARCH_TERM, expression );
+  					
+  					manager.searchRCM(
+  						parameters, 
+  						new SearchObserver() {
+  							
+  							public void 
+  							resultReceived(
+  								SearchInstance 		search, 
+  								SearchResult 		search_result ) 
+  							{
+  								SearchRelatedContent result = new SearchRelatedContent( search_result );
+  								
+  								// logical and -- should probably be done in searchRCM as a parameter
+  								if (expressions.length > 1) {
+  									
+  									String[] tags = result.getTags();
+  									String name = result.getTitle();
+  									for (String expr : expressions) {
+  										boolean found = false;
+  										
+  										if (expr.startsWith("tag:")) {
+  											expr = expr.substring(4);
+    										for (String tag : tags) {
+  												if (tag.toLowerCase().contains(expr.toLowerCase())) {
+  													found = true;
+  													break;
+  												}
+  											}
+  										} else {
+  											found = name.toLowerCase().contains(expr.toLowerCase());
+  										}
+  										if (!found) {
+  											return;
+  										}
+										}
+  									
+  								}
+  								
+  								
+  								listener.contentFound( new RelatedContent[]{ result });
+  							}
+  							
+  							public Object 
+  							getProperty(
+  								int property ) 
+  							{
+  								return null;
+  							}
+  							
+  							public void 
+  							complete() 
+  							{
+  								synchronized (expressions) {
+  									expressions_searching--;
+  									if (expressions_searching == 0) {
+  	  								listener.lookupComplete();
+  									}
+  								}
+  							}
+  							
+  							public void 
+  							cancelled() 
+  							{
+  								synchronized (expressions) {
+  									expressions_searching--;
+  									if (expressions_searching == 0) {
+  	  								listener.lookupComplete();
+  									}
+  								}
+  							}
+  						});
+					}
 					
 				}else if ( file_size != 0 ){
 				
@@ -3066,6 +3142,15 @@ RelatedContentUISWT
 			long		_file_size )
 		{
 			super( _hash, _networks, _file_size );
+		}
+		
+		protected
+		RCMItemSubView(
+			byte[]		_hash,
+			String[]	_networks,
+			String[]		s )
+		{
+			super( _hash, _networks, s );
 		}
 		
 		private void
