@@ -883,8 +883,10 @@ RelatedContentUISWT
 					run() 
 					{
 						boolean isSearch = search_strings != null;
-						buttons[0].setVisible(!isSearch);
-						buttons[1].setVisible(!isSearch);
+						if ( buttons != null ){
+  						buttons[0].setVisible(!isSearch);
+  						buttons[1].setVisible(!isSearch);
+						}
 						status_label.setText(isSearch ? Arrays.toString(search_strings) : "");
 						
 						status_label.getParent().layout();
