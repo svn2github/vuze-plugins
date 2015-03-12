@@ -84,7 +84,8 @@ RatingsUpdater
     private static final int INCOMPLETE_DOWNLOAD_LOOKUP_PERIOD 			= 1*60*60*1000;
     
     private static final int TIMER_CHECK_PERIOD		= 2*60*1000;
-    private static final int STALL_TRIGGER_PERIOD	= 15*60*1000;
+    private static final int STALL_MIN_DL_AGE		= 12*60*60*1000;
+    private static final int STALL_TRIGGER_PERIOD	= 2*60*60*1000;
     
 	private final RatingPlugin 		plugin;
 	private final PluginInterface	plugin_interface;
@@ -326,7 +327,7 @@ RatingsUpdater
 				continue;
 			}
 			
-			checkReseed( mono_now, interesting, i, download, core_dm, pm );
+			checkReseed( real_now, mono_now, interesting, i, download, core_dm, pm );
 			
 			if ( rcm != null ){
 				
@@ -337,6 +338,7 @@ RatingsUpdater
 	
 	private void
 	checkReseed(
+		long												real_now,
 		long												mono_now,
 		List<Download>										interesting,
 		int													interesting_index,
@@ -348,6 +350,18 @@ RatingsUpdater
 
 		try{
 			if ( core_dm.getUserData( reseed_asked_key ) != null ){
+				
+				return;
+			}
+			
+			long date_added = core_dm.getDownloadState().getLongParameter( DownloadManagerState.PARAM_DOWNLOAD_ADDED_TIME );
+			
+			if ( date_added <= 0 ){
+				
+				return;
+			}
+			
+			if ( real_now - date_added < STALL_MIN_DL_AGE ){
 				
 				return;
 			}
@@ -492,7 +506,7 @@ RatingsUpdater
 				final String msg_prefix = "Please seed! File '";
 				final String file_name	= worst_file.getTorrentFile().getRelativePath();
 				
-				final String message 	= msg_prefix + file_name + "' is stuck with an availability of " + worst_avail + "!";
+				final String message 	= msg_prefix + file_name + "' is stuck with an availability of " + worst_avail + " :(";
 				
 				if ( BuddyPluginUtils.isBetaChatAvailable()){
 					
