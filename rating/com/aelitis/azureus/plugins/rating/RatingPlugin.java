@@ -61,7 +61,7 @@ public class RatingPlugin implements UnloadablePlugin, PluginListener {
 		  
 		  	// fix missing default for fancy menu causing settings not to be remembered
 		  
-		  COConfigurationManager.setBooleanDefault( "GUI_SWT_bFancyTab", true );
+		  COConfigurationManager.setBooleanDefault( "Library.showFancyMenu", true );
 		  
 		  	// switch default for chat sound notifications
 		  
