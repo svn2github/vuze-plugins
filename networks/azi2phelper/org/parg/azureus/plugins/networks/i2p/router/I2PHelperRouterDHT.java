@@ -116,11 +116,13 @@ I2PHelperRouterDHT
 		String			i2p_host,
 		int				i2p_port,
 		String			name,
-		Properties		sm_properties )
+		Properties		_sm_properties )
 		
 		throws Exception
 	{
-		sm_properties = new Properties( sm_properties );
+		Properties sm_properties = new Properties();
+		
+		sm_properties.putAll( _sm_properties );
 		
 		sm_properties.setProperty( "outbound.nickname", "Vuze DHT: " + name ); 
 

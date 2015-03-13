@@ -74,7 +74,7 @@ I2PHelperRouter
 	public static final int		PARAM_RECV_KBS_DEFAULT		= 50;
 	
 	public static final String	PARAM_SHARE_PERCENT			= "azi2phelper.share.percent";
-	public static final int		PARAM_SHARE_PERCENT_DEFAULT	= 25;
+	public static final int		PARAM_SHARE_PERCENT_DEFAULT	= 33;
 	
 	public static final String	PARAM_INBOUND_HOPS				= "azi2phelper.inbound.hops";
 	public static final int		PARAM_INBOUND_HOPS_DEFAULT		= 3;	// increased from 2 on 2015/03/09
@@ -1100,7 +1100,9 @@ I2PHelperRouter
 		        	InputStream is = new FileInputStream( dest_key_file );
 		        	
 			    	try{
-			    		Properties sm_props = new Properties( sm_properties );
+			    		Properties sm_props = new Properties();
+			    		
+			    		sm_props.putAll( sm_properties );
 			    		
 			    		sm_props.setProperty( "outbound.nickname", "Vuze: " + server_id ); 
 			    		
