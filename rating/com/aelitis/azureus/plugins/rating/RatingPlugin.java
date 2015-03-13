@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.PluginException;
@@ -55,6 +56,24 @@ public class RatingPlugin implements UnloadablePlugin, PluginListener {
   
   private static final Object	DDBS_KEY	= new Object();
 
+  static{
+	  try{
+		  
+		  	// fix missing default for fancy menu causing settings not to be remembered
+		  
+		  COConfigurationManager.setBooleanDefault( "GUI_SWT_bFancyTab", true );
+		  
+		  	// switch default for chat sound notifications
+		  
+		  if ( !COConfigurationManager.doesParameterNonDefaultExist( "azbuddy.chat.notif.sound.enable" )){
+			  
+			  COConfigurationManager.setParameter( "azbuddy.chat.notif.sound.enable", false );
+		  }
+	  }catch( Throwable e ){  
+	  }
+  }
+  
+  
   private PluginInterface pluginInterface;
   
   private TorrentAttribute ta_networks;
