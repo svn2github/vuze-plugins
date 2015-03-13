@@ -887,9 +887,11 @@ RelatedContentUISWT
   						buttons[0].setVisible(!isSearch);
   						buttons[1].setVisible(!isSearch);
 						}
-						status_label.setText(isSearch ? Arrays.toString(search_strings) : "");
-						
-						status_label.getParent().layout();
+						if (status_label != null) {
+  						status_label.setText(isSearch ? Arrays.toString(search_strings) : "");
+  						
+  						status_label.getParent().layout();
+						}
 						if ( buttons != null ){
 							
 							if ( related_mode ){
