@@ -504,99 +504,73 @@ RatingsUpdater
 				core_dm.setUserData( reseed_asked_key, "" );
 				
 				final String msg_prefix = "Please seed! File '";
-				final String file_name	= worst_file.getTorrentFile().getRelativePath();
+				final String file_name	= worst_file.getTorrentFile().getRelativePath().replace( '\\', '/' );
 				
 				final String message 	= msg_prefix + file_name + "' is stuck with an availability of " + worst_avail + " :(";
 				
 				if ( BuddyPluginUtils.isBetaChatAvailable()){
 					
 					chat_write_dispatcher.dispatch(
-							new AERunnable() {
-								
-								@Override
-								public void 
-								runSupport() 
-								{
-									final BuddyPluginBeta.ChatInstance chat = BuddyPluginUtils.getChat( download );
+						new AERunnable() {
+							
+							@Override
+							public void 
+							runSupport() 
+							{
+								final BuddyPluginBeta.ChatInstance chat = BuddyPluginUtils.getChat( download );
+									
+								if ( chat != null ){
 										
-									if ( chat != null ){
-											
-										chat.setAutoNotify( true );
-										
-										final TimerEventPeriodic[] event = { null };
-										
-										event[0] = 
-											SimpleTimer.addPeriodicEvent(
-												"Rating:chat:checker",
-												30*1000,
-												new TimerEventPerformer()
-												{
-													private int elapsed_time;
-			
-													public void 
-													perform(
-														TimerEvent e ) 
-													{
-														elapsed_time += 30*1000;
+									chat.setAutoNotify( true );
+									
+									waitForChat(
+										chat,
+										new AERunnable()
+										{
+											@Override
+											public void 
+											runSupport() 
+											{
+												long now = SystemTime.getCurrentTime();
+												
+												List<ChatMessage>	messages = chat.getMessages();
+												
+												for ( ChatMessage message: messages ){
+													
+													String msg = message.getMessage();
+													
+													if ( message.getParticipant().isMe()){
 														
-															// get sync state before messages to things work reliably
-														
-														int	sync_state = chat.getIncomingSyncState();
-														
-														List<ChatMessage>	messages = chat.getMessages();
-														
-														if ( chat.isDestroyed()){
+														if ( msg.startsWith( msg_prefix )){
 																															
-															event[0].cancel();
-															
-														}else{
+															return;
+														}
+													}else{
 														
-															long now = SystemTime.getCurrentTime();
+															// someone else recently reported?
+														
+														if ( msg.startsWith( msg_prefix )){
 															
-															for ( ChatMessage message: messages ){
-																
-																String msg = message.getMessage();
-																
-																if ( message.getParticipant().isMe()){
-																	
-																	if ( msg.startsWith( msg_prefix )){
-																		
-																		event[0].cancel();
-																		
-																		return;
-																	}
-																}else{
-																	
-																		// someone else recently reported?
-																	
-																	if ( msg.startsWith( msg_prefix ) && msg.contains( file_name )){
-																	
-																		if ( now - message.getTimeStamp() < 12*60*60*1000 ){
-																			
-																			event[0].cancel();
-																			
-																			return;
-																		}
-																	}
+															if ( msg.replace( '\\', '/' ).contains( file_name )){
+														
+																if ( now - message.getTimeStamp() < 12*60*60*1000 ){
+																																		
+																	return;
 																}
-															}
-															
-															if ( 	sync_state == 0 ||
-																	elapsed_time >= 5*60*1000 ){
-																
-																event[0].cancel();
-
-																Map<String,Object>	flags 	= new HashMap<String, Object>();
-																
-																flags.put( BuddyPluginBeta.FLAGS_MSG_ORIGIN_KEY, BuddyPluginBeta.FLAGS_MSG_ORIGIN_RATINGS );
-																
-																Map<String,Object>	options = new HashMap<String, Object>();
-																
-																chat.sendMessage( message, flags, options );																
 															}
 														}
 													}
-												});
+												}
+												
+												Map<String,Object>	flags 	= new HashMap<String, Object>();
+												
+												flags.put( BuddyPluginBeta.FLAGS_MSG_ORIGIN_KEY, BuddyPluginBeta.FLAGS_MSG_ORIGIN_RATINGS );
+												
+												Map<String,Object>	options = new HashMap<String, Object>();
+												
+												chat.sendMessage( message, flags, options );																									
+											}
+										});
 									}
 								}
 							});
@@ -877,52 +851,18 @@ RatingsUpdater
 					if ( chat != null ){
 							
 						chat.setAutoNotify( true );
-													
-						final TimerEventPeriodic[] event = { null };
-						
-						event[0] = 
-							SimpleTimer.addPeriodicEvent(
-								"Rating:chat:checker",
-								30*1000,
-								new TimerEventPerformer()
+							
+						waitForChat(
+							chat,
+							new AERunnable() {
+								
+								@Override
+								public void 
+								runSupport() 
 								{
-									private int elapsed_time;
-
-									public void 
-									perform(
-										TimerEvent e ) 
-									{
-										elapsed_time += 30*1000;
-										
-											// get sync state before messages to things work reliably
-										
-										int	sync_state = chat.getIncomingSyncState();
-																				
-										if ( chat.isDestroyed()){
-																											
-											event[0].cancel();
-											
-										}else{
-										
-											if ( 	sync_state == 0 ||
-													elapsed_time >= 5*60*1000 ){
-																								
-												event[0].cancel();
-											
-												chat_write_dispatcher.dispatch(
-													new AERunnable() {
-														
-														@Override
-														public void 
-														runSupport() 
-														{
-															altContentWrite( chat, download, file, contents );
-														}
-													});
-											}
-										}
-									}
-								});
+									altContentWrite( chat, download, file, contents );
+								}
+							});
 						
 						if ( Constants.isCVSVersion()){
 							
@@ -1054,6 +994,11 @@ RatingsUpdater
 			}
 		}
 		
+		if ( msg_map.size() == 0 ){
+			
+			return;
+		}
+
 		Map<String,Object>	flags 	= new HashMap<String, Object>();
 		
 		flags.put( BuddyPluginBeta.FLAGS_MSG_ORIGIN_KEY, BuddyPluginBeta.FLAGS_MSG_ORIGIN_RATINGS );
@@ -1072,6 +1017,82 @@ RatingsUpdater
 		if ( !has_info ){
 		
 			chat.sendMessage( "See http://wiki.vuze.com/w/Swarm_Merging[[Swarm%20Merging]] for help", options);
+		}
+	}
+	
+	private void
+	waitForChat(
+		final ChatInstance		chat,
+		final AERunnable		runnable )
+	{
+			// wait for chat to synchronize and then run 
+		
+		final TimerEventPeriodic[] event = { null };
+		
+		synchronized( event ){
+			
+			event[0] = 
+				SimpleTimer.addPeriodicEvent(
+					"Rating:chat:checker",
+					30*1000,
+					new TimerEventPerformer()
+					{
+						private int elapsed_time;
+	
+						public void 
+						perform(
+							TimerEvent e ) 
+						{
+							elapsed_time += 30*1000;
+																													
+							if ( chat.isDestroyed()){
+									
+								synchronized( event ){
+								
+									event[0].cancel();
+								}
+								
+							}else{
+							
+								if ( 	chat.getIncomingSyncState() == 0 ||
+										elapsed_time >= 5*60*1000 ){
+										
+									synchronized( event ){
+										
+										event[0].cancel();
+									}
+								
+									SimpleTimer.addEvent(
+										"Rating:chat:checker",
+										SystemTime.getOffsetTime( 2*60*1000 ),
+										new TimerEventPerformer()
+										{	
+											public void 
+											perform(
+												TimerEvent event ) 
+											{
+												if ( !chat.isDestroyed()){
+													
+													chat_write_dispatcher.dispatch( 
+														new AERunnable() {
+															
+															@Override
+															public void 
+															runSupport() 
+															{
+																if ( !chat.isDestroyed()){
+																	
+																	runnable.runSupport();
+																}
+															}
+														});
+												}
+											}
+										});
+								}
+							}
+						}
+					});	
 		}
 	}
 	
@@ -1876,60 +1897,37 @@ RatingsUpdater
 									
 								if ( written ){
 									
-									final TimerEventPeriodic[] event = { null };
-									
-									event[0] = 
-										SimpleTimer.addPeriodicEvent(
-											"Rating:chat:checker",
-											30*1000,
-											new TimerEventPerformer()
+									waitForChat(
+										chat, 
+										new AERunnable()
+										{
+											public void 
+											runSupport() 
 											{
-												private int elapsed_time;
-		
-												public void 
-												perform(
-													TimerEvent e ) 
-												{
-													elapsed_time += 30*1000;
+												List<ChatMessage>	messages = chat.getMessages();
+												
+												if ( messages.size() > 50 ){
 													
-														// get sync state before messages to things work reliably
+														// busy, let's not even bother checking
 													
-													int	sync_state = chat.getIncomingSyncState();
+													return;
+												}
+												
+												for ( ChatMessage message: messages ){
 													
-													List<ChatMessage>	messages = chat.getMessages();
-													
-													if ( messages.size() > 50 || chat.isDestroyed()){
+													if ( message.getParticipant().isMe()){
 														
-															// busy, let's not even bother checking 
-														
-														event[0].cancel();
-														
-													}else{
-													
-													
-														for ( ChatMessage message: messages ){
-															
-															if ( message.getParticipant().isMe()){
-																
-																if ( message.getMessage().equals( f_msg )){
-																	
-																	event[0].cancel();
-																	
-																	return;
-																}
-															}
-														}
-														
-														if ( 	sync_state == 0 ||
-																elapsed_time >= 5*60*1000 ){
-															
-															do_write.run();
-															
-															event[0].cancel();
+														if ( message.getMessage().equals( f_msg )){
+																														
+															return;
 														}
 													}
 												}
-											});
+												
+												do_write.run();
+											};
+										});
+									
 								}else{
 									
 									do_write.run();
