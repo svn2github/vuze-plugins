@@ -1938,13 +1938,20 @@ RelatedContentUISWT
 										view.getTitle(),
 										view, null, true, null );
 								
-								entry.addListener(new MdiChildCloseListener() {
-									public void mdiChildEntryClosed(MdiEntry parent, MdiEntry child,
-											boolean user) {
-										removeFromItemMap(hash);
-									}
-								});
+								entry.addListener(
+										new MdiCloseListener() 
+										{
+											public void 
+											mdiEntryClosed( 
+												MdiEntry 	entry,
+												boolean 	user) 
+											{
+												removeFromItemMap(hash);
+											}
+										});
+								
 								new_si.setMdiEntry(entry);
+								
 								if (entry instanceof SideBarEntrySWT) {
 									new_si.setTreeItem( ((SideBarEntrySWT)entry).getTreeItem() );
 								}
@@ -2031,12 +2038,17 @@ RelatedContentUISWT
 									
 									new_si.setMdiEntry(entry);
 									
-									entry.addListener(new MdiChildCloseListener() {
-										public void mdiChildEntryClosed(MdiEntry parent, MdiEntry child,
-												boolean user) {
-											removeFromItemMap(dummy_hash);
-										}
-									});
+									entry.addListener(
+										new MdiCloseListener() 
+										{
+											public void 
+											mdiEntryClosed( 
+												MdiEntry 	entry,
+												boolean 	user) 
+											{
+												removeFromItemMap(dummy_hash);
+											}
+										});
 
 									if (entry instanceof SideBarEntrySWT){
 										
@@ -2170,12 +2182,18 @@ RelatedContentUISWT
 											view.getTitle(),
 											view, null, true, null );
 									
-									entry.addListener(new MdiChildCloseListener() {
-										public void mdiChildEntryClosed(MdiEntry parent, MdiEntry child,
-												boolean user) {
-											removeFromItemMap(dummy_hash);
-										}
-									});
+									entry.addListener(
+										new MdiCloseListener() 
+										{
+											public void 
+											mdiEntryClosed( 
+												MdiEntry 	entry,
+												boolean 	user) 
+											{
+												removeFromItemMap(dummy_hash);
+											}
+										});
+									
 									new_si.setMdiEntry(entry);
 									
 									if (entry instanceof SideBarEntrySWT){
@@ -2403,12 +2421,17 @@ RelatedContentUISWT
 										view.getTitle(),
 										view, null, true, null );
 								
-								entry.addListener(new MdiChildCloseListener() {
-									public void mdiChildEntryClosed(MdiEntry parent, MdiEntry child,
-											boolean user) {
-										removeFromItemMap(subs_hash);
-									}
-								});
+								entry.addListener(
+										new MdiCloseListener() 
+										{
+											public void 
+											mdiEntryClosed( 
+												MdiEntry 	entry,
+												boolean 	user) 
+											{
+												removeFromItemMap(subs_hash);
+											}
+										});
 
 								new_si.setMdiEntry(entry);
 								
@@ -3718,7 +3741,10 @@ RelatedContentUISWT
 		return( nets );
 	}
 	
-	public void removeFromItemMap(byte[] hash) {
+	public void 
+	removeFromItemMap(
+		byte[] hash) 
+	{
 		synchronized( RelatedContentUISWT.this ){
 			
 			rcm_item_map.remove( hash );
