@@ -1871,7 +1871,9 @@ RelatedContentUISWT
 					      	 
 					      	 if ( uif != null ){
 					      		 
-					      		 uif.openView( UIFunctions.VIEW_CONFIG, "Associations" );
+					      		 uif.getMDI().showEntryByID(
+					      				 MultipleDocumentInterface.SIDEBAR_SECTION_CONFIG,
+					      				 "Associations");
 					      	 }
 						}
 					});
@@ -3992,7 +3994,7 @@ RelatedContentUISWT
 			public void prompterClosed(int result) {
 				if (result < 0) {
 					if (so_list != null) {
-						UIFunctionsManager.getUIFunctions().openView(UIFunctions.VIEW_MYTORRENTS, null);
+						UIFunctionsManager.getUIFunctions().getMDI().showEntryByID(MultipleDocumentInterface.SIDEBAR_SECTION_LIBRARY);
 					}
 					
 					if ( listener != null ){
@@ -4008,7 +4010,7 @@ RelatedContentUISWT
 							if (result == 0) {
 								enableRCM(true, true, so_list);
 							} else if (so_list != null) {
-								UIFunctionsManager.getUIFunctions().openView(UIFunctions.VIEW_MYTORRENTS, null);
+								UIFunctionsManager.getUIFunctions().getMDI().showEntryByID(MultipleDocumentInterface.SIDEBAR_SECTION_LIBRARY);
 							}
 							
 							if ( listener != null ){
