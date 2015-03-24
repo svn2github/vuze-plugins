@@ -57,6 +57,10 @@ public class FilterBean implements Serializable {
       Pattern.compile("(.*?)" + "([0-9]+)([0-9]{2})" + ".*?"),
   };
 
+  private static final Pattern episodeDatePattern =
+  Pattern.compile("(.*?)" + "([0-9]{4}).([0-9]{2}).([0-9]{2})" + ".*?");
+
+
   // Proper torrents are published if originals are bad.
   public static Pattern properPattern = Pattern.compile("\\bproper\\b");
 
@@ -329,38 +333,51 @@ public class FilterBean implements Serializable {
     Episode e = null;
 
     Matcher m = null;
+
+    // First, try by date because we might get caught by a catch-all episode regex
+    m = episodeDatePattern.matcher(str);
+    if (m.matches()) {
+      final int end = m.end(m.groupCount());
+      final boolean isProper = properPattern.matcher(str.substring(end)).find();
+      showTitle = stringClean(m.group(1));
+      seasonStart = Integer.parseInt(m.group(2));
+      episodeStart = Integer.parseInt(m.group(3)) * 100 + Integer.parseInt(m.group(4));
+      e = new Episode(showTitle, seasonStart, episodeStart, isProper);
+      return e;
+    }
+
     for (Pattern pattern : episodePatterns) {
       m = pattern.matcher(str);
       if (m.matches()) {
         break;
       }
     }
-    if (m == null || !m.matches()) return null;
+    if (m.matches()) {
+      showTitle = stringClean(m.group(1));
+      final int end = m.end(m.groupCount());
+      final boolean isProper = properPattern.matcher(str.substring(end)).find();
 
-    showTitle = stringClean(m.group(1));
-    final int end = m.end(m.groupCount());
-    final boolean isProper = properPattern.matcher(str.substring(end)).find();
-
-    switch(m.groupCount()) {
-      case 3:
-        seasonStart = Integer.parseInt(m.group(2));
-        episodeStart = Integer.parseInt(m.group(3));
-        e = new Episode(showTitle, seasonStart, episodeStart, isProper);
-        break;
-      case 4:
-        seasonStart = Integer.parseInt(m.group(2));
-        episodeStart = Integer.parseInt(m.group(3));
-        seasonEnd = Integer.parseInt(m.group(2));
-        episodeEnd = Integer.parseInt(m.group(4));
-        e = new Episode(showTitle, seasonStart, episodeStart, seasonEnd, episodeEnd, isProper);
-        break;
-      case 5:
-        seasonStart = Integer.parseInt(m.group(2));
-        episodeStart = Integer.parseInt(m.group(3));
-        seasonEnd = Integer.parseInt(m.group(4));
-        episodeEnd = Integer.parseInt(m.group(5));
-        e = new Episode(showTitle, seasonStart, episodeStart, seasonEnd, episodeEnd, isProper);
-        break;
+      switch(m.groupCount()) {
+        case 3:
+          seasonStart = Integer.parseInt(m.group(2));
+          episodeStart = Integer.parseInt(m.group(3));
+          e = new Episode(showTitle, seasonStart, episodeStart, isProper);
+          break;
+        case 4:
+          seasonStart = Integer.parseInt(m.group(2));
+          episodeStart = Integer.parseInt(m.group(3));
+          seasonEnd = Integer.parseInt(m.group(2));
+          episodeEnd = Integer.parseInt(m.group(4));
+          e = new Episode(showTitle, seasonStart, episodeStart, seasonEnd, episodeEnd, isProper);
+          break;
+        case 5:
+          seasonStart = Integer.parseInt(m.group(2));
+          episodeStart = Integer.parseInt(m.group(3));
+          seasonEnd = Integer.parseInt(m.group(4));
+          episodeEnd = Integer.parseInt(m.group(5));
+          e = new Episode(showTitle, seasonStart, episodeStart, seasonEnd, episodeEnd, isProper);
+          break;
+      }
     }
 
     return e;
