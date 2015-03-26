@@ -2276,25 +2276,26 @@ TorPlugin
 					
 					filtering_i2p_host	= i2p_host;
 					
-				}
-				
+				}				
 				if ( filtering_proxy == null ){
 					
 					int filtering_proxy_last_port = plugin_config.getPluginIntParameter( "filtering.proxy.port", 0 );
 					
 					try{
 						try{
-							filtering_proxy = new SOCKSProxy( filtering_proxy_last_port, true, "Filtering" );
-							
+							filtering_proxy = new SOCKSProxy( filtering_proxy_last_port, true, "Filtering for I2P: " + filtering_i2p_port );
+						
 						}catch( Throwable e ){
 							
-							filtering_proxy = new SOCKSProxy( 0, true, "Filtering for I2P:" + filtering_i2p_port );
+							filtering_proxy = new SOCKSProxy( 0, true, "Filtering for I2P: " + filtering_i2p_port );
 
 							filtering_proxy_last_port = filtering_proxy.getPort();
 							
 							plugin_config.setPluginParameter( "filtering.proxy.port", filtering_proxy_last_port );
 						}
 						
+						log( "Filtering details: " + filtering_proxy.getPort() + " -> " + filtering_i2p_host + ":" + filtering_i2p_port );
+
 					}catch( Throwable e ){
 						
 						log( "Failed to start filtering proxy", e );
