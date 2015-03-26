@@ -124,7 +124,7 @@ I2PHelperRouterDHT
 		
 		sm_properties.putAll( _sm_properties );
 		
-		sm_properties.setProperty( "outbound.nickname", "Vuze DHT: " + name ); 
+		router.setupSMExplicitOpts( sm_properties, "Vuze DHT: " + name, dht_index==0?0:1 ); 
 
 		try{
 			synchronized( init_lock ){
