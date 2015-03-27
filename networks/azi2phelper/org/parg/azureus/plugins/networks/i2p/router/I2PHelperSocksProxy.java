@@ -54,6 +54,7 @@ import org.gudy.azureus2.core3.tracker.protocol.PRHelpers;
 import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.AEThread2;
+import org.gudy.azureus2.core3.util.BEncoder;
 import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.SystemTime;
@@ -63,8 +64,6 @@ import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.torrent.Torrent;
 import org.gudy.azureus2.plugins.torrent.TorrentAnnounceURLListSet;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperAdapter;
-import org.parg.azureus.plugins.networks.i2p.I2PHelperAltNetHandler;
-import org.parg.azureus.plugins.networks.i2p.util.I2PHelperHostnameService;
 
 import com.aelitis.azureus.core.proxy.AEProxyConnection;
 import com.aelitis.azureus.core.proxy.AEProxyException;
@@ -493,7 +492,7 @@ I2PHelperSocksProxy
 			original_unresolved	= unresolved;
 			original_port		= _address.getPort();
 			
-			trace( "connect request to " + unresolved + "/" + resolved + "/" + _address.getPort());
+			if ( TRACE )trace( "connect request to " + unresolved + "/" + resolved + "/" + _address.getPort() + "/" + BEncoder.encodeToJSON( options ));
 					
 			boolean		handling_connection = false;
 			
