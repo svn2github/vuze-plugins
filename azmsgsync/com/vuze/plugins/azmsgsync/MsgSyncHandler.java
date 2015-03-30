@@ -49,6 +49,7 @@ import org.bouncycastle.crypto.params.KeyParameter;
 import org.bouncycastle.crypto.params.ParametersWithIV;
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
+import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.BEncoder;
@@ -64,6 +65,7 @@ import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.SHA1Simple;
 import org.gudy.azureus2.core3.util.SimpleTimer;
 import org.gudy.azureus2.core3.util.SystemTime;
+import org.gudy.azureus2.core3.util.ThreadPool;
 import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.gudy.azureus2.core3.util.TimerEventPeriodic;
@@ -166,6 +168,8 @@ MsgSyncHandler
 		xfer_options.put( "disable_call_acks", true );
 	}
 	
+	private static ThreadPool	sync_pool 	= new ThreadPool("MsgSyncHandler:pool", 32, true );
+
 	private final MsgSyncPlugin						plugin;
 	private final DHTPluginInterface				dht;
 	private final byte[]							user_key;
@@ -3414,6 +3418,10 @@ MsgSyncHandler
 			MsgSyncNode	current_biased_node_in 	= biased_node_in;
 			MsgSyncNode	current_biased_node_out = biased_node_out;
 			
+			boolean	clear_biased_node_out 	= false;
+			boolean	clear_biased_node_in	= false;
+			boolean	clear_prefer_live		= false;
+			
 			if ( current_biased_node_out != null ){
 				
 					// node_out should be live as we should have just successfully hit it
@@ -3425,7 +3433,7 @@ MsgSyncHandler
 					if ( TRACE )trace( "Selecting biased node_out " + sync_node.getName());
 				}
 				
-				biased_node_out = null;
+				clear_biased_node_out = true;
 				
 			}else if ( current_biased_node_in != null ){
 			
@@ -3438,7 +3446,7 @@ MsgSyncHandler
 					if ( TRACE )trace( "Selecting biased node_in " + sync_node.getName());
 				}
 				
-				biased_node_in = null;
+				clear_biased_node_in	= true;
 				
 			}else{
 				
@@ -3448,7 +3456,7 @@ MsgSyncHandler
 					
 					if ( sync_node != null ){
 						
-						prefer_live_sync_outstanding = false;
+						clear_prefer_live = true;
 					}
 				}
 			}
@@ -3488,28 +3496,51 @@ MsgSyncHandler
 				return;
 			}
 			
+			if ( sync_pool.isFull()){
+				
+				if ( TRACE )trace( "Thread pool is full" );
+				
+				return;
+			}
+			
+			if ( clear_biased_node_out ){
+				
+				biased_node_out = null;
+			}
+			
+			if ( clear_biased_node_in ){
+				
+				biased_node_in = null;
+			}
+			
+			if ( clear_prefer_live ){
+				
+				prefer_live_sync_outstanding = false;
+			}
+			
 			active_syncs.add( sync_node );
 		}
 						
 		final MsgSyncNode	f_sync_node = sync_node;
 		
-		new AEThread2( "MsgSyncHandler:sync"){
-			
-			@Override
-			public void run() {
-				try{
-					
-					sync( f_sync_node, false );
-					
-				}finally{
+		sync_pool.run(
+			new AERunnable()
+			{	
+				@Override
+				public void runSupport() {
+					try{
 						
-					synchronized( node_uid_map ){
+						sync( f_sync_node, false );
 						
-						active_syncs.remove( f_sync_node );
+					}finally{
+							
+						synchronized( node_uid_map ){
+							
+							active_syncs.remove( f_sync_node );
+						}
 					}
 				}
-			}
-		}.start();
+			});
 	}
 	
 	private MsgSyncNode

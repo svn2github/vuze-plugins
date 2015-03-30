@@ -525,6 +525,11 @@ MsgSyncPlugin
 			throw( new IPCException( "Unsupported network: " + network ));
 		}	
 		
+		if ( dht == null ){
+			
+			throw( new IPCException( "DHT not available" ));
+		}
+		
 		return( dht );
 	}
 	
