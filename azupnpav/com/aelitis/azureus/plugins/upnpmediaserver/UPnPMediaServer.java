@@ -2058,6 +2058,8 @@ UPnPMediaServer
 		play( file );
 	}
 	
+		// get content URL
+	
 	public String
 	getContentURL(
 		Download download)
@@ -2097,6 +2099,47 @@ UPnPMediaServer
 		}
 	}
 
+		// peek content URL
+	
+	public String
+	peekContentURL(
+		Download download)
+	
+		throws IPCException
+	{
+		return( peekContentURL( download.getDiskManagerFileInfo()[0]));
+	}
+	
+	public String
+	peekContentURL(
+		DiskManagerFileInfo	file )
+	
+		throws IPCException
+	{
+		try{
+			String	id = content_directory.createResourceID( file.getDownloadHash(), file );
+
+			UPnPMediaServerContentDirectory.contentItem item = content_directory.peekContentFromResourceID( id );
+
+			if ( item != null ){
+
+				try{
+					return item.getURI( getLocalIP(), -1 );
+
+				}catch( Throwable e ){
+
+					log( "Failed to get URI", e);
+				}
+			}
+			
+			return "";
+			
+		} catch (Throwable t) {
+			
+			throw new IPCException(t);
+		}
+	}
+	
 	public String[]
 	getMimeTypes(
 		DiskManagerFileInfo	file )

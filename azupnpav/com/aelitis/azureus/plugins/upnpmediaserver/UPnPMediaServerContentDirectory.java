@@ -741,10 +741,28 @@ UPnPMediaServerContentDirectory
 	}
 		
 	protected contentItem
+	peekContentFromResourceID(
+		String		id )
+	{
+		return( getContentFromResourceIDSupport( id, true ));
+	}
+	
+	protected contentItem
 	getContentFromResourceID(
 		String		id )
 	{
-		ensureStarted();
+		return( getContentFromResourceIDSupport( id, false ));
+	}
+	
+	protected contentItem
+	getContentFromResourceIDSupport(
+		String		id,
+		boolean		is_peek )
+	{
+		if ( !is_peek ){
+			
+			ensureStarted();
+		}
 		
 		int	pos = id.indexOf( "-" );
 		
