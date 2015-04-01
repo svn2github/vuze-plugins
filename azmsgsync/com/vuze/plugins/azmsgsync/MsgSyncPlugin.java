@@ -191,6 +191,8 @@ MsgSyncPlugin
 						
 						private int	count = 0;
 						
+						private Random	random;
+						
 						@Override
 						public void 
 						perform(
@@ -198,11 +200,52 @@ MsgSyncPlugin
 						{
 							count++;
 							
-							if ( sync_handlers.size() > 0 ){
+							List<MsgSyncHandler> l_handlers = sync_handlers.getList();
+							
+							int	num_handlers = l_handlers.size();
+														
+							if ( num_handlers > 0 ){
 								
-								for ( MsgSyncHandler handler: sync_handlers ){
+									// randomize in case thread pool limits are being reached to achieve some
+									// fairness
+								
+								MsgSyncHandler[] handlers = l_handlers.toArray( new MsgSyncHandler[num_handlers ]);
+								
+								if ( random != null ){
 									
-									handler.timerTick( count );
+									for ( int i=num_handlers-1; i>0; i--){
+										
+										MsgSyncHandler temp = handlers[i];
+										
+										int	r = random.nextInt(i+1);
+										
+										handlers[i] = handlers[r];
+										
+										handlers[r] = temp;
+									}
+								}
+								
+								boolean randomize = false;
+								
+								for ( int i=0;i<handlers.length;i++){
+									
+									boolean overloaded = handlers[i].timerTick( count );
+									
+									if ( overloaded ){
+										
+										randomize = true;
+									}
+								}
+								
+								if ( randomize ){
+									
+									if ( random == null ){
+										
+										random = new Random();
+									}
+								}else{
+									
+									random = null;
 								}
 							}
 						}

@@ -33,7 +33,6 @@ import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -1616,13 +1615,13 @@ MsgSyncHandler
 			});		
 	}
 	
-	protected void
+	protected boolean
 	timerTick(
 		int		count )
 	{
 		if ( destroyed ){
 			
-			return;
+			return( false );
 		}
 		
 		if ( count % SECRET_TIDY_TICKS == 0 ){
@@ -1666,7 +1665,7 @@ MsgSyncHandler
 				
 				if ( private_messaging_fatal_error ){
 					
-					return;
+					return( false );
 				}
 				
 				if ( parent_handler.destroyed ){
@@ -1675,7 +1674,7 @@ MsgSyncHandler
 					
 					private_messaging_fatal_error = true;
 					
-					return;
+					return( false );
 				}
 				
 				synchronized(  MsgSyncHandler.this ){
@@ -1686,7 +1685,7 @@ MsgSyncHandler
 						
 						if ( now - private_messaging_secret_getting_last < 20*1000 ){
 							
-							return;
+							return( false );
 						}
 						
 						private_messaging_secret_getting = true;
@@ -1950,8 +1949,10 @@ MsgSyncHandler
 		
 		if ( count % ( is_anonymous_chat?2:1)  == 0 ){
 
-			sync();
+			return( sync());
 		}
+		
+		return( false );
 	}
 
 	private boolean
@@ -3338,13 +3339,13 @@ MsgSyncHandler
 	
 	
 	
-	protected void
+	protected boolean
 	sync()
 	{
-		sync( false );
+		return( sync( false ));
 	}
 		
-	protected void
+	protected boolean
 	sync(
 		final boolean		prefer_live )
 	{
@@ -3356,7 +3357,7 @@ MsgSyncHandler
 				
 				if ( private_messaging_secret == null ){
 								
-					return;
+					return( false );
 				}
 			}
 			
@@ -3369,7 +3370,7 @@ MsgSyncHandler
 			
 			if ( active_syncs.size() > MAX_CONC_SYNC ){
 				
-				return;
+				return( false );
 			}
 			
 			Set<String>	active_addresses = new HashSet<String>();
@@ -3493,14 +3494,14 @@ MsgSyncHandler
 			
 			if ( sync_node == null ){
 				
-				return;
+				return( false );
 			}
 			
 			if ( sync_pool.isFull()){
 				
 				if ( TRACE )trace( "Thread pool is full" );
 				
-				return;
+				return( true );
 			}
 			
 			if ( clear_biased_node_out ){
@@ -3541,6 +3542,8 @@ MsgSyncHandler
 					}
 				}
 			});
+		
+		return( false );
 	}
 	
 	private MsgSyncNode
