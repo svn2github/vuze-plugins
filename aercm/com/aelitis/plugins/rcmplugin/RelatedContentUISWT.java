@@ -808,6 +808,10 @@ RelatedContentUISWT
 			
 			skin.initialize( skin_area, "subskin" );
 			
+			if (dl != null || dl_file != null || search_strings != null) {
+				doSearch();
+			}
+
 			initialized = true;
 
 			SWTSkinObject so = skin.getSkinObjectByID( "rcmsubskinview" );
@@ -825,9 +829,6 @@ RelatedContentUISWT
 
 			skin.layout();
 			
-			if (dl != null || dl_file != null || search_strings != null) {
-				doSearch();
-			}
 		}
 		
 		private void
@@ -1023,6 +1024,7 @@ RelatedContentUISWT
 						public boolean
 						searching()
 						{
+							System.out.println("SEARCING");
 							if ( 	current_data_source != new_subview ||
 									( status_img_label != null && status_img_label.isDisposed())){
 								
@@ -2784,6 +2786,8 @@ RelatedContentUISWT
 										}
   									
   								}
+  								
+  								System.out.println("found");
   								
   								listener.contentFound( new RelatedContent[]{ result });
   							}
