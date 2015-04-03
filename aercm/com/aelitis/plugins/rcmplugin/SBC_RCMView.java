@@ -35,14 +35,12 @@ import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.config.ParameterListener;
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.*;
-import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.UIPluginViewToolBarListener;
 import org.gudy.azureus2.plugins.ui.tables.TableColumn;
 import org.gudy.azureus2.plugins.ui.tables.TableColumnCreationListener;
 import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.plugins.ui.toolbar.UIToolBarItem;
-import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.gudy.azureus2.pluginsimpl.local.PluginInitializer;
 import org.gudy.azureus2.ui.swt.Utils;
 import org.gudy.azureus2.ui.swt.mainwindow.ClipboardCopy;
@@ -877,18 +875,10 @@ SBC_RCMView
 								
 								if ( hits.size() > 0 ){
 									
-									Utils.execSWTThread(
-											new Runnable()
-											{
-												public void
-												run()
-												{
-													if ( tv_related_content != null ){
-														
-														tv_related_content.removeDataSources( hits.toArray( new RelatedContent[ hits.size()] ));
-													}
-												}
-											});
+										if ( tv_related_content != null ){
+											
+											tv_related_content.removeDataSources( hits.toArray( new RelatedContent[ hits.size()] ));
+										}
 								}
 							}
 							
@@ -1203,8 +1193,9 @@ SBC_RCMView
 
 					remove_item.addSelectionListener(new SelectionAdapter() {
 						public void widgetSelected(SelectionEvent e) {
-							manager.delete( related_content );
-						};
+							userDelete(related_content);
+						}
+
 					});
 				}
 
@@ -1214,6 +1205,7 @@ SBC_RCMView
 				{
 				}
 			});
+
 
 		tv_related_content.addKeyListener(
 				new KeyListener()
@@ -1245,7 +1237,7 @@ SBC_RCMView
 								content[i] = (RelatedContent)selected[i];
 							}
 							
-							manager.delete( content );
+							userDelete( content );
 							
 							e.doit = false;
 						}
@@ -1263,6 +1255,26 @@ SBC_RCMView
 		control.layout(true);
 	}
 	
+	private void userDelete(RelatedContent[] related_content) {
+		TableRowCore focusedRow = tv_related_content.getFocusedRow();
+		TableRowCore focusRow = null;
+		if (focusedRow != null) {
+			int i = tv_related_content.indexOf(focusedRow);
+			int size = tv_related_content.size(false);
+			if (i < size - 1) {
+				focusRow = tv_related_content.getRow(i + 1);
+			} else if (i > 0) {
+				focusRow = tv_related_content.getRow(i - 1);
+			}
+		}
+		manager.delete(related_content);
+		
+		if (focusRow != null) {
+  		tv_related_content.setSelectedRows(new TableRowCore[] {
+  			focusRow
+  		});
+		}
+	};
 
 	public String 
 	getUpdateUIName() 
@@ -1327,7 +1339,7 @@ SBC_RCMView
 				
 				System.arraycopy( _related_content, 0, related_content, 0, related_content.length );
 				
-				manager.delete( related_content );
+				userDelete(related_content);
 			
 				return true;
 			}
