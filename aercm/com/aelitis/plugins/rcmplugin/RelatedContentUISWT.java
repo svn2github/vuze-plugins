@@ -29,9 +29,7 @@ import org.eclipse.swt.events.*;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
-import org.eclipse.swt.layout.FormLayout;
-import org.eclipse.swt.layout.GridData;
-import org.eclipse.swt.layout.RowLayout;
+import org.eclipse.swt.layout.*;
 import org.eclipse.swt.widgets.*;
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.internat.MessageText;
@@ -740,14 +738,12 @@ RelatedContentUISWT
 
 			Composite header = new Composite( parent, SWT.NONE );
 			
-			RowLayout header_layout = new RowLayout();
-			
-			header_layout.center = true;
-			header_layout.spacing = 10;
+			GridLayout header_layout = new GridLayout(5, false);
+			header_layout.marginHeight = 0;
 			
 			header.setLayout( header_layout );
 						
-			header.setLayoutData( new GridData( GridData.FILL_HORIZONTAL));
+			header.setLayoutData( new GridData( GridData.FILL_HORIZONTAL ));
 			
 			status_img_label = new ImageLabel( header, swarm_image );
 
@@ -762,9 +758,12 @@ RelatedContentUISWT
 			final Button button_size = new Button( header, SWT.RADIO );
 			
 			button_size.setText( MessageText.getString( "rcm.subview.filesize" ));
-			
-			
-			final Button button_more = new Button( header, SWT.PUSH  );
+
+			Composite cMore = new Composite(header, SWT.NONE);
+			cMore.setLayout(new FillLayout());
+			GridData gridData = new GridData(SWT.RIGHT, SWT.FILL, true, false);
+			cMore.setLayoutData(gridData);
+			final Button button_more = new Button( cMore, SWT.PUSH  );
 			button_more.setText(MessageText.getString("rcm.menu.searchmore"));
 			button_more.addSelectionListener(new SelectionListener() {
 				
@@ -908,41 +907,6 @@ RelatedContentUISWT
 				related_mode = false;
 			}
 			
-			Utils.execSWTThread(
-				new Runnable()
-				{
-					public void 
-					run() 
-					{
-						boolean isSearch = search_strings != null;
-						if ( buttons != null ){
-  						buttons[0].setVisible(!isSearch);
-  						buttons[1].setVisible(!isSearch);
-						}
-						if (status_label != null) {
-  						status_label.setText(isSearch ? Arrays.toString(search_strings) : "");
-  						
-  						status_label.getParent().layout();
-						}
-						if ( buttons != null ){
-							
-							if ( related_mode ){
-								
-								buttons[0].setSelection( true );
-								buttons[1].setSelection( false );
-								
-							}else{
-								
-								buttons[1].setSelection( true );
-								buttons[0].setSelection( false );
-							}
-							
-							buttons[0].setEnabled( dl != null );
-							buttons[1].setEnabled( dl_file != null );
-						}
-					}
-				});
-			
 			if (initialized) {
 				doSearch();
 			}
@@ -951,6 +915,41 @@ RelatedContentUISWT
 		private void
 		doSearch()
 		{	
+			Utils.execSWTThread(
+					new Runnable()
+					{
+						public void 
+						run() 
+						{
+							boolean isSearch = search_strings != null;
+							if ( buttons != null ){
+	  						buttons[0].setVisible(!isSearch);
+	  						buttons[1].setVisible(!isSearch);
+							}
+							if (status_label != null) {
+	  						status_label.setText(isSearch ? Arrays.toString(search_strings) : "");
+	  						
+	  						status_label.getParent().layout();
+							}
+							if ( buttons != null ){
+								
+								if ( related_mode ){
+									
+									buttons[0].setSelection( true );
+									buttons[1].setSelection( false );
+									
+								}else{
+									
+									buttons[1].setSelection( true );
+									buttons[0].setSelection( false );
+								}
+								
+								buttons[0].setEnabled( dl != null );
+								buttons[1].setEnabled( dl_file != null );
+							}
+						}
+					});
+				
 			if ( current_rm == related_mode && current_dl == dl ){
 				
 				if ( current_file == null && dl_file == null  && search_strings == null){
@@ -1024,7 +1023,6 @@ RelatedContentUISWT
 						public boolean
 						searching()
 						{
-							System.out.println("SEARCING");
 							if ( 	current_data_source != new_subview ||
 									( status_img_label != null && status_img_label.isDisposed())){
 								
@@ -2786,8 +2784,6 @@ RelatedContentUISWT
 										}
   									
   								}
-  								
-  								System.out.println("found");
   								
   								listener.contentFound( new RelatedContent[]{ result });
   							}
