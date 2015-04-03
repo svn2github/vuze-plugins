@@ -33,7 +33,6 @@ import org.eclipse.swt.layout.FormLayout;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.RowLayout;
 import org.eclipse.swt.widgets.*;
-
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.*;
@@ -42,7 +41,10 @@ import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.disk.DiskManagerFileInfo;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.torrent.Torrent;
-import org.gudy.azureus2.plugins.ui.*;
+import org.gudy.azureus2.plugins.ui.UIInputReceiver;
+import org.gudy.azureus2.plugins.ui.UIInputReceiverListener;
+import org.gudy.azureus2.plugins.ui.UIInstance;
+import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.config.*;
 import org.gudy.azureus2.plugins.ui.menus.MenuItem;
 import org.gudy.azureus2.plugins.ui.menus.MenuItemFillListener;
@@ -52,7 +54,10 @@ import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.tables.TableContextMenuItem;
 import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.plugins.ui.tables.TableRow;
-import org.gudy.azureus2.plugins.utils.search.*;
+import org.gudy.azureus2.plugins.utils.search.SearchInstance;
+import org.gudy.azureus2.plugins.utils.search.SearchObserver;
+import org.gudy.azureus2.plugins.utils.search.SearchProvider;
+import org.gudy.azureus2.plugins.utils.search.SearchResult;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.gudy.azureus2.ui.swt.SimpleTextEntryWindow;
 import org.gudy.azureus2.ui.swt.Utils;
@@ -77,8 +82,11 @@ import com.aelitis.azureus.ui.common.viewtitleinfo.ViewTitleInfoManager;
 import com.aelitis.azureus.ui.mdi.*;
 import com.aelitis.azureus.ui.swt.imageloader.ImageLoader;
 import com.aelitis.azureus.ui.swt.skin.*;
-import com.aelitis.azureus.ui.swt.views.skin.*;
+import com.aelitis.azureus.ui.swt.views.skin.SkinView;
+import com.aelitis.azureus.ui.swt.views.skin.SkinViewManager;
 import com.aelitis.azureus.ui.swt.views.skin.SkinViewManager.SkinViewManagerListener;
+import com.aelitis.azureus.ui.swt.views.skin.VuzeMessageBox;
+import com.aelitis.azureus.ui.swt.views.skin.VuzeMessageBoxListener;
 import com.aelitis.azureus.ui.swt.views.skin.sidebar.SideBar;
 import com.aelitis.azureus.ui.swt.views.skin.sidebar.SideBarEntrySWT;
 
@@ -88,7 +96,7 @@ RelatedContentUISWT
 {		
 	public static final String SIDEBAR_SECTION_RELATED_CONTENT = "RelatedContent";
 	
-	private static final String SPINNER_IMAGE_ID 	= "image.sidebar.vitality.dl";
+	private static final String SPINNER_IMAGE_ID 	= "image.sidebar.vitality.dots";
 
 	private static RelatedContentUISWT		singleton;
 	
@@ -711,6 +719,8 @@ RelatedContentUISWT
 		private Image[]			vitality_images;
 		private Image swarm_image;
 		
+		private boolean initialized;
+		
 		private
 		SubViewHolder(
 			SWTSkin	_skin  )
@@ -753,6 +763,21 @@ RelatedContentUISWT
 			
 			button_size.setText( MessageText.getString( "rcm.subview.filesize" ));
 			
+			
+			final Button button_more = new Button( header, SWT.PUSH  );
+			button_more.setText(MessageText.getString("rcm.menu.searchmore"));
+			button_more.addSelectionListener(new SelectionListener() {
+				
+				public void widgetSelected(SelectionEvent e) {
+					if (current_data_source != null) {
+						current_data_source.search();
+					}
+				}
+				
+				public void widgetDefaultSelected(SelectionEvent e) {
+				}
+			});
+
 			Listener but_list  = 
 				new Listener()
 				{
@@ -783,6 +808,8 @@ RelatedContentUISWT
 			
 			skin.initialize( skin_area, "subskin" );
 			
+			initialized = true;
+
 			SWTSkinObject so = skin.getSkinObjectByID( "rcmsubskinview" );
 			
 			RCMItemSubView	ds = current_data_source;
@@ -797,6 +824,10 @@ RelatedContentUISWT
 			so.setVisible( true );
 
 			skin.layout();
+			
+			if (dl != null || dl_file != null || search_strings != null) {
+				doSearch();
+			}
 		}
 		
 		private void
@@ -911,7 +942,9 @@ RelatedContentUISWT
 					}
 				});
 			
-			doSearch();
+			if (initialized) {
+				doSearch();
+			}
 		}
 		
 		private void
@@ -2752,7 +2785,6 @@ RelatedContentUISWT
   									
   								}
   								
-  								
   								listener.contentFound( new RelatedContent[]{ result });
   							}
   							
@@ -3201,6 +3233,7 @@ RelatedContentUISWT
 		protected void
 		lookupStarts()
 		{
+			complete = false;
 			super.lookupStarts();
 			
 			synchronized( this ){
