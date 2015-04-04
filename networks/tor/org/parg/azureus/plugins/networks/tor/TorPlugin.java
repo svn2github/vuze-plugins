@@ -30,6 +30,7 @@ import java.lang.reflect.Method;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.PasswordAuthentication;
 import java.net.Proxy;
 import java.net.Socket;
 import java.net.URL;
@@ -44,6 +45,8 @@ import javax.net.ssl.HandshakeCompletedListener;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 
+import org.gudy.azureus2.core3.security.SEPasswordListener;
+import org.gudy.azureus2.core3.security.SESecurityManager;
 import org.gudy.azureus2.core3.tracker.protocol.PRHelpers;
 import org.gudy.azureus2.core3.util.*;
 import org.gudy.azureus2.plugins.*;
@@ -3211,7 +3214,7 @@ TorPlugin
 		
 		private class
 		SOCKSProxyConnection
-			implements AESocksProxyPlugableConnection
+			implements AESocksProxyPlugableConnection, SEPasswordListener
 		{
 			private AESocksProxyConnection	connection;
 			private Socket					tor_socket;
@@ -3335,29 +3338,46 @@ TorPlugin
 						runSupport() 
 						{
 							try{
-								Socket socket = new Socket( proxy );
+									// Tor uses SOCKS username/password authentication to manage
+									// stream isolation so we need to forward this when delegating
 								
-								socket.connect( final_address );
+								boolean	add_pw_listener = connection.getUsername() != null;
 								
-								synchronized( SOCKSProxyConnection.this ){
+								if ( add_pw_listener ){
 									
-									if ( socket_closed ){
-										
-										try{
-											socket.close();
-											
-										}catch( Throwable e ){
-										
-										}
-										
-										throw( new Exception( "Connection already closed" ));
-									}
-									
-									tor_socket = socket;
+									SESecurityManager.setThreadPasswordHandler( SOCKSProxyConnection.this );
 								}
 								
-								connection.connected();
-								
+								try{
+									Socket socket = new Socket( proxy );
+									
+									socket.connect( final_address );
+									
+									synchronized( SOCKSProxyConnection.this ){
+										
+										if ( socket_closed ){
+											
+											try{
+												socket.close();
+												
+											}catch( Throwable e ){
+											
+											}
+											
+											throw( new Exception( "Connection already closed" ));
+										}
+										
+										tor_socket = socket;
+									}
+									
+									connection.connected();
+								}finally{
+									
+									if ( add_pw_listener ){
+										
+										SESecurityManager.unsetThreadPasswordHandler();
+									}
+								}
 							}catch( Throwable e ){
 								
 								try{
@@ -3416,6 +3436,37 @@ TorPlugin
 				
 				
 				closed( this );
+			}
+			
+			public PasswordAuthentication
+			getAuthentication(
+				String		realm,
+				URL			tracker )
+			{
+				String username = connection.getUsername();
+				String password	= connection.getPassword();
+				
+				if ( username != null && password != null ){
+					
+					return( new PasswordAuthentication( username, password.toCharArray()));
+					
+				}else{
+					
+					return( null );
+				}
+			}
+			
+			public void
+			setAuthenticationOutcome(
+				String		realm,
+				URL			tracker,
+				boolean		success )
+			{
+			}
+			
+			public void
+			clearPasswords()
+			{
 			}
 		}
 		
