@@ -806,6 +806,38 @@ RCMPlugin
 	}
 	
 	public static String
+	getNetworkString(
+		String[]		networks )
+	{
+		if ( networks == null || networks.length == 0 ){
+			
+			return( "" );
+			
+		}else if ( networks.length == 1 ){
+			
+			if ( networks[0] != AENetworkClassifier.AT_PUBLIC ){
+				
+				return( " [" + networks[0] + "]" );
+				
+			}else{
+				
+				return( "" );
+			}
+		}else{
+	
+			String str = "";
+			
+			for ( String net: networks ){
+				
+				str += (str.length()==0?"":",") + net;
+			}
+			
+			return( " [" + str + "]" );
+		}
+	}
+
+
+	public static String
 	getMagnetURI(
 		RelatedContent		rc )
 	{

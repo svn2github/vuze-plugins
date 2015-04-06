@@ -1250,6 +1250,24 @@ SBC_RCMView
 					}
 				});
 		
+		if (ds instanceof RCMItemSubView) {
+  		tv_related_content.addCountChangeListener(new TableCountChangeListener() {
+  			
+  			public void rowRemoved(TableRowCore row) {
+  				updateCount();
+  			}
+  			
+  			public void rowAdded(TableRowCore row) {
+  				updateCount();
+  			}
+
+				private void updateCount() {
+					int size = tv_related_content == null ? 0 : tv_related_content.size(false);
+					((RCMItemSubView) ds).setCount(size);
+				}
+  		});
+		}
+		
 		tv_related_content.initialize( table_parent );
 
 		control.layout(true);
@@ -1377,7 +1395,6 @@ SBC_RCMView
 				String command = (String) field.get(program);
 				command = command.replaceAll("%[1lL]", s);
 				command = command.replace(" --", "");
-				System.out.println(command + " -incognito");
 				PluginInitializer.getDefaultInterface().getUtilities().createProcess(command + " -incognito");
 			} catch (Exception e1) {
 				e1.printStackTrace();
