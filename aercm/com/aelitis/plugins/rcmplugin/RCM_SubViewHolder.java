@@ -369,7 +369,7 @@ public class RCM_SubViewHolder
 				new RCMItemSubViewListener()
 				{
 					private int vi_index;
-					private int lastCount;
+					private int lastCount = -1;
 					
 					public boolean
 					searching()

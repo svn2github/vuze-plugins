@@ -1266,6 +1266,7 @@ SBC_RCMView
 					((RCMItemSubView) ds).setCount(size);
 				}
   		});
+  		((RCMItemSubView) ds).setCount(0);
 		}
 		
 		tv_related_content.initialize( table_parent );
