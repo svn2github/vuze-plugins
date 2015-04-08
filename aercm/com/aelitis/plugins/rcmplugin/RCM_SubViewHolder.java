@@ -10,12 +10,12 @@ import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.*;
 import org.eclipse.swt.widgets.*;
-
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.disk.DiskManagerFileInfo;
 import org.gudy.azureus2.plugins.download.Download;
+import org.gudy.azureus2.plugins.torrent.Torrent;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.gudy.azureus2.ui.swt.Utils;
 import org.gudy.azureus2.ui.swt.plugins.UISWTView;
@@ -333,17 +333,35 @@ public class RCM_SubViewHolder
 		
 		if ( related_mode && dl != null ){
 			
-			String[] networks = PluginCoreUtils.unwrap( dl ).getDownloadState().getNetworks();
+			Torrent torrent = dl.getTorrent();
 			
-			new_subview = new RCMItemSubView(dl.getTorrent().getHash(), networks );
+			if ( torrent == null ){
+				
+				new_subview = new RelatedContentUISWT.RCMItemSubViewEmpty();
+				
+			}else{
+				
+				String[] networks = PluginCoreUtils.unwrap( dl ).getDownloadState().getNetworks();
+				
+				new_subview = new RCMItemSubView( torrent.getHash(), networks );
+			}
 							
 		}else if ( !related_mode && dl_file != null && dl != null ){
-					
-			String[] networks = PluginCoreUtils.unwrap( dl ).getDownloadState().getNetworks();
-
-			long file_size = dl_file.getLength();
-										
-			new_subview = new RCMItemSubView(dl.getTorrent().getHash(), networks, file_size );
+				
+			Torrent torrent = dl.getTorrent();
+			
+			if ( torrent == null ){
+				
+				new_subview = new RelatedContentUISWT.RCMItemSubViewEmpty();
+				
+			}else{
+				
+				String[] networks = PluginCoreUtils.unwrap( dl ).getDownloadState().getNetworks();
+	
+				long file_size = dl_file.getLength();
+											
+				new_subview = new RCMItemSubView(torrent.getHash(), networks, file_size );
+			}
 											
 		}else if (search_strings != null){
 			String[] networks = AENetworkClassifier.getDefaultNetworks();
