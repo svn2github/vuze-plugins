@@ -663,10 +663,13 @@ I2PHelperPlugin
 				
 			link_rates_param.addListener( link_listener );
 			
+			final BooleanParameter treat_as_lan_param = config_model.addBooleanParameter2( "azi2phelper.rates.use.lan", "azi2phelper.rates.use.lan", false );
+
+			
 			config_model.createGroup( 
 					"azi2phelper.bandwidth.group",
 					new Parameter[]{ 
-						link_rates_param, up_limit_param, down_limit_param, share_percent_param 	
+						link_rates_param, up_limit_param, down_limit_param, share_percent_param, treat_as_lan_param	
 					});
 			
 				// Network Mixing
@@ -1296,7 +1299,8 @@ I2PHelperPlugin
 										}
 									}
 									
-								}else if ( type == PluginEvent.PEV_PLUGIN_INSTALLED ){
+								}else if ( 	type == PluginEvent.PEV_PLUGIN_INSTALLED ||
+											type == PluginEvent.PEV_PLUGIN_UPDATED ){
 									
 									String id = (String)ev.getValue();
 									

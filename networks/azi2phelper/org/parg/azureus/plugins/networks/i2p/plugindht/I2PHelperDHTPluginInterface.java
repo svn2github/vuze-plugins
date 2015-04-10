@@ -23,6 +23,9 @@
 package org.parg.azureus.plugins.networks.i2p.plugindht;
 
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
@@ -31,6 +34,7 @@ import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.AsyncDispatcher;
 import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.HashWrapper;
 import org.gudy.azureus2.core3.util.SimpleTimer;
 import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
@@ -46,8 +50,14 @@ import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT;
 
 
 
+
+
+
+import com.aelitis.azureus.core.dht.db.DHTDB;
+import com.aelitis.azureus.core.dht.db.DHTDBValue;
 import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
 import com.aelitis.azureus.core.dht.transport.DHTTransportProgressListener;
+import com.aelitis.azureus.core.dht.transport.DHTTransportValue;
 import com.aelitis.azureus.plugins.dht.DHTPluginContact;
 import com.aelitis.azureus.plugins.dht.DHTPluginInterface;
 import com.aelitis.azureus.plugins.dht.DHTPluginKeyStats;
@@ -360,9 +370,14 @@ I2PHelperDHTPluginInterface
 		byte							version,
 		boolean							is_cvs )
 	{
-		Debug.out( "not imp" );
+		if ( dht == null ){
+			
+			Debug.out( "DHT not yet available" );
 		
-		return( null );
+			return( null );
+		}
+		
+		return( dht.importContact( address ));
 	}
 	
 	public void
@@ -526,6 +541,67 @@ I2PHelperDHTPluginInterface
 		Debug.out( "not imp" );
 	}
 	
+	@Override
+	public DHTInterface[] 
+	getDHTInterfaces() 
+	{
+		I2PHelperAZDHT dht = getDHT( 5*1000 );
+	
+		if ( dht == null ){
+			
+			return( new DHTInterface[0] );
+		}
+		
+		return( new DHTInterface[]{ dht } );
+	}
+	
+	@Override
+	public List<DHTPluginValue> 
+	getValues() 
+	{
+		List<DHTPluginValue>	vals = new ArrayList<DHTPluginValue>();
+
+		if ( dht != null ){
+							
+			try{
+				DHTDB	db = dht.getDHT().getDataBase();
+				
+				Iterator<HashWrapper>	keys = db.getKeys();
+				
+				
+				while( keys.hasNext()){
+					
+					DHTDBValue val = db.getAnyValue( keys.next());
+					
+					if ( val != null ){
+						
+						vals.add( mapValue( val ));
+					}
+				}
+				
+				return( vals );
+				
+			}catch( Throwable e ){
+				
+				Debug.out( e );
+			}
+		}
+		
+		return( vals );
+	}
+	
+	protected DHTPluginValue
+	mapValue(
+		final DHTTransportValue	value )
+	{
+		if ( value == null ){
+			
+			return( null );
+		}
+		
+		return( new DHTPluginValueImpl(value));
+	}
+	
 	public void
 	addListener(
 		DHTPluginListener	l )
@@ -543,6 +619,45 @@ I2PHelperDHTPluginInterface
 		String	str )
 	{
 		plugin.log( str );
+	}
+	
+	private class
+	DHTPluginValueImpl
+		implements DHTPluginValue
+	{
+		private DHTTransportValue		value;
+		
+		private 
+		DHTPluginValueImpl(
+			DHTTransportValue		_v )
+		{
+			value	= _v;
+		}
+		
+		public byte[]
+		getValue()
+		{
+			return( value.getValue());
+		}
+		
+		@Override
+		public long getCreationTime() {
+			return( value.getCreationTime());
+		}
+		
+		@Override
+		public int getFlags() {
+			return( value.getFlags());
+		}
+		
+		@Override
+		public long getVersion() {
+			return( value.getVersion());
+		}
+		@Override
+		public boolean isLocal() {
+			return( value.isLocal());
+		}
 	}
 	
 	private class
@@ -724,6 +839,14 @@ I2PHelperDHTPluginInterface
 				
 				throw( new RuntimeException( e ));
 			}
+		}
+		
+		public String
+		getString()
+		{
+			DHTTransportContact contact = fixup();
+			
+			return( contact.getString());	
 		}
 	}
 }

@@ -59,6 +59,7 @@ import com.aelitis.azureus.core.dht.transport.DHTTransportQueryStoreReply;
 import com.aelitis.azureus.core.dht.transport.DHTTransportRequestHandler;
 import com.aelitis.azureus.core.dht.transport.DHTTransportStoreReply;
 import com.aelitis.azureus.core.dht.transport.DHTTransportValue;
+import com.aelitis.azureus.plugins.dht.DHTPluginContact;
 
 import net.i2p.I2PAppContext;
 import net.i2p.client.I2PSession;
@@ -236,6 +237,48 @@ DHTAZClient
 		
 		return( dht );
 	}
+	
+		// DHTInterface fake methods start
+	
+	public byte[]
+	getID()
+	{
+		return( null );
+	}
+	
+	public boolean
+	isIPV6()
+	{
+		return( false );
+	}
+	
+	public int
+	getNetwork()
+	{
+		return( DHT.NW_MAIN );
+	}
+			
+	public DHTPluginContact[]
+	getReachableContacts()
+	{
+		return( null );
+	}
+	
+	public DHTPluginContact[]
+	getRecentContacts()
+	{
+		return( null );
+	}
+	
+	public List<DHTPluginContact>
+	getClosestContacts(
+		byte[]		to_id,
+		boolean		live_only )
+	{
+		return( null );
+	}
+	
+		// 	DHTInterface fake methods end
 	
 	public void
 	log(

@@ -85,6 +85,19 @@ DHTTransportAZ
 	
 	private DHTTransferHandler 			xfer_handler;
 
+	private static final int CONTACT_HISTORY_MAX 		= 32;
+	
+	private Map<InetSocketAddress,DHTTransportContact>	contact_history = 
+		new LinkedHashMap<InetSocketAddress,DHTTransportContact>(CONTACT_HISTORY_MAX,0.75f,true)
+		{
+			protected boolean 
+			removeEldestEntry(
+		   		Map.Entry<InetSocketAddress,DHTTransportContact> eldest) 
+			{
+				return size() > CONTACT_HISTORY_MAX;
+			}
+		};
+		
 	private volatile boolean			destroyed;
 	
 	protected
@@ -1106,6 +1119,8 @@ DHTTransportAZ
 					contact.setDetails( instance_id, (byte)flags);
 					
 					reply_handler.reply( contact, payload );
+					
+					contactAlive( contact );
 				}
 				
 				@Override
@@ -1171,6 +1186,8 @@ DHTTransportAZ
 		if ( TRACE ) trace( "Received request: " + payload_in );
 		
 		DHTTransportContactAZ az_contact = new DHTTransportContactAZ( this, contact );
+		
+		contactAlive( az_contact );
 		
 		boolean	adhoc = true;
 		
@@ -1347,16 +1364,35 @@ DHTTransportAZ
 		return( true );
 	}
 	
+	private void
+	contactAlive(
+		DHTTransportContact	contact )
+	{
+		synchronized( contact_history ){
+		
+			contact_history.put( contact.getTransportAddress(), contact );
+		}
+	}
+	
 	public DHTTransportContact[]
 	getReachableContacts()
 	{
-		return( new DHTTransportContact[0]);
+		return( getRecentContacts());
 	}
 	
 	public DHTTransportContact[]
 	getRecentContacts()
 	{
-		return( new DHTTransportContact[0]);		
+		synchronized( contact_history ){
+
+			Collection<DHTTransportContact> vals = contact_history.values();
+			
+			DHTTransportContact[]	res = new DHTTransportContact[vals.size()];
+			
+			vals.toArray( res );
+			
+			return( res );
+		}
 	}
 	
 	public void

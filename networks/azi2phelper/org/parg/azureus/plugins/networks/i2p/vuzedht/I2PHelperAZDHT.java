@@ -33,6 +33,7 @@ import com.aelitis.azureus.core.dht.transport.DHTTransportProgressListener;
 import com.aelitis.azureus.core.dht.transport.DHTTransportTransferHandler;
 import com.aelitis.azureus.core.dht.transport.DHTTransportValue;
 import com.aelitis.azureus.plugins.dht.DHTPluginContact;
+import com.aelitis.azureus.plugins.dht.DHTPluginInterface.DHTInterface;
 import com.aelitis.azureus.plugins.dht.DHTPluginOperationListener;
 import com.aelitis.azureus.plugins.dht.DHTPluginProgressListener;
 import com.aelitis.azureus.plugins.dht.DHTPluginTransferHandler;
@@ -40,6 +41,7 @@ import com.aelitis.azureus.plugins.dht.DHTPluginValue;
 
 public abstract class 
 I2PHelperAZDHT 
+	implements DHTInterface
 {
 	public static final short		FLAG_NONE			= DHT.FLAG_NONE;			
 	public static final short		FLAG_NON_ANON		= DHT.FLAG_SINGLE_VALUE;	// getters will get putter's address
@@ -337,13 +339,13 @@ I2PHelperAZDHT
 	};
 	
 	
-	private class
+	protected class
 	DHTContactImpl
 		implements DHTContact
 	{
 		private DHTTransportContact		contact;
 		
-		private
+		protected
 		DHTContactImpl(
 			DHTTransportContact		_c )
 		{
@@ -544,6 +546,13 @@ I2PHelperAZDHT
 				
 				throw( new RuntimeException( e ));
 			}
+		}
+		
+		@Override
+		public String 
+		getString() 
+		{
+			return( contact.getString());
 		}
 	}
 	

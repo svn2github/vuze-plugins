@@ -22,7 +22,13 @@
 
 package org.parg.azureus.plugins.networks.i2p.vuzedht;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.aelitis.azureus.core.dht.DHT;
+import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
+import com.aelitis.azureus.plugins.dht.DHTPluginContact;
+import com.aelitis.azureus.plugins.dht.impl.DHTPluginContactImpl;
 
 public class 
 DHTAZFull
@@ -60,5 +66,70 @@ DHTAZFull
 	getDHT()
 	{
 		return( dht.getDHT());
+	}
+	
+	public byte[]
+	getID()
+	{
+		return( dht.getDHT().getRouter().getID());
+	}
+	
+	public boolean
+	isIPV6()
+	{
+		return( false );
+	}
+	
+	public int
+	getNetwork()
+	{
+		return( DHT.NW_MAIN );
+	}
+			
+	public DHTPluginContact[]
+	getReachableContacts()
+	{
+		DHTTransportContact[] contacts = dht.getDHT().getTransport().getReachableContacts();
+		
+		DHTPluginContact[] result = new DHTPluginContact[contacts.length];
+		
+		for ( int i=0;i<contacts.length;i++ ){
+			
+			result[i] = new DHTContactImpl( contacts[i] );
+		}
+		
+		return( result );
+	}
+	
+	public DHTPluginContact[]
+	getRecentContacts()
+	{
+		DHTTransportContact[] contacts = dht.getDHT().getTransport().getRecentContacts();
+		
+		DHTPluginContact[] result = new DHTPluginContact[contacts.length];
+		
+		for ( int i=0;i<contacts.length;i++ ){
+			
+			result[i] = new DHTContactImpl( contacts[i] );
+		}
+		
+		return( result );
+	}
+	
+	public List<DHTPluginContact>
+	getClosestContacts(
+		byte[]		to_id,
+		boolean		live_only )
+	{
+		List<DHTTransportContact> contacts = dht.getDHT().getControl().getClosestKContactsList(to_id, live_only);
+		
+		List<DHTPluginContact> result = new ArrayList<DHTPluginContact>( contacts.size());
+		
+		for ( DHTTransportContact contact: contacts ){
+			
+			result.add( new DHTContactImpl( contact ));
+		}
+		
+		return( result );
 	}
 }
