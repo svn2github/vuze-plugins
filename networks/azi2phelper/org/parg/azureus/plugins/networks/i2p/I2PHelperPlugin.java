@@ -162,33 +162,33 @@ I2PHelperPlugin
 	implements UnloadablePlugin, I2PHelperAdapter
 {	
 	/*
-	 *	Router: commented out System.setProperties for timezone, http agent etc in static initialiser
+	 	----Router: (patch integrated in 0.9.19, yay! commented out System.setProperties for timezone, http agent etc in static initialiser
 	 
-	 	RoutingKeyGenerator: (patch integrated in 0.9.13, yay!) Fixed up SimpleDateFormat as it assumes GMT (TimeZone default used within SimpleDateFormat)
+	 	----RoutingKeyGenerator: (patch integrated in 0.9.13, yay!) Fixed up SimpleDateFormat as it assumes GMT (TimeZone default used within SimpleDateFormat)
 	     	private final static SimpleDateFormat _fmt = new SimpleDateFormat(FORMAT, Locale.UK);
     		static{
     			_fmt.setCalendar( _cal );	 // PARG
     		}
-    		
-    		
-    	NativeBigInteger: Added load attempt from classes's loader (i.e. plugin class loader)
-    		URL resource = ClassLoader.getSystemResource(resourceName);	// existing line in loadFromResource
-    	    if (resource == null) {
-        		// PARG added search via plugin class loader as well
-        		resource = NativeBigInteger.class.getClassLoader().getResource(resourceName);
-        	}
-        	
-        CoreVersion: Added a getVersion method to avoid constant getting cached within Vuze when printing it
+    		        	
+        ----CoreVersion: (patch integrated in 0.9.19, yay!)Added a getVersion method to avoid constant getting cached within Vuze when printing it
             public static String
 		    getVersion()
 		    {
 		    	return( VERSION );
 		    }
 		    
-        UDPReceiver - hacked in a sleep(1000) after detection of exception on reading socket to avoid 100% CPU issue
-        // 0.9.16 has some core changes to hopefully prevent this, so no hack required!
+        ----UDPReceiver - hacked in a sleep(1000) after detection of exception on reading socket to avoid 100% CPU issue
+        		// 0.9.16 has some core changes to hopefully prevent this, so no hack required!
         
-        	NativeBigInteger: added some temporary load limit support
+        
+       	NativeBigInteger: Added load attempt from classes's loader (i.e. plugin class loader)
+    		URL resource = ClassLoader.getSystemResource(resourceName);	// existing line in loadFromResource
+    	    if (resource == null) {
+        		// PARG added search via plugin class loader as well
+        		resource = NativeBigInteger.class.getClassLoader().getResource(resourceName);
+        	}
+
+       	NativeBigInteger: added some temporary load limit support
         	
             public interface
 		    ModPowLimiter
@@ -232,13 +232,21 @@ I2PHelperPlugin
 		    
 		
 		Router Console app
+		------------------
 		Fix the loading 
 		
-		LocalClientAppsJob - replace system class - 2 places
+		LoadClientAppsJob - replace system class - 2 places
                 _cl = LoadClientAppsJob.class.getClassLoader(); // PARG ClassLoader.getSystemClassLoader();
                 cl = LoadClientAppsJob.class.getClassLoader(); // PARG ClassLoader.getSystemClassLoader();
 
 	*/
+	
+	static{
+		System.setProperty( "I2P_DISABLE_DNS_CACHE_OVERRIDE", "1" );
+		System.setProperty( "I2P_DISABLE_HTTP_AGENT_OVERRIDE", "1" );
+		System.setProperty( "I2P_DISABLE_HTTP_KEEPALIVE_OVERRIDE", "1" );
+		System.setProperty( "I2P_DISABLE_TIMEZONE_OVERRIDE", "1" );
+	}
 	
 	private static final String	BOOTSTRAP_SERVER = "http://i2pboot.vuze.com:60000/?getNodes=true";
 	
