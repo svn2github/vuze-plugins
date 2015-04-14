@@ -1765,86 +1765,99 @@ UPnPMediaServer
 			}
 		});
 		toolBarItem.setImageID("image.sidebar.device.samsung.big");
-		
-    if (new_renderer instanceof UPnPMediaRendererRemote) {
-    	UPnPMediaRendererRemote rendererRemote = (UPnPMediaRendererRemote) new_renderer;
 
-			UPnPRootDevice rootDevice = rendererRemote.getDevice();
-			final UPnPDevice upnpDevice = rootDevice.getDevice();
+	    if (new_renderer instanceof UPnPMediaRendererRemote) {
+	    	UPnPMediaRendererRemote rendererRemote = (UPnPMediaRendererRemote) new_renderer;
+	
+				UPnPRootDevice rootDevice = rendererRemote.getDevice();
+				final UPnPDevice upnpDevice = rootDevice.getDevice();
+	
+	    	// set tooltip
+	    	toolBarItem.setToolTip("Play to " + upnpDevice.getFriendlyName());
 
-    	// set tooltip
-    	toolBarItem.setToolTip("Play to " + upnpDevice.getFriendlyName());
+	    	boolean isAZ3 = COConfigurationManager.getStringParameter("ui").equals("az3");
 
-			final DeviceManager deviceManager = DeviceManagerFactory.getSingleton();
-			Device device = deviceManager.findDevice(upnpDevice);
-			if (device != null) {
-				String imageID = device.getImageID();
-				if (imageID != null) {
-					toolBarItem.setImageID(imageID);
-				}
-			} else {
-				deviceManager.addListener(new DeviceManagerListener() {
-					
-					public void deviceRemoved(Device device) {
+	    		// no devicemanager for non-Vuze UI
+	    	
+			if ( isAZ3 ){
+				final DeviceManager deviceManager = DeviceManagerFactory.getSingleton();
+				Device device = deviceManager.findDevice(upnpDevice);
+				if (device != null) {
+					String imageID = device.getImageID();
+					if (imageID != null) {
+						toolBarItem.setImageID(imageID);
 					}
-					
-					public void deviceManagerLoaded() {
-					}
-					
-					public void deviceChanged(Device device) {
-						checkForImage(device);
-					}
-					
-					public void deviceAttentionRequest(Device device) {
-					}
-					
-					public void deviceAdded(Device device) {
-						checkForImage(device);
-					}
-					
-					public void checkForImage(Device device) {
-						if (device instanceof DeviceUPnP) {
-							DeviceUPnP deviceUPnP = (DeviceUPnP) device;
-							UPnPDevice uPnPDevice2 = deviceUPnP.getUPnPDevice();
-							if (upnpDevice.equals(uPnPDevice2)) {
-								deviceManager.removeListener(this);
-								String imageID = device.getImageID();
-								if (imageID != null) {
-									toolBarItem.setImageID(imageID);
+				} else {
+					deviceManager.addListener(new DeviceManagerListener() {
+	
+						public void deviceRemoved(Device device) {
+						}
+	
+						public void deviceManagerLoaded() {
+						}
+	
+						public void deviceChanged(Device device) {
+							checkForImage(device);
+						}
+	
+						public void deviceAttentionRequest(Device device) {
+						}
+	
+						public void deviceAdded(Device device) {
+							checkForImage(device);
+						}
+	
+						public void checkForImage(Device device) {
+							if (device instanceof DeviceUPnP) {
+								DeviceUPnP deviceUPnP = (DeviceUPnP) device;
+								UPnPDevice uPnPDevice2 = deviceUPnP.getUPnPDevice();
+								if (upnpDevice.equals(uPnPDevice2)) {
+									deviceManager.removeListener(this);
+									String imageID = device.getImageID();
+									if (imageID != null) {
+										toolBarItem.setImageID(imageID);
+									}
 								}
 							}
 						}
-					}
-				});
+					});
+				}
 			}
-    	}
-    
+	    }
+
 
 		tbm.addToolBarItem(toolBarItem);
 	}
 
 	public UPnPMediaRendererRemote findRendererByIP(String ip) {
-		synchronized( renderers ){
-			for (UPnPMediaRenderer renderer : renderers) {
-				if (renderer instanceof UPnPMediaRendererRemote) {
-					UPnPMediaRendererRemote rendererRemote = (UPnPMediaRendererRemote) renderer;
-					UPnPRootDevice rootDevice = rendererRemote.getDevice();
-					UPnPDevice uPnPDevice = rootDevice.getDevice();
+		boolean isAZ3 = COConfigurationManager.getStringParameter("ui").equals("az3");
+		
+			// no devicemanager for non-Vuze UI
 
-					DeviceManager deviceManager = DeviceManagerFactory.getSingleton();
-					Device device = deviceManager.findDevice(uPnPDevice);
-					if (device != null) {
-						InetAddress address = device.getAddress();
-						if (address != null) {
-							String remoteIP = address.getHostAddress();
-							if (remoteIP.equals(ip)) {
-								return rendererRemote;
+		if ( isAZ3 ){
+			synchronized( renderers ){
+				for (UPnPMediaRenderer renderer : renderers) {
+					if (renderer instanceof UPnPMediaRendererRemote) {
+						UPnPMediaRendererRemote rendererRemote = (UPnPMediaRendererRemote) renderer;
+						UPnPRootDevice rootDevice = rendererRemote.getDevice();
+						UPnPDevice uPnPDevice = rootDevice.getDevice();
+	
+						DeviceManager deviceManager = DeviceManagerFactory.getSingleton();
+						Device device = deviceManager.findDevice(uPnPDevice);
+						if (device != null) {
+							InetAddress address = device.getAddress();
+							if (address != null) {
+								String remoteIP = address.getHostAddress();
+								if (remoteIP.equals(ip)) {
+									return rendererRemote;
+								}
 							}
 						}
 					}
 				}
 			}
 		}
+		
 		return null;
 	}
 	
