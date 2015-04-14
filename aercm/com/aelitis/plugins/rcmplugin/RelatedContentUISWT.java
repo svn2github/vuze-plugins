@@ -2299,6 +2299,11 @@ RelatedContentUISWT
   					
   					parameters.put( SearchProvider.SP_SEARCH_TERM, expression );
   					
+  					if ( networks != null && networks.length > 0 ){
+  						
+  						parameters.put( "n", networks );	// update to SearchProvider.SP_NETWORKS sometime
+  					}
+  					
   					manager.searchRCM(
   						parameters, 
   						new SearchObserver() {

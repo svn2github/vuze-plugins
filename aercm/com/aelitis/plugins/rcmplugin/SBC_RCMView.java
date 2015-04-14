@@ -30,7 +30,6 @@ import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.layout.*;
 import org.eclipse.swt.program.Program;
 import org.eclipse.swt.widgets.*;
-
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.config.ParameterListener;
 import org.gudy.azureus2.core3.internat.MessageText;
@@ -1173,6 +1172,28 @@ SBC_RCMView
 						public void widgetSelected(SelectionEvent e) {
 							
 							ClipboardCopy.copyToClipBoard( RCMPlugin.getMagnetURI(related_content[0]));
+						};
+					});
+					
+					if ( related_content.length==1 ){
+						byte[] hash = related_content[0].getHash();
+						item.setEnabled(hash!=null&&hash.length > 0 );
+					}else{
+						item.setEnabled(false);
+					}
+					
+					item = new MenuItem(menu, SWT.PUSH);
+					item.setText(MessageText.getString("rcm.menu.uri.i2p"));
+					item.addSelectionListener(new SelectionAdapter() {
+						public void widgetSelected(SelectionEvent e) {
+							
+							String[] magnet_uri = { RCMPlugin.getMagnetURI(related_content[0]) };
+							
+							UrlUtils.extractNetworks( magnet_uri );
+							
+							String i2p_only_uri = magnet_uri[0] + "&net=" + UrlUtils.encode( AENetworkClassifier.AT_I2P );
+							
+							ClipboardCopy.copyToClipBoard( i2p_only_uri );
 						};
 					});
 					
