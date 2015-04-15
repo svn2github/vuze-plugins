@@ -2013,11 +2013,17 @@ UPnPMediaServerContentDirectory
 		}
 		
 		protected String
-		getDuration()
-		{
-				// hack for xbox "00:01:00.000";
+		getDuration(
+			long		def )
+		{			
+			long 	millis = getLongProperty( AzureusContentFile.PT_DURATION, def );
 			
-			long 	millis = getLongProperty( AzureusContentFile.PT_DURATION, 1*60*1000 );
+				// default value of < 0 means return null if no value available
+			
+			if ( millis < 0 ){
+				
+				return( null );
+			}
 			
 			long	secs = millis/1000;
 			
@@ -2202,13 +2208,29 @@ UPnPMediaServerContentDirectory
 			
 			if ( item_class.equals( CONTENT_VIDEO )){
 
-				attributes.put( "duration", getDuration());
+					// hack for XBOX as it always needs a duration
+				
+				String duration_str = getDuration( client_type==CT_XBOX?1*60*1000:-1 );
+				
+				if ( duration_str != null ){
+				
+					attributes.put( "duration", duration_str );
+				}
+				
 				attributes.put( "resolution", getResolution());
 
 			}else if ( item_class.equals( CONTENT_AUDIO )){
 
-				attributes.put( "duration", getDuration());
+					// hack for XBOX as it always needs a duration
+					
+				String duration_str = getDuration( client_type==CT_XBOX?1*60*1000:-1 );
+				
+				if ( duration_str != null ){
+				
+					attributes.put( "duration", duration_str );
+				}
 			}
+			
 				// experiment
 			
 			/*
