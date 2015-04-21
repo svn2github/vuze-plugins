@@ -369,6 +369,7 @@ TorBrowserPlugin
 					char slash = File.separatorChar;
 
 					// Version 4.0 - Data moved from /Data to [Browser|TorBrowser.app]/TorBrowser/Data
+					// Windows and Linux use 'Browser'
 					
 					String	top_level_folder = Constants.isOSX?"TorBrowser.app":"Browser";
 					
@@ -406,7 +407,7 @@ TorBrowserPlugin
 					old.delete();
 				}
 								
-				if ( Constants.isOSX ){
+				if ( Constants.isOSX || Constants.isLinux ){
 					
 					String chmod = findCommand( "chmod" );
 					
@@ -648,6 +649,7 @@ TorBrowserPlugin
 		char slash = File.separatorChar;
 
 		// Version 4.0 - Data moved from /Data to [Browser|TorBrowser.app]/TorBrowser/Data
+		// Windows and Linux use 'Browser'
 		
 		String	top_level_folder = Constants.isOSX?"TorBrowser.app":"Browser";
 
@@ -940,6 +942,7 @@ TorBrowserPlugin
 			String slash = File.separator;
 			
 			// Version 4.0 - Data moved from /Data to [Browser|TorBrowser.app]/TorBrowser/Data
+			// Windows and Linux use 'Browser'
 			
 			String	top_level_folder = Constants.isOSX?"TorBrowser.app":"Browser";
 			
@@ -980,6 +983,16 @@ TorBrowserPlugin
 					cmd_list.add( browser_root + slash + "TorBrowser.app" );
 					
 				}
+			}else if ( Constants.isLinux ){
+				
+				cmd_list.add( browser_root + slash + "Browser" + slash + "start-tor-browser" );
+				
+				cmd_list.add( "-profile" );
+				
+				cmd_list.add( PROFILE_DIR + slash );
+				
+				cmd_list.add( "-allow-remote" );
+				
 			}else{
 				
 				throw( new Exception( "Unsupported OS" ));
@@ -1227,9 +1240,13 @@ TorBrowserPlugin
 			
 			return( getWindowsProcesses( "firefox.exe" ));
 			
-		}else{
+		}else if(  Constants.isOSX ){
 			
 			return( getOSXProcesses( "TorBrowser.app" ));
+			
+		}else{
+			
+			return( getLinuxProcesses( "TorBrowser" ));
 		}
 	}
 	
@@ -1291,6 +1308,66 @@ TorBrowserPlugin
 	
 	private Set<Integer>
 	getOSXProcesses(
+		String	cmd  )
+	{
+		Set<Integer>	result = new HashSet<Integer>();
+		
+		try{
+			
+			Process p = Runtime.getRuntime().exec( new String[]{ findCommand( "bash" ), "-c", "ps ax" });
+			
+			try{
+				LineNumberReader lnr = new LineNumberReader( new InputStreamReader( p.getInputStream(), "UTF-8" ));
+				
+				while( true ){
+					
+					String line = lnr.readLine();
+					
+					if ( line == null ){
+						
+						break;
+					}
+					
+					if ( line.contains( cmd )){
+						
+						String[] bits = line.split( "\\s+" );
+						
+						for ( int i=0;i<bits.length;i++ ){
+							
+							String bit = bits[i].trim();
+							
+							if ( bit.length() == 0 ){
+								
+								continue;
+							}
+							
+							try{
+								int		pid 		= Integer.parseInt( bit );
+																
+								result.add( pid );
+								
+							}catch( Throwable e ){
+								
+							}
+							
+							break;
+						}
+					}
+				}					
+			}finally{
+				
+				p.destroy();
+			}
+		}catch( Throwable e ){
+			
+			logDebug( "Failed to list processes: " + Debug.getNestedExceptionMessage( e ));
+		}
+		
+		return( result );
+	}
+	
+	private Set<Integer>
+	getLinuxProcesses(
 		String	cmd  )
 	{
 		Set<Integer>	result = new HashSet<Integer>();

@@ -16,6 +16,25 @@ Mac:
     .\TorBrowser\Data\Tor
     .\TorBrowser\Data\Browser\profile.default\extensions\tor-launcher@torproject.org.xpi
 
+Linux:
+
+	*** to manage processes correctly it is necessary to remove the backgrounding of firefox in 
+	
+	.\Browser\start-to-browser
+	
+	by replacing the commented out lines below with the one above:
+	
+	elif [ "$debug" -ne 1 ] ; then
+    TOR_CONTROL_PASSWD=${TOR_CONTROL_PASSWD} ./firefox --class "Tor Browser" \
+        -profile TorBrowser/Data/Browser/profile.default "${@}"
+#       -profile TorBrowser/Data/Browser/profile.default "${@}" > /dev/null 2>&1 </dev/null &
+#   disown "$!"
+	
+    .\Browser\TorBrowser\Docs
+    .\Browser\TorBrowser\Tor
+    .\Browser\TorBrowser\Data\Tor
+    .\Browser\TorBrowser\Data\Browser\profile.default\extensions\tor-launcher@torproject.org.xpi
+    
 -- versions prior to 4.0
 
 Windows:
