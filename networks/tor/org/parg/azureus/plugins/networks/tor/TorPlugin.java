@@ -721,9 +721,46 @@ TorPlugin
 			
 			readPromptDecisions();
 
-			config_file = pi.getPluginconfig().getPluginUserFile( "config.txt" );
+			File plugin_install_dir = new File( pi.getPluginDirectoryName());
+
+			// Ideally we'd do what we used to:
+			//     config_file = pi.getPluginconfig().getPluginUserFile( "config.txt" );
+			// so we always get a writable location even if plugin installed into shared space. However,
+			// the way things currently work we have to have the executable in the same location so for 
+			// the moment I'm fixing by assuming we can write to wherever the plugin is installed.
+			// This issue came to light on Linux where the bundled plugins are installed into the
+			// shared plugin location...
+			
+			config_file = new File( plugin_install_dir, "config.txt" );
 			
 			plugin_dir 	= config_file.getParentFile();
+			
+				// hack for linux - currently bundle both 32+64 bit versions into one plugin and then
+				// copy the required files into place...
+			
+			if ( Constants.isLinux ){
+				
+				File	arch_dir = new File( plugin_dir, Constants.is64Bit?"linux64":"linux32" );
+				
+				File[] files = arch_dir.listFiles();
+				
+				if ( files != null ){
+					
+					for ( File f: files ){
+						
+							// +x permissions will be fixed up later
+						
+						File target = new File( plugin_dir, f.getName());
+						
+						if ( !FileUtil.copyFile( f, target )){
+							
+								// continue, maybe things will work out
+							
+							Debug.out( "Failed to copy file from " + f + " to " + target );
+						}
+					}
+				}
+			}
 			
 			data_dir 	= new File( plugin_dir, "data" );
 			
