@@ -25,9 +25,7 @@ import java.io.File;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.math.BigDecimal;
-import java.util.*;
 
-import org.apache.commons.io.FileSystemUtils;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.disk.DiskManagerFileInfo;
 import org.gudy.azureus2.plugins.download.Download;
@@ -511,7 +509,7 @@ DownloadDeleterPlugin
 							if ( start_if_space.getValue()){
 								
 								try{
-									long space 		= FileSystemUtils.freeSpaceKb( download.getSavePath()) * 1024;
+									long space 		= new File( download.getSavePath()).getUsableSpace();
 									
 									long allocated	= 0;
 									long size		= download.getTorrent().getSize();
