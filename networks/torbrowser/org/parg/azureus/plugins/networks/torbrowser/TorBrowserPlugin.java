@@ -27,6 +27,7 @@ import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.AEThread2;
@@ -56,8 +57,12 @@ import org.gudy.azureus2.plugins.ui.config.ParameterListener;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
+import org.gudy.azureus2.ui.swt.shells.MessageBoxShell;
 
 import com.aelitis.azureus.core.util.GeneralUtils;
+import com.aelitis.azureus.ui.UIFunctions;
+import com.aelitis.azureus.ui.UIFunctionsManager;
+import com.aelitis.azureus.ui.UIFunctionsUserPrompter;
 
 public class 
 TorBrowserPlugin
@@ -932,6 +937,11 @@ TorBrowserPlugin
 
 			if ( new_launch ){
 				
+				if ( !checkFirefox()){
+					
+					throw( new Exception( "Launch cancelled" ));
+				}
+				
 				checkConfig();
 			}
 			
@@ -947,9 +957,7 @@ TorBrowserPlugin
 			String	top_level_folder = Constants.isOSX?"TorBrowser.app":"Browser";
 			
 			String PROFILE_DIR = browser_root + slash + top_level_folder + slash + "TorBrowser" + slash + "Data" + slash + "Browser" + slash + "profile.default";
-			
-			boolean is_osx_open = false;
-			
+						
 			if ( Constants.isWindows ){
 		
 				cmd_list.add( browser_root + slash + "Browser" + slash + "firefox.exe" );
@@ -959,7 +967,20 @@ TorBrowserPlugin
 				cmd_list.add( PROFILE_DIR + slash );
 				
 				cmd_list.add( "-allow-remote" );
-				
+							
+				if ( url != null ){
+					
+					if ( new_window ){
+						
+						cmd_list.add( "-new-window"  );
+							
+					}else{
+							
+						cmd_list.add( "-new-tab"  );
+					}
+								
+					cmd_list.add( "\"" + url + "\"" );
+				}
 			}else if ( Constants.isOSX ){
 								
 				if ( new_launch ){
@@ -972,17 +993,52 @@ TorBrowserPlugin
 					
 					cmd_list.add( "-allow-remote" );
 					
+					if ( url != null ){
+													
+						if ( new_window ){
+						
+							cmd_list.add( "-new-window"  );
+							
+						}else{
+							
+							cmd_list.add( "-new-tab"  );
+						}
+							
+						cmd_list.add( url );
+					}					
 				}else{
-					
-					is_osx_open = true;
-					
+										
 					cmd_list.add( "open" );
 					
 					cmd_list.add( "-a" );
 					
 					cmd_list.add( browser_root + slash + "TorBrowser.app" );
 					
-				}
+					if ( url != null ){
+							
+						cmd_list.add( url );
+					}
+											
+					cmd_list.add( "--args" );
+					
+					cmd_list.add( "-profile" );
+					
+					cmd_list.add( PROFILE_DIR );
+					
+					cmd_list.add( "-allow-remote" );
+					
+					if ( url != null ){
+						
+						if ( new_window ){
+							
+							cmd_list.add( "-new-window"  );
+							
+						}else{
+							
+							cmd_list.add( "-new-tab"  );
+						}
+					}
+				}								
 			}else if ( Constants.isLinux ){
 				
 				cmd_list.add( browser_root + slash + "Browser" + slash + "start-tor-browser" );
@@ -993,43 +1049,23 @@ TorBrowserPlugin
 				
 				cmd_list.add( "-allow-remote" );
 				
+				if ( url != null ){
+											
+					if ( new_window ){
+					
+						cmd_list.add( "-new-window"  );
+						
+					}else{
+						
+						cmd_list.add( "-new-tab"  );
+					}
+						
+					cmd_list.add( url );
+				}
+				
 			}else{
 				
 				throw( new Exception( "Unsupported OS" ));
-			}
-			
-			if ( url == null ){
-			
-			}else{
-				
-				if ( new_window ){
-				
-					cmd_list.add( "-new-window"  );
-					
-				}else{
-					
-					cmd_list.add( "-new-tab"  );
-				}
-		
-				if ( Constants.isWindows ){
-				
-					cmd_list.add( "\"" + url + "\"" );
-					
-				}else{
-					
-					cmd_list.add( url );
-				}
-			}
-			
-			if ( is_osx_open ){
-				
-				cmd_list.add( "--args" );
-				
-				cmd_list.add( "-profile" );
-				
-				cmd_list.add( PROFILE_DIR );
-				
-				cmd_list.add( "-allow-remote" );
 			}
 			
 			ProcessBuilder pb = GeneralUtils.createProcessBuilder( root, cmd_list.toArray(new String[cmd_list.size()]), null );
@@ -1233,8 +1269,82 @@ TorBrowserPlugin
 		}
 	}
 	
+	private boolean
+	checkFirefox()
+	{
+			// OSX doesn't suffer from the existing firefox + -allow-remote issue
+		
+		if (  Constants.isOSX ){
+			
+			return( true );
+		}
+		
+		Set<Integer> pids = getFireFoxProcesses();
+		
+		if ( pids.size() == 0 ){
+			
+			return( true );
+		}
+				
+		String title 	= MessageText.getString( "aztorbrowserplugin.firefox.found.title" );
+		String text 	= MessageText.getString( "aztorbrowserplugin.firefox.found.text" );
+		
+		/*		
+		UIFunctions uif = UIFunctionsManager.getUIFunctions();
+		
+		if ( uif == null ){
+			
+			return( true );
+		}
+
+		UIFunctionsUserPrompter prompter = uif.getUserPrompter(title, text, new String[] {
+			MessageText.getString("Button.yes"),
+			MessageText.getString("Button.no")
+		}, 0);
+		
+		*/
+	
+		MessageBoxShell prompter = new MessageBoxShell(title, text, new String[] {
+				MessageText.getString("Button.yes"),
+				MessageText.getString("Button.no")
+			}, 0 );
+	
+		
+		String remember_id = "aznettorbrowser.firefox.found";
+		
+		prompter.setRemember( 
+			remember_id, 
+			false,
+			MessageText.getString("MessageBoxWindow.nomoreprompting"));
+	
+		prompter.setRememberOnlyIfButton( 0 );
+		
+		prompter.setAutoCloseInMS(0);
+		
+		prompter.open( null );
+		
+		return( prompter.waitUntilClosed() == 0 );
+	}
+	
 	private Set<Integer>
-	getProcesses()
+	getFireFoxProcesses()
+	{
+		if ( Constants.isWindows ){
+			
+			return( getWindowsProcesses( "firefox.exe" ));
+			
+		}else if(  Constants.isOSX ){
+			
+			return( getOSXProcesses( "Firefox.app" ));
+			
+		}else{
+			
+			return( getLinuxProcesses( "firefox", "no-remote" ));
+		}
+	}
+	
+	private Set<Integer>
+	getTorBrowserProcesses()
 	{
 		if ( Constants.isWindows ){
 			
@@ -1246,7 +1356,7 @@ TorBrowserPlugin
 			
 		}else{
 			
-			return( getLinuxProcesses( "TorBrowser" ));
+			return( getLinuxProcesses( "TorBrowser", null ));
 		}
 	}
 	
@@ -1368,7 +1478,8 @@ TorBrowserPlugin
 	
 	private Set<Integer>
 	getLinuxProcesses(
-		String	cmd  )
+		String	cmd,
+		String	exclude_str )
 	{
 		Set<Integer>	result = new HashSet<Integer>();
 		
@@ -1389,6 +1500,11 @@ TorBrowserPlugin
 					}
 					
 					if ( line.contains( cmd )){
+						
+						if ( exclude_str != null && line.contains( exclude_str )){
+							
+							continue;
+						}
 						
 						String[] bits = line.split( "\\s+" );
 						
@@ -1500,7 +1616,7 @@ TorBrowserPlugin
 				
 				// process.destroy doesn't work on Windows :( - rumour is it sends a SIG_TERM which is ignored
 				
-			Set<Integer>	pre_procs = getProcesses();
+			Set<Integer>	pre_procs = getTorBrowserProcesses();
 			
 			process = pb.start();	
 				
@@ -1508,7 +1624,7 @@ TorBrowserPlugin
 			
 			while( SystemTime.getMonotonousTime() - now < 5*1000 ){
 				
-				Set<Integer>	post_procs = getProcesses();
+				Set<Integer>	post_procs = getTorBrowserProcesses();
 				
 				for ( Integer s: pre_procs ){
 						
