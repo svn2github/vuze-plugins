@@ -33,6 +33,7 @@ import java.util.regex.Pattern;
 
 import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
+import org.gudy.azureus2.plugins.UnloadablePlugin;
 import org.gudy.azureus2.plugins.tracker.web.TrackerWebPageRequest;
 import org.gudy.azureus2.plugins.tracker.web.TrackerWebPageResponse;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
@@ -40,7 +41,8 @@ import org.gudy.azureus2.ui.webplugin.WebPlugin;
 
 public class 
 WikiServicePlugin 
-	extends WebPlugin
+	extends 	WebPlugin
+	implements 	UnloadablePlugin
 {
 	public static final int DEFAULT_PORT    = 23144;
 
@@ -79,8 +81,47 @@ WikiServicePlugin
 
 		throws IOException
 	{
-		String current_page = null;
+		String local_address = null;
 		
+		String cookies = (String)request.getHeaders().get("cookie");
+		
+		if ( cookies != null ){
+			
+			String[] cookie_list = cookies.split( ";" );
+			
+			for ( String cookie: cookie_list ){
+				
+				String[] bits = cookie.split( "=" );
+				
+				if ( bits.length == 2 ){
+					
+					if ( bits[0].trim().equals( "X-Wiki-Page" )){
+						
+						local_address = URLDecoder.decode( bits[1].trim(), "UTF-8" );
+					}
+				}
+			}
+		}
+		
+		if ( local_address == null ){
+			
+			String referrer = (String)request.getHeaders().get("referer");
+			
+			if ( referrer != null ){
+				
+				try{
+					URL url = new URL( referrer );
+					
+					if ( url.getHost().equals( "127.0.0.1" )){
+						
+						local_address = url.toExternalForm();
+					}
+				}catch( Throwable e ){
+					
+				}
+			}
+		}
+							
 		String url = request.getURL();
 
 		int pos = url.indexOf( '?' );
@@ -101,7 +142,7 @@ WikiServicePlugin
 					
 					if ( bits[0].equals( "formcurrentpage" )){
 						
-						current_page = URLDecoder.decode( bits[1], "UTF-8" );
+						local_address = URLDecoder.decode( bits[1], "UTF-8" );
 						
 						skip = true;
 					}
@@ -116,31 +157,10 @@ WikiServicePlugin
 			url = url.substring( 0, pos+1 ) + modified_args;
 		}
 		
-		if ( current_page == null ){
+
 			
-			String cookies = (String)request.getHeaders().get("cookie");
-			
-			if ( cookies != null ){
-				
-				String[] cookie_list = cookies.split( ";" );
-				
-				for ( String cookie: cookie_list ){
-					
-					String[] bits = cookie.split( "=" );
-					
-					if ( bits.length == 2 ){
-						
-						if ( bits[0].trim().equals( "X-Wiki-Page" )){
-							
-							current_page = URLDecoder.decode( bits[1].trim(), "UTF-8" );
-						}
-					}
-				}
-			}
-		}
-		
-		//System.out.println( "GET: " + url + " - " + request.getHeaders());
-		
+		System.out.println( "GET: " + request.getURL() + ", local_address=" + local_address + " - " + request.getHeaders());
+
 		if ( url.contains( ".php?" )){
 				
 			String target = "http://wiki.vuze.com" + url;
@@ -170,13 +190,13 @@ WikiServicePlugin
 			
 			String redirect_to;
 			
-			if ( current_page == null ){
+			if ( local_address == null ){
 				
 				redirect_to = "http://wiki.vuze.com/";
 				
 			}else{
 				
-				URL u = new URL( current_page );
+				URL u = new URL( local_address );
 				
 				redirect_to = "http://" + u.getHost() + ":" + u.getPort() + "/wiki.vuze.com/";
 			}
@@ -234,9 +254,9 @@ WikiServicePlugin
 				content = sb.toString();
 			}
 			
-			if ( current_page != null ){
+			if ( local_address != null ){
 			
-				response.setHeader( "Set-Cookie", "X-Wiki-Page=" + URLEncoder.encode( current_page, "UTF-8" )+ "; path=/; HttpOnly" );
+				response.setHeader( "Set-Cookie", "X-Wiki-Page=" + URLEncoder.encode( local_address, "UTF-8" )+ "; path=/; HttpOnly" );
 			}
 			
 			response.getOutputStream().write( content.getBytes( "UTF-8" ));
@@ -245,13 +265,13 @@ WikiServicePlugin
 			
 			String target;
 			
-			if ( current_page == null ){
+			if ( local_address == null ){
 				
 				target = "http://wiki.vuze.com" + url;
 				
 			}else{
 				
-				URL u = new URL( current_page );
+				URL u = new URL( local_address );
 				
 				target = "http://" + u.getHost() + ":" + u.getPort() + url;
 			}
@@ -266,5 +286,14 @@ WikiServicePlugin
 		}
 		
 		return( true );
+	}
+	
+	public void 
+	unload() 
+		throws 
+	
+		PluginException 
+	{
+		super.unloadPlugin();
 	}
 }
