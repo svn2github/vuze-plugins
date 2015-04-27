@@ -94,6 +94,7 @@ TorPlugin
 	private File	plugin_dir;
 	private File	config_file;
 	private File	data_dir;
+	private File	services_dir;
 	
 	private BooleanParameter prompt_on_use_param;
 	
@@ -102,6 +103,8 @@ TorPlugin
 	private ActionParameter browser_install_param; 
 	private ActionParameter browser_launch_param;
 	
+	private BooleanParameter services_enable_param;
+
 	private boolean	plugin_enabled;
 	private boolean	external_tor;
 	private boolean	start_on_demand;
@@ -165,7 +168,9 @@ TorPlugin
 					return size() > MAX_HISTORY_RECORDS;
 				}
 			};
-			
+		
+	private volatile boolean		config_needs_checking	= true;
+	
 	private volatile boolean		unloaded;
 	
 	
@@ -269,6 +274,19 @@ TorPlugin
 			}
 			
 			internal_socks_port = socks_port_param.getValue();
+			
+			services_enable_param 						= config_model.addBooleanParameter2( "services_enable", "aztorplugin.services.enable", false );
+			
+			services_enable_param.addListener(
+				new ParameterListener()
+				{	
+					public void 
+					parameterChanged(
+						Parameter param) 
+					{
+						config_needs_checking	= true;
+					}
+				});
 			
 			final BooleanParameter debug_server_param 	= config_model.addBooleanParameter2( "debug_server", "aztorplugin.debug_server", false );
 			
@@ -682,6 +700,8 @@ TorPlugin
 						
 						control_port_param.setEnabled( plugin_enabled && !external_tor );
 						socks_port_param.setEnabled( plugin_enabled && !external_tor );
+						services_enable_param.setEnabled( plugin_enabled && !external_tor );
+						
 						debug_server_param.setEnabled( plugin_enabled && !external_tor );
 						
 						ext_tor_param.setEnabled( plugin_enabled );
@@ -762,7 +782,10 @@ TorPlugin
 				}
 			}
 			
-			data_dir 	= new File( plugin_dir, "data" );
+			data_dir 		= new File( plugin_dir, "data" );
+			services_dir 	= new File( plugin_dir, "services" );
+			
+			services_dir.mkdirs();
 			
 				// see if server already running, unlikely due to the way we arrange for it to die if we do but you never know
 			
@@ -775,113 +798,7 @@ TorPlugin
 				control.shutdown( true );
 			}
 		
-			boolean	write_config = false;
-			
-			List<String>	required_config_lines = new ArrayList<String>();
-			
-			required_config_lines.add( "SocksPort 127.0.0.1:" + internal_socks_port );
-			required_config_lines.add( "ControlPort 127.0.0.1:" + internal_control_port );
-			required_config_lines.add( "CookieAuthentication 1" );
-			required_config_lines.add( "DataDirectory ." + File.separator + data_dir.getName());
-			
-			if ( config_file.exists()){
-				
-				LineNumberReader lnr = null;
-				
-				try{
-					lnr = new LineNumberReader( new InputStreamReader( new FileInputStream( config_file )));
-					
-					Set<String>	keys = new HashSet<String>();
-					
-					for ( String str: required_config_lines ){
-						
-						str = str.substring( 0, str.indexOf(' ' ));
-						
-						keys.add( str );
-					}
-					
-					Set<String>	missing_lines = new LinkedHashSet<String>( required_config_lines );
-					
-					List<String> config_lines = new ArrayList<String>();
-					
-					while( true ){
-						
-						String line = lnr.readLine();
-						
-						if ( line == null ){
-							
-							break;
-						}
-						
-						line = line.trim();
-						
-						boolean	ok = true;
-						
-						if ( !missing_lines.remove( line )){
-							
-							int	pos = line.indexOf( ' ' );
-							
-							if ( pos > 0 ){
-								
-								String l_key = line.substring( 0, pos );
-								
-								if ( keys.contains( l_key )){
-									
-									ok = false;
-								}
-							}
-						}
-						
-						if ( ok ){
-						
-							config_lines.add( line );
-						}
-					}
-					
-					if ( missing_lines.size() > 0 ){
-						
-						config_lines.addAll( missing_lines );
-						
-						required_config_lines = config_lines;
-						
-						write_config = true;
-					}
-				}catch( Throwable e ){
-					
-					write_config = true;
-					
-				}finally{
-					
-					try{
-						lnr.close();
-						
-					}catch( Throwable e ){
-					}
-				}
-			}else{
-				
-				write_config = true;
-			}
-			
-			if ( write_config ){
-				
-				try{
-						// appears that the local file system encoding needs to be used
-					
-					PrintWriter pw = new PrintWriter( new OutputStreamWriter( new FileOutputStream( config_file )));
-					
-					for ( String line: required_config_lines ){
-						
-						pw.println( line );
-					}
-					
-					pw.close();
-					
-				}catch( Throwable e ){
-					
-					Debug.out( e );
-				}
-			}		
+			checkConfig();
 			
 			pi.addListener(
 				new PluginAdapter()
@@ -984,6 +901,162 @@ TorPlugin
 		}
 	}
 
+	private void
+	checkConfig()
+	{
+		if ( !config_needs_checking ){
+			
+			return;
+		}
+		
+		config_needs_checking = false;
+		
+		boolean	write_config = false;
+		
+		List<String>	required_config_lines = new ArrayList<String>();
+		
+		required_config_lines.add( "SocksPort 127.0.0.1:" + internal_socks_port );
+		required_config_lines.add( "ControlPort 127.0.0.1:" + internal_control_port );
+		required_config_lines.add( "CookieAuthentication 1" );
+		required_config_lines.add( "DataDirectory ." + File.separator + data_dir.getName());
+		
+		LinkedHashSet<String>	required_hs		= new LinkedHashSet<String>();
+
+		if ( services_enable_param.getValue()){
+		
+			File[] files = services_dir.listFiles();
+			
+			if ( files != null ){
+				
+				for ( File f: files ){
+					
+					if ( f.getName().endsWith( ".txt" )){
+						
+						try{
+							required_hs.addAll( readFileAsStrings( f ));
+							
+						}catch( Throwable e ){
+						}
+					}
+				}
+			}
+		}
+		
+		if ( config_file.exists()){
+			
+			LineNumberReader lnr = null;
+			
+			try{
+				lnr = new LineNumberReader( new InputStreamReader( new FileInputStream( config_file )));
+				
+				Set<String>	keys = new HashSet<String>();
+				
+				for ( String str: required_config_lines ){
+					
+					str = str.substring( 0, str.indexOf(' ' ));
+					
+					keys.add( str );
+				}
+								
+				Set<String>		missing_lines 	= new LinkedHashSet<String>( required_config_lines );	
+				Set<String> 	removed_hs		= new HashSet<String>();
+				List<String> 	config_lines 	= new ArrayList<String>();
+				
+				while( true ){
+					
+					String line = lnr.readLine();
+					
+					if ( line == null ){
+						
+						break;
+					}
+					
+					line = line.trim();
+					
+					if ( line.startsWith( "HiddenService" )){
+						
+						removed_hs.add( line );
+						
+						continue;
+					}
+					
+					boolean	ok = true;
+					
+					if ( !missing_lines.remove( line )){
+						
+						int	pos = line.indexOf( ' ' );
+						
+						if ( pos > 0 ){
+							
+							String l_key = line.substring( 0, pos );
+							
+							if ( keys.contains( l_key )){
+								
+								ok = false;
+							}
+						}
+					}
+					
+					if ( ok ){
+					
+						config_lines.add( line );
+					}
+				}
+				
+				if ( missing_lines.size() > 0 ){
+					
+					config_lines.addAll( missing_lines );
+					
+					required_config_lines = config_lines;
+					
+					write_config = true;
+				}
+				
+				if ( !required_hs.equals( removed_hs )){
+					
+					write_config = true;
+				}
+
+			}catch( Throwable e ){
+				
+				write_config = true;
+				
+			}finally{
+				
+				try{
+					lnr.close();
+					
+				}catch( Throwable e ){
+				}
+			}
+		}else{
+			
+			write_config = true;
+		}
+		
+		if ( write_config ){
+			
+			required_config_lines.addAll( required_hs );
+			
+			try{
+					// appears that the local file system encoding needs to be used
+				
+				PrintWriter pw = new PrintWriter( new OutputStreamWriter( new FileOutputStream( config_file )));
+				
+				for ( String line: required_config_lines ){
+					
+					pw.println( line );
+				}
+				
+				pw.close();
+				
+			}catch( Throwable e ){
+				
+				Debug.out( e );
+			}
+		}		
+	}
+	
 	private void
 	setUnloadable(
 		boolean	b )
@@ -1109,7 +1182,7 @@ TorPlugin
 	{
 			// see if we should connect at start of day
 		
-		if ( plugin_enabled && !( unloaded || external_tor || start_on_demand )){
+		if ( plugin_enabled && !( unloaded || external_tor || ( start_on_demand && !services_enable_param.getValue()))){
 			
 			prepareConnection( "Startup" );
 		}
@@ -1154,67 +1227,96 @@ TorPlugin
 						}
 					}
 					
-					boolean	should_be_disconnected 	= false;
-					boolean	should_be_connected 	= false;
-					
-					synchronized( TorPlugin.this ){
-						
-						if ( plugin_enabled && !( unloaded || external_tor )){
-							
-							if ( start_on_demand ){
-								
-								if ( stop_on_idle ){
-									
-									if ( http_proxy_map.size() == 0 ){
-									
-										should_be_disconnected = SystemTime.getMonotonousTime() - last_use_time > STOP_ON_IDLE_TIME;
-									}
-								}
-							}else{
-									// should always be running
-															
-								if ( !isConnected()){
-								
-									should_be_connected = true;
-								}
-							}
-						}else{
-							
-							should_be_disconnected = true;
-						}
-						
-						if ( proxy_map.size() > 0 ){
-							
-							long now = SystemTime.getMonotonousTime();
-							
-							Iterator<ProxyMapEntry>	it = proxy_map.values().iterator();
-							
-							while( it.hasNext()){
-								
-								ProxyMapEntry entry = it.next();
-								
-								if ( now - entry.getCreateTime() > 10*60*1000 ){
-									
-									it.remove();
-									
-									Debug.out( "Removed orphaned proxy entry for " + entry.getHost());
-								}
-							}
-						}
-					}
-					
-					if ( should_be_disconnected ){
-						
-						closeConnection( "Close on idle" );
-						
-					}else if ( should_be_connected ){
-						
-						prepareConnection( "Start on demand disabled" );
-					}
+					checkServerStatus();
 				}
 			});
 	}
 	
+	private AESemaphore	server_check_sem = new AESemaphore( "checksem", 1 );
+	
+	private void
+	checkServerStatus()
+	{
+		try{
+			server_check_sem.reserve();
+		
+			boolean	should_be_disconnected 	= false;
+			boolean	should_be_connected 	= false;
+			boolean	should_be_reloaded	 	= false;
+			
+			synchronized( TorPlugin.this ){
+				
+				if ( plugin_enabled && !( unloaded || external_tor )){
+					
+					if ( start_on_demand && !services_enable_param.getValue()){
+						
+						if ( stop_on_idle ){
+							
+							if ( http_proxy_map.size() == 0 ){
+							
+								should_be_disconnected = SystemTime.getMonotonousTime() - last_use_time > STOP_ON_IDLE_TIME;
+							}
+						}
+					}else{
+							// should always be running
+													
+						if ( !isConnected()){
+						
+							should_be_connected = true;
+							
+						}else{
+							
+							if ( config_needs_checking ){
+								
+								should_be_reloaded = true;
+								
+									// next time we come through here we'll restart the server
+									// and that will clear the 'needs checking' flag
+							}
+						}
+					}
+				}else{
+					
+					should_be_disconnected = true;
+				}
+				
+				if ( proxy_map.size() > 0 ){
+					
+					long now = SystemTime.getMonotonousTime();
+					
+					Iterator<ProxyMapEntry>	it = proxy_map.values().iterator();
+					
+					while( it.hasNext()){
+						
+						ProxyMapEntry entry = it.next();
+						
+						if ( now - entry.getCreateTime() > 10*60*1000 ){
+							
+							it.remove();
+							
+							Debug.out( "Removed orphaned proxy entry for " + entry.getHost());
+						}
+					}
+				}
+			}
+			
+			if ( should_be_reloaded ){
+				
+				closeConnection( "Reloading configuration" );
+	
+			}else if ( should_be_disconnected ){
+				
+				closeConnection( "Close on idle" );
+				
+			}else if ( should_be_connected ){
+				
+				prepareConnection( "Start on demand disabled" );
+			}
+		}finally{
+			
+			server_check_sem.release();
+		}
+	}
 	
 	private Process
 	startServer()
@@ -1224,6 +1326,8 @@ TorPlugin
 		File exe_file = new File( plugin_dir, Constants.isWindows?"AzureusTor.exe":(Constants.isOSX?"AzureusTor":"tor" ));
 		
 		checkPermissions( exe_file );
+		
+		checkConfig();
 		
 		int	pid = getPID();
 		
@@ -2684,6 +2788,225 @@ TorPlugin
 			if ( http_proxy_map.size() == 0 ){
 			
 				setUnloadable( true );
+			}
+		}
+	}
+	
+	public Map<String,Object>
+	getProxyServer(
+		String				reason,
+		Map<String,Object>	server_options )
+		
+		throws IPCException
+	{
+		String	server_id = (String)server_options.get( "id" );
+		
+		int		target_port = (Integer)server_options.get( "port" );
+
+		File service_file = new File( services_dir, server_id + ".txt" );
+		
+		String FS = File.separator;
+		
+		String[] required_lines = { 
+			"HiddenServiceDir ." + FS + "services" + FS + server_id,
+			"HiddenServicePort 80 127.0.0.1:" + target_port
+		};
+		
+		boolean	config_ok = false;
+		
+		if ( service_file.exists()){
+			
+			List<String> lines = readFileAsStrings( service_file );
+
+			if ( 	lines.size() == 2 && 
+					lines.get(0).equals( required_lines[0] ) &&
+					lines.get(1).equals( required_lines[1])){
+				
+				config_ok = true;
+			}
+		}
+		
+		final File host_file = new File( services_dir, server_id + FS + "hostname" );
+
+		String	host_name = null;
+		
+		if ( config_ok ){
+			
+				// this code is below as well
+			
+			if ( host_file.exists()){
+				
+				try{
+					String host = FileUtil.readFileAsString( host_file, 100 ).trim();
+					
+					if ( host.endsWith( ".onion" )){
+						
+						host_name = host;
+					}
+				}catch( Throwable e ){
+					
+				}
+			}
+			
+			if ( host_name == null ){
+				
+				config_ok = false;
+			}
+		}
+		
+		if ( !config_ok ){
+			
+			PrintWriter pw = null;
+			
+			try{
+				pw = new PrintWriter( new OutputStreamWriter( new FileOutputStream( service_file )));
+				
+				for ( String line: required_lines ){
+					
+					pw.println( line );
+				}
+			}catch( Throwable e ){
+				
+				log( "Failed to write " + service_file, e );
+				
+				throw( new IPCException( e ));
+				
+			}finally{
+				
+				if ( pw != null ){
+					
+					try{
+						pw.close();
+						
+					}catch( Throwable e ){
+					}
+				}
+			}
+		}
+		
+		if ( external_tor ){
+			
+			return( null );
+		}
+		
+		if ( !services_enable_param.getValue()){
+			
+			return( null );
+		}
+
+		if ( host_name == null ){
+			
+			final AESemaphore sem = new AESemaphore( "waiter" );
+			
+			final String[] f_host = { null };
+			
+			new AEThread2( "waiter" )
+			{
+				public void
+				run()
+				{
+					long	start = SystemTime.getMonotonousTime();
+					
+					config_needs_checking	= true;
+				
+					try{
+						while( true ){
+							
+							if ( host_file.exists()){
+								
+								try{
+									String host = FileUtil.readFileAsString( host_file, 100 ).trim();
+									
+									if ( host.endsWith( ".onion" )){
+										
+										f_host[0] = host;
+										
+										break;
+									}
+								}catch( Throwable e ){
+									
+								}
+							}
+							
+							if ( SystemTime.getMonotonousTime() - start > 15*1000 ){
+								
+								break;
+							}
+							
+							checkServerStatus();
+							
+							try{
+								Thread.sleep( 1000 );
+								
+							}catch( Throwable e ){
+								
+							}
+						}
+					}finally{
+						
+						sem.release();
+					}
+				}
+			}.start();
+			
+			sem.reserve( 15*1000 );
+			
+			host_name = f_host[0];
+			
+			if ( host_name == null ){
+			
+				return( null );
+			}
+		}
+		
+		Map<String,Object>	reply = new HashMap<String, Object>();
+		
+		reply.put( "host", host_name );
+		
+		return( reply );
+	}
+	
+	private List<String>
+	readFileAsStrings(
+		File		file )
+		
+		throws IPCException
+	{
+		List<String>	result = new ArrayList<String>();
+		
+		LineNumberReader lnr = null;
+		
+		try{
+			lnr = new LineNumberReader( new InputStreamReader( new FileInputStream( file )));
+			
+			while( true ){
+				
+				String line = lnr.readLine();
+				
+				if ( line == null ){
+					
+					break;
+				}
+				
+				result.add( line.trim());
+			}
+			
+			return( result );
+			
+		}catch( Throwable e ){
+			
+			log( "Failed to read " + file, e );
+			
+			throw( new IPCException( e ));
+			
+		}finally{
+			
+			try{
+				if ( lnr != null ){
+				
+					lnr.close();
+				}
+			}catch( Throwable e ){
 			}
 		}
 	}
