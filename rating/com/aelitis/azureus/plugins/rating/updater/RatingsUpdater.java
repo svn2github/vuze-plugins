@@ -160,17 +160,6 @@ RatingsUpdater
 								TIMER_CHECK_PERIOD,
 								new TimerEventPerformer()
 								{
-									private RelatedContentManager	rcm;
-									
-									{
-										try{
-											rcm = RelatedContentManager.getSingleton();
-											
-										}catch( Throwable e ){
-										
-										}	
-									}
-									
 									public void 
 									perform(
 										TimerEvent event) 
@@ -189,7 +178,13 @@ RatingsUpdater
 											return;
 										}
 										
-										checkStalls( rcm );
+										try{
+											RelatedContentManager rcm = RelatedContentManager.getSingleton();
+											
+											checkStalls( rcm );
+											
+										}catch( Throwable e ){
+										}	
 									}
 								});
 						}
