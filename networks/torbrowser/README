@@ -19,7 +19,11 @@ Mac:
 Linux:
 
 	*** to manage processes correctly it is necessary to remove the backgrounding of firefox in 
-	
+	*** 4.5 Update - new $detach argument introduced that is passed to start-to-browser from the
+		desktop starter script but obviously not when we launch it directly. So in theory we don't need
+		to do anything to this script anymore. However, for the moment remote the detach logic and also
+		the redirections so that we can capture output
+		
 	.\Browser\start-to-browser
 	
 	by replacing the commented out lines below with the one above:
