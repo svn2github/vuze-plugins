@@ -822,7 +822,7 @@ class View implements UISWTViewCoreEventListener
             case UISWTViewEvent.TYPE_INITIALIZE:
                 i18nAZ.log("View initializing...");
                 this.saveObjects.clear();
-                this.initialize((Composite) e.getData(), (SWTSkinObjectContainer) ((UISWTViewImpl) e.getView()).getSkinObject());
+                this.initialize((Composite) e.getData(), (SWTSkinObjectContainer) ((UISWTViewImpl) e.getView()).getPluginSkinObject());
                 i18nAZ.log("View initialized !");
                 break;
             case UISWTViewEvent.TYPE_FOCUSGAINED:
