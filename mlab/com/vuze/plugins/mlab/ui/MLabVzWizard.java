@@ -31,8 +31,6 @@ import com.vuze.plugins.mlab.MLabPlugin.ToolListener;
 
 public class MLabVzWizard
 {
-	private static final int SHAPER_PROBE_MIN_UPRATE = 400*1024;
-	
 	protected static final String PATH_SKIN_DEFS = "com/vuze/plugins/mlab/ui/resources/";
 
 	private static final String FILE_SKINIMAGES_DEFS = "images";
@@ -71,17 +69,10 @@ public class MLabVzWizard
 
 	private boolean limitsApplied;
 
-	private final boolean allowShaperProbeLogic;
-
 	public MLabVzWizard(MLabPlugin mLabPlugin, IPCInterface callback,
 			Map<String, Object> args) {
 		this.mLabPlugin = mLabPlugin;
 		this.callback = callback;
-		if (args != null && (args.get("allowShaperProbeLogic") instanceof Boolean)) {
-			allowShaperProbeLogic = ((Boolean) args.get("allowShaperProbeLogic")).booleanValue();
-		} else {
-			allowShaperProbeLogic = false;
-		}
 	}
 
 	public void open() {
@@ -384,18 +375,9 @@ public class MLabVzWizard
 
 				calculateLimits();
 				
-				if (shouldRunShaperProbe()) {
-					pauseAndRun(new AERunnable() {
-						public void runSupport() {
-							runShaperProbe();
-						}
-					});
-				} else {
-					boxTest.closeWithButtonVal(BUTTON_OK);
-				}
+				boxTest.closeWithButtonVal(BUTTON_OK);
 
 				runner = null;
-
 			}
 		});
 
@@ -622,53 +604,6 @@ public class MLabVzWizard
 		limitsApplied = true;
 	}
 
-	private void runShaperProbe() {
-		if (cancelled) {
-
-			return;
-		}
-
-		runner = mLabPlugin.runShaperProbe(new ToolListener() {
-			public void reportSummary(final String str) {
-				appendLog(str + "\n");
-			}
-
-			public void reportDetail(String str) {
-			}
-
-			public void complete(final Map<String, Object> results) {
-				//Long	up 			= (Long)results.get( "up" );
-				//Long	down 		= (Long)results.get( "down" );
-				Long shape_up = (Long) results.get("shape_up");
-				//Long	shape_down 	= (Long)results.get( "shape_down" );
-
-				if (shape_up == null || shape_up == 0) {
-
-					// no results, use existing
-
-				} else if (shape_up >= up_rate) {
-
-					// no interference, use existing up
-
-				} else {
-
-					// interference, use shape up
-					up_rate = shape_up;
-
-				}
-
-				calculateLimits();
-				
-				boxTest.closeWithButtonVal(BUTTON_OK);
-			}
-		});
-
-		if (cancelled) {
-
-			runner.cancel();
-		}
-	}
-
 	protected void appendLog(String string) {
 		lg.append(string);
 		soDetails.setText(lg.toString());
@@ -718,43 +653,6 @@ public class MLabVzWizard
 		} else {
 
 			return (false);
-		}
-	}
-
-	private boolean shouldRunShaperProbe() {
-			// we only want to run this on people with high upload rates as there are limited server
-			// resources for this test and this seems a reasonable way of limiting things as it is
-			// most likely that those with high initial upload rates are subject to burst-shaping
-		
-		if ( Constants.isWindows || Constants.isOSX ){
-		
-			boolean needsShaperProbe = up_rate >= SHAPER_PROBE_MIN_UPRATE;
-			
-			if ( allowShaperProbeLogic ){
-				
-				return( needsShaperProbe );
-				
-			}else{
-				
-				if ( needsShaperProbe ){
-					
-					appendLog( mLabPlugin.getLocalisedText( "mlab.log.shaperprobe.disabled" ));
-					
-						// in the absence of actually doing the required test make a 
-						// worst-case assumption
-					
-					up_rate = up_rate / 2;
-					
-					calculateLimits();
-				}
-				
-				COConfigurationManager.setParameter ( "needsShaperProbe",  needsShaperProbe);
-				
-				return( false );
-			}
-		}else{
-			
-			return( false );
 		}
 	}
 }

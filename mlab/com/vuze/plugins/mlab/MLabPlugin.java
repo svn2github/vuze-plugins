@@ -51,8 +51,6 @@ import com.aelitis.azureus.util.JSONUtils;
 import com.vuze.plugins.mlab.tools.ndt.Tcpbw100;
 import com.vuze.plugins.mlab.tools.ndt.swingemu.Tcpbw100UIWrapper;
 import com.vuze.plugins.mlab.tools.ndt.swingemu.Tcpbw100UIWrapperListener;
-import com.vuze.plugins.mlab.tools.shaperprobe.ShaperProbe;
-import com.vuze.plugins.mlab.tools.shaperprobe.ShaperProbeListener;
 import com.vuze.plugins.mlab.ui.MLabVzWizard;
 import com.vuze.plugins.mlab.ui.MLabWizard;
 
@@ -68,7 +66,8 @@ MLabPlugin
 	private BasicPluginViewModel	view_model;
 	
 	private ActionParameter ndt_button;
-	private ActionParameter sp_button; 
+	
+	//private ActionParameter sp_button; 
 	
 	private boolean test_active;
 	
@@ -147,22 +146,6 @@ MLabPlugin
 					runNDT( null );
 				}
 			});
-		
-		if ( Constants.isWindows || Constants.isOSX ){
-			
-			sp_button = config_model.addActionParameter2( "mlab.tool.shaperprobe", "mlab.run" );
-			
-			sp_button.addListener(
-				new ParameterListener()
-				{
-					public void 
-					parameterChanged(
-						Parameter param ) 
-					{
-						runShaperProbe( null );
-					}
-				});
-		}
 	}
 	
 	public ToolRun
@@ -342,103 +325,6 @@ MLabPlugin
 							
 							results.put( "up", up_bps );
 							results.put( "down", down_bps );
-							
-							listener.complete( results );
-						}
-					}finally{
-						
-						sem.release();
-						
-						if ( !completed && listener != null ){
-							
-							listener.complete( new HashMap<String, Object>());
-						}
-					}
-				}
-			});
-		
-		sem.reserve();
-		
-		return( run );
-	}
-	
-	public ToolRun
-	runShaperProbe(
-		final ToolListener	listener )
-	{
-		final ToolRun run = new ToolRunImpl();
-		
-		final AESemaphore	sem = new AESemaphore( "waiter" );
-
-		runTool(
-			sp_button,
-			new Runnable()
-			{
-				public void
-				run()
-				{
-					boolean completed = false;
-					
-					try{
-						logger.log( "Starting ShaperProbe Test" );
-						logger.log( "-----------------" );
-	
-						final ShaperProbe sp = 
-							ShaperProbe.createIt(
-								plugin_interface,
-								new ShaperProbeListener()
-								{
-									public void 
-									reportSummary(
-										String str) 
-									{
-										logger.log( str.trim());
-										
-										if ( listener != null ){
-										
-											listener.reportSummary( str );
-										}
-									}
-								});
-						
-						run.addListener(
-								new ToolRunListener()
-								{
-									public void
-									cancelled()
-									{
-										sp.killIt();
-									}
-								});
-							
-						sem.release();
-							
-						sp.runIt();
-						
-						long up_bps 	= sp.getUpBitsPerSec()/8;
-						long down_bps 	= sp.getDownBitsPerSec()/8;
-						
-						long shape_up_bps 		= sp.getShapeUpBitsPerSec()/8;
-						long shape_down_bps 	= sp.getShapeDownBitsPerSec()/8;
-						
-						logger.log( "" );
-						
-						logger.log( 
-								"Completed: up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( up_bps ) +
-								", down=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( down_bps ) +
-								", shape_up=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( shape_up_bps ) +
-								", shape_down=" + DisplayFormatters.formatByteCountToKiBEtcPerSec( shape_down_bps ));
-	
-						completed = true;
-						
-						if ( listener != null ){
-							
-							Map<String,Object>	results = new HashMap<String, Object>();
-							
-							results.put( "up", up_bps );
-							results.put( "down", down_bps );
-							results.put( "shape_up", shape_up_bps );
-							results.put( "shape_down", shape_down_bps );
 							
 							listener.complete( results );
 						}

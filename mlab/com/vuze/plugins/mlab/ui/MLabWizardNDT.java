@@ -436,7 +436,7 @@ MLabWizardNDT
 	public IWizardPanel 
 	getNextPanel() 
 	{
-		return(( Constants.isWindows || Constants.isOSX)?new MLabWizardShaperProbe( wizard, this ):null);
+		return(null);
 	}
 	
 	public boolean 
