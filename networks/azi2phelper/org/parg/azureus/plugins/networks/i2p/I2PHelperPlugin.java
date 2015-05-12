@@ -683,6 +683,7 @@ I2PHelperPlugin
 				// Network Mixing
 			
 			final BooleanParameter net_mix_enable		= config_model.addBooleanParameter2( "azi2phelper.netmix.enable", "azi2phelper.netmix.enable", true );
+			final BooleanParameter seed_request_enable	= config_model.addBooleanParameter2( "azi2phelper.seedreq.enable", "azi2phelper.seedreq.enable", true );
 
 			final IntParameter net_mix_incomp_num 		= config_model.addIntParameter2( "azi2phelper.netmix.incomp.num", "azi2phelper.netmix.incomp.num", 5 );
 			
@@ -691,7 +692,7 @@ I2PHelperPlugin
 			config_model.createGroup( 
 					"azi2phelper.netmix.group",
 					new Parameter[]{ 
-							net_mix_enable, net_mix_incomp_num, net_mix_comp_num	
+							net_mix_enable, seed_request_enable, net_mix_incomp_num, net_mix_comp_num	
 					});
 			
 			
@@ -1068,6 +1069,7 @@ I2PHelperPlugin
 							share_percent_param.setEnabled( enabled_not_ext );
 							
 							net_mix_enable.setEnabled( plugin_enabled );
+							seed_request_enable.setEnabled( plugin_enabled );
 							net_mix_incomp_num.setEnabled( plugin_enabled );
 							net_mix_comp_num.setEnabled( plugin_enabled );
 							
@@ -1191,11 +1193,11 @@ I2PHelperPlugin
 									if ( !unloaded ){
 										
 										boolean	first_run = true;
-
-										tracker = new I2PHelperTracker( I2PHelperPlugin.this, my_router);
 										
-										network_mixer = new I2PHelperNetworkMixer( I2PHelperPlugin.this, net_mix_enable, net_mix_incomp_num, net_mix_comp_num );
+										network_mixer = new I2PHelperNetworkMixer( I2PHelperPlugin.this, net_mix_enable, seed_request_enable, net_mix_incomp_num, net_mix_comp_num );
 
+										tracker = new I2PHelperTracker( I2PHelperPlugin.this, my_router, network_mixer );
+										
 										router_init_sem.releaseForever();
 										
 										while( !unloaded ){
@@ -4224,7 +4226,7 @@ I2PHelperPlugin
 			
 			I2PHelperDHT dht = router.selectDHT().getDHT();
 			
-			I2PHelperTracker tracker = new I2PHelperTracker( adapter, router );
+			I2PHelperTracker tracker = new I2PHelperTracker( adapter, router, null );
 			
 			I2PHelperConsole console = new I2PHelperConsole();
 			

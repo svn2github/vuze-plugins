@@ -21,10 +21,7 @@
 
 package org.parg.azureus.plugins.networks.i2p;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.AERunnable;
@@ -49,10 +46,18 @@ import org.gudy.azureus2.plugins.ui.config.IntParameter;
 import org.gudy.azureus2.plugins.ui.config.Parameter;
 import org.gudy.azureus2.plugins.ui.config.ParameterListener;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
+import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouter;
+import org.parg.azureus.plugins.networks.i2p.tracker.I2PDHTTrackerPluginListener;
+
+import com.aelitis.azureus.plugins.net.buddy.BuddyPluginBeta.ChatInstance;
+import com.aelitis.azureus.plugins.net.buddy.BuddyPluginBeta.ChatMessage;
+import com.aelitis.azureus.plugins.net.buddy.BuddyPluginBeta.ChatAdapter;
+import com.aelitis.azureus.plugins.net.buddy.BuddyPluginBeta;
+import com.aelitis.azureus.plugins.net.buddy.BuddyPluginUtils;
 
 public class 
 I2PHelperNetworkMixer 
-	implements DownloadAttributeListener, DownloadManagerListener
+	implements DownloadAttributeListener, DownloadManagerListener, I2PDHTTrackerPluginListener
 {
 	private static final int MS_NONE				= 0;
 	private static final int MS_CHANGING			= 1;
@@ -64,18 +69,30 @@ I2PHelperNetworkMixer
 	private TorrentAttribute 	ta_networks;
 	private TorrentAttribute 	ta_mixstate;
 
-	private volatile boolean		enabled;
+	private volatile boolean		mix_enabled;
+	private volatile boolean		seed_requests_enabled;
+	
 	private int						incomplete_limit;
 	private int						complete_limit;
 	
-	private static final int MIN_CHECK_PERIOD 	= 60*1000;
-	private static final int RECHECK_PERIOD 	= 5*60*1000;
+	private static final int TIMER_PERIOD 	= 1*60*1000;
+
+	private static final int MIX_CHECK_PERIOD_MIN 	= 60*1000;
+	
+	private static final int MIX_CHECK_PERIOD 		= 5*60*1000;
+	private static final int MIX_CHECK_TICKS 		= MIX_CHECK_PERIOD/TIMER_PERIOD;
+	
+	private static final int SEED_REQUEST_CHECK_PERIOD 		= 1*60*1000;
+	private static final int SEED_REQUEST_CHECK_TICKS 		= SEED_REQUEST_CHECK_PERIOD/TIMER_PERIOD;
+
+	
+	
 	
 	private static final int MIN_ACTIVE_PERIOD 	= 20*60*1000;
 	
 	private TimerEventPeriodic	recheck_timer;
 	
-	private long		last_check		= -MIN_CHECK_PERIOD;
+	private long		last_check		= -MIX_CHECK_PERIOD_MIN;
 	private TimerEvent	check_pending 	= null;
 	private boolean		check_active;
 	
@@ -86,7 +103,8 @@ I2PHelperNetworkMixer
 	protected
 	I2PHelperNetworkMixer(
 		I2PHelperPlugin			_plugin,
-		final BooleanParameter	enable_param,
+		final BooleanParameter	enable_mix_param,
+		final BooleanParameter	enable_seed_requests_param,
 		final IntParameter		incomp_param,
 		final IntParameter		comp_param )
 	{
@@ -108,7 +126,9 @@ I2PHelperNetworkMixer
 				{
 					synchronized( I2PHelperNetworkMixer.this ){
 						
-						enabled				= enable_param.getValue();
+						mix_enabled				= enable_mix_param.getValue();
+						seed_requests_enabled	= enable_seed_requests_param.getValue();
+						
 						incomplete_limit	= incomp_param.getValue();
 						complete_limit		= comp_param.getValue();
 					}
@@ -119,7 +139,9 @@ I2PHelperNetworkMixer
 			
 		listener.parameterChanged( null );
 		
-		enable_param.addListener( listener );
+		enable_mix_param.addListener( listener );
+		enable_seed_requests_param.addListener( listener );
+		
 		incomp_param.addListener( listener );
 		comp_param.addListener( listener );
 		
@@ -150,14 +172,26 @@ I2PHelperNetworkMixer
 		recheck_timer = 
 			SimpleTimer.addPeriodicEvent(
 				"i2pmixrecheck",
-				RECHECK_PERIOD,
+				TIMER_PERIOD,
 				new TimerEventPerformer()
 				{
+					private int	tick_count = 0;
+					
 					public void 
 					perform(
 						TimerEvent event ) 
 					{
-						checkStuff();
+						tick_count++;
+						
+						if ( tick_count % MIX_CHECK_TICKS == 0 ){
+						
+							checkMixedDownloads();
+						}
+						
+						if ( tick_count % SEED_REQUEST_CHECK_TICKS == 0 ){
+							
+							checkSeedRequests();
+						}
 					}
 				});
 	}
@@ -165,9 +199,9 @@ I2PHelperNetworkMixer
 	private void
 	parametersChanged()
 	{
-		if ( enabled ){
+		if ( mix_enabled ){
 			
-			checkStuff();
+			checkMixedDownloads();
 			
 		}else{
 			
@@ -203,9 +237,9 @@ I2PHelperNetworkMixer
 			
 			download.addAttributeListener( this, ta_networks, DownloadAttributeListener.WRITTEN );
 			
-			if ( enabled ){
+			if ( mix_enabled ){
 				
-				checkStuff();
+				checkMixedDownloads();
 			}
 		}
 	}
@@ -214,14 +248,198 @@ I2PHelperNetworkMixer
 	downloadRemoved(
 		Download	download )
 	{
-		if ( enabled ){
+		if ( mix_enabled ){
 			
-			checkStuff();
+			checkMixedDownloads();
+		}
+	}
+	
+	private static final String seed_request_write_key = "Statistics: Announce: Requests";
+	
+	private Object					seed_request_lock = new Object();
+	
+	private volatile ChatInstance	seed_request_chat;
+	
+	private Set<Download>			seed_requests_pending	= new HashSet<Download>();
+	
+	private void
+	checkSeedRequests()
+	{
+		if ( !seed_requests_enabled ){
+			
+			return;
+		}
+		
+		if ( !BuddyPluginUtils.isBetaChatAnonAvailable()){
+			
+			return;
+		}
+		
+		if ( seed_request_chat == null ){
+			
+			synchronized( seed_request_lock ){
+				
+				if ( seed_requests_pending.size() == 0 ){
+					
+					return;
+				}
+			}
+			
+			dispatcher.dispatch(
+					new AERunnable()
+					{
+						public void 
+						runSupport() 
+						{
+							synchronized( seed_request_lock ){
+								
+								if ( seed_request_chat != null ){
+									
+									return;
+								}
+
+								try{
+									Map<String,Object>	options = new HashMap<String, Object>();
+									
+									options.put( ChatInstance.OPT_INVISIBLE, true );
+																	
+									ChatInstance chat = 
+											BuddyPluginUtils.getChat(
+												AENetworkClassifier.AT_I2P, 
+												seed_request_write_key,
+												options );
+	
+									chat.setSharedNickname( false );
+									
+									chat.addListener(
+										new ChatAdapter()
+										{
+											@Override
+											public void 
+											messageReceived(
+												ChatMessage message) 
+											{
+											}
+										});
+									
+									seed_request_chat = chat;
+									
+								}catch( Throwable e ){
+									
+									e.printStackTrace();
+								}
+							}
+						}
+					});
+			
+			return;
+		}
+		
+		if ( seed_request_chat.getIncomingSyncState() != 0 ){
+			
+			return;
+		}
+		
+		synchronized( seed_request_lock ){
+			
+			if ( seed_requests_pending.size() == 0 ){
+				
+				return;
+			}
+			
+			Iterator<Download>	it = seed_requests_pending.iterator();
+			
+			String	message = "";
+			
+			int	num_added = 0;
+			
+			while( it.hasNext()){
+				
+				Download d = it.next();
+				
+				it.remove();
+				
+				byte[] hash = d.getTorrent().getPieces()[0];
+						
+				int code = (( hash[0]&0xff) << 16 ) + (( hash[1]&0xff ) << 8 )  + ( hash[2]&0xff );
+				
+				message += (message.length()==0?"":" ") + Integer.toHexString( code );
+				
+				num_added++;
+				
+				if ( num_added >= 20 ){
+					
+					break;
+				}
+			}
+			
+			Map<String,Object>	flags 	= new HashMap<String, Object>();
+			
+			flags.put( BuddyPluginBeta.FLAGS_MSG_ORIGIN_KEY, BuddyPluginBeta.FLAGS_MSG_ORIGIN_SEED_REQ );
+			
+			Map<String,Object>	options = new HashMap<String, Object>();
+
+			seed_request_chat.sendMessage( message, flags, options );
+		}
+	}
+	
+	public void
+	trackingStarted(
+		Download		download,
+		I2PHelperDHT	dht )
+	{
+		if ( 	dht.getDHTIndex() != I2PHelperRouter.DHT_NON_MIX || 
+				download.getFlag( Download.FLAG_LOW_NOISE ) ||
+				download.isComplete()){
+			
+			return;
+		}
+		
+		String[] nets = PluginCoreUtils.unwrap( download ).getDownloadState().getNetworks();
+		
+		boolean	found_non_pub = false;
+		
+		for ( String net: nets ){
+			
+			if ( net == AENetworkClassifier.AT_PUBLIC ){
+				
+				return;
+				
+			}else{
+				
+				found_non_pub = true;
+			}
+		}
+		
+		if ( !found_non_pub ){
+			
+			return;
+		}
+				
+		synchronized( seed_request_lock ){
+			
+			seed_requests_pending.add( download );
+		}
+	}
+	
+	public void
+	trackingStopped(
+		Download		download,
+		I2PHelperDHT	dht )
+	{
+		if ( dht.getDHTIndex() != I2PHelperRouter.DHT_NON_MIX || download.getFlag( Download.FLAG_LOW_NOISE ) ){
+			
+			return;
+		}
+		
+		synchronized( seed_request_lock ){
+			
+			seed_requests_pending.remove( download );
 		}
 	}
 	
 	private void
-	checkStuff()
+	checkMixedDownloads()
 	{
 		synchronized( this ){
 			
@@ -239,12 +457,12 @@ I2PHelperNetworkMixer
 			
 			long time_since_last_check = now - last_check;
 			
-			if ( time_since_last_check < MIN_CHECK_PERIOD ){
+			if ( time_since_last_check < MIX_CHECK_PERIOD_MIN ){
 				
 				check_pending = 
 					SimpleTimer.addEvent(
 						"i2pmixer",
-						SystemTime.getCurrentTime() + ( MIN_CHECK_PERIOD - time_since_last_check ),
+						SystemTime.getCurrentTime() + ( MIX_CHECK_PERIOD_MIN - time_since_last_check ),
 						new TimerEventPerformer() 
 						{
 							public void 
@@ -256,7 +474,7 @@ I2PHelperNetworkMixer
 									check_pending = null;
 								}
 								
-								checkStuff();
+								checkMixedDownloads();
 							}
 						});
 				
@@ -283,7 +501,7 @@ I2PHelperNetworkMixer
 					}
 					
 					try{
-						checkStuffSupport();
+						checkMixedDownloadsSupport();
 						
 					}finally{
 						
@@ -327,7 +545,7 @@ I2PHelperNetworkMixer
 			};
 			
 	private void
-	checkStuffSupport()
+	checkMixedDownloadsSupport()
 	{
 		DownloadManager dm = plugin_interface.getDownloadManager();
 		
@@ -467,7 +685,7 @@ I2PHelperNetworkMixer
 	checkMixState(
 		Download		download )
 	{
-		if ( !enabled ){
+		if ( !mix_enabled ){
 			
 			return;
 		}

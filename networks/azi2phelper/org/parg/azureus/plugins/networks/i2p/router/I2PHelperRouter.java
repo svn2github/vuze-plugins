@@ -1400,9 +1400,14 @@ I2PHelperRouter
 						
 			Properties overrides = new Properties();
 			
+			overrides.setProperty( "i2p.streaming.connectDelay", "250" );
+
             I2PSocketOptions socket_opts = socket_manager.buildOptions( overrides );
-            
+                        
             socket_opts.setPort( port );
+            
+            socket_opts.setConnectTimeout( 120*1000 );
+            socket_opts.setReadTimeout( 120*1000 );
      
 			I2PSocket socket = socket_manager.connect( remote_dest, socket_opts );
 			

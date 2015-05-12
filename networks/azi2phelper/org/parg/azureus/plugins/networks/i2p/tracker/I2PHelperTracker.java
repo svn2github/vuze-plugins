@@ -44,8 +44,9 @@ I2PHelperTracker
 	
 	public
 	I2PHelperTracker(
-		I2PHelperAdapter	_adapter,
-		I2PHelperRouter		_router )
+		I2PHelperAdapter				_adapter,
+		I2PHelperRouter					_router,
+		I2PDHTTrackerPluginListener		_listener )
 	{
 		adapter	= _adapter;
 		router	= _router;
@@ -54,7 +55,7 @@ I2PHelperTracker
 		
 		if ( pi != null ){
 			
-			tracker = new I2PDHTTrackerPlugin( adapter, router );
+			tracker = new I2PDHTTrackerPlugin( adapter, router, _listener );
 		}
 	}
 	

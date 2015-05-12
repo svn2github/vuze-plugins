@@ -127,9 +127,10 @@ I2PDHTTrackerPlugin
 		}
 	}
 	
-	private I2PHelperAdapter		adapter;
-	private PluginInterface			plugin_interface;
-	private I2PHelperRouter			router;
+	private I2PHelperAdapter				adapter;
+	private PluginInterface					plugin_interface;
+	private I2PHelperRouter					router;
+	private I2PDHTTrackerPluginListener		listener;
 	
 	private UTTimer				timer;
 	private TorrentAttribute 	ta_networks;
@@ -164,12 +165,14 @@ I2PDHTTrackerPlugin
 	
 	protected
 	I2PDHTTrackerPlugin(
-		I2PHelperAdapter	_adapter,
-		I2PHelperRouter		_router )
+		I2PHelperAdapter				_adapter,
+		I2PHelperRouter					_router,
+		I2PDHTTrackerPluginListener		_listener )
 	{	
 		adapter				= _adapter;
 		router				= _router;
-						
+		listener			= _listener;
+		
 		plugin_interface	= adapter.getPluginInterface();
 		
 		ta_networks 	= plugin_interface.getTorrentManager().getAttribute( TorrentAttribute.TA_NETWORKS );
@@ -1147,6 +1150,8 @@ I2PDHTTrackerPlugin
 		
 		byte flags = details.getFlags();
 		
+		boolean	listener_informed = false;
+		
 		for (int i=0;i<targets.length;i++){
 			
 			final trackerTarget target = targets[i];
@@ -1169,7 +1174,21 @@ I2PDHTTrackerPlugin
 			}else{
 				
 				try{
-					router.selectDHT( download ).getDHT(true).put( 
+					I2PHelperDHT dht = router.selectDHT( download ).getDHT(true);
+				
+					if ( listener != null && !listener_informed ){
+						
+						listener_informed = true;
+						
+						try{
+							listener.trackingStarted( download, dht );
+							
+						}catch( Throwable e ){
+							
+						}
+					}
+					
+					dht.put( 
 						target.getHash(),
 						"Tracker reg of '" + download.getName() + "'" + target.getDesc() + " -> " + encoded,
 						//encoded_bytes,
@@ -1797,6 +1816,16 @@ I2PDHTTrackerPlugin
 		
 		try{
 			I2PHelperDHT dht = router.selectDHT( download ).getDHT(true);
+			
+			if ( listener != null ){
+				
+				try{
+					listener.trackingStopped( download, dht );
+					
+				}catch( Throwable e ){
+					
+				}
+			}
 			
 			for (int i=0;i<targets.length;i++){
 				
