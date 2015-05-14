@@ -40,6 +40,9 @@ public class FilterBean implements Serializable {
   private long	minTorrentSize;
   private long  maxTorrentSize;
 
+  // Match quality indicators like 720p or 1080i etc.
+  public static final String qualityPattern = "\\b\\d{3,4}[ip]\\b";
+
   // Most movie torrents will follow the naming convention <title><delimiters><year>
   public static Pattern moviePattern = Pattern.compile("^(.*)[._\\-\\s]+\\(?(\\d{4})");
 
@@ -334,6 +337,8 @@ public class FilterBean implements Serializable {
 
     Matcher m = null;
 
+    // get rid of quality indicators (720p, 1080i etc) so they don't incorrectly match as season/episode
+    str = str.replaceAll(qualityPattern, "");
     // First, try by date because we might get caught by a catch-all episode regex
     m = episodeDatePattern.matcher(str);
     if (m.matches()) {
