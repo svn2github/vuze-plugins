@@ -40,6 +40,7 @@ import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.gudy.azureus2.core3.util.TimerEventPeriodic;
+import org.gudy.azureus2.core3.util.TorrentUtils;
 import org.gudy.azureus2.plugins.PluginAdapter;
 import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
@@ -60,9 +61,7 @@ import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.gudy.azureus2.ui.swt.shells.MessageBoxShell;
 
 import com.aelitis.azureus.core.util.GeneralUtils;
-import com.aelitis.azureus.ui.UIFunctions;
-import com.aelitis.azureus.ui.UIFunctionsManager;
-import com.aelitis.azureus.ui.UIFunctionsUserPrompter;
+
 
 public class 
 TorBrowserPlugin
@@ -222,6 +221,9 @@ TorBrowserPlugin
 				
 				plugin_data_dir.mkdirs();
 			}
+			
+			deleteOldStuff( plugin_install_dir );
+			deleteOldStuff( plugin_data_dir );
 			
 			File[]	install_files = plugin_install_dir.listFiles();
 			
@@ -552,6 +554,126 @@ TorBrowserPlugin
 				}
 			}
 		}
+	}
+	
+	private void
+	deleteOldStuff(
+		File		dir )
+	{
+		File[] files = dir.listFiles();
+		
+		if ( files == null || files.length == 0 ){
+			
+			return;
+		}
+		
+		Map<String,List<Object[]>>	map = new HashMap<String,List<Object[]>>();
+		
+		for ( File f: files ){
+			
+			String name = f.getName();
+			
+			int	pos = name.lastIndexOf( '_' );
+			
+			if ( pos == -1 ){
+				
+				continue;
+			}
+			
+			String root		= name.substring( 0, pos );
+			String ver_str 	= name.substring( pos+1 );
+			
+			if ( ver_str.endsWith( ".jar" ) || ver_str.endsWith( ".zip" )){
+				
+				root += ver_str.substring(  ver_str.length() - 4 );
+				
+				ver_str = ver_str.substring( 0, ver_str.length() - 4 );
+			}
+			
+			for ( char c: ver_str.toCharArray()){
+				
+				if ( c != '.' && !Character.isDigit( c )){
+					
+					ver_str = null;
+					
+					break;
+				}
+			}
+			
+			if ( ver_str != null && ver_str.length() > 0 ){
+				
+				List<Object[]> entry = map.get( root );
+				
+				if ( entry == null ){
+					
+					entry = new ArrayList<Object[]>();
+					
+					map.put( root, entry );
+				}
+				
+				entry.add( new Object[]{ ver_str, f });
+			}
+		}
+		
+		for ( Map.Entry<String,List<Object[]>> entry: map.entrySet()){
+			
+			String 			root 	= entry.getKey();
+			List<Object[]>	list	= entry.getValue();
+			
+			Collections.sort(
+				list,
+				new Comparator<Object[]>()
+				{
+					public int 
+					compare(
+						Object[] e1, 
+						Object[] e2) 
+					{
+						String ver1 = (String)e1[0];
+						String ver2 = (String)e2[0];
+						
+						return( Constants.compareVersions( ver1, ver2 ));
+					}
+				});
+			
+			/*
+			System.out.println( root );
+			
+			for ( Object[] o: list ){
+				
+				System.out.println( "    " + o[0] + " - " + o[1] );
+			}
+			*/
+			
+			int	ver_to_delete = list.size() - 3;
+							
+			for ( int i=0;i<ver_to_delete;i++ ){
+				
+				File f = (File)list.get(i)[1];
+				
+				delete( f );
+			}
+		}
+	}
+	
+	private void
+	delete(
+		File		f )
+	{
+		if ( f.isDirectory()){
+						
+			File[] files = f.listFiles();
+			
+			if ( files != null ){
+				
+				for ( File x: files ){
+					
+					delete( x );
+				}
+			}
+		}
+		
+		f.delete();
 	}
 	
 	private IPCInterface
