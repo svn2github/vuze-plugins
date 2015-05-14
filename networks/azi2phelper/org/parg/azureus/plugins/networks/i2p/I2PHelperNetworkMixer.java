@@ -26,6 +26,7 @@ import java.util.*;
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.core3.util.AsyncDispatcher;
+import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.SimpleTimer;
 import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.core3.util.TimerEvent;
@@ -49,6 +50,8 @@ import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouter;
 import org.parg.azureus.plugins.networks.i2p.tracker.I2PDHTTrackerPluginListener;
 
+import com.aelitis.azureus.core.util.bloom.BloomFilter;
+import com.aelitis.azureus.core.util.bloom.BloomFilterFactory;
 import com.aelitis.azureus.plugins.net.buddy.BuddyPluginBeta.ChatInstance;
 import com.aelitis.azureus.plugins.net.buddy.BuddyPluginBeta.ChatMessage;
 import com.aelitis.azureus.plugins.net.buddy.BuddyPluginBeta.ChatAdapter;
@@ -68,6 +71,7 @@ I2PHelperNetworkMixer
 	private PluginInterface		plugin_interface;
 	private TorrentAttribute 	ta_networks;
 	private TorrentAttribute 	ta_mixstate;
+	private TorrentAttribute 	ta_sr_code;
 
 	private volatile boolean		mix_enabled;
 	private volatile boolean		seed_requests_enabled;
@@ -85,6 +89,8 @@ I2PHelperNetworkMixer
 	private static final int SEED_REQUEST_CHECK_PERIOD 		= 1*60*1000;
 	private static final int SEED_REQUEST_CHECK_TICKS 		= SEED_REQUEST_CHECK_PERIOD/TIMER_PERIOD;
 
+	private static final int SR_CODE_FAILED 	= -1;
+	private static final int SR_CODE_NOT_SET	= 0;
 	
 	
 	
@@ -116,6 +122,7 @@ I2PHelperNetworkMixer
 		TorrentManager tm = plugin_interface.getTorrentManager();
 		
 		ta_mixstate = tm.getPluginAttribute( "mixstate" );
+		ta_sr_code	= tm.getPluginAttribute( "srcode" );
 		
 		ParameterListener	listener = 
 			new ParameterListener() 
@@ -167,6 +174,8 @@ I2PHelperNetworkMixer
 			
 				download.addAttributeListener( this, ta_networks, DownloadAttributeListener.WRITTEN );
 			}
+			
+			addSRCode( download );
 		}
 		
 		recheck_timer = 
@@ -217,6 +226,111 @@ I2PHelperNetworkMixer
 		}
 	}
 	
+	private int
+	calculateSRCode(
+		Download		download )
+	{
+			// ensure we never return 0 so we can distinguish an actual code from an unset torrent attribute
+		
+		try{
+			Torrent torrent = download.getTorrent();
+			
+			if ( torrent == null ){
+				
+				return( SR_CODE_FAILED );
+			}
+			
+			byte[][] hashes = download.getTorrent().getPieces();
+			
+			for ( byte[] hash: hashes ){
+				
+				for ( int i=0;i<hash.length-2;i+=3){
+				
+					int code = (( hash[i]&0xff) << 16 ) + (( hash[i+1]&0xff ) << 8 )  + ( hash[i+2]&0xff );
+				
+					if ( code != 0 ){
+						
+						return( code );
+					}
+				}
+			}
+			
+			return( 1 );
+			
+		}catch( Throwable e ){
+			
+			return( SR_CODE_FAILED );
+		}
+	}
+	
+	private Map<Integer,Download>	sr_code_map = new HashMap<Integer, Download>();
+	
+	private int
+	getSRCode(
+		Download		download )
+	{
+		int code = download.getIntAttribute( ta_sr_code );
+		
+			// should always be set...
+		
+		if ( code == SR_CODE_NOT_SET ){
+			
+			code = SR_CODE_FAILED;
+		}
+		
+		return( code );
+	}
+	
+	private void
+	addSRCode(
+		Download		download )
+	{
+		if ( !download.isPersistent()){
+			
+			return;		
+		}
+		
+		int	sr_code = download.getIntAttribute( ta_sr_code );
+		
+		if ( sr_code == SR_CODE_NOT_SET ){
+					
+			sr_code = calculateSRCode( download );
+			
+			download.setIntAttribute( ta_sr_code, sr_code );	
+		}
+		
+		if ( sr_code != SR_CODE_FAILED ){
+			
+				// small chance of a clash but no real point in maintaining a list of downloads
+				// to cover it
+			
+			synchronized( sr_code_map ){
+					
+				sr_code_map.put( sr_code, download );
+			}
+		}
+	}
+	
+	private void
+	removeSRCode(
+		Download		download )
+	{
+		if ( !download.isPersistent()){
+			
+			return;
+		}
+		
+		int	sr_code = download.getIntAttribute( ta_sr_code );
+
+		if ( sr_code != SR_CODE_NOT_SET ){
+			
+			synchronized( sr_code_map ){
+				
+				sr_code_map.remove( sr_code );
+			}
+		}
+	}
+	
 	public void
 	downloadAdded(
 		Download	download )
@@ -242,6 +356,8 @@ I2PHelperNetworkMixer
 				checkMixedDownloads();
 			}
 		}
+		
+		addSRCode( download );
 	}
 	
 	public void
@@ -252,15 +368,21 @@ I2PHelperNetworkMixer
 			
 			checkMixedDownloads();
 		}
+		
+		removeSRCode( download );
 	}
 	
 	private static final String seed_request_write_key = "Statistics: Announce: Requests";
 	
-	private Object					seed_request_lock = new Object();
+	private Object					seed_request_write_lock = new Object();
+	private volatile ChatInstance	seed_request_write_chat;
+	private Set<Download>			seed_requests_write_pending	= new HashSet<Download>();
 	
-	private volatile ChatInstance	seed_request_chat;
+	private static final String seed_request_read_key = "Statistics: Announce: Summary1";
 	
-	private Set<Download>			seed_requests_pending	= new HashSet<Download>();
+	private Object					seed_request_read_lock = new Object();
+	private volatile ChatInstance	seed_request_read_chat;
+
 	
 	private void
 	checkSeedRequests()
@@ -270,84 +392,257 @@ I2PHelperNetworkMixer
 			return;
 		}
 		
+		checkIncomingSeedRequests();
+		
+		checkOutgoingSeedRequests();
+	}
+	
+	private void
+	checkIncomingSeedRequests()
+	{
+		if ( !mix_enabled ){
+			
+				// no point in monitoring seed requests if we're not going to be able 
+				// to mix in a torrent in response
+			
+			return;
+		}
+		
+		if ( !BuddyPluginUtils.isBetaChatAvailable()){
+			
+			return;
+		}
+		
+		synchronized( seed_request_read_lock ){
+
+			if ( seed_request_read_chat != null && seed_request_read_chat.isDestroyed()){
+				
+				seed_request_read_chat = null;
+			}
+			
+			if ( seed_request_read_chat == null ){
+				
+				dispatcher.dispatch(
+						new AERunnable()
+						{
+							public void 
+							runSupport() 
+							{
+								synchronized( seed_request_read_lock ){
+									
+									if ( seed_request_read_chat != null ){
+										
+										return;
+									}
+	
+									try{
+										Map<String,Object>	options = new HashMap<String, Object>();
+										
+										options.put( ChatInstance.OPT_INVISIBLE, true );
+																		
+										final ChatInstance chat = 
+												BuddyPluginUtils.getChat(
+													AENetworkClassifier.AT_PUBLIC, 
+													seed_request_read_key,
+													options );
+		
+										chat.setSharedNickname( false );
+										
+										chat.addListener(
+											new ChatAdapter()
+											{
+												@Override
+												public void 
+												messageReceived(
+													ChatMessage 	msg,
+													boolean			sort_outstanding )
+												{
+													receiveIncomingSeedRequest( msg );
+												}
+											});
+										
+										List<ChatMessage>	messages = chat.getMessages();
+										
+										for ( ChatMessage msg: messages ){
+											
+											receiveIncomingSeedRequest( msg );
+										}
+										
+										seed_request_read_chat = chat;
+										
+									}catch( Throwable e ){
+										
+										e.printStackTrace();
+									}
+								}
+							}
+						});
+				
+				return;
+			}
+		}
+	}
+	
+	private void
+	receiveIncomingSeedRequest(
+		ChatMessage		msg )
+	{
+		if ( msg.getMessageType() != ChatMessage.MT_NORMAL ){
+			
+			return;
+		}
+		
+		byte[] bytes = msg.getRawMessage();
+		
+		try{
+			Map<String,Object> map = BDecoder.decode( bytes );
+			
+			byte[] codes = (byte[])map.get( "c" );
+			
+			if ( codes != null ){
+				
+				for ( int i=0;i<codes.length;i+=3 ){
+					
+					int	code = (( codes[i]<<16)&0xff0000 ) | (( codes[i+1]<<8)&0xff00 ) | ( codes[i+2] & 0xff );
+					
+					//System.out.println( "got code: " + Integer.toHexString( code ));
+					
+					synchronized( sr_code_map ){
+						
+						Download download = sr_code_map.get( code );
+						
+						if ( download != null ){
+							
+							handleIncomingSeedRequest( download );
+						}
+					}
+				}
+				
+			}else{
+				/* bloom filters don't work as too many false positives and too little savings if capacity
+				 * increased to reduce them
+				 
+				Map<String,Object>	bf = (Map<String,Object>)map.get( "b" );
+				
+				if ( bf != null ){
+					
+					BloomFilter bloom = BloomFilterFactory.deserialiseFromMap( bf );
+					
+					System.out.println( "got bloom: " + bloom );
+					
+					synchronized( sr_code_map ){
+						
+						for ( Map.Entry<Integer, Download> entry: sr_code_map.entrySet()){
+							
+							int code = entry.getKey();
+							
+							byte[]	code_bytes = { (byte)(code>>>16), (byte)(code>>>8), (byte)code };
+							
+							if ( bloom.contains( code_bytes )){
+								
+								Download download = entry.getValue();
+								
+								System.out.println( "     matched " + code + " to " + download.getName());
+							}
+						}
+					}
+				}
+				*/
+			}
+		}catch( Throwable e ){
+			
+		}
+	}
+	
+	private void
+	handleIncomingSeedRequest(
+		Download		download )
+	{
+		int state = download.getState();
+		
+		if ( state == Download.ST_ERROR || state == Download.ST_STOPPED ){
+			
+			return;
+		}
+		
+		System.out.println( "Seed request for " + download.getName());
+	}
+	
+	private void
+	checkOutgoingSeedRequests()
+	{
 		if ( !BuddyPluginUtils.isBetaChatAnonAvailable()){
 			
 			return;
 		}
 		
-		if ( seed_request_chat == null ){
-			
-			synchronized( seed_request_lock ){
+		synchronized( seed_request_write_lock ){
+
+			if ( seed_request_write_chat != null && seed_request_write_chat.isDestroyed()){
 				
-				if ( seed_requests_pending.size() == 0 ){
-					
-					return;
-				}
+				seed_request_write_chat = null;
 			}
 			
-			dispatcher.dispatch(
-					new AERunnable()
-					{
-						public void 
-						runSupport() 
+			if ( seed_request_write_chat == null ){
+										
+				if ( seed_requests_write_pending.size() == 0 ){
+						
+					return;
+				}
+				
+				dispatcher.dispatch(
+						new AERunnable()
 						{
-							synchronized( seed_request_lock ){
-								
-								if ( seed_request_chat != null ){
+							public void 
+							runSupport() 
+							{
+								synchronized( seed_request_write_lock ){
 									
-									return;
-								}
-
-								try{
-									Map<String,Object>	options = new HashMap<String, Object>();
-									
-									options.put( ChatInstance.OPT_INVISIBLE, true );
-																	
-									ChatInstance chat = 
-											BuddyPluginUtils.getChat(
-												AENetworkClassifier.AT_I2P, 
-												seed_request_write_key,
-												options );
+									if ( seed_request_write_chat != null ){
+										
+										return;
+									}
 	
-									chat.setSharedNickname( false );
-									
-									chat.addListener(
-										new ChatAdapter()
-										{
-											@Override
-											public void 
-											messageReceived(
-												ChatMessage message) 
-											{
-											}
-										});
-									
-									seed_request_chat = chat;
-									
-								}catch( Throwable e ){
-									
-									e.printStackTrace();
+									try{
+										Map<String,Object>	options = new HashMap<String, Object>();
+										
+										options.put( ChatInstance.OPT_INVISIBLE, true );
+																		
+										ChatInstance chat = 
+												BuddyPluginUtils.getChat(
+													AENetworkClassifier.AT_I2P, 
+													seed_request_write_key,
+													options );
+		
+										chat.setSharedNickname( false );
+										
+										seed_request_write_chat = chat;
+										
+									}catch( Throwable e ){
+										
+										e.printStackTrace();
+									}
 								}
 							}
-						}
-					});
+						});
+				
+				return;
+			}
+		}
+		
+		if ( seed_request_write_chat.getIncomingSyncState() != 0 ){
 			
 			return;
 		}
 		
-		if ( seed_request_chat.getIncomingSyncState() != 0 ){
+		synchronized( seed_request_write_lock ){
 			
-			return;
-		}
-		
-		synchronized( seed_request_lock ){
-			
-			if ( seed_requests_pending.size() == 0 ){
+			if ( seed_requests_write_pending.size() == 0 ){
 				
 				return;
 			}
 			
-			Iterator<Download>	it = seed_requests_pending.iterator();
+			Iterator<Download>	it = seed_requests_write_pending.iterator();
 			
 			String	message = "";
 			
@@ -359,27 +654,31 @@ I2PHelperNetworkMixer
 				
 				it.remove();
 				
-				byte[] hash = d.getTorrent().getPieces()[0];
-						
-				int code = (( hash[0]&0xff) << 16 ) + (( hash[1]&0xff ) << 8 )  + ( hash[2]&0xff );
+				int code = getSRCode( d );
 				
-				message += (message.length()==0?"":" ") + Integer.toHexString( code );
-				
-				num_added++;
-				
-				if ( num_added >= 20 ){
+				if ( code != SR_CODE_FAILED ){
 					
-					break;
+					message += (message.length()==0?"":" ") + Integer.toHexString( code );
+					
+					num_added++;
+					
+					if ( num_added >= 20 ){
+						
+						break;
+					}
 				}
 			}
 			
-			Map<String,Object>	flags 	= new HashMap<String, Object>();
-			
-			flags.put( BuddyPluginBeta.FLAGS_MSG_ORIGIN_KEY, BuddyPluginBeta.FLAGS_MSG_ORIGIN_SEED_REQ );
-			
-			Map<String,Object>	options = new HashMap<String, Object>();
-
-			seed_request_chat.sendMessage( message, flags, options );
+			if ( num_added > 0 ){
+				
+				Map<String,Object>	flags 	= new HashMap<String, Object>();
+				
+				flags.put( BuddyPluginBeta.FLAGS_MSG_ORIGIN_KEY, BuddyPluginBeta.FLAGS_MSG_ORIGIN_SEED_REQ );
+				
+				Map<String,Object>	options = new HashMap<String, Object>();
+	
+				seed_request_write_chat.sendMessage( message, flags, options );
+			}
 		}
 	}
 	
@@ -416,9 +715,9 @@ I2PHelperNetworkMixer
 			return;
 		}
 				
-		synchronized( seed_request_lock ){
+		synchronized( seed_request_write_lock ){
 			
-			seed_requests_pending.add( download );
+			seed_requests_write_pending.add( download );
 		}
 	}
 	
@@ -432,9 +731,9 @@ I2PHelperNetworkMixer
 			return;
 		}
 		
-		synchronized( seed_request_lock ){
+		synchronized( seed_request_write_lock ){
 			
-			seed_requests_pending.remove( download );
+			seed_requests_write_pending.remove( download );
 		}
 	}
 	
