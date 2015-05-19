@@ -39,6 +39,9 @@ import org.gudy.azureus2.plugins.download.DownloadAttributeListener;
 import org.gudy.azureus2.plugins.download.DownloadManager;
 import org.gudy.azureus2.plugins.download.DownloadManagerListener;
 import org.gudy.azureus2.plugins.download.DownloadScrapeResult;
+import org.gudy.azureus2.plugins.peers.Peer;
+import org.gudy.azureus2.plugins.peers.PeerManager;
+import org.gudy.azureus2.plugins.peers.PeerStats;
 import org.gudy.azureus2.plugins.torrent.Torrent;
 import org.gudy.azureus2.plugins.torrent.TorrentAttribute;
 import org.gudy.azureus2.plugins.torrent.TorrentManager;
@@ -50,8 +53,6 @@ import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouter;
 import org.parg.azureus.plugins.networks.i2p.tracker.I2PDHTTrackerPluginListener;
 
-import com.aelitis.azureus.core.util.bloom.BloomFilter;
-import com.aelitis.azureus.core.util.bloom.BloomFilterFactory;
 import com.aelitis.azureus.plugins.net.buddy.BuddyPluginBeta.ChatInstance;
 import com.aelitis.azureus.plugins.net.buddy.BuddyPluginBeta.ChatMessage;
 import com.aelitis.azureus.plugins.net.buddy.BuddyPluginBeta.ChatAdapter;
@@ -94,7 +95,8 @@ I2PHelperNetworkMixer
 	
 	
 	
-	private static final int MIN_ACTIVE_PERIOD 	= 20*60*1000;
+	private static final int MIN_ACTIVE_PERIOD 				= 20*60*1000;
+	private static final int MIN_ACTIVE_WITH_PEERS_PERIOD 	= 60*60*1000;
 	
 	private TimerEventPeriodic	recheck_timer;
 	
@@ -329,6 +331,11 @@ I2PHelperNetworkMixer
 				sr_code_map.remove( sr_code );
 			}
 		}
+		
+		synchronized( seed_request_downloads ){
+		
+			seed_request_downloads.remove( download );
+		}
 	}
 	
 	public void
@@ -554,10 +561,28 @@ I2PHelperNetworkMixer
 		}
 	}
 	
+	private static final int MAX_SEED_REQUEST_DOWNLOADS	= 5;
+	
+	private Map<Download,Long>	seed_request_downloads = 
+		new LinkedHashMap<Download,Long>(MAX_SEED_REQUEST_DOWNLOADS,0.75f,true)
+		{
+			protected boolean 
+			removeEldestEntry(
+		   		Map.Entry<Download,Long> eldest ) 
+			{
+				return size() > MAX_SEED_REQUEST_DOWNLOADS;
+			}
+		};
+		
 	private void
 	handleIncomingSeedRequest(
 		Download		download )
 	{
+		if ( !download.isPersistent()){
+			
+			return;
+		}
+		
 		int state = download.getState();
 		
 		if ( state == Download.ST_ERROR || state == Download.ST_STOPPED ){
@@ -565,7 +590,14 @@ I2PHelperNetworkMixer
 			return;
 		}
 		
-		System.out.println( "Seed request for " + download.getName());
+		synchronized( seed_request_downloads ){
+		
+			seed_request_downloads.put( download, SystemTime.getMonotonousTime());
+		}
+		
+		plugin.log( "Netmix: seed request for " + download.getName());
+		
+		checkMixedDownloads();
 	}
 	
 	private void
@@ -821,6 +853,29 @@ I2PHelperNetworkMixer
 					Download 	d1, 
 					Download 	d2 ) 
 				{
+					boolean	d1_sr = seed_request_downloads.containsKey( d1 );
+					boolean	d2_sr = seed_request_downloads.containsKey( d2 );
+					
+					if ( d1_sr || d2_sr ){
+						
+						if ( d1_sr && d2_sr ){
+							
+							long l = d2.getCreationTime() - d1.getCreationTime();
+							
+							if ( l < 0 ){
+								return( -1 );
+							}else if ( l > 0 ){
+								return( 1 );
+							}else{
+								return(0);
+							}
+						}else if ( d1_sr ){
+							return( -1 );
+						}else{
+							return( 1 );
+						}
+					}
+					
 					DownloadScrapeResult s1 = d1.getAggregatedScrapeResult();
 					DownloadScrapeResult s2 = d2.getAggregatedScrapeResult();
 					
@@ -919,14 +974,27 @@ I2PHelperNetworkMixer
 			
 			active_limit = Integer.MAX_VALUE;
 		}
-		
-		Collections.sort( downloads, download_comparator );
 				
+		int	sr_count;
+		
+		synchronized( seed_request_downloads ){
+		
+			Collections.sort( downloads, download_comparator );
+		
+			sr_count = seed_request_downloads.size();
+		}
+		
+		int sr_to_activate = 0;
+		
 			// downloads are sorted highest priority first
 		
-		ArrayList<Download>		to_activate 	= new ArrayList<Download>( downloads.size());
-
-		int	failed_to_deactivate = 0;
+		List<Download>		to_activate 			= new ArrayList<Download>( downloads.size());
+		List<Download>		failed_to_deactivate	= new ArrayList<Download>();
+		
+		long	now = SystemTime.getMonotonousTime() ;
+		
+			// remember downloads are ordered with seed-requests first and then in decreasing
+			// priority for activation
 		
 		for ( int i=0;i<downloads.size();i++){
 			
@@ -934,6 +1002,19 @@ I2PHelperNetworkMixer
 			
 			int	existing_state = download.getIntAttribute( ta_mixstate );
 
+			boolean	is_sr;
+			
+			if ( sr_count > 0 ){
+				
+				synchronized( seed_request_downloads ){
+					
+					is_sr = seed_request_downloads.containsKey( download );
+				}
+			}else{
+				
+				is_sr = false;
+			}
+			
 			if ( existing_state == MS_ACTIVE ){
 				
 				if ( i < active_limit ){
@@ -944,21 +1025,88 @@ I2PHelperNetworkMixer
 					
 					Long	activate_time = (Long)download.getUserData( I2PHelperNetworkMixer.class );
 					
-					if ( 	activate_time == null ||	// shouldn't happen but just in case
-							SystemTime.getMonotonousTime() - activate_time >= MIN_ACTIVE_PERIOD ){
+					if ( activate_time == null ){
 						
-						plugin.log( "Netmix: deactivating " + download.getName());
+						activate_time = 0L;	// shouldn't happen but just in case
+					}
+					
+					long	elapsed = now - activate_time;
+					
+					if ( elapsed >= MIN_ACTIVE_PERIOD ){
+												
+						boolean	prevent_deactivation = false;
 						
-						setNetworkState( download, false );
+						if ( elapsed < MIN_ACTIVE_WITH_PEERS_PERIOD ){
+							
+							PeerManager pm = download.getPeerManager();
+							
+							if ( pm != null ){
+
+								if ( is_sr ){
+									
+									prevent_deactivation = true;
+									
+								}else{
+									
+									Peer[] peers = pm.getPeers();
+									
+									for ( Peer peer: peers ){
+										
+										PeerStats stats = peer.getStats();
+										
+										long mins_connected = stats.getTimeSinceConnectionEstablished()/(60*1000);
+										
+											// 5k a min sounds like a reasonable test of liveness...
+										
+										if ( stats.getTotalReceived() + stats.getTotalSent() >= mins_connected*5*1024 ){
+											
+											String peer_net = AENetworkClassifier.categoriseAddress( peer.getIp());
+											
+											if ( peer_net == AENetworkClassifier.AT_I2P ){
+												
+												prevent_deactivation = true;
+												
+												break;
+											}
+										}
+									}
+								}
+							}
+						}
 						
+						if ( prevent_deactivation ){
+							
+							failed_to_deactivate.add( download );
+							
+						}else{
+							
+							plugin.log( "Netmix: deactivating " + download.getName() + ", sr=" + is_sr );
+							
+							setNetworkState( download, false );
+							
+							if ( is_sr ){
+								
+									// it's had its chance, kill the seed request 
+								
+								synchronized( seed_request_downloads ){
+	
+									seed_request_downloads.remove( download );
+								}
+							}
+						}
 					}else{
 						
-						failed_to_deactivate++;
+						failed_to_deactivate.add( download );
 					}
 				}
 			}else{
 				
 				if ( i < active_limit ){
+					
+					if ( is_sr ){
+					
+						sr_to_activate++;
+					}
 					
 					to_activate.add( download );
 				}
@@ -968,13 +1116,56 @@ I2PHelperNetworkMixer
 			// if we failed to deactivate N downloads then that means we can't yet activate N
 			// new ones
 		
-		int	num_to_activate = to_activate.size() - failed_to_deactivate;
+		int	num_to_activate = to_activate.size() - failed_to_deactivate.size();
+		
+		int	force_active = sr_to_activate - num_to_activate;
+		
+		if ( force_active > 0 ){
+		
+				// we really want to try and get seed requests active so see if we can force-deactivate
+				// some that failed normal deactivation
+			
+			for ( int i=failed_to_deactivate.size()-1; i>=0; i-- ){
+				
+				Download download = failed_to_deactivate.get(i);
+				
+				boolean	is_sr;
+				
+				synchronized( seed_request_downloads ){
+					
+					is_sr = seed_request_downloads.containsKey( download );
+				}
+				
+				if ( !is_sr ){
+					
+					plugin.log( "Netmix: force deactivating " + download.getName());
+					
+					setNetworkState( download, false );
+					
+					num_to_activate++;
+					
+					force_active--;
+					
+					if ( force_active == 0 ){
+						
+						break;
+					}
+				}
+			}
+		}
 		
 		for ( int i=0;i<num_to_activate;i++){
 			
 			Download download = to_activate.get(i);
 			
-			plugin.log( "Netmix: activating " + download.getName());
+			boolean	is_sr;
+			
+			synchronized( seed_request_downloads ){
+				
+				is_sr = seed_request_downloads.containsKey( download );
+			}
+			
+			plugin.log( "Netmix: activating " + download.getName() + ", sr=" + is_sr );
 			
 			setNetworkState( download, true );
 		}
