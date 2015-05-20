@@ -385,7 +385,7 @@ I2PHelperNetworkMixer
 	private volatile ChatInstance	seed_request_write_chat;
 	private Set<Download>			seed_requests_write_pending	= new HashSet<Download>();
 	
-	private static final String seed_request_read_key = "Statistics: Announce: Summary1";
+	private static final String seed_request_read_key = "Statistics: Announce: Summary[pk=AR4QZBLCNKCC7ONS2ZTHZJMIO6UB3AM2X3VRQDYYSBUBDDMBSEA5KXUTCUQID4AS5AP4AMUA4MUW67Y&ro=1]";
 	
 	private Object					seed_request_read_lock = new Object();
 	private volatile ChatInstance	seed_request_read_chat;
@@ -590,12 +590,17 @@ I2PHelperNetworkMixer
 			return;
 		}
 		
+		boolean	new_request;
+		
 		synchronized( seed_request_downloads ){
 		
-			seed_request_downloads.put( download, SystemTime.getMonotonousTime());
+			new_request = seed_request_downloads.put( download, SystemTime.getMonotonousTime()) == null;
 		}
 		
-		plugin.log( "Netmix: seed request for " + download.getName());
+		if ( new_request ){
+		
+			plugin.log( "Netmix: seed request for " + download.getName());
+		}
 		
 		checkMixedDownloads();
 	}

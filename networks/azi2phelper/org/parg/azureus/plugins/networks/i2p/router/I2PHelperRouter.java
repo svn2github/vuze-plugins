@@ -140,6 +140,7 @@ I2PHelperRouter
 	private String		i2p_host;
 	private int			i2p_port;
 	
+	private int			rate_multiplier = 1;
 	
 	private volatile Router 			router;
 	
@@ -288,10 +289,19 @@ I2PHelperRouter
 	{
 			// router bandwidth
 			
-		int	base_in 		= is_bootstrap_node?500:getIntegerParameter(PARAM_RECV_KBS);
+		int mult 				= is_bootstrap_node?1:rate_multiplier;
+		
+		long	base_in 		= is_bootstrap_node?500:getIntegerParameter(PARAM_RECV_KBS);
 		
 		if ( base_in <= 0 ){
+			
 			base_in = 100*1024;	// unlimited - 100MB/sec
+			
+		}else{
+			
+			base_in *= mult;
+			
+			base_in = Math.min( base_in, 100*1024 );
 		}
 		
 			// got to keep some bytes flowing here
@@ -300,13 +310,20 @@ I2PHelperRouter
 			base_in = 10;
 		}
 		
-		int burst_in_ks 	= base_in+(base_in/10);
-		int burst_in_k		= burst_in_ks*20;
+		long burst_in_ks 	= base_in+(base_in/10);
+		long burst_in_k		= burst_in_ks*20;
 		
-		int	base_out 		= is_bootstrap_node?500:getIntegerParameter(PARAM_SEND_KBS);
+		long	base_out 		= is_bootstrap_node?500:getIntegerParameter(PARAM_SEND_KBS);
 		
 		if ( base_out <= 0 ){
+			
 			base_out = 100*1024;	// unlimited - 100MB/sec
+			
+		}else{
+			
+			base_out *= mult;
+			
+			base_out = Math.min( base_out, 100*1024 );
 		}
 		
 			// got to keep some bytes flowing here
@@ -315,9 +332,8 @@ I2PHelperRouter
 			base_out = 10;
 		}
 		
-		int burst_out_ks 	= base_out+(base_out/10);
-		int burst_out_k		= burst_out_ks*20;
-	
+		long burst_out_ks 	= base_out+(base_out/10);
+		long burst_out_k	= burst_out_ks*20;
 		
 		int share_pct	= is_bootstrap_node?75:getIntegerParameter(PARAM_SHARE_PERCENT);
 		
@@ -341,9 +357,25 @@ I2PHelperRouter
 		
 		I2PHelperUtils.normalizeProperties( props );
 		
-		router.saveConfig( props, null );
-		
-		router.getContext().bandwidthLimiter().reinitialize();
+		if ( router != null ){
+			
+			router.saveConfig( props, null );
+			
+			router.getContext().bandwidthLimiter().reinitialize();
+		}
+	}
+	
+	public void
+	setRateMultiplier(
+		int		mult )
+	{
+		rate_multiplier = mult;
+	}
+	
+	public int
+	getRateMultiplier()
+	{
+		return( rate_multiplier );
 	}
 	
 	private void
@@ -1022,6 +1054,7 @@ I2PHelperRouter
 			adapter.log( 
 				"Rates: send=" + DisplayFormatters.formatByteCountToKiBEtcPerSec(send_rate) +
 				", recv=" + DisplayFormatters.formatByteCountToKiBEtcPerSec(recv_rate) +
+				", mult=" + rate_multiplier +
 				"; Limits: send=" + DisplayFormatters.formatByteCountToKiBEtcPerSec(bwl.getOutboundKBytesPerSecond()*1024) + 
 				", recv=" + DisplayFormatters.formatByteCountToKiBEtcPerSec(bwl.getInboundKBytesPerSecond()*1024));
 		}

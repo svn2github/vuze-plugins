@@ -78,6 +78,9 @@ I2PHelperMessageHandler
 		}
 	}
 	
+	private volatile long	data_bytes_sent;
+	private volatile long	data_bytes_received;
+	
 	protected
 	I2PHelperMessageHandler(
 		I2PHelperPlugin		_plugin )
@@ -90,6 +93,12 @@ I2PHelperMessageHandler
 		}
 		
 		NetworkConnectionFactory.addListener( this );			
+	}
+	
+	public long[]
+	getDataTotals()
+	{
+		return( new long[]{ data_bytes_sent, data_bytes_received });
 	}
 	
 	private void
@@ -210,7 +219,11 @@ I2PHelperMessageHandler
 						}
 						
 						@Override
-						public void dataBytesSent(int byte_count) {
+						public void 
+						dataBytesSent(
+							int byte_count) 
+						{
+							data_bytes_sent += byte_count;
 						}
 					});
 				
@@ -393,7 +406,10 @@ I2PHelperMessageHandler
 						}
 						
 						@Override
-						public void dataBytesReceived(int byte_count) {							
+						public void 
+						dataBytesReceived(int byte_count) 
+						{
+							data_bytes_received += byte_count;
 						}
 					});
 			}			

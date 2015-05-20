@@ -290,6 +290,8 @@ I2PHelperPlugin
 
 	private I2PHelperMessageHandler		message_handler;
 	
+	private TimerEventPeriodic			timer_event;
+	
 	private I2PHelperAltNetHandler		alt_network_handler;
 	
 	private I2PHelperNetworkMixer		network_mixer;
@@ -589,9 +591,12 @@ I2PHelperPlugin
 			
 			final BooleanParameter link_rates_param = config_model.addBooleanParameter2( "azi2phelper.link.rates", "azi2phelper.link.rates", false );
 			
-			final IntParameter up_limit_param 		= config_model.addIntParameter2( I2PHelperRouter.PARAM_SEND_KBS, I2PHelperRouter.PARAM_SEND_KBS, I2PHelperRouter.PARAM_SEND_KBS_DEFAULT, 0, Integer.MAX_VALUE );
-			final IntParameter down_limit_param 	= config_model.addIntParameter2( I2PHelperRouter.PARAM_RECV_KBS, I2PHelperRouter.PARAM_RECV_KBS, I2PHelperRouter.PARAM_RECV_KBS_DEFAULT, 0, Integer.MAX_VALUE );
-			final IntParameter share_percent_param 	= config_model.addIntParameter2( I2PHelperRouter.PARAM_SHARE_PERCENT, I2PHelperRouter.PARAM_SHARE_PERCENT, I2PHelperRouter.PARAM_SHARE_PERCENT_DEFAULT, 10, 100 );
+			final IntParameter up_limit_param 			= config_model.addIntParameter2( I2PHelperRouter.PARAM_SEND_KBS, I2PHelperRouter.PARAM_SEND_KBS, I2PHelperRouter.PARAM_SEND_KBS_DEFAULT, 0, Integer.MAX_VALUE );
+			final IntParameter down_limit_param 		= config_model.addIntParameter2( I2PHelperRouter.PARAM_RECV_KBS, I2PHelperRouter.PARAM_RECV_KBS, I2PHelperRouter.PARAM_RECV_KBS_DEFAULT, 0, Integer.MAX_VALUE );
+			
+			final IntParameter limit_multiplier_param 	= config_model.addIntParameter2( "azi2phelper.rate.multiplier", "azi2phelper.rate.multiplier", 2, 1, 100 );
+
+			final IntParameter share_percent_param 		= config_model.addIntParameter2( I2PHelperRouter.PARAM_SHARE_PERCENT, I2PHelperRouter.PARAM_SHARE_PERCENT, I2PHelperRouter.PARAM_SHARE_PERCENT_DEFAULT, 10, 100 );
 						
 			ParameterListener link_listener = 
 				new ParameterListener()
@@ -642,6 +647,18 @@ I2PHelperPlugin
 					private void
 					syncRates()
 					{
+						I2PHelperRouter current_router = router;
+						
+						if ( current_router != null ){
+							
+							if ( current_router.getRateMultiplier() != 1 ){
+								
+								current_router.setRateMultiplier( 1 );
+								
+								current_router.updateProperties();
+							}
+						}
+						
 						int dl_limit = NetworkManager.getMaxDownloadRateBPS() / 1024;
 						
 						int ul_limit;
@@ -677,7 +694,7 @@ I2PHelperPlugin
 			config_model.createGroup( 
 					"azi2phelper.bandwidth.group",
 					new Parameter[]{ 
-						link_rates_param, up_limit_param, down_limit_param, share_percent_param, treat_as_lan_param	
+						link_rates_param, up_limit_param, down_limit_param, limit_multiplier_param, share_percent_param, treat_as_lan_param	
 					});
 			
 				// Network Mixing
@@ -1066,6 +1083,7 @@ I2PHelperPlugin
 							link_rates_param.setEnabled( enabled_not_ext );
 							up_limit_param.setEnabled( enabled_not_ext && !is_linked );
 							down_limit_param.setEnabled( enabled_not_ext  && !is_linked );
+							limit_multiplier_param.setEnabled( enabled_not_ext  && !is_linked );
 							share_percent_param.setEnabled( enabled_not_ext );
 							
 							net_mix_enable.setEnabled( plugin_enabled );
@@ -1106,12 +1124,83 @@ I2PHelperPlugin
 			link_rates_param.addListener( enabler_listener );
 			
 			enabler_listener.parameterChanged( null );
-							
+				
+			boolean	is_external_router = ext_i2p_param.getValue();
+			
 			if ( plugin_enabled ){
 				
 				log( "Internal port=" + int_port +", external=" + ext_port + ", socks=" + sock_port );
 
 				message_handler = new I2PHelperMessageHandler( I2PHelperPlugin.this );
+				
+				if ( !is_external_router ){
+					
+						// we don't manage rate limits for external routers
+					
+					timer_event = 
+						SimpleTimer.addPeriodicEvent(
+							"i2phelper:checker",
+							60*1000,
+							new TimerEventPerformer()
+							{	
+								private long		last_total;
+								private long		last_active;
+								
+								@Override
+								public void 
+								perform(
+									TimerEvent event) 
+								{
+									if ( unloaded ){
+										
+										if ( timer_event != null ){
+											
+											timer_event.cancel();
+										}
+										
+										return;
+									}
+									
+									int mult;
+									
+									if ( link_rates_param.getValue()){
+										
+										mult = 1;
+										
+									}else{
+									
+										long[] totals = message_handler.getDataTotals();
+										
+										long current_total = totals[0] + totals[1];
+										
+										long	now = SystemTime.getCurrentTime();
+										
+										if ( current_total != last_total ){
+										
+											last_total = current_total;
+											
+											last_active = now;
+										}
+										
+										boolean	is_active = now - last_active <= 5*60*1000;
+										
+										mult = is_active?limit_multiplier_param.getValue():1;
+									}
+									
+									I2PHelperRouter current_router = router;
+									
+									if ( current_router != null ){
+										
+										if ( current_router.getRateMultiplier() != mult ){
+										
+											current_router.setRateMultiplier( mult );
+											
+											current_router.updateProperties();
+										}
+									}
+								}
+							});
+				}
 				
 				alt_network_handler = new I2PHelperAltNetHandler();
 				
@@ -3890,6 +3979,13 @@ I2PHelperPlugin
 					network_mixer.destroy();
 					
 					network_mixer = null;
+				}
+				
+				if ( timer_event != null ){
+					
+					timer_event.cancel();
+					
+					timer_event = null;
 				}
 			}
 		}finally{
