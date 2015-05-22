@@ -102,7 +102,7 @@ MsgSyncHandler
 	
 	private static final int VERSION		= 4;
 	
-	private static final int MIN_VERSION	= 3;
+	private static final int MIN_VERSION	= 4;
 	
 	private static final boolean TRACE = System.getProperty( "az.msgsync.trace.enable", "0" ).equals( "1" );
 	
@@ -199,7 +199,7 @@ MsgSyncHandler
 	private static final int				MIN_BLOOM_BITS	= 8*8;
 	
 	private static final int				MAX_MESSAGES			= 128;
-	private static final int				MAX_DELETED_MESSAGES	= 64;
+	private static final int				MAX_DELETED_MESSAGES	= 128;
 	
 	private static final int				MAX_NODES				= 128;
 	private static final int				MIN_NODES				= 3;
@@ -1927,9 +1927,12 @@ MsgSyncHandler
 			
 			long	now = SystemTime.getMonotonousTime();
 			
+			long elapsed = now - last_dht_check;
+			
 			if ( 	live == 0 ||
-					now - last_dht_check > 30*60*1000 ||
-					now - last_dht_check > live*60*1000 ){
+					( live < 50  && elapsed > live*60*1000 )   ||
+					( live < 100 && elapsed > live*2*60*1000 ) ||
+					elapsed > live*4*60*1000 ){
 				
 				checkDHT( false );
 			}
@@ -2296,7 +2299,7 @@ MsgSyncHandler
 					
 					messages.addFirst( msg );
 				}
-								
+				
 				if ( messages.size() > MAX_MESSAGES ){
 											
 					MsgSyncMessage removed = messages.removeFirst();
@@ -2330,7 +2333,7 @@ MsgSyncHandler
 					
 					deleted_messages_inverted_sigs_map.put( new HashWrapper( removed_inv_sig ), "" );
 				}
-								
+									
 				message_mutation_id++;
 
 				if ( msg_source != MS_LOADING ){
@@ -2389,6 +2392,26 @@ MsgSyncHandler
 				
 				reportInfoRaw( "Reset performed" );
 			
+				return;
+				
+			}else if ( cmd.equals( "dump" )){
+				
+				synchronized( message_lock ){
+
+					for ( int i=0;i<messages.size(); i++ ){
+						
+						MsgSyncMessage message = messages.get(i);
+						
+						byte[]	sig = message.getSignature();
+												
+						String msg_id = ByteFormatter.encodeString( sig, 8, 3 );
+						
+						System.out.println(msg_id + ", age=" +  message.getAgeSecs() + " (" + message.getAgeSecsWhenReceived() + ")" );
+					}
+				}
+				
+				System.out.println( "History bloom: " + (history_key_bloom==null?"null":history_key_bloom.getString()));
+				
 				return;
 				
 			}else{

@@ -32,13 +32,14 @@ MsgSyncMessage
 	public static final int ST_NORMAL_MESSAGE	= 1;
 	public static final int ST_LOCAL_MESSAGE	= 2;
 	
-	private MsgSyncNode		node;
-	private byte[]			message_id;
-	private byte[]			content;
+	private final MsgSyncNode	node;
+	private final byte[]		message_id;
+	private final byte[]		content;
 	
-	private byte[]			signature;
+	private final byte[]		signature;
 	
-	private int				age_when_received_secs;
+	private final int			age_when_received_secs;
+	
 	private long			time_received;
 	
 	private int				delivery_count;
@@ -60,22 +61,25 @@ MsgSyncMessage
 	{
 		node		= _node;
 		message_id	= _message_id;
-		content		= _content;
 		signature	= _signature;
 		history		= _history==null?BLANK_HISTORY:_history;
 		
 		age_when_received_secs	= _age_secs < 0 ?0:_age_secs;
 		time_received			= SystemTime.getCurrentTime();		// can't use monotime here as computer sleep suspends it :(
 		
-		if ( content == null ){
+		if ( _content == null ){
+			
 			content = new byte[0];
-		}
-		
-		if ( content.length > MsgSyncHandler.MAX_MESSAGE_SIZE ){
+			
+		}else if ( _content.length > MsgSyncHandler.MAX_MESSAGE_SIZE ){
 			
 			content = new byte[0];
 			
 			setLocalMessage( "Message rejected - too large (max bytes=" + MsgSyncHandler.MAX_MESSAGE_SIZE + ")" );
+			
+		}else{
+			
+			content		= _content;
 		}
 	}
 	
