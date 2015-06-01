@@ -755,12 +755,21 @@ TorPlugin
 			
 			plugin_dir 	= config_file.getParentFile();
 			
-				// hack for linux - currently bundle both 32+64 bit versions into one plugin and then
+				// hack for linux and OSX - currently bundle both 32+64 bit versions into one plugin and then
 				// copy the required files into place...
 			
-			if ( Constants.isLinux ){
+			if ( Constants.isLinux || Constants.isOSX ){
 				
-				File	arch_dir = new File( plugin_dir, Constants.is64Bit?"linux64":"linux32" );
+				File	arch_dir;
+				
+				if ( Constants.isLinux ){
+					
+					arch_dir = new File( plugin_dir, Constants.is64Bit?"linux64":"linux32" );
+					
+				}else{
+					
+					arch_dir = new File( plugin_dir, Constants.is64Bit?"osx64":"osx32" );
+				}
 				
 				File[] files = arch_dir.listFiles();
 				
