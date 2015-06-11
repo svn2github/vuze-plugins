@@ -60,6 +60,11 @@ I2PHelperAZDHT
 	
 		throws Exception;
 	
+	public abstract DHT
+	getBaseDHT()
+	
+		throws Exception;
+	
 	public void
 	put(
 		final byte[]						key,

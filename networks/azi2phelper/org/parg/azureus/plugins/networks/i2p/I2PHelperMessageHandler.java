@@ -22,6 +22,7 @@
 package org.parg.azureus.plugins.networks.i2p;
 
 import java.net.InetSocketAddress;
+import java.nio.channels.SocketChannel;
 import java.util.*;
 
 import net.i2p.data.Base32;
@@ -36,6 +37,7 @@ import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.SHA1Simple;
 
 import com.aelitis.azureus.core.networkmanager.*;
+import com.aelitis.azureus.core.networkmanager.impl.tcp.TransportEndpointTCP;
 import com.aelitis.azureus.core.peermanager.messaging.Message;
 import com.aelitis.azureus.core.peermanager.messaging.MessageException;
 import com.aelitis.azureus.core.peermanager.messaging.MessageManager;
@@ -136,7 +138,7 @@ I2PHelperMessageHandler
 	connectionCreated(
 		final NetworkConnection		connection )
 	{
-		InetSocketAddress address = connection.getEndpoint().getNotionalAddress();
+		final InetSocketAddress address = connection.getEndpoint().getNotionalAddress();
 		
 		if ( address.isUnresolved()){
 			
@@ -254,8 +256,23 @@ I2PHelperMessageHandler
 								
 								torrent_hash = bt_handshake.getDataHash();
 								
-								plugin.checkMixState( torrent_hash );
+								if ( connection.isIncoming()){
 								
+									TransportEndpointTCP ep = (TransportEndpointTCP)connection.getTransport().getTransportEndpoint();
+								
+									SocketChannel chan = ep.getSocketChannel();
+									
+									if ( !plugin.checkMixState( (InetSocketAddress)chan.socket().getRemoteSocketAddress(), torrent_hash )){
+										
+										throw( new RuntimeException( "Incorrect mix" ));
+									}
+								}else{
+								
+									if ( !plugin.checkMixState( address, torrent_hash )){
+										
+										throw( new RuntimeException( "Incorrect mix" ));
+									}
+								}
 							}else if ( message instanceof LTHandshake ){
 								
 								LTMessageEncoder encoder = (LTMessageEncoder)connection.getOutgoingMessageQueue().getEncoder();

@@ -49,12 +49,12 @@ DHTTransportContactI2P
 {
 	protected static final byte[]	DEFAULT_TOKEN = {};
 	
-	private DHTTransportI2P		transport;
-	private NodeInfo			node;
-	private byte				version;
-	private int					instance_id;
-	private long				skew;
-	private byte				generic_flags;
+	private final DHTTransportI2P		transport;
+	private final NodeInfo				node;
+	private byte						version;
+	private int							instance_id;
+	private long						skew;
+	private byte						generic_flags;
 	
 	private InetSocketAddress	address;
 	
@@ -85,6 +85,22 @@ DHTTransportContactI2P
 		address = InetSocketAddress.createUnresolved( host, node.getPort());
 
 		id		= node.getNID().getData();
+	}
+	
+	protected
+	DHTTransportContactI2P(
+		DHTTransportI2P			_transport,
+		DHTTransportContactI2P	_other )
+	{
+		transport 		= _transport;
+		
+		node			= _other.node;
+		version			= _other.version;
+		instance_id		= _other.instance_id;
+		skew			= _other.skew;
+		generic_flags	= _other.generic_flags;
+		address 		= _other.address;
+		id				= _other.id;
 	}
 	
 	protected void

@@ -57,9 +57,12 @@ import org.parg.azureus.plugins.networks.i2p.I2PHelperAdapter;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperDHT;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperDHTAdapter;
 import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouter;
+import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTI2P;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTTransportContactI2P;
+import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT;
 
 import com.aelitis.azureus.core.dht.DHT;
+import com.aelitis.azureus.plugins.dht.DHTPluginOperationListener;
 
 
 /**
@@ -1764,6 +1767,30 @@ I2PDHTTrackerPlugin
 					ANNOUNCE_DERIVED_TIMEOUT,
 					//false, false,
 					listener );
+			
+		}catch( Throwable e ){
+			
+			listener.complete( false );
+		}
+	}
+	
+	public void
+	trackerGet(
+		String							reason,
+		byte[]							torrent_hash,
+		I2PHelperAZDHT					dht,
+		I2PHelperDHTAdapter				listener )
+	{
+		try{
+			dht.getBaseDHT().get(
+					torrent_hash, 
+					reason,
+					DHT.FLAG_DOWNLOADING,
+					NUM_WANT, 
+					ANNOUNCE_DERIVED_TIMEOUT,
+					false, 
+					true,
+					new DHTI2P.GetCacheEntry( listener ));
 			
 		}catch( Throwable e ){
 			

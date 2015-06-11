@@ -62,7 +62,8 @@ I2PHelperAdapter
 	
 	public void
 	incomingConnection(
-		I2PSocket		socket )
+		I2PHelperRouterDHT		dht,
+		I2PSocket				socket )
 		
 		throws Exception;
 	

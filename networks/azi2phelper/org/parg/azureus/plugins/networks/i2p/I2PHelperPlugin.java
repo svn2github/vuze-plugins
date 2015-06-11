@@ -147,6 +147,7 @@ import com.aelitis.azureus.core.tracker.TrackerPeerSource;
 import com.aelitis.azureus.core.util.bloom.BloomFilter;
 import com.aelitis.azureus.core.util.bloom.BloomFilterFactory;
 import com.aelitis.azureus.plugins.dht.DHTPluginInterface;
+import com.aelitis.azureus.plugins.dht.DHTPluginOperationAdapter;
 import com.aelitis.azureus.plugins.dht.DHTPluginValue;
 import com.aelitis.azureus.plugins.dht.DHTPluginContact;
 import com.aelitis.azureus.plugins.upnp.UPnPMapping;
@@ -368,7 +369,20 @@ I2PHelperPlugin
 				return size() > DEST_HISTORY_MAX;
 			}
 		};
-		
+	
+	private int LOCAL_PORT_HISTORY_MAX	= 512;
+	
+	private Map<Integer,Integer>		local_port_map = 
+		new LinkedHashMap<Integer,Integer>(LOCAL_PORT_HISTORY_MAX,0.75f,true)
+		{
+			protected boolean 
+			removeEldestEntry(
+		   		Map.Entry<Integer,Integer> eldest) 
+			{
+				return size() > LOCAL_PORT_HISTORY_MAX;
+			}
+		};
+			
 	private static final int EXTERNAL_BOOTSTRAP_PERIOD = 30*60*1000;
 		
 	private long		last_external_bootstrap;
@@ -1944,6 +1958,7 @@ I2PHelperPlugin
 					ServerInstance inst = 
 						router.createServer( 
 							"chat_" + nick,
+							false,
 							new I2PHelperRouter.ServerAdapter()
 							{							
 								@Override
@@ -2000,6 +2015,7 @@ I2PHelperPlugin
 					final ServerInstance inst = 
 							router.createServer( 
 								"chat_" + my_nick,
+								false,
 								new I2PHelperRouter.ServerAdapter()
 								{							
 									@Override
@@ -2139,6 +2155,52 @@ I2PHelperPlugin
 								}
 							});
 					
+				}else if ( cmd.equals( "az_pi_lookup" )){
+
+					if ( bits.length != 2 ){
+						
+						throw( new Exception( "usage: az_pi_lookup <hash>"));
+					}
+					
+					byte[] torrent_hash = ByteFormatter.decodeString( bits[1] );
+					
+					Map<String,Object>	options = new HashMap<String, Object>();
+					
+					options.put( "server_id", "Scraper" );
+					options.put( "server_id_transient", true );
+					
+					IPCInterface callback = new IPCInterface() {
+						
+						@Override
+						public Object 
+						invoke(
+							String 		methodName, 
+							Object[]	params )
+							
+							throws IPCException 
+						{
+							System.out.println( "Callback: " + params[0] );
+							
+							return null;
+						}
+						
+						@Override
+						public boolean 
+						canInvoke(
+							String methodName, 
+							Object[] params) 
+						{
+							return( true );
+						}
+					};
+					
+					plugin_maybe_null.lookupTorrent( 
+						"test lookup", 
+						torrent_hash, 
+						options, 
+						callback );
+
+
 				}else if ( cmd.equals( "ddb_setup" )){
 
 
@@ -2596,11 +2658,12 @@ I2PHelperPlugin
 	@Override
 	public void 
 	incomingConnection(
-		I2PSocket i2p_socket )
+		I2PHelperRouterDHT		dht,
+		I2PSocket 				i2p_socket )
 		
 		throws Exception 
 	{
-		forwardSocket( i2p_socket, true, COConfigurationManager.getIntParameter( "TCP.Listen.Port" ));
+		forwardSocket( dht, i2p_socket, true, COConfigurationManager.getIntParameter( "TCP.Listen.Port" ));
 	}
 	
 	@Override
@@ -2613,9 +2676,10 @@ I2PHelperPlugin
 	
 	private void
 	forwardSocket(
-		I2PSocket 	i2p_socket,
-		boolean		handle_maggots,
-		int			target_port )
+		I2PHelperRouterDHT			dht,
+		I2PSocket 					i2p_socket,
+		boolean						handle_maggots,
+		int							target_port )
 			
 		throws Exception
 	{
@@ -2650,11 +2714,21 @@ I2PHelperPlugin
 				
 				vuze_socket.bind( null );
 				
-				int local_port = vuze_socket.getLocalPort();
+				final int local_port = vuze_socket.getLocalPort();
 				
 					// we need to pass the peer_ip to the core so that it doesn't just see '127.0.0.1'
 				
 				final AEProxyAddressMapper.PortMapping mapping = AEProxyFactory.getAddressMapper().registerPortMapping( local_port, peer_ip );
+				
+				final Integer dht_index = dht==null?null:dht.getDHTIndex();
+				
+				if ( dht_index != null ){
+					
+					synchronized( local_port_map ){
+						
+						local_port_map.put( local_port, dht_index );
+					}
+				}
 				
 				// System.out.println( "local port=" + local_port );
 				
@@ -2691,6 +2765,17 @@ I2PHelperPlugin
 								}
 								
 								mapping.unregister();
+								
+								if ( dht_index != null ){
+									
+									synchronized( local_port_map ){
+										
+										if ( local_port_map.get( local_port ) == dht_index ){
+										
+											local_port_map.remove( local_port );
+										}
+									}
+								}
 							}
 						};
 						
@@ -2705,6 +2790,17 @@ I2PHelperPlugin
 					if ( !ok ){
 						
 						mapping.unregister();
+						
+						if ( dht_index != null ){
+							
+							synchronized( local_port_map ){
+								
+								if ( local_port_map.get( local_port ) == dht_index ){
+								
+									local_port_map.remove( local_port );
+								}
+							}
+						}
 					}
 				}
 			}
@@ -3564,6 +3660,7 @@ I2PHelperPlugin
 					I2PHelperRouter.ServerInstance server = 
 						current_router.createServer(
 							server_id, 
+							false,
 							new I2PHelperRouter.ServerAdapter() 
 							{			
 								@Override
@@ -3576,7 +3673,7 @@ I2PHelperPlugin
 								{	
 									int port = (Integer)server.getUserProperty( "port" );
 									
-									forwardSocket( i2p_socket, false, port );
+									forwardSocket( null, i2p_socket, false, port );
 								}
 							});
 					
@@ -3636,6 +3733,10 @@ I2PHelperPlugin
 					
 					if ( server_id != null ){
 						
+						Boolean b_is_transient = (Boolean)server_options.get( "server_id_transient" );
+						
+						boolean is_transient = b_is_transient != null && b_is_transient;
+						
 						long	start = SystemTime.getMonotonousTime();
 
 						while( true ){
@@ -3668,6 +3769,7 @@ I2PHelperPlugin
 								I2PHelperRouter.ServerInstance server = 
 									current_router.createServer(
 										server_id, 
+										is_transient,
 										new I2PHelperRouter.ServerAdapter() 
 										{			
 											@Override
@@ -3808,49 +3910,131 @@ I2PHelperPlugin
 								return;
 							}
 						}
-						
-						reportLookupStatus( callback, TrackerPeerSource.ST_UPDATING );
 
-						tracker_plugin.trackerGet( 
-							reason,
-							torrent_hash,
-							options,
-							new I2PHelperDHTAdapter()
-							{
-								private volatile int	leechers	= 0;
-								private volatile int 	seeds		= 0;
-								private volatile int 	peers		= 0;
+						if ( options.containsKey( "server_id" )){
+							
+							DHTPluginInterface dht_pi = getProxyDHT( "torrentLookup", options );
+							
+							if ( dht_pi instanceof I2PHelperDHTPluginInterface ){
 								
-								@Override
-								public void
-								valueRead(
-									DHTTransportContactI2P		contact,
-									String						host,
-									int							contact_state )
-								{
-									if ( contact_state == CS_SEED ){
+								I2PHelperAZDHT az_dht = ((I2PHelperDHTPluginInterface)dht_pi).getDHT(10*1000);
+								
+								if ( az_dht != null ){
+									
+									start = SystemTime.getMonotonousTime();
+									
+									while( true ){
 										
-										seeds++;
-										
-									}else if ( contact_state == CS_LEECH ){
-										
-										leechers++;
-										
-									}else{
-										
-										peers++;
+										az_dht.waitForInitialisation( 2500 );
+																			
+										if ( az_dht.isInitialised()){
+											
+											break;
+										}
+
+										if ( unloaded || !plugin_enabled || ( SystemTime.getMonotonousTime() - start > 2*60*1000 )){
+											
+											reportLookupStatus( callback, TrackerPeerSource.ST_UNAVAILABLE );
+				
+											return;
+										}
 									}
 									
-									reportLookupStatus( callback, TrackerPeerSource.ST_UPDATING, seeds, leechers, peers );
+									reportLookupStatus( callback, TrackerPeerSource.ST_UPDATING );
+									
+									tracker_plugin.trackerGet( 
+										reason,
+										torrent_hash,
+										az_dht,
+										new I2PHelperDHTAdapter()
+										{
+											private volatile int	leechers	= 0;
+											private volatile int 	seeds		= 0;
+											private volatile int 	peers		= 0;
+											
+											@Override
+											public void
+											valueRead(
+												DHTTransportContactI2P		contact,
+												String						host,
+												int							contact_state )
+											{
+												if ( contact_state == CS_SEED ){
+													
+													seeds++;
+													
+												}else if ( contact_state == CS_LEECH ){
+													
+													leechers++;
+													
+												}else{
+													
+													peers++;
+												}
+												
+												reportLookupStatus( callback, TrackerPeerSource.ST_UPDATING, seeds, leechers, peers );
+											}
+				
+											public void
+											complete(
+												boolean		timeout )
+											{
+												reportLookupStatus( callback, TrackerPeerSource.ST_ONLINE, seeds, leechers, peers );
+											}
+										});	
+								}else{
+									
+									reportLookupStatus( callback, TrackerPeerSource.ST_UNAVAILABLE );
 								}
+							}else{
+								
+								reportLookupStatus( callback, TrackerPeerSource.ST_UNAVAILABLE );
+							}
+						}else{
+							
+							reportLookupStatus( callback, TrackerPeerSource.ST_UPDATING );
 	
-								public void
-								complete(
-									boolean		timeout )
+							tracker_plugin.trackerGet( 
+								reason,
+								torrent_hash,
+								options,
+								new I2PHelperDHTAdapter()
 								{
-									reportLookupStatus( callback, TrackerPeerSource.ST_ONLINE, seeds, leechers, peers );
-								}
-							});				
+									private volatile int	leechers	= 0;
+									private volatile int 	seeds		= 0;
+									private volatile int 	peers		= 0;
+									
+									@Override
+									public void
+									valueRead(
+										DHTTransportContactI2P		contact,
+										String						host,
+										int							contact_state )
+									{
+										if ( contact_state == CS_SEED ){
+											
+											seeds++;
+											
+										}else if ( contact_state == CS_LEECH ){
+											
+											leechers++;
+											
+										}else{
+											
+											peers++;
+										}
+										
+										reportLookupStatus( callback, TrackerPeerSource.ST_UPDATING, seeds, leechers, peers );
+									}
+		
+									public void
+									complete(
+										boolean		timeout )
+									{
+										reportLookupStatus( callback, TrackerPeerSource.ST_ONLINE, seeds, leechers, peers );
+									}
+								});	
+						}
 					}catch( Throwable e ){
 						
 						reportLookupStatus( callback, TrackerPeerSource.ST_UNAVAILABLE );
@@ -4010,24 +4194,44 @@ I2PHelperPlugin
 		}
 	}
 	
-	protected void
+	protected boolean
 	checkMixState(
-		byte[]		hash )
+		InetSocketAddress		source,
+		byte[]					hash )
 	{
-		I2PHelperNetworkMixer	mixer = network_mixer;
-		
-		if ( mixer != null ){
+		try{
+			Download download = plugin_interface.getDownloadManager().getDownload( hash );
 			
-			try{
-				Download download = plugin_interface.getDownloadManager().getDownload( hash );
-			
-				if ( download != null ){
+			if ( !source.isUnresolved()){
 				
+				int required_dht = selectDHTIndex( download );
+				
+				synchronized( local_port_map ){
+					
+					Integer dht_index = local_port_map.get( source.getPort());
+					
+					if ( dht_index == null || dht_index != required_dht ){
+						
+						return( false );
+					}
+				}
+			}
+			
+			I2PHelperNetworkMixer	mixer = network_mixer;
+			
+			if ( mixer != null ){
+								
+				if ( download != null ){
+					
 					mixer.checkMixState( download );
 				}
-			}catch( Throwable e ){
-				
 			}
+		
+			return( true );
+			
+		}catch( Throwable e ){
+		
+			return( true );
 		}
 	}
 	
@@ -4280,7 +4484,8 @@ I2PHelperPlugin
 				
 				public void 
 				incomingConnection(
-					I2PSocket socket )
+					I2PHelperRouterDHT	dht,
+					I2PSocket 			socket )
 					
 					throws Exception 
 				{
@@ -4362,6 +4567,7 @@ I2PHelperPlugin
 						try{
 							router.createServer( 
 								"test", 
+								false,
 								new I2PHelperRouter.ServerAdapter() 
 								{
 								

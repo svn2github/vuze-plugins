@@ -886,6 +886,7 @@ I2PHelperRouter
 	public ServerInstance 
 	createServer(
 		final String			server_id,
+		boolean					is_transient,
 		ServerAdapter			server_adapter )
 		
 		throws Exception
@@ -906,7 +907,7 @@ I2PHelperRouter
 				return( existing_server );
 			}
 			
-			server = new ServerInstance( server_id, server_adapter );
+			server = new ServerInstance( server_id, is_transient, server_adapter );
 			
 			servers.put( server_id, server );
 		}
@@ -1160,6 +1161,7 @@ I2PHelperRouter
 		private
 		ServerInstance(
 			String				_server_id,
+			boolean				_is_transient,
 			ServerAdapter		_adapter )
 			
 			throws Exception
@@ -1172,6 +1174,11 @@ I2PHelperRouter
 			Destination	dest = null;
 			
 			try{
+				if ( _is_transient ){
+					
+					dest_key_file.delete();
+				}
+				
 				if ( dest_key_file.exists()){
 		    	   
 		    		InputStream is = new FileInputStream( dest_key_file );

@@ -1204,7 +1204,7 @@ DHTI2P
 		}
 	}
 	
-	private static class
+	public static class
 	GetCacheEntry
 		extends DHTOperationAdapter
 	{
@@ -1217,7 +1217,7 @@ DHTI2P
 		private boolean		complete;
 		private boolean		timeout;
 		
-		private
+		public
 		GetCacheEntry(
 			I2PHelperDHTListener		listener )
 		{

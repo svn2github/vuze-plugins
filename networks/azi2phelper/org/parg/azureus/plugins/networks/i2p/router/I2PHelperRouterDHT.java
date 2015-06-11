@@ -292,7 +292,7 @@ I2PHelperRouterDHT
 									}else{
 										try{
 										
-											adapter.incomingConnection( socket );
+											adapter.incomingConnection( I2PHelperRouterDHT.this, socket );
 										
 										}catch( Throwable e ){
 											

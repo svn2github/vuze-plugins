@@ -75,6 +75,7 @@ DHTAZClient
 	private I2PHelperAdapter		adapter;
 	
 	private volatile DHT 			dht;
+	private volatile DHT 			base_dht;
 	private volatile Exception		init_error;
 	
 	public
@@ -134,7 +135,7 @@ DHTAZClient
 								my_node, 
 								DHTUtilsI2P.REQUEST_TIMEOUT );
 							
-						//base_transport.setTraceOn( true );
+						base_transport.setTraceOn( true );
 						
 						base_transport.setRequestHandler( new BogusRequestHandler());
 						
@@ -172,16 +173,24 @@ DHTAZClient
 						
 						database.setSleeping( true );	// don't accepts any remote storage
 						
-						Properties	props = new Properties();
+						Properties	base_props = new Properties();
 		
-						DHTRouter	base_router = az_dht.getDHT().getRouter();
+						base_props.put( DHT.PR_ENCODE_KEYS, 0 );		// raw keys, no sha1'ing them
 
+						base_dht = 
+								DHTFactory.create( 
+									base_transport, 
+									new RouterWrapperBase( az_dht.getBaseDHT().getRouter(), base_transport ),
+									database,
+									base_props,
+									storage_adapter,
+									DHTAZClient.this );
 						dht = 
 							DHTFactory.create( 
 								transport, 
-								new RouterWrapper( base_router, transport ),
+								new RouterWrapperAZ( az_dht.getDHT().getRouter(), transport ),
 								database,
-								props,
+								new Properties(),
 								storage_adapter,
 								DHTAZClient.this );
 						
@@ -236,6 +245,24 @@ DHTAZClient
 		}
 		
 		return( dht );
+	}
+	
+	public DHT
+	getBaseDHT()
+		
+		throws Exception
+	{
+		if ( !isInitialised()){
+			
+			throw( new Exception( "DHT not yet initialized " ));
+		}
+		
+		if ( init_error != null ){
+			
+			throw( init_error );
+		}
+		
+		return( base_dht );
 	}
 	
 		// DHTInterface fake methods start
@@ -317,7 +344,7 @@ DHTAZClient
 		return( null );
 	}
 	
-	private class
+	private abstract class
 	RouterWrapper
 		extends DHTRouterWrapper
 	{
@@ -326,29 +353,17 @@ DHTAZClient
 			 * to support puts/gets without any extra baggage. Unfortunately we have to map router contacts
 			 * as they have an embedded transport contact which we need to 'redirect'
 			 */
-		
-		private DHTTransportAZ		az_transport;
-		
+				
 		private
 		RouterWrapper(
-			DHTRouter			router,
-			DHTTransportAZ		transport )
+			DHTRouter			router )
 		{
 			super( router );
-			
-			az_transport = transport;
 		}
 		
-		private DHTRouterContact
+		protected abstract DHTRouterContact
 		map(
-			DHTRouterContact	contact )
-		{
-			if ( contact == null ){
-				
-				return( null );
-			}
-			return( new ContactWrapper( contact ));
-		}
+			DHTRouterContact	contact );
 		
 		private List<DHTRouterContact>
 		map(
@@ -514,7 +529,99 @@ DHTAZClient
 		{
 			return( false );
 		}
+	}
 	
+	private class
+	RouterWrapperBase
+		extends RouterWrapper
+	{
+			/*
+			 * the point of this is to leverage just enough functionality from the live router
+			 * to support puts/gets without any extra baggage. Unfortunately we have to map router contacts
+			 * as they have an embedded transport contact which we need to 'redirect'
+			 */
+		
+		private DHTTransportI2P		base_transport;
+		
+		private
+		RouterWrapperBase(
+			DHTRouter			router,
+			DHTTransportI2P		transport )
+		{
+			super( router );
+			
+			base_transport = transport;
+		}
+		
+		protected DHTRouterContact
+		map(
+			DHTRouterContact	contact )
+		{
+			if ( contact == null ){
+				
+				return( null );
+			}
+			return( new ContactWrapper( contact ));
+		}
+		
+		private class
+		ContactWrapper
+			extends DHTRouterContactWrapper
+		{
+			private
+			ContactWrapper(
+				DHTRouterContact		c )
+			{
+				super( c );
+			}
+			
+			public DHTRouterContactAttachment
+			getAttachment()
+			{
+				DHTControlContact cc = (DHTControlContact)getDelegate().getAttachment();
+				
+				DHTTransportContactI2P t_c = (DHTTransportContactI2P)cc.getTransportContact();
+				
+				t_c = new DHTTransportContactI2P( base_transport, t_c );
+				
+				return( new DHTControlContactImpl( t_c, ContactWrapper.this ));	
+			}
+		}
+	}
+	
+	private class
+	RouterWrapperAZ
+		extends RouterWrapper
+	{
+			/*
+			 * the point of this is to leverage just enough functionality from the live router
+			 * to support puts/gets without any extra baggage. Unfortunately we have to map router contacts
+			 * as they have an embedded transport contact which we need to 'redirect'
+			 */
+		
+		private DHTTransportAZ		az_transport;
+		
+		private
+		RouterWrapperAZ(
+			DHTRouter			router,
+			DHTTransportAZ		transport )
+		{
+			super( router );
+			
+			az_transport = transport;
+		}
+		
+		protected DHTRouterContact
+		map(
+			DHTRouterContact	contact )
+		{
+			if ( contact == null ){
+				
+				return( null );
+			}
+			return( new ContactWrapper( contact ));
+		}
+		
 		private class
 		ContactWrapper
 			extends DHTRouterContactWrapper
@@ -539,6 +646,8 @@ DHTAZClient
 			}
 		}
 	}
+	
+	
 	
 	private class
 	BogusRequestHandler

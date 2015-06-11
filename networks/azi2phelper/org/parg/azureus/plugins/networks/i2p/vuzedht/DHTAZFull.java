@@ -68,6 +68,12 @@ DHTAZFull
 		return( dht.getDHT());
 	}
 	
+	public DHT
+	getBaseDHT()
+	{
+		return( dht.getBaseDHT());
+	}
+	
 	public byte[]
 	getID()
 	{
