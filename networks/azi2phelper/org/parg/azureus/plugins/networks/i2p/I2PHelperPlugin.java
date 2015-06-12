@@ -2179,7 +2179,7 @@ I2PHelperPlugin
 							
 							throws IPCException 
 						{
-							System.out.println( "Callback: " + params[0] );
+							System.out.println( "Callback: " + methodName + "/" + params[0] );
 							
 							return null;
 						}
@@ -3945,6 +3945,7 @@ I2PHelperPlugin
 									tracker_plugin.trackerGet( 
 										reason,
 										torrent_hash,
+										options,
 										az_dht,
 										new I2PHelperDHTAdapter()
 										{

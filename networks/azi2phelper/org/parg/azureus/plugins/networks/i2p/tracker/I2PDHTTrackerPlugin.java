@@ -26,14 +26,25 @@ package org.parg.azureus.plugins.networks.i2p.tracker;
 import java.net.URL;
 import java.util.*;
 
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.layout.FillLayout;
+import org.eclipse.swt.layout.GridData;
+import org.eclipse.swt.layout.GridLayout;
+import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.widgets.Text;
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.peer.PEPeerManager;
 import org.gudy.azureus2.core3.peer.PEPeerSource;
 import org.gudy.azureus2.core3.util.AEMonitor;
 import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.SimpleTimer;
 import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.core3.util.TimeFormatter;
+import org.gudy.azureus2.core3.util.TimerEvent;
+import org.gudy.azureus2.core3.util.TimerEventPerformer;
+import org.gudy.azureus2.core3.util.TimerEventPeriodic;
 import org.gudy.azureus2.core3.util.TorrentUtils;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.download.Download;
@@ -53,15 +64,23 @@ import org.gudy.azureus2.plugins.utils.UTTimer;
 import org.gudy.azureus2.plugins.utils.UTTimerEvent;
 import org.gudy.azureus2.plugins.utils.UTTimerEventPerformer;
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
+import org.gudy.azureus2.ui.swt.Utils;
+import org.gudy.azureus2.ui.swt.components.shell.ShellFactory;
+import org.gudy.azureus2.ui.swt.views.stats.DHTOpsPanel;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperAdapter;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperDHT;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperDHTAdapter;
+import org.parg.azureus.plugins.networks.i2p.I2PHelperDHTListener;
 import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouter;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTI2P;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTTransportContactI2P;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT;
 
 import com.aelitis.azureus.core.dht.DHT;
+import com.aelitis.azureus.core.dht.DHTOperationListener;
+import com.aelitis.azureus.core.dht.control.DHTControlActivity;
+import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
+import com.aelitis.azureus.core.dht.transport.DHTTransportValue;
 import com.aelitis.azureus.plugins.dht.DHTPluginOperationListener;
 
 
@@ -1776,21 +1795,200 @@ I2PDHTTrackerPlugin
 	
 	public void
 	trackerGet(
-		String							reason,
-		byte[]							torrent_hash,
-		I2PHelperAZDHT					dht,
-		I2PHelperDHTAdapter				listener )
+		final String							reason,
+		final byte[]							torrent_hash,
+		final Map<String,Object>				options,
+		final I2PHelperAZDHT					az_dht,
+		final I2PHelperDHTAdapter				listener )
 	{
 		try{
-			dht.getBaseDHT().get(
-					torrent_hash, 
-					reason,
-					DHT.FLAG_DOWNLOADING,
-					NUM_WANT, 
-					ANNOUNCE_DERIVED_TIMEOUT,
-					false, 
-					true,
-					new DHTI2P.GetCacheEntry( listener ));
+			final DHT dht = az_dht.getBaseDHT();
+			
+			Utils.execSWTThread(
+				new Runnable()
+				{
+					private TimerEventPeriodic timer;
+					
+					public void
+					run()
+					{
+						Composite parent = (Composite)options.get( "ui_composite" );
+						
+						Shell shell = null;
+						
+						if ( parent == null ){
+							
+							shell = ShellFactory.createMainShell( SWT.DIALOG_TRIM | SWT.RESIZE | SWT.MIN | SWT.MAX );
+								
+							parent	= shell;
+						}
+						
+						parent.setLayout( new GridLayout());
+						
+						Composite panel_comp = new Composite( parent, SWT.NULL );
+						GridData grid_data = new GridData( GridData.FILL_BOTH );
+						panel_comp.setLayoutData( grid_data );
+						
+						panel_comp.setLayout(new FillLayout());
+						
+						final DHTOpsPanel panel = new DHTOpsPanel( panel_comp );
+						
+						panel.setFilter(
+							new DHTOpsPanel.ActivityFilter() {
+								
+								@Override
+								public boolean 
+								accept(
+									DHTControlActivity activity) 
+								{
+									return( Arrays.equals( activity.getTarget(),torrent_hash ));
+								}
+							});
+						
+						panel.setMinimumSlots( 5 );
+						
+						panel.setScaleAndRotation(0, 1000, -1000, 1000, Math.PI/2 );
+												
+						final Text text = new Text( parent, SWT.NULL );
+						grid_data = new GridData( GridData.FILL_HORIZONTAL );
+						text.setLayoutData( grid_data );
+						
+						if ( shell != null ){
+							
+							shell.setSize( 400, 400 );
+							
+							shell.open();
+							
+						}else{
+							
+							parent.layout( true );
+						}
+												
+						panel.refreshView( dht );
+						
+						I2PHelperDHTListener	listener_wrapper =
+							new I2PHelperDHTListener()
+							{
+								private boolean	complete;
+								private int		found;
+								
+								public void
+								searching(
+									final String		host )
+								{
+									listener.searching(host);
+									
+									update( "[" + found + "] Searching " + host.substring( 0, 20 ) + "...", false );
+								}
+								
+								public void
+								valueRead(
+									DHTTransportContactI2P		contact,
+									String						host,
+									int							contact_state )
+								{
+									listener.valueRead(contact, host, contact_state);
+									
+									synchronized( this ){
+										
+										found++;
+									}
+									
+									update( "Found " + host, false );
+								}
+								
+								public void
+								complete(
+									boolean		timeout )
+								{
+									listener.complete(timeout);
+									
+									update( "", false );
+								}
+								
+								private void
+								update(
+									final String 	str,
+									boolean			is_done )
+								{
+									synchronized( this ){
+										
+										if ( complete ){
+											
+											return;
+										}
+										
+										complete = is_done;
+									}
+									
+									Utils.execSWTThread(
+										new Runnable()
+										{
+											public void
+											run()
+											{
+												if ( text.isDisposed()){
+												
+													synchronized( this ){
+														
+														complete = true;
+													}
+												}else{
+													
+													text.setText( str );
+												}
+											}
+										});
+								}
+							};
+							
+						DHTOperationListener awesome_listener =	new DHTI2P.GetCacheEntry( listener_wrapper );
+						
+						dht.get(
+								torrent_hash, 
+								reason,
+								DHT.FLAG_DOWNLOADING,
+								NUM_WANT, 
+								ANNOUNCE_DERIVED_TIMEOUT,
+								false, 
+								true,
+								awesome_listener );
+						
+						final Composite f_parent = parent;
+						
+						timer = 
+							SimpleTimer.addPeriodicEvent(
+								"dhtops",
+								250,
+								new TimerEventPerformer() {
+									
+									@Override
+									public void 
+									perform(
+										TimerEvent event) 
+									{
+										if ( f_parent.isDisposed()){
+											
+											timer.cancel();
+											
+										}else{
+											
+											Utils.execSWTThread(
+												new Runnable()
+												{
+													public void
+													run()
+													{
+														panel.refresh();
+													}
+												});
+										}
+									}
+								});
+						
+					}
+				});
+			
 			
 		}catch( Throwable e ){
 			
