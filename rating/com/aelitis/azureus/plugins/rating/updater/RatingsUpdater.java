@@ -1011,7 +1011,7 @@ RatingsUpdater
 		
 		if ( !has_info ){
 		
-			chat.sendMessage( "See http://wiki.vuze.com/w/Swarm_Merging[[Swarm%20Merging]] for help", options);
+			chat.sendMessage( "See http://wiki.vuze.com/w/Swarm_Merging[[Swarm%20Merging]] for help", flags, options);
 		}
 	}
 	
