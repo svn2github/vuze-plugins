@@ -46,11 +46,13 @@ import java.nio.channels.ServerSocketChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import net.i2p.I2PAppContext;
@@ -147,7 +149,6 @@ import com.aelitis.azureus.core.tracker.TrackerPeerSource;
 import com.aelitis.azureus.core.util.bloom.BloomFilter;
 import com.aelitis.azureus.core.util.bloom.BloomFilterFactory;
 import com.aelitis.azureus.plugins.dht.DHTPluginInterface;
-import com.aelitis.azureus.plugins.dht.DHTPluginOperationAdapter;
 import com.aelitis.azureus.plugins.dht.DHTPluginValue;
 import com.aelitis.azureus.plugins.dht.DHTPluginContact;
 import com.aelitis.azureus.plugins.upnp.UPnPMapping;
@@ -3868,7 +3869,9 @@ I2PHelperPlugin
 	{
 		if ( unloaded || !plugin_enabled || lookup_dispatcher.getQueueSize() > 32 ){
 			
-			reportLookupStatus( callback, TrackerPeerSource.ST_UNAVAILABLE );
+			reportLookupStatus( 
+				callback, TrackerPeerSource.ST_UNAVAILABLE, 
+				"Plugin unavailable, disabled or overloaded" );
 			
 			return;
 		}
@@ -3887,6 +3890,8 @@ I2PHelperPlugin
 						
 						long	start = SystemTime.getMonotonousTime();
 						
+						String dots = "";
+						
 						while( true ){
 							
 							I2PHelperTracker t = tracker;
@@ -3901,16 +3906,89 @@ I2PHelperPlugin
 								}
 							}
 							
+							dots += ".";
+							
+							reportLookupStatus( callback, "Waiting for tracker initialization" + dots);
+
+							if ( dots.length() == 3 ){	
+								
+								dots = "";
+							}
+							
 							router_init_sem.reserve(2500);
 							
 							if ( unloaded || !plugin_enabled || ( SystemTime.getMonotonousTime() - start > 2*60*1000 )){
 								
-								reportLookupStatus( callback, TrackerPeerSource.ST_UNAVAILABLE );
+								reportLookupStatus( 
+									callback, TrackerPeerSource.ST_UNAVAILABLE, 
+									"Timeout waiting for tracker, try again later" );
 	
 								return;
 							}
 						}
 
+
+						I2PHelperDHTAdapter adapter = 
+							new I2PHelperDHTAdapter()
+							{
+								private volatile int	leechers	= 0;
+								private volatile int 	seeds		= 0;
+								private volatile int 	peers		= 0;
+								
+								private Set<String>	hosts	= new HashSet<String>();
+								
+								@Override
+								public void
+								valueRead(
+									DHTTransportContactI2P		contact,
+									String						host,
+									int							contact_state )
+								{
+									synchronized( hosts ){
+										
+										if ( hosts.contains( host )){
+											
+											return;
+										}
+										
+										hosts.add( host );
+									}
+									
+									if ( contact_state == CS_SEED ){
+																							
+										seeds++;
+										
+									}else if ( contact_state == CS_LEECH ){
+																							
+										leechers++;
+										
+									}else{
+																							
+										peers++;
+									}
+									
+									try{
+										callback.invoke(
+											"peerFound",
+											new Object[]{
+												host, contact_state
+											});
+										
+									}catch( Throwable e){
+										
+									}
+									
+									reportLookupStatus( callback, TrackerPeerSource.ST_UPDATING, seeds, leechers, peers );
+								}
+	
+								public void
+								complete(
+									boolean		timeout )
+								{
+									reportLookupStatus( callback, TrackerPeerSource.ST_ONLINE, seeds, leechers, peers );
+								}
+							};	
+			
 						if ( options.containsKey( "server_id" )){
 							
 							DHTPluginInterface dht_pi = getProxyDHT( "torrentLookup", options );
@@ -3923,7 +4001,18 @@ I2PHelperPlugin
 									
 									start = SystemTime.getMonotonousTime();
 									
+									dots = "";
+									
 									while( true ){
+										
+										dots += ".";
+										
+										reportLookupStatus( callback, "Waiting for DHT initialization" + dots);
+
+										if ( dots.length() == 3 ){	
+											
+											dots = "";
+										}
 										
 										az_dht.waitForInitialisation( 2500 );
 																			
@@ -3934,58 +4023,27 @@ I2PHelperPlugin
 
 										if ( unloaded || !plugin_enabled || ( SystemTime.getMonotonousTime() - start > 2*60*1000 )){
 											
-											reportLookupStatus( callback, TrackerPeerSource.ST_UNAVAILABLE );
+											reportLookupStatus( 
+												callback, TrackerPeerSource.ST_UNAVAILABLE, 
+												"Timeout waiting for DHT, try again later" );
 				
 											return;
 										}
 									}
 									
-									reportLookupStatus( callback, TrackerPeerSource.ST_UPDATING );
+									reportLookupStatus( callback, TrackerPeerSource.ST_UPDATING, 0, 0, 0 );
 									
 									tracker_plugin.trackerGet( 
 										reason,
 										torrent_hash,
 										options,
 										az_dht,
-										new I2PHelperDHTAdapter()
-										{
-											private volatile int	leechers	= 0;
-											private volatile int 	seeds		= 0;
-											private volatile int 	peers		= 0;
-											
-											@Override
-											public void
-											valueRead(
-												DHTTransportContactI2P		contact,
-												String						host,
-												int							contact_state )
-											{
-												if ( contact_state == CS_SEED ){
-													
-													seeds++;
-													
-												}else if ( contact_state == CS_LEECH ){
-													
-													leechers++;
-													
-												}else{
-													
-													peers++;
-												}
-												
-												reportLookupStatus( callback, TrackerPeerSource.ST_UPDATING, seeds, leechers, peers );
-											}
-				
-											public void
-											complete(
-												boolean		timeout )
-											{
-												reportLookupStatus( callback, TrackerPeerSource.ST_ONLINE, seeds, leechers, peers );
-											}
-										});	
+										adapter );
 								}else{
 									
-									reportLookupStatus( callback, TrackerPeerSource.ST_UNAVAILABLE );
+									reportLookupStatus( 
+										callback, TrackerPeerSource.ST_UNAVAILABLE , 
+										"AZ DHT unavailable, try again later" );
 								}
 							}else{
 								
@@ -3999,42 +4057,7 @@ I2PHelperPlugin
 								reason,
 								torrent_hash,
 								options,
-								new I2PHelperDHTAdapter()
-								{
-									private volatile int	leechers	= 0;
-									private volatile int 	seeds		= 0;
-									private volatile int 	peers		= 0;
-									
-									@Override
-									public void
-									valueRead(
-										DHTTransportContactI2P		contact,
-										String						host,
-										int							contact_state )
-									{
-										if ( contact_state == CS_SEED ){
-											
-											seeds++;
-											
-										}else if ( contact_state == CS_LEECH ){
-											
-											leechers++;
-											
-										}else{
-											
-											peers++;
-										}
-										
-										reportLookupStatus( callback, TrackerPeerSource.ST_UPDATING, seeds, leechers, peers );
-									}
-		
-									public void
-									complete(
-										boolean		timeout )
-									{
-										reportLookupStatus( callback, TrackerPeerSource.ST_ONLINE, seeds, leechers, peers );
-									}
-								});	
+								adapter );
 						}
 					}catch( Throwable e ){
 						
@@ -4047,11 +4070,38 @@ I2PHelperPlugin
 	private void
 	reportLookupStatus(
 		IPCInterface		callback,
+		int					status,
+		String				msg )
+	{
+		reportLookupStatus( callback, msg );
+		
+		reportLookupStatus( callback, status );
+	}
+	
+	private void
+	reportLookupStatus(
+		IPCInterface		callback,
 		int					status )
 	{
 		try{
 			callback.invoke(
 				"statusUpdate",
+				new Object[]{
+					status
+				});
+			
+		}catch( Throwable e){
+		}	
+	}
+	
+	private void
+	reportLookupStatus(
+		IPCInterface		callback,
+		String				status )
+	{
+		try{
+			callback.invoke(
+				"msgUpdate",
 				new Object[]{
 					status
 				});

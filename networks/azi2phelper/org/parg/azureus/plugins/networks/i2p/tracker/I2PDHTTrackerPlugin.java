@@ -79,9 +79,6 @@ import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT;
 import com.aelitis.azureus.core.dht.DHT;
 import com.aelitis.azureus.core.dht.DHTOperationListener;
 import com.aelitis.azureus.core.dht.control.DHTControlActivity;
-import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
-import com.aelitis.azureus.core.dht.transport.DHTTransportValue;
-import com.aelitis.azureus.plugins.dht.DHTPluginOperationListener;
 
 
 /**
@@ -96,6 +93,7 @@ I2PDHTTrackerPlugin
 	private static final int	ANNOUNCE_TIMEOUT			= 5*60*1000;
 	private static final int	ANNOUNCE_DERIVED_TIMEOUT	= 60*1000;	// spend less time on these
 	private static final int	SCRAPE_TIMEOUT				= 30*1000;
+	private static final int	LOOKUP_TIMEOUT				= 2*60*1000;
 	
 	private static final int	ANNOUNCE_METADATA_RETRY		= 1*60*1000;
 	
@@ -1949,7 +1947,7 @@ I2PDHTTrackerPlugin
 								reason,
 								DHT.FLAG_DOWNLOADING,
 								NUM_WANT, 
-								ANNOUNCE_DERIVED_TIMEOUT,
+								LOOKUP_TIMEOUT,
 								false, 
 								true,
 								awesome_listener );
