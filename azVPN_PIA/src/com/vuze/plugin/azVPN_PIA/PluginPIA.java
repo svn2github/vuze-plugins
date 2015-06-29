@@ -174,6 +174,12 @@ public class PluginPIA
 	}
 
 	public static void log(String s) {
+		if (s == null) {
+			return;
+		}
+		if (s.endsWith("\n")) {
+			s = s.substring(0, s.length() - 1);
+		}
 		if (LOG_TO_STDOUT || logger == null) {
 			long offsetTime = SystemTime.getCurrentTime()
 					- AzureusCoreFactory.getSingleton().getCreateTime();

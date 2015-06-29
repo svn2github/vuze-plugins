@@ -198,10 +198,7 @@ public class CheckerPIA
 					if (newStatusID != STATUS_ID_BAD) {
 						newStatusID = STATUS_ID_WARN;
 
-						String s = CHAR_WARN + " "
-								+ texts.getLocalisedMessageText("pia.port.forwarding.get.failed");
-						sReply.append(s).append("\n");
-						PluginPIA.log(s);
+						addReply(sReply, CHAR_WARN, "pia.port.forwarding.get.failed");
 					}
 				}
 			}
@@ -285,10 +282,8 @@ public class CheckerPIA
 								portForwardEnabled = (Boolean) mapSettings.get("portforward");
 							}
 
-							String s = texts.getLocalisedMessageText(portForwardEnabled
+							addReply(sReply, CHAR_WARN, portForwardEnabled
 									? "pia.no.forwarding.port" : "pia.no.port.config");
-							sReply.append(s).append("\n");
-							PluginPIA.log(s);
 						}
 
 					}
@@ -299,20 +294,19 @@ public class CheckerPIA
 						Number nPort = (Number) oPort;
 						int port = nPort.intValue();
 
-						String s = CHAR_GOOD + " Port stored in PIA Manager config is "
-								+ port;
-						sReply.append(s).append("\n");
-						PluginPIA.log(s);
+						addReply(sReply, CHAR_GOOD, "pia.port.in.manager", new String[] {
+							Integer.toString(port)
+						});
 
 						changePort(port, sReply);
 					}
 				}
 
 				if (!gotPort) {
-					String s = CHAR_BAD + " Read invalid port JSON from status_file: "
-							+ jsonPort;
-					sReply.append(s).append("\n");
-					PluginPIA.log(s);
+					addReply(sReply, CHAR_BAD, "pia.invalid.port.status_file",
+							new String[] {
+								jsonPort
+					});
 				}
 			}
 		} catch (IOException e) {
@@ -324,7 +318,7 @@ public class CheckerPIA
 
 	public String calcProtocolAddresses() {
 		long now = pi.getUtilities().getCurrentSystemTime();
-		StringBuffer sReply = new StringBuffer("Last Checked ").append(
+		StringBuilder sReply = new StringBuilder("Last Checked ").append(
 				pi.getUtilities().getFormatters().formatDate(now)).append("\n");
 		// Stolen from NetworkAdminImpl.generateDiagnostics
 		// This takes some time (1s-ish), so it's better to do it on demand
@@ -356,24 +350,20 @@ public class CheckerPIA
 						}
 					}
 
-					String s = protocol.getName() + " - " + ext_addr
-							+ (country == null ? "" : " - " + country);
-					sReply.append(s).append("\n");
-					PluginPIA.log(s);
+					addLiteralReply(sReply, protocol.getName() + " - " + ext_addr
+							+ (country == null ? "" : " - " + country));
 
 				} catch (NetworkAdminException e) {
 
-					String s = protocol.getName() + " - "
-							+ Debug.getNestedExceptionMessage(e);
-					sReply.append(s).append("\n");
-					PluginPIA.log(s);
+					addLiteralReply(sReply,
+							protocol.getName() + " - " + Debug.getNestedExceptionMessage(e));
 				}
 			}
 
 		} catch (Exception e) {
-			String s = "Nat Devices: Can't get -> " + e.toString();
-			sReply.append(s).append("\n");
-			PluginPIA.log(s);
+			addReply(sReply, CHAR_BAD, "pia.nat.error", new String[] {
+				e.toString()
+			});
 		}
 
 		lastProtocolAddresses = sReply.toString();
@@ -390,6 +380,24 @@ public class CheckerPIA
 		return lastProtocolAddresses;
 	}
 
+	private void addReply(StringBuilder sReply, char prefix, String id) {
+		String s = (prefix == 0 ? "" : prefix + " ")
+				+ texts.getLocalisedMessageText(id);
+		addLiteralReply(sReply, s);
+	}
+
+	private void addReply(StringBuilder sReply, char prefix, String id,
+			String[] params) {
+		String s = (prefix == 0 ? "" : prefix + " ")
+				+ texts.getLocalisedMessageText(id, params);
+		addLiteralReply(sReply, s);
+	}
+
+	private void addLiteralReply(StringBuilder sReply, String s) {
+		sReply.append(s).append("\n");
+		PluginPIA.log(s);
+	}
+
 	private int findBindingAddress(File pathPIAManagerData,
 			StringBuilder sReply) {
 		int newStatusID = -1;
@@ -400,14 +408,11 @@ public class CheckerPIA
 		if (handlers.size() == 0) {
 			PRUDPReleasablePacketHandler releasableHandler = PRUDPPacketHandlerFactory.getReleasableHandler(
 					0);
-			PluginPIA.log("derp");
 			handlers = PRUDPPacketHandlerFactory.getHandlers();
 			releasableHandler.release();
 		}
 		if (handlers.size() == 0) {
-			String s = CHAR_BAD + " No UDP Handlers";
-			sReply.append(s).append("\n");
-			PluginPIA.log(s);
+			addLiteralReply(sReply, CHAR_BAD + " No UDP Handlers");
 
 			newStatusID = STATUS_ID_BAD;
 		} else {
@@ -508,27 +513,27 @@ public class CheckerPIA
 					Number nPort = (Number) oPort;
 					int port = nPort.intValue();
 
-					String s = CHAR_GOOD + " Port returned from RPC is " + port;
-					sReply.append(s).append("\n");
-					PluginPIA.log(s);
+					addReply(sReply, CHAR_GOOD, "pia.port.from.rpc", new String[] {
+						Integer.toString(port)
+					});
+
 					changePort(port, sReply);
 				}
 			}
 
 			if (!gotPort) {
-				String s = CHAR_WARN + " RPC result: " + result;
-				sReply.append(s).append("\n");
-				PluginPIA.log(s);
+				addReply(sReply, CHAR_WARN, "pia.rpc.bad", new String[] {
+					result.toString()
+				});
 
 				// mapResult.containsKey("error")
 				return false;
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
-			String s = CHAR_BAD + " Can't connect to PIA RPC via " + bindIP + ": "
-					+ e.getMessage();
-			sReply.append(s).append("\n");
-			PluginPIA.log(s);
+			addReply(sReply, CHAR_BAD, "pia.rpc.no.connect", new String[] {
+				bindIP + ": " + e.getMessage()
+			});
 
 			return false;
 		} finally {
@@ -557,14 +562,17 @@ public class CheckerPIA
 						+ networkInterface.getDisplayName() + ")";
 			} catch (Throwable e) {
 			}
-			s = CHAR_GOOD + " Vuze UDP is bound to " + bindIP + " aka " + niName;
+			addReply(sReply, CHAR_GOOD, "pia.bound.good", new String[] {
+				"" + bindIP,
+				niName
+			});
 			vpnIP = bindIP;
 		} else {
-			s = CHAR_BAD + " Vuze UDP is bound to non PIA address of " + bindIP;
+			addReply(sReply, CHAR_BAD, "pia.bound.bad", new String[] {
+				"" + bindIP
+			});
 			newStatusID = STATUS_ID_BAD;
 		}
-		sReply.append(s).append("\n");
-		PluginPIA.log(s);
 
 		try {
 			// Check if default routing goes through 10.*, by connecting to address
@@ -575,21 +583,27 @@ public class CheckerPIA
 			NetworkInterface networkInterface = NetworkInterface.getByInetAddress(
 					localAddress);
 
-			s = "Non-Vuze probably routing through " + localAddress + " aka "
-					+ networkInterface.getName() + " ("
-					+ networkInterface.getDisplayName() + ").";
+			s = texts.getLocalisedMessageText("pia.nonvuze.probable.route",
+					new String[] {
+						"" + localAddress,
+						networkInterface.getName() + " ("
+								+ networkInterface.getDisplayName() + ")"
+			});
+			char replyChar = ' ';
+
 			if ((localAddress instanceof Inet4Address)
 					&& localAddress.getHostAddress().startsWith("10.")) {
 
 				if (localAddress.equals(bindIP)) {
-					s = (isGoodExistingBind ? CHAR_GOOD : CHAR_WARN) + " " + s
-							+ " Same as Vuze";
+					replyChar = isGoodExistingBind ? CHAR_GOOD : CHAR_WARN;
+					s += " " + texts.getLocalisedMessageText("pia.same.as.vuze");
 				} else {
 					// Vuze is bound, default routing goes somewhere else
 					// This is ok, since Vuze will not accept incoming from "somewhere else"
 					// We'll warn, but not update the status id
 
-					s = CHAR_WARN + " " + s + " WARNING, not the same as Vuze!";
+					replyChar = CHAR_WARN;
+					s += " " + texts.getLocalisedMessageText("pia.not.same");
 
 					if (isGoodExistingBind) {
 						s += " " + texts.getLocalisedMessageText(
@@ -597,8 +611,7 @@ public class CheckerPIA
 					}
 				}
 
-				sReply.append(s).append("\n");
-				PluginPIA.log(s);
+				addLiteralReply(sReply, replyChar + " " + s);
 
 				if (!isGoodExistingBind && rebindNetworkInterface) {
 					rebindNetworkInterface(networkInterface, localAddress, sReply);
@@ -608,13 +621,12 @@ public class CheckerPIA
 			} else {
 				// Vuze is bound, default routing goes to somewhere else.
 				// Probably network splitting
-				s = (isGoodExistingBind ? CHAR_WARN : CHAR_BAD) + " " + s;
+				replyChar = isGoodExistingBind ? CHAR_WARN : CHAR_BAD;
 				if (isGoodExistingBind) {
 					s += " " + texts.getLocalisedMessageText(
 							"default.routing.not.vpn.network.splitting");
 				}
-				sReply.append(s).append("\n");
-				PluginPIA.log(s);
+				addLiteralReply(sReply, replyChar + " " + s);
 			}
 		} catch (Throwable t) {
 			t.printStackTrace();
@@ -633,13 +645,10 @@ public class CheckerPIA
 		String s;
 
 		if (bindIP.isAnyLocalAddress()) {
-			s = CHAR_WARN + " Warning: Vuze UDP is unbound (We'll try to fix this)";
+			addReply(sReply, CHAR_WARN, "pia.vuze.unbound");
 		} else {
-			s = CHAR_BAD
-					+ " Vuze UDP is loopback (Kill Switched or incorrect bind address/interface)";
+			addReply(sReply, CHAR_BAD, "pia.vuze.loopback");
 		}
-		sReply.append(s).append("\n");
-		PluginPIA.log(s);
 
 		try {
 			NetworkAdmin networkAdmin = NetworkAdmin.getSingleton();
@@ -653,10 +662,9 @@ public class CheckerPIA
 					newBindNetworkInterface = NetworkInterface.getByInetAddress(
 							newBindIP);
 
-					s = CHAR_GOOD + " Found bindable address " + newBindIP
-							+ " which is likely VPN's local IP";
-					sReply.append(s).append("\n");
-					PluginPIA.log(s);
+					addReply(sReply, CHAR_GOOD, "pia.found.bindable.vpn", new String[] {
+						"" + newBindIP
+					});
 
 					break;
 				}
@@ -672,9 +680,12 @@ public class CheckerPIA
 					InetAddress address = a.getAddress();
 					if (address instanceof Inet4Address) {
 						if (address.getHostAddress().startsWith("10.")) {
-							s = "Possible PIA VPN at " + address + " on "
-									+ networkAdminInterface.getDisplayName() + "/"
-									+ networkAdminInterface.getName();
+							s = texts.getLocalisedMessageText("pia.possible.vpn",
+									new String[] {
+										"" + address,
+										networkAdminInterface.getName() + " ("
+												+ networkAdminInterface.getDisplayName() + ")"
+							});
 
 							if (newBindIP == null) {
 								foundNIF = true;
@@ -685,19 +696,21 @@ public class CheckerPIA
 								newBindNetworkInterface = NetworkInterface.getByName(
 										networkAdminInterface.getName());
 
-								s += ".  Assuming VPN";
+								s = CHAR_GOOD + " " + s + ". "
+										+ texts.getLocalisedMessageText("pia.assuming.vpn");
 							} else if (address.equals(newBindIP)) {
-								s = CHAR_GOOD + " " + s + ".  Same as address above :)";
+								s = CHAR_GOOD + " " + s + ". "
+										+ texts.getLocalisedMessageText("pia.same.address");
 								foundNIF = true;
 							} else {
 								if (newStatusID != STATUS_ID_BAD) {
 									newStatusID = STATUS_ID_WARN;
 								}
-								s = CHAR_WARN + " " + s + ".  WARNING, not the same as above!";
+								s = CHAR_WARN + " " + s + ". "
+										+ texts.getLocalisedMessageText("pia.not.same.address");
 							}
 
-							sReply.append(s).append("\n");
-							PluginPIA.log(s);
+							addLiteralReply(sReply, s);
 
 							if (rebindNetworkInterface) {
 								// stops message below from being added, we'll rebind later
@@ -710,10 +723,7 @@ public class CheckerPIA
 			}
 
 			if (!foundNIF) {
-				s = CHAR_BAD
-						+ " Could not find PIA's network interface.  Perhaps your VPN is disconnected?";
-				sReply.append(s).append("\n");
-				PluginPIA.log(s);
+				addReply(sReply, CHAR_BAD, "pia.interface.not.found");
 			}
 
 			// Check if default routing goes through 10.*, by connecting to address
@@ -724,9 +734,12 @@ public class CheckerPIA
 			NetworkInterface networkInterface = NetworkInterface.getByInetAddress(
 					localAddress);
 
-			s = "Non-Vuze probably routing through " + localAddress + " aka "
-					+ networkInterface.getName() + " ("
-					+ networkInterface.getDisplayName() + ").";
+			s = texts.getLocalisedMessageText("pia.nonvuze.probable.route",
+					new String[] {
+						"" + localAddress,
+						networkInterface.getName() + " ("
+								+ networkInterface.getDisplayName() + ")"
+			});
 
 			if ((localAddress instanceof Inet4Address)
 					&& localAddress.getHostAddress().startsWith("10.")) {
@@ -735,9 +748,11 @@ public class CheckerPIA
 					newBindIP = localAddress;
 					newBindNetworkInterface = networkInterface;
 
-					s = CHAR_GOOD + " " + s + "  Assuming VPN";
+					s = CHAR_GOOD + " " + s + " "
+							+ texts.getLocalisedMessageText("pia.assuming.vpn");
 				} else if (localAddress.equals(newBindIP)) {
-					s = CHAR_GOOD + " " + s + "  Same as address above :)";
+					s = CHAR_GOOD + " " + s + " "
+							+ texts.getLocalisedMessageText("pia.same.address");
 				} else {
 					// Vuze not bound. We already found a boundable address, but it's not this one
 					/* Possibly good case:
@@ -749,16 +764,16 @@ public class CheckerPIA
 					if (newStatusID != STATUS_ID_BAD) {
 						newStatusID = STATUS_ID_WARN;
 					}
-					s = CHAR_WARN + " " + s
-							+ "  WARNING, not the same as the one we will try to bind to! "
+					s = CHAR_WARN + " " + s + " "
+							+ texts.getLocalisedMessageText("pia.not.same.future.address")
+							+ " "
 							+ texts.getLocalisedMessageText(
 									"default.routing.not.vpn.network.splitting")
 							+ " " + texts.getLocalisedMessageText(
 									"default.routing.not.vpn.network.splitting.unbound");
 				}
 
-				sReply.append(s).append("\n");
-				PluginPIA.log(s);
+				addLiteralReply(sReply, s);
 
 			} else {
 				s = CHAR_WARN + " " + s;
@@ -775,20 +790,17 @@ public class CheckerPIA
 							"default.routing.not.vpn.network.splitting.unbound");
 				}
 
-				sReply.append(s).append("\n");
-				PluginPIA.log(s);
+				addLiteralReply(sReply, s);
 			}
 
 		} catch (Exception e) {
-			s = CHAR_BAD + " Nat Devices: Can't get -> " + e.toString();
-			sReply.append(s).append("\n");
-			PluginPIA.log(s);
+			addReply(sReply, CHAR_BAD, "pia.nat.error", new String[] {
+				e.toString()
+			});
 		}
 
 		if (newBindIP == null) {
-			s = CHAR_BAD + " Can't determine VPN's local IP";
-			sReply.append(s).append("\n");
-			PluginPIA.log(s);
+			addReply(sReply, CHAR_BAD, "pia.vpn.ip.detect.fail");
 			return STATUS_ID_BAD;
 		}
 
@@ -831,9 +843,9 @@ public class CheckerPIA
 				|| (bindNetworkInterfaceIndex >= 0 && configBindIP.equals(
 						ifName + "[" + bindNetworkInterfaceIndex + "]"))) {
 
-			String s = CHAR_GOOD + " Excellent, Vuze already bound to " + ifName;
-			sReply.append(s).append("\n");
-			PluginPIA.log(s);
+			addReply(sReply, CHAR_GOOD, "pia.already.bound.good", new String[] {
+				ifName
+			});
 		} else {
 			String newConfigBindIP = ifName;
 			if (bindNetworkInterfaceIndex >= 0) {
@@ -848,14 +860,14 @@ public class CheckerPIA
 							if (property.equals(NetworkAdmin.PR_DEFAULT_BIND_ADDRESS)) {
 								sem.releaseForever();
 								NetworkAdmin.getSingleton().removePropertyChangeListener(this);
-								String s = CHAR_GOOD + " Received binding applied event";
 
-								sReply.append(s).append("\n");
-								PluginPIA.log(s);
+								addReply(sReply, CHAR_GOOD, "pia.bind.complete.triggered");
 							}
 						}
 					});
 
+			// I think setting CORE_PARAM_STRING_LOCAL_BIND_IP is actually synchronous
+			// We set up a PropertyChangeListener in case it ever becomes asynchronous
 			config.setCoreStringParameter(
 					PluginConfig.CORE_PARAM_STRING_LOCAL_BIND_IP, newConfigBindIP);
 			config.setUnsafeBooleanParameter("Enforce Bind IP", true);
@@ -869,10 +881,11 @@ public class CheckerPIA
 					COConfigurationManager.setParameter( "Check Bind IP On Start", true );
 			 */
 
-			String s = CHAR_GOOD + " Change Vuze binding to interface "
-					+ newConfigBindIP + " (" + networkInterface.getDisplayName() + ")";
-			sReply.append(s).append("\n");
-			PluginPIA.log(s);
+			addReply(sReply, CHAR_GOOD, "pia.change.binding", new String[] {
+				"" + newConfigBindIP,
+				networkInterface.getName() + " (" + networkInterface.getDisplayName()
+						+ ")"
+			});
 
 			sem.reserve(11000);
 			return sem.isReleasedForever();
@@ -911,18 +924,20 @@ public class CheckerPIA
 		if (coreTCPPort != port) {
 			pluginConfig.setCoreIntParameter(
 					PluginConfig.CORE_PARAM_INT_INCOMING_TCP_PORT, port);
-			String s = CHAR_GOOD + " Changed core TCP port from " + coreTCPPort
-					+ " to " + port;
-			sReply.append(s).append("\n");
-			PluginPIA.log(s);
+			addReply(sReply, CHAR_GOOD, "pia.changed.port", new String[] {
+				"TCP",
+				Integer.toString(coreTCPPort),
+				Integer.toString(port)
+			});
 		}
 		if (coreUDPPort != port) {
 			pluginConfig.setCoreIntParameter(
 					PluginConfig.CORE_PARAM_INT_INCOMING_UDP_PORT, port);
-			String s = CHAR_GOOD + " Changed core UDP port from " + coreUDPPort
-					+ " to " + port;
-			sReply.append(s).append("\n");
-			PluginPIA.log(s);
+			addReply(sReply, CHAR_GOOD, "pia.changed.port", new String[] {
+				"UDP",
+				Integer.toString(coreUDPPort),
+				Integer.toString(port)
+			});
 		}
 	}
 
