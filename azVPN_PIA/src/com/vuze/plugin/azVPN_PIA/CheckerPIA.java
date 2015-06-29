@@ -146,6 +146,9 @@ public class CheckerPIA
 
 			// settings.json has the user name
 			File fileSettings = new File(pathPIAManagerData, "settings.json");
+			if (!fileSettings.isFile() || !fileSettings.canRead()) {
+				return "";
+			}
 			String settingsText = FileUtil.readFileAsString(fileSettings, -1);
 			Map<?, ?> mapSettings = JSONUtils.decodeJSON(settingsText);
 			String user = (String) mapSettings.get("user");
@@ -195,8 +198,8 @@ public class CheckerPIA
 					if (newStatusID != STATUS_ID_BAD) {
 						newStatusID = STATUS_ID_WARN;
 					}
-					String s = CHAR_WARN
-							+ " Could not get Forwarding Port.  Ensure PIA Manager directory is properly set, or set user/pass in plugin config.";
+					String s = CHAR_WARN + " "
+							+ texts.getLocalisedMessageText("pia.port.forwarding.get.failed");
 					sReply.append(s).append("\n");
 					PluginPIA.log(s);
 				}
@@ -854,7 +857,9 @@ public class CheckerPIA
 
 			config.setCoreStringParameter(
 					PluginConfig.CORE_PARAM_STRING_LOCAL_BIND_IP, newConfigBindIP);
-			// XXX What about Enforce Bind IP
+			config.setUnsafeBooleanParameter("Enforce Bind IP", true);
+			config.setUnsafeBooleanParameter("Check Bind IP On Start", true);
+			// XXX What about turning off UPnP
 			/*
 			 * Vuze Core does this when generic VPN detected:
 			 		COConfigurationManager.setParameter( "User Mode", 2 );

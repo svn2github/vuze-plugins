@@ -21,6 +21,7 @@ package com.vuze.plugin.azVPN_PIA;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
@@ -138,8 +139,10 @@ public class PluginPIA
 		BasicPluginConfigModel configModel = uiManager.createBasicPluginConfigModel(
 				CONFIG_SECTION_ID);
 
-		configModel.addDirectoryParameter2(CONFIG_PIA_MANAGER_DIR,
-				CONFIG_PIA_MANAGER_DIR, checkerPIA.getPIAManagerPath().toString());
+		if (Constants.isWindows) {
+  		configModel.addDirectoryParameter2(CONFIG_PIA_MANAGER_DIR,
+  				CONFIG_PIA_MANAGER_DIR, checkerPIA.getPIAManagerPath().toString());
+		}
 
 		IntParameter checkMinsParameter = configModel.addIntParameter2(
 				CONFIG_CHECK_MINUTES, "check.port.every.mins", 1);
