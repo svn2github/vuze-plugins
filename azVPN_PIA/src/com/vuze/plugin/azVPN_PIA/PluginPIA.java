@@ -58,6 +58,8 @@ public class PluginPIA
 
 	private static final boolean LOG_TO_STDOUT = false;
 
+	private static final int DEFAULT_CHECK_EVERY_MINS = 2;
+
 	private PluginInterface pi;
 
 	private static LoggerChannel logger;
@@ -145,7 +147,8 @@ public class PluginPIA
 		}
 
 		IntParameter checkMinsParameter = configModel.addIntParameter2(
-				CONFIG_CHECK_MINUTES, "check.port.every.mins", 1);
+				CONFIG_CHECK_MINUTES, "check.port.every.mins", DEFAULT_CHECK_EVERY_MINS,
+				0, 60 * 24);
 		checkMinsParameter.addListener(new ParameterListener() {
 			public void parameterChanged(Parameter param) {
 				checkerPIA.buildTimer();
