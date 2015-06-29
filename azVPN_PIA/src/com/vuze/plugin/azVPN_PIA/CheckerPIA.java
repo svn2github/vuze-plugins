@@ -197,11 +197,12 @@ public class CheckerPIA
 				if (!gotPort) {
 					if (newStatusID != STATUS_ID_BAD) {
 						newStatusID = STATUS_ID_WARN;
+
+						String s = CHAR_WARN + " "
+								+ texts.getLocalisedMessageText("pia.port.forwarding.get.failed");
+						sReply.append(s).append("\n");
+						PluginPIA.log(s);
 					}
-					String s = CHAR_WARN + " "
-							+ texts.getLocalisedMessageText("pia.port.forwarding.get.failed");
-					sReply.append(s).append("\n");
-					PluginPIA.log(s);
 				}
 			}
 
