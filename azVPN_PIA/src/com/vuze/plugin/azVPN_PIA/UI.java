@@ -24,9 +24,13 @@ import java.util.ResourceBundle;
 
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.PluginInterface;
+import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 
 import com.aelitis.azureus.ui.UIFunctionsManager;
+import com.aelitis.azureus.ui.common.viewtitleinfo.ViewTitleInfo;
+import com.aelitis.azureus.ui.common.viewtitleinfo.ViewTitleInfoManager;
+import com.aelitis.azureus.ui.mdi.MdiCloseListener;
 import com.aelitis.azureus.ui.mdi.MdiEntry;
 import com.aelitis.azureus.ui.mdi.MdiEntryCreationListener;
 import com.aelitis.azureus.ui.mdi.MultipleDocumentInterface;
@@ -55,6 +59,61 @@ public class UI
 				MdiEntry entry = mdi.createEntryFromSkinRef(null, VIEW_ID, "piaview",
 						"PIA", null, null, true, null);
 				entry.setTitleID("ConfigView.section.vpn_pia");
+				
+				final ViewTitleInfo viewTitleInfo = new ViewTitleInfo() {
+					public Object getTitleInfoProperty(int propertyID) {
+						if (propertyID == ViewTitleInfo.TITLE_INDICATOR_TEXT) {
+							int statusID = PluginPIA.instance.checkerPIA.getCurrentStatusID();
+							
+							LocaleUtilities texts = UI.this.pi.getUtilities().getLocaleUtilities();
+
+							if (statusID == CheckerPIA.STATUS_ID_OK) {
+								return texts.getLocalisedMessageText("pia.indicator.ok");
+							}
+							if (statusID == CheckerPIA.STATUS_ID_BAD) {
+								return texts.getLocalisedMessageText("pia.indicator.bad");
+							}
+							if (statusID == CheckerPIA.STATUS_ID_WARN) {
+								return texts.getLocalisedMessageText("pia.indicator.warn");
+							}
+							return null;
+						}
+						if (propertyID == ViewTitleInfo.TITLE_INDICATOR_COLOR) {
+							int statusID = PluginPIA.instance.checkerPIA.getCurrentStatusID();
+
+							if (statusID == CheckerPIA.STATUS_ID_BAD) {
+								return new int[] { 128, 30, 30 };
+							}
+							if (statusID == CheckerPIA.STATUS_ID_WARN) {
+								return new int[] { 255, 255, 60 };
+							}
+							return null;
+						}
+						return null;
+					}
+				};
+				
+				entry.setViewTitleInfo(viewTitleInfo);
+
+				final CheckerPIAListener checkerListener = new CheckerPIAListener() {
+
+					public void protocolAddressesStatusChanged(String status) {
+					}
+
+					public void portCheckStatusChanged(String status) {
+						ViewTitleInfoManager.refreshTitleInfo(viewTitleInfo);
+					}
+
+					public void portCheckStart() {
+					}
+				};
+				PluginPIA.instance.checkerPIA.addListener(checkerListener);
+
+				entry.addListener(new MdiCloseListener() {
+					public void mdiEntryClosed(MdiEntry entry, boolean userClosed) {
+						PluginPIA.instance.checkerPIA.removeListener(checkerListener);
+					}
+				});
 				return entry;
 			}
 		});

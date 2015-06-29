@@ -60,11 +60,11 @@ public class CheckerPIA
 
 	private static final char CHAR_WARN = '\u2318';
 
-	private static final int STATUS_ID_OK = 0;
+	public static final int STATUS_ID_OK = 0;
 
-	private static final int STATUS_ID_BAD = 1;
+	public static final int STATUS_ID_BAD = 1;
 
-	private static final int STATUS_ID_WARN = 2;
+	public static final int STATUS_ID_WARN = 2;
 
 	// Is it always 70000? who knows
 	private static final int STATUS_FILE_PORT_INDEX = 70000;
