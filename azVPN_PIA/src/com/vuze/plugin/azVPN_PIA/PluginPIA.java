@@ -56,9 +56,13 @@ public class PluginPIA
 
 	public static final String CONFIG_CHECK_MINUTES = "check.minutes";
 
+	public static final String CONFIG_VPN_IP_MATCHING = "vpn.ip.regex";
+
 	private static final boolean LOG_TO_STDOUT = false;
 
 	private static final int DEFAULT_CHECK_EVERY_MINS = 2;
+
+	private static final String DEFAULT_VPN_IP_REGEX = "10\\.[0-9]+\\.[0-9]+\\.[0-9]+";
 
 	private PluginInterface pi;
 
@@ -142,8 +146,8 @@ public class PluginPIA
 				CONFIG_SECTION_ID);
 
 		if (Constants.isWindows) {
-  		configModel.addDirectoryParameter2(CONFIG_PIA_MANAGER_DIR,
-  				CONFIG_PIA_MANAGER_DIR, checkerPIA.getPIAManagerPath().toString());
+			configModel.addDirectoryParameter2(CONFIG_PIA_MANAGER_DIR,
+					CONFIG_PIA_MANAGER_DIR, checkerPIA.getPIAManagerPath().toString());
 		}
 
 		IntParameter checkMinsParameter = configModel.addIntParameter2(
@@ -167,6 +171,10 @@ public class PluginPIA
 
 		configModel.createGroup("login.group",
 				parameters.toArray(new Parameter[0]));
+
+		StringParameter paramRegex = configModel.addStringParameter2(CONFIG_VPN_IP_MATCHING,
+				CONFIG_VPN_IP_MATCHING, DEFAULT_VPN_IP_REGEX);
+		paramRegex.setMinimumRequiredUserMode(StringParameter.MODE_ADVANCED);
 	}
 
 	/* (non-Javadoc)

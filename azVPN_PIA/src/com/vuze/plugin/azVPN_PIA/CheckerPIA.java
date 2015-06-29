@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.*;
 import java.util.*;
+import java.util.regex.Pattern;
 
 import org.apache.http.NameValuePair;
 import org.apache.http.client.config.RequestConfig;
@@ -548,11 +549,20 @@ public class CheckerPIA
 		return true;
 	}
 
+	private boolean matchesVPNIP(InetAddress address) {
+		if (address == null) {
+			return false;
+		}
+		String regex = config.getPluginStringParameter(
+				PluginPIA.CONFIG_VPN_IP_MATCHING);
+		return Pattern.matches(regex, address.getHostAddress());
+	}
+
 	private int handleBound(InetAddress bindIP, StringBuilder sReply) {
 		int newStatusID = STATUS_ID_OK;
 
 		String s;
-		boolean isGoodExistingBind = bindIP.getHostAddress().startsWith("10.");
+		boolean isGoodExistingBind = matchesVPNIP(bindIP);
 		if (isGoodExistingBind) {
 			String niName = "Unknown Interface";
 			try {
@@ -592,7 +602,7 @@ public class CheckerPIA
 			char replyChar = ' ';
 
 			if ((localAddress instanceof Inet4Address)
-					&& localAddress.getHostAddress().startsWith("10.")) {
+					&& matchesVPNIP(localAddress)) {
 
 				if (localAddress.equals(bindIP)) {
 					replyChar = isGoodExistingBind ? CHAR_GOOD : CHAR_WARN;
@@ -657,7 +667,7 @@ public class CheckerPIA
 			InetAddress[] bindableAddresses = networkAdmin.getBindableAddresses();
 
 			for (InetAddress bindableAddress : bindableAddresses) {
-				if (bindableAddress.getHostAddress().startsWith("10.")) {
+				if (matchesVPNIP(bindableAddress)) {
 					newBindIP = bindableAddress;
 					newBindNetworkInterface = NetworkInterface.getByInetAddress(
 							newBindIP);
@@ -679,7 +689,7 @@ public class CheckerPIA
 				for (NetworkAdminNetworkInterfaceAddress a : addresses) {
 					InetAddress address = a.getAddress();
 					if (address instanceof Inet4Address) {
-						if (address.getHostAddress().startsWith("10.")) {
+						if (matchesVPNIP(address)) {
 							s = texts.getLocalisedMessageText("pia.possible.vpn",
 									new String[] {
 										"" + address,
@@ -742,7 +752,7 @@ public class CheckerPIA
 			});
 
 			if ((localAddress instanceof Inet4Address)
-					&& localAddress.getHostAddress().startsWith("10.")) {
+					&& matchesVPNIP(localAddress)) {
 
 				if (newBindIP == null) {
 					newBindIP = localAddress;
