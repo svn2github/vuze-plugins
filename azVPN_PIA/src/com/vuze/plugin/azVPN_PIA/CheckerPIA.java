@@ -37,6 +37,7 @@ import org.apache.http.message.BasicNameValuePair;
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.FileUtil;
+import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.plugins.PluginConfig;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.utils.*;
@@ -190,8 +191,14 @@ public class CheckerPIA
 
 			if (!rpcCalled) {
 				boolean gotPort = checkStatusFileForPort(pathPIAManagerData, sReply);
-				if (!gotPort && newStatusID != STATUS_ID_BAD) {
-					newStatusID = STATUS_ID_WARN;
+				if (!gotPort) {
+					if (newStatusID != STATUS_ID_BAD) {
+						newStatusID = STATUS_ID_WARN;
+					}
+					String s = CHAR_WARN
+							+ " Could not get Forwarding Port.  Ensure PIA Manager directory is properly set, or set user/pass in plugin config.";
+					sReply.append(s).append("\n");
+					PluginPIA.log(s);
 				}
 			}
 
@@ -235,6 +242,9 @@ public class CheckerPIA
 		boolean gotValidPort = false;
 
 		File fileStatus = new File(pathPIAManagerData, "status_file.txt");
+		if (!fileStatus.isFile() || !fileStatus.canRead()) {
+			return false;
+		}
 		try {
 			byte[] statusFileBytes = FileUtil.readFileAsByteArray(fileStatus);
 
@@ -421,7 +431,16 @@ public class CheckerPIA
 		try {
 			// Let's assume the client_id.txt file is the one for port forwarding.
 			File fileClientID = new File(pathPIAManagerData, "client_id.txt");
-			String clientID = FileUtil.readFileAsString(fileClientID, -1);
+			String clientID;
+			if (fileClientID.isFile() && fileClientID.canRead()) {
+				clientID = FileUtil.readFileAsString(fileClientID, -1);
+			} else {
+				clientID = config.getPluginStringParameter("client.id", null);
+				if (clientID == null) {
+					clientID = RandomUtils.generateRandomAlphanumerics(20);
+					config.setPluginParameter("client.id", clientID);
+				}
+			}
 
 			HttpPost post = new HttpPost(PIA_RPC_URL);
 
