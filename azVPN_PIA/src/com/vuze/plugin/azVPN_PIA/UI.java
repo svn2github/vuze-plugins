@@ -81,11 +81,14 @@ public class UI
 						if (propertyID == ViewTitleInfo.TITLE_INDICATOR_COLOR) {
 							int statusID = PluginPIA.instance.checkerPIA.getCurrentStatusID();
 
+							if (statusID == CheckerPIA.STATUS_ID_OK) {
+								return new int[] { 0, 80, 0 };
+							}
 							if (statusID == CheckerPIA.STATUS_ID_BAD) {
 								return new int[] { 128, 30, 30 };
 							}
 							if (statusID == CheckerPIA.STATUS_ID_WARN) {
-								return new int[] { 255, 255, 60 };
+								return new int[] { 255, 140, 0 };
 							}
 							return null;
 						}
