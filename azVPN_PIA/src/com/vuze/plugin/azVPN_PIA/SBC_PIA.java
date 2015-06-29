@@ -20,8 +20,19 @@ package com.vuze.plugin.azVPN_PIA;
 
 import com.aelitis.azureus.ui.swt.skin.SWTSkinButtonUtility.ButtonListenerAdapter;
 
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.dnd.Clipboard;
+import org.eclipse.swt.dnd.TextTransfer;
+import org.eclipse.swt.dnd.Transfer;
+import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionListener;
+import org.eclipse.swt.widgets.Control;
+import org.eclipse.swt.widgets.Menu;
+import org.eclipse.swt.widgets.MenuItem;
+import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.ui.swt.Utils;
+import org.gudy.azureus2.ui.swt.mainwindow.ClipboardCopy;
 
 import com.aelitis.azureus.ui.UIFunctionsManager;
 import com.aelitis.azureus.ui.mdi.MultipleDocumentInterface;
@@ -37,9 +48,13 @@ public class SBC_PIA
 {
 
 	private SWTSkinObjectText soAddresses;
+
 	private SWTSkinObjectButton soAddressesButton;
+
 	private SWTSkinObjectText soPFStatus;
+
 	private SWTSkinObjectButton soPFButton;
+
 	private SWTSkinButtonUtility btnPFCheck;
 
 	/* (non-Javadoc)
@@ -48,26 +63,65 @@ public class SBC_PIA
 	@Override
 	public Object skinObjectInitialShow(SWTSkinObject skinObject, Object params) {
 		soAddresses = (SWTSkinObjectText) getSkinObject("addresses");
-		
+		Control control = soAddresses.getControl();
+		Menu clipMenuA = new Menu(control);
+		MenuItem miClipA = new MenuItem(clipMenuA, SWT.PUSH);
+		miClipA.setText(
+				MessageText.getString("MyTorrentsView.menu.thisColumn.toClipboard"));
+		miClipA.addSelectionListener(new SelectionListener() {
+			public void widgetSelected(SelectionEvent e) {
+				new Clipboard(e.display).setContents(new Object[] {
+					soPFStatus.getText()
+				}, new Transfer[] {
+					TextTransfer.getInstance()
+				});
+			}
+
+			public void widgetDefaultSelected(SelectionEvent e) {
+			}
+		});
+		control.setMenu(clipMenuA);
+
 		soAddressesButton = (SWTSkinObjectButton) getSkinObject("addresses-button");
-		final SWTSkinButtonUtility btnAddresses = new SWTSkinButtonUtility(soAddressesButton);
+		final SWTSkinButtonUtility btnAddresses = new SWTSkinButtonUtility(
+				soAddressesButton);
 		soAddressesButton.addSelectionListener(new ButtonListenerAdapter() {
 			@Override
 			public void pressed(SWTSkinButtonUtility buttonUtility,
 					SWTSkinObject skinObject, int stateMask) {
 				btnAddresses.setDisabled(true);
+				soAddresses.switchSuffix("-disabled");
 				Utils.getOffOfSWTThread(new AERunnable() {
 					@Override
 					public void runSupport() {
 						PluginPIA.instance.checkerPIA.calcProtocolAddresses();
 						btnAddresses.setDisabled(false);
+						soAddresses.switchSuffix(null);
 					}
 				});
 			}
 		});
-		
+
 		soPFStatus = (SWTSkinObjectText) getSkinObject("port-forwarding-status");
-		
+		Control controlStatus = soPFStatus.getControl();
+		Menu clipMenuPF = new Menu(controlStatus);
+		MenuItem miClipPF = new MenuItem(clipMenuPF, SWT.PUSH);
+		miClipPF.setText(
+				MessageText.getString("MyTorrentsView.menu.thisColumn.toClipboard"));
+		miClipPF.addSelectionListener(new SelectionListener() {
+			public void widgetSelected(SelectionEvent e) {
+				new Clipboard(e.display).setContents(new Object[] {
+					soPFStatus.getText()
+				}, new Transfer[] {
+					TextTransfer.getInstance()
+				});
+			}
+
+			public void widgetDefaultSelected(SelectionEvent e) {
+			}
+		});
+		controlStatus.setMenu(clipMenuPF);
+
 		soPFButton = (SWTSkinObjectButton) getSkinObject("port-forwarding-button");
 		btnPFCheck = new SWTSkinButtonUtility(soPFButton);
 		soPFButton.addSelectionListener(new ButtonListenerAdapter() {
@@ -83,7 +137,8 @@ public class SBC_PIA
 			}
 		});
 
-		SWTSkinObjectButton soConfigButton = (SWTSkinObjectButton) getSkinObject("config-button");
+		SWTSkinObjectButton soConfigButton = (SWTSkinObjectButton) getSkinObject(
+				"config-button");
 		soConfigButton.addSelectionListener(new ButtonListenerAdapter() {
 			/* (non-Javadoc)
 			 * @see com.aelitis.azureus.ui.swt.skin.SWTSkinButtonUtility.ButtonListenerAdapter#pressed(com.aelitis.azureus.ui.swt.skin.SWTSkinButtonUtility, com.aelitis.azureus.ui.swt.skin.SWTSkinObject, int)
@@ -92,12 +147,13 @@ public class SBC_PIA
 			public void pressed(SWTSkinButtonUtility buttonUtility,
 					SWTSkinObject skinObject, int stateMask) {
 				MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
-				mdi.showEntryByID(MultipleDocumentInterface.SIDEBAR_SECTION_CONFIG, "vpn_pia");
+				mdi.showEntryByID(MultipleDocumentInterface.SIDEBAR_SECTION_CONFIG,
+						"vpn_pia");
 			}
 		});
 
 		PluginPIA.instance.checkerPIA.addListener(this);
-		
+
 		return null;
 	}
 
@@ -117,7 +173,7 @@ public class SBC_PIA
 	public void protocolAddressesStatusChanged(String status) {
 		soAddresses.setText(status);
 	}
-	
+
 	/* (non-Javadoc)
 	 * @see com.vuze.plugin.azVPN_PIA.CheckerPIAListener#portCheckStart()
 	 */

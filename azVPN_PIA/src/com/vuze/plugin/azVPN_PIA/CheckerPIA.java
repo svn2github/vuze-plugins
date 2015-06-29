@@ -47,7 +47,6 @@ import com.aelitis.azureus.core.networkmanager.admin.*;
 import com.aelitis.azureus.core.proxy.AEProxySelector;
 import com.aelitis.azureus.core.proxy.AEProxySelectorFactory;
 import com.aelitis.azureus.util.JSONUtils;
-import com.aelitis.azureus.util.MapUtils;
 import com.aelitis.net.udp.uc.PRUDPPacketHandler;
 import com.aelitis.net.udp.uc.PRUDPPacketHandlerFactory;
 import com.aelitis.net.udp.uc.PRUDPReleasablePacketHandler;
@@ -60,18 +59,18 @@ public class CheckerPIA
 
 	private static final char CHAR_WARN = '\u2318';
 
-	private static int STATUS_ID_OK = 0;
+	private static final int STATUS_ID_OK = 0;
 
-	private static int STATUS_ID_BAD = 1;
+	private static final int STATUS_ID_BAD = 1;
 
-	private static int STATUS_ID_WARN = 2;
+	private static final int STATUS_ID_WARN = 2;
 
 	// Is it always 70000? who knows
-	private final static int STATUS_FILE_PORT_INDEX = 70000;
+	private static final int STATUS_FILE_PORT_INDEX = 70000;
 
-	private final static String PIA_DOMAIN = "www.privateinternetaccess.com";
+	private static final String PIA_DOMAIN = "www.privateinternetaccess.com";
 
-	private final static String PIA_RPC_URL = "https://" + PIA_DOMAIN
+	private static final String PIA_RPC_URL = "https://" + PIA_DOMAIN
 			+ "/vpninfo/port_forward_assignment";
 
 	private static final boolean rebindNetworkInterface = true;
@@ -266,7 +265,7 @@ public class CheckerPIA
 							File fileSettings = new File(pathPIAManagerData, "settings.json");
 							String settingsString = FileUtil.readFileAsString(fileSettings,
 									-1);
-							Map mapSettings = JSONUtils.decodeJSON(settingsString);
+							Map<?, ?> mapSettings = JSONUtils.decodeJSON(settingsString);
 							if (mapSettings != null
 									&& mapSettings.containsKey("portforward")) {
 								portForwardEnabled = (Boolean) mapSettings.get("portforward");
@@ -916,4 +915,7 @@ public class CheckerPIA
 		listeners.remove(l);
 	}
 
+	public int getCurrentStatusID() {
+		return currentStatusID;
+	}
 }

@@ -45,6 +45,8 @@ import com.aelitis.azureus.ui.mdi.MultipleDocumentInterface;
 public class PluginPIA
 	implements UnloadablePlugin
 {
+	private static final String CONFIG_SECTION_ID = "vpn_pia";
+
 	public static final String CONFIG_PIA_MANAGER_DIR = "pia_manager.dir";
 
 	public static final String CONFIG_P = "p.privx";
@@ -53,23 +55,17 @@ public class PluginPIA
 
 	public static final String CONFIG_CHECK_MINUTES = "check.minutes";
 
+	private static final boolean LOG_TO_STDOUT = false;
+
 	private PluginInterface pi;
 
 	private static LoggerChannel logger;
-
-	private IntParameter checkMinsParameter;
-
-	private PasswordParameter paramPass;
-
-	private StringParameter paramUser;
 
 	protected UIInstance uiInstance;
 
 	public static PluginPIA instance;
 
 	public CheckerPIA checkerPIA;
-
-	private DirectoryParameter paramPIAManagerDir;
 
 	/* (non-Javadoc)
 	 * @see org.gudy.azureus2.plugins.Plugin#initialize(org.gudy.azureus2.plugins.PluginInterface)
@@ -100,11 +96,11 @@ public class PluginPIA
 
 		UIManager uiManager = pi.getUIManager();
 
-		logger = pi.getLogger().getTimeStampedChannel("vpn_pia");
+		logger = pi.getLogger().getTimeStampedChannel(CONFIG_SECTION_ID);
 
 		final BasicPluginViewModel model = uiManager.createLoggingViewModel(logger,
 				true);
-		model.setConfigSectionID("vpn_pia");
+		model.setConfigSectionID(CONFIG_SECTION_ID);
 
 		setupConfigModel(uiManager);
 
@@ -140,14 +136,13 @@ public class PluginPIA
 
 	private void setupConfigModel(UIManager uiManager) {
 		BasicPluginConfigModel configModel = uiManager.createBasicPluginConfigModel(
-				"vpn_pia");
+				CONFIG_SECTION_ID);
 
-		paramPIAManagerDir = configModel.addDirectoryParameter2(
-				CONFIG_PIA_MANAGER_DIR, CONFIG_PIA_MANAGER_DIR,
-				checkerPIA.getPIAManagerPath().toString());
+		configModel.addDirectoryParameter2(CONFIG_PIA_MANAGER_DIR,
+				CONFIG_PIA_MANAGER_DIR, checkerPIA.getPIAManagerPath().toString());
 
-		checkMinsParameter = configModel.addIntParameter2(CONFIG_CHECK_MINUTES,
-				"check.port.every.mins", 1);
+		IntParameter checkMinsParameter = configModel.addIntParameter2(
+				CONFIG_CHECK_MINUTES, "check.port.every.mins", 1);
 		checkMinsParameter.addListener(new ParameterListener() {
 			public void parameterChanged(Parameter param) {
 				checkerPIA.buildTimer();
@@ -157,11 +152,11 @@ public class PluginPIA
 		List<Parameter> parameters = new ArrayList<Parameter>();
 
 		parameters.add(configModel.addLabelParameter2("login.group.explain"));
-		paramUser = configModel.addStringParameter2(CONFIG_USER, "config.user",
-				checkerPIA.getDefaultUsername());
+		StringParameter paramUser = configModel.addStringParameter2(CONFIG_USER,
+				"config.user", checkerPIA.getDefaultUsername());
 		parameters.add(paramUser);
-		paramPass = configModel.addPasswordParameter2(CONFIG_P, "config.pass",
-				PasswordParameter.ET_PLAIN, new byte[] {});
+		PasswordParameter paramPass = configModel.addPasswordParameter2(CONFIG_P,
+				"config.pass", PasswordParameter.ET_PLAIN, new byte[] {});
 		parameters.add(paramPass);
 
 		configModel.createGroup("login.group",
@@ -176,9 +171,11 @@ public class PluginPIA
 	}
 
 	public static void log(String s) {
-		long offsetTime = SystemTime.getCurrentTime()
-				- AzureusCoreFactory.getSingleton().getCreateTime();
-		System.out.println(offsetTime + "] LOGGER: " + s);
+		if (LOG_TO_STDOUT || logger == null) {
+			long offsetTime = SystemTime.getCurrentTime()
+					- AzureusCoreFactory.getSingleton().getCreateTime();
+			System.out.println(offsetTime + "] LOGGER: " + s);
+		}
 		if (logger == null) {
 			return;
 		}
