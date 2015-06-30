@@ -145,7 +145,7 @@ public class PluginPIA
 		BasicPluginConfigModel configModel = uiManager.createBasicPluginConfigModel(
 				CONFIG_SECTION_ID);
 
-		if (Constants.isWindows) {
+		if (Constants.isWindows || Constants.isOSX) {
 			configModel.addDirectoryParameter2(CONFIG_PIA_MANAGER_DIR,
 					CONFIG_PIA_MANAGER_DIR, checkerPIA.getPIAManagerPath().toString());
 		}

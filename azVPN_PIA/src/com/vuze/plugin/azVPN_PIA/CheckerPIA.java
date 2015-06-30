@@ -18,10 +18,7 @@
 
 package com.vuze.plugin.azVPN_PIA;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.*;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -35,10 +32,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.SystemDefaultDnsResolver;
 import org.apache.http.message.BasicNameValuePair;
-import org.gudy.azureus2.core3.util.AESemaphore;
-import org.gudy.azureus2.core3.util.Debug;
-import org.gudy.azureus2.core3.util.FileUtil;
-import org.gudy.azureus2.core3.util.RandomUtils;
+import org.gudy.azureus2.core3.util.*;
 import org.gudy.azureus2.plugins.PluginConfig;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.utils.*;
@@ -46,6 +40,7 @@ import org.gudy.azureus2.plugins.utils.*;
 import com.aelitis.azureus.core.AzureusCore;
 import com.aelitis.azureus.core.AzureusCoreFactory;
 import com.aelitis.azureus.core.networkmanager.admin.*;
+import com.aelitis.azureus.core.networkmanager.admin.impl.NetworkAdminProtocolImpl;
 import com.aelitis.azureus.core.proxy.AEProxySelector;
 import com.aelitis.azureus.core.proxy.AEProxySelectorFactory;
 import com.aelitis.azureus.util.JSONUtils;
@@ -362,6 +357,7 @@ public class CheckerPIA
 			}
 
 		} catch (Exception e) {
+			e.printStackTrace();
 			addReply(sReply, CHAR_BAD, "pia.nat.error", new String[] {
 				e.toString()
 			});
@@ -587,56 +583,61 @@ public class CheckerPIA
 		try {
 			// Check if default routing goes through 10.*, by connecting to address
 			// via socket.  Address doesn't need to be reachable, just routable.
+			// This works on Windows, but on Mac returns a wildcard address
 			DatagramSocket socket = new DatagramSocket();
 			socket.connect(testSocketAddress, 0);
 			InetAddress localAddress = socket.getLocalAddress();
-			NetworkInterface networkInterface = NetworkInterface.getByInetAddress(
-					localAddress);
+			socket.close();
+			
+			if (!localAddress.isAnyLocalAddress()) {
+				NetworkInterface networkInterface = NetworkInterface.getByInetAddress(
+						localAddress);
 
-			s = texts.getLocalisedMessageText("pia.nonvuze.probable.route",
-					new String[] {
-						"" + localAddress,
-						networkInterface.getName() + " ("
-								+ networkInterface.getDisplayName() + ")"
-			});
-			char replyChar = ' ';
+				s = texts.getLocalisedMessageText("pia.nonvuze.probable.route",
+						new String[] {
+							"" + localAddress,
+							networkInterface.getName() + " ("
+									+ networkInterface.getDisplayName() + ")"
+				});
+				char replyChar = ' ';
 
-			if ((localAddress instanceof Inet4Address)
-					&& matchesVPNIP(localAddress)) {
+				if ((localAddress instanceof Inet4Address)
+						&& matchesVPNIP(localAddress)) {
 
-				if (localAddress.equals(bindIP)) {
-					replyChar = isGoodExistingBind ? CHAR_GOOD : CHAR_WARN;
-					s += " " + texts.getLocalisedMessageText("pia.same.as.vuze");
+					if (localAddress.equals(bindIP)) {
+						replyChar = isGoodExistingBind ? CHAR_GOOD : CHAR_WARN;
+						s += " " + texts.getLocalisedMessageText("pia.same.as.vuze");
+					} else {
+						// Vuze is bound, default routing goes somewhere else
+						// This is ok, since Vuze will not accept incoming from "somewhere else"
+						// We'll warn, but not update the status id
+
+						replyChar = CHAR_WARN;
+						s += " " + texts.getLocalisedMessageText("pia.not.same");
+
+						if (isGoodExistingBind) {
+							s += " " + texts.getLocalisedMessageText(
+									"default.routing.not.vpn.network.splitting");
+						}
+					}
+
+					addLiteralReply(sReply, replyChar + " " + s);
+
+					if (!isGoodExistingBind && rebindNetworkInterface) {
+						rebindNetworkInterface(networkInterface, localAddress, sReply);
+						// Should we redo test?
+					}
+
 				} else {
-					// Vuze is bound, default routing goes somewhere else
-					// This is ok, since Vuze will not accept incoming from "somewhere else"
-					// We'll warn, but not update the status id
-
-					replyChar = CHAR_WARN;
-					s += " " + texts.getLocalisedMessageText("pia.not.same");
-
+					// Vuze is bound, default routing goes to somewhere else.
+					// Probably network splitting
+					replyChar = isGoodExistingBind ? CHAR_WARN : CHAR_BAD;
 					if (isGoodExistingBind) {
 						s += " " + texts.getLocalisedMessageText(
 								"default.routing.not.vpn.network.splitting");
 					}
+					addLiteralReply(sReply, replyChar + " " + s);
 				}
-
-				addLiteralReply(sReply, replyChar + " " + s);
-
-				if (!isGoodExistingBind && rebindNetworkInterface) {
-					rebindNetworkInterface(networkInterface, localAddress, sReply);
-					// Should we redo test?
-				}
-
-			} else {
-				// Vuze is bound, default routing goes to somewhere else.
-				// Probably network splitting
-				replyChar = isGoodExistingBind ? CHAR_WARN : CHAR_BAD;
-				if (isGoodExistingBind) {
-					s += " " + texts.getLocalisedMessageText(
-							"default.routing.not.vpn.network.splitting");
-				}
-				addLiteralReply(sReply, replyChar + " " + s);
 			}
 		} catch (Throwable t) {
 			t.printStackTrace();
@@ -738,72 +739,78 @@ public class CheckerPIA
 
 			// Check if default routing goes through 10.*, by connecting to address
 			// via socket.  Address doesn't need to be reachable, just routable.
+			// This works on Windows, but on Mac returns a wildcard address
 			DatagramSocket socket = new DatagramSocket();
 			socket.connect(testSocketAddress, 0);
 			InetAddress localAddress = socket.getLocalAddress();
-			NetworkInterface networkInterface = NetworkInterface.getByInetAddress(
-					localAddress);
+			socket.close();
 
-			s = texts.getLocalisedMessageText("pia.nonvuze.probable.route",
-					new String[] {
-						"" + localAddress,
-						networkInterface.getName() + " ("
-								+ networkInterface.getDisplayName() + ")"
-			});
+			if (!localAddress.isAnyLocalAddress()) {
+				NetworkInterface networkInterface = NetworkInterface.getByInetAddress(
+						localAddress);
 
-			if ((localAddress instanceof Inet4Address)
-					&& matchesVPNIP(localAddress)) {
+				s = texts.getLocalisedMessageText("pia.nonvuze.probable.route",
+						new String[] {
+							"" + localAddress,
+							networkInterface == null ? "null" : networkInterface.getName()
+									+ " (" + networkInterface.getDisplayName() + ")"
+				});
 
-				if (newBindIP == null) {
-					newBindIP = localAddress;
-					newBindNetworkInterface = networkInterface;
+				if ((localAddress instanceof Inet4Address)
+						&& matchesVPNIP(localAddress)) {
 
-					s = CHAR_GOOD + " " + s + " "
-							+ texts.getLocalisedMessageText("pia.assuming.vpn");
-				} else if (localAddress.equals(newBindIP)) {
-					s = CHAR_GOOD + " " + s + " "
-							+ texts.getLocalisedMessageText("pia.same.address");
+					if (newBindIP == null) {
+						newBindIP = localAddress;
+						newBindNetworkInterface = networkInterface;
+
+						s = CHAR_GOOD + " " + s + " "
+								+ texts.getLocalisedMessageText("pia.assuming.vpn");
+					} else if (localAddress.equals(newBindIP)) {
+						s = CHAR_GOOD + " " + s + " "
+								+ texts.getLocalisedMessageText("pia.same.address");
+					} else {
+						// Vuze not bound. We already found a boundable address, but it's not this one
+						/* Possibly good case:
+						 * - Vuze: unbound
+						 * - Found Bindable: 10.100.1.6
+						 * - Default Routing: 10.255.1.1
+						 * -> Split network
+						 */
+						if (newStatusID != STATUS_ID_BAD) {
+							newStatusID = STATUS_ID_WARN;
+						}
+						s = CHAR_WARN + " " + s + " "
+								+ texts.getLocalisedMessageText("pia.not.same.future.address")
+								+ " "
+								+ texts.getLocalisedMessageText(
+										"default.routing.not.vpn.network.splitting")
+								+ " " + texts.getLocalisedMessageText(
+										"default.routing.not.vpn.network.splitting.unbound");
+					}
+
+					addLiteralReply(sReply, s);
+
 				} else {
-					// Vuze not bound. We already found a boundable address, but it's not this one
-					/* Possibly good case:
-					 * - Vuze: unbound
-					 * - Found Bindable: 10.100.1.6
-					 * - Default Routing: 10.255.1.1
-					 * -> Split network
-					 */
-					if (newStatusID != STATUS_ID_BAD) {
-						newStatusID = STATUS_ID_WARN;
+					s = CHAR_WARN + " " + s;
+					if (!bindIP.isLoopbackAddress()) {
+						s += " " + texts.getLocalisedMessageText(
+								"default.routing.not.vpn.network.splitting");
 					}
-					s = CHAR_WARN + " " + s + " "
-							+ texts.getLocalisedMessageText("pia.not.same.future.address")
-							+ " "
-							+ texts.getLocalisedMessageText(
-									"default.routing.not.vpn.network.splitting")
-							+ " " + texts.getLocalisedMessageText(
-									"default.routing.not.vpn.network.splitting.unbound");
-				}
 
-				addLiteralReply(sReply, s);
-
-			} else {
-				s = CHAR_WARN + " " + s;
-				if (!bindIP.isLoopbackAddress()) {
-					s += " " + texts.getLocalisedMessageText(
-							"default.routing.not.vpn.network.splitting");
-				}
-
-				if (newBindIP == null && foundNIF) {
-					if (newStatusID != STATUS_ID_BAD) {
-						newStatusID = STATUS_ID_WARN;
+					if (newBindIP == null && foundNIF) {
+						if (newStatusID != STATUS_ID_BAD) {
+							newStatusID = STATUS_ID_WARN;
+						}
+						s += " " + texts.getLocalisedMessageText(
+								"default.routing.not.vpn.network.splitting.unbound");
 					}
-					s += " " + texts.getLocalisedMessageText(
-							"default.routing.not.vpn.network.splitting.unbound");
-				}
 
-				addLiteralReply(sReply, s);
+					addLiteralReply(sReply, s);
+				}
 			}
 
 		} catch (Exception e) {
+			e.printStackTrace();
 			addReply(sReply, CHAR_BAD, "pia.nat.error", new String[] {
 				e.toString()
 			});
@@ -905,22 +912,27 @@ public class CheckerPIA
 
 	protected File getPIAManagerPath() {
 		File pathPIAManager = null;
-		String pathProgFiles = System.getenv("ProgramFiles");
-		if (pathProgFiles != null) {
-			pathPIAManager = new File(pathProgFiles, "pia_manager");
+		if (Constants.isWindows) {
+  		String pathProgFiles = System.getenv("ProgramFiles");
+  		if (pathProgFiles != null) {
+  			pathPIAManager = new File(pathProgFiles, "pia_manager");
+  		}
+  		if (pathPIAManager == null || !pathPIAManager.exists()) {
+  			String pathProgFiles86 = System.getenv("ProgramFiles");
+  			if (pathProgFiles == null && pathProgFiles86 != null) {
+  				pathProgFiles86 = pathProgFiles + "(x86)";
+  			}
+  			if (pathProgFiles86 != null) {
+  				pathPIAManager = new File(pathProgFiles86, "pia_manager");
+  			}
+  		}
+  		if (pathPIAManager == null || !pathPIAManager.exists()) {
+  			pathPIAManager = new File("C:\\Program Files\\pia_manager");
+  		}
+		} else {
+			pathPIAManager = new File(System.getProperty("user.home"), ".pia_manager");
 		}
-		if (pathPIAManager == null || !pathPIAManager.exists()) {
-			String pathProgFiles86 = System.getenv("ProgramFiles");
-			if (pathProgFiles == null && pathProgFiles86 != null) {
-				pathProgFiles86 = pathProgFiles + "(x86)";
-			}
-			if (pathProgFiles86 != null) {
-				pathPIAManager = new File(pathProgFiles86, "pia_manager");
-			}
-		}
-		if (pathPIAManager == null || !pathPIAManager.exists()) {
-			pathPIAManager = new File("C:\\Program Files\\pia_manager");
-		}
+		
 		return pathPIAManager;
 	}
 
