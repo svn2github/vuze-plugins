@@ -1811,7 +1811,7 @@ I2PDHTTrackerPlugin
 					run()
 					{
 						Composite parent = (Composite)options.get( "ui_composite" );
-						
+												
 						Shell shell = null;
 						
 						if ( parent == null ){
@@ -1819,8 +1819,14 @@ I2PDHTTrackerPlugin
 							shell = ShellFactory.createMainShell( SWT.DIALOG_TRIM | SWT.RESIZE | SWT.MIN | SWT.MAX );
 								
 							parent	= shell;
+							
+						}else if ( parent.isDisposed()){
+							
+							listener.complete( false );
+							
+							return;
 						}
-						
+
 						parent.setLayout( new GridLayout());
 						
 						Composite panel_comp = new Composite( parent, SWT.NULL );

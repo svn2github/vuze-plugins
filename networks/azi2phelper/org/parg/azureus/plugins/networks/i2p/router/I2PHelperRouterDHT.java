@@ -45,10 +45,6 @@ import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.SystemTime;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperAdapter;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperDHT;
-/*
-import org.parg.azureus.plugins.networks.i2p.dht.DHTNodes;
-import org.parg.azureus.plugins.networks.i2p.dht.KRPC;
-*/
 import org.parg.azureus.plugins.networks.i2p.snarkdht.NID;
 import org.parg.azureus.plugins.networks.i2p.snarkdht.NodeInfo;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTI2P;
@@ -67,6 +63,7 @@ I2PHelperRouterDHT
 	
 	private volatile I2PSession 			dht_session;
 	private volatile I2PSocketManager 		dht_socket_manager;
+	private volatile Properties				dht_socket_manager_properties;
 	private volatile I2PServerSocket		dht_server_socket;
 
 	private String				b32_dest = "";
@@ -75,6 +72,7 @@ I2PHelperRouterDHT
 
 	private Object				init_lock	= new Object();
 	
+	private volatile boolean	started;
 	private volatile boolean	initialized;
 	private volatile boolean	destroyed;
 
@@ -105,7 +103,13 @@ I2PHelperRouterDHT
 		return( dht_index );
 	}
 	
-	protected boolean
+	public boolean
+	isDHTStarted()
+	{
+		return( started );
+	}
+	
+	public boolean
 	isDHTInitialised()
 	{
 		return( initialized );
@@ -120,6 +124,8 @@ I2PHelperRouterDHT
 		
 		throws Exception
 	{
+		started = true;
+		
 		Properties sm_properties = new Properties();
 		
 		sm_properties.putAll( _sm_properties );
@@ -174,6 +180,10 @@ I2PHelperRouterDHT
 				        }
 						
 						if ( sm != null ){
+							
+							dht_socket_manager_properties = new Properties();
+							
+							dht_socket_manager_properties.putAll( sm_properties );
 							
 							break;
 						
@@ -496,6 +506,144 @@ I2PHelperRouterDHT
 		init_sem.reserve();
 		
 		return( dht );
+	}
+	
+	public Integer
+	getIntegerOption(
+		String		name )
+	{
+		Properties props = dht_socket_manager_properties;
+		
+		if ( props != null ){
+			
+			Object obj = props.getProperty( name, null );
+			
+			if ( obj instanceof String ){
+				
+				try{
+					return( Integer.parseInt((String)obj));
+					
+				}catch( Throwable e ){
+					
+					Debug.out( e );
+				}
+			}
+		}
+		
+		return( null );
+	}
+	
+	public boolean
+	updateSocketManagerOptions(
+		Properties	_props )
+	{
+		I2PSocketManager sm = dht_socket_manager;
+		
+		if ( sm != null ){
+			
+			Properties props = new Properties();
+			
+			props.putAll( _props );
+			
+			I2PHelperUtils.normalizeProperties(props);			
+			
+			sm.getSession().updateOptions( props );
+			
+			dht_socket_manager_properties.putAll( props );
+			
+			return( true );
+		}
+		
+		return( false );
+	}
+	
+	private int		last_auto_quantity = -1;
+	private long 	last_auto_quantity_time;
+	
+	public void
+	updatePeerCount(
+		int		peers,
+		int		min_quantity )
+	{
+		if ( dht_socket_manager == null ){
+			
+			return;
+		}
+			
+		int	target;
+		
+		if ( peers <= 5 ){
+			
+			target = 2;
+			
+		}else if ( peers <= 10 ){
+			
+			target = 3;
+			
+		}else if ( peers <= 20 ){
+			
+			target = 4;
+			
+		}else if ( peers <= 50 ){
+			
+			target = 5;
+			
+		}else{
+			
+			target = 6;
+		}
+					
+		target = Math.max( target, min_quantity );
+			
+		Integer current_in 	= getIntegerOption( "inbound.quantity" );
+		Integer current_out = getIntegerOption( "outbound.quantity" );
+		
+		boolean	update_now		= false;
+		boolean	update_pending 	= false;
+		
+		if ( 	current_in == null 	|| 
+				current_out == null	|| 
+				Math.min( current_in, current_out ) != target ){
+			
+			if ( 	last_auto_quantity == -1 ||
+					target > last_auto_quantity ){
+				
+				update_now = true;
+				
+			}else if ( target < last_auto_quantity ){
+				
+				if ( SystemTime.getMonotonousTime() - last_auto_quantity_time > 5*60*1000 ){
+						
+					update_now = true;
+					
+				}else{
+					
+					update_pending = true;
+				}
+			}
+		}
+			
+		//System.out.println( "Update peer count for " + dht_index + " - " + peers + ": " + current_in + "/" + current_out + " -> " + target + ", update=" + update_now + "/" + update_pending );
+
+		if ( update_now ){
+						
+			String s_target = String.valueOf( target );
+			
+			Properties props = new Properties();
+			
+			props.put("inbound.quantity", s_target );
+			props.put("outbound.quantity", s_target );
+			
+			if ( updateSocketManagerOptions( props )){
+				
+				last_auto_quantity 			= target;
+			}
+		}
+		
+		if ( !update_pending ){
+			
+			last_auto_quantity_time	= SystemTime.getMonotonousTime();
+		}
 	}
 	
 	private void

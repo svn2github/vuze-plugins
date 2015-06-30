@@ -65,6 +65,9 @@ import net.i2p.data.Destination;
 import net.i2p.util.NativeBigInteger;
 
 import org.gudy.azureus2.core3.config.COConfigurationManager;
+import org.gudy.azureus2.core3.download.DownloadManager;
+import org.gudy.azureus2.core3.peer.PEPeer;
+import org.gudy.azureus2.core3.peer.PEPeerManager;
 import org.gudy.azureus2.core3.torrent.TOTorrent;
 import org.gudy.azureus2.core3.torrent.TOTorrentFactory;
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
@@ -137,6 +140,7 @@ import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT.DHTContact;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT.DHTValue;
 
+import com.aelitis.azureus.core.AzureusCoreFactory;
 import com.aelitis.azureus.core.dht.transport.DHTTransportAlternativeContact;
 import com.aelitis.azureus.core.dht.transport.DHTTransportAlternativeNetwork;
 import com.aelitis.azureus.core.dht.transport.udp.impl.DHTUDPUtils;
@@ -429,6 +433,8 @@ I2PHelperPlugin
 				throw( new PluginException( "Another instance of Vuze is running, can't initialize plugin" ));
 			}
 			
+			readPluginInfo();
+			
 			loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
 			
 			log	= plugin_interface.getLogger().getTimeStampedChannel( "I2PHelper");
@@ -610,6 +616,7 @@ I2PHelperPlugin
 			final IntParameter down_limit_param 		= config_model.addIntParameter2( I2PHelperRouter.PARAM_RECV_KBS, I2PHelperRouter.PARAM_RECV_KBS, I2PHelperRouter.PARAM_RECV_KBS_DEFAULT, 0, Integer.MAX_VALUE );
 			
 			final IntParameter limit_multiplier_param 	= config_model.addIntParameter2( "azi2phelper.rate.multiplier", "azi2phelper.rate.multiplier", 2, 1, 100 );
+			limit_multiplier_param.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
 
 			final IntParameter share_percent_param 		= config_model.addIntParameter2( I2PHelperRouter.PARAM_SHARE_PERCENT, I2PHelperRouter.PARAM_SHARE_PERCENT, I2PHelperRouter.PARAM_SHARE_PERCENT_DEFAULT, 10, 100 );
 						
@@ -835,62 +842,15 @@ I2PHelperPlugin
 
 			
 			final IntParameter[] tunnel_params =
-				{ mix_in_hops_param, mix_in_quant_param, mix_out_hops_param, mix_out_quant_param };
+				{ 	mix_in_hops_param, mix_in_quant_param, mix_out_hops_param, mix_out_quant_param,
+					i2p_in_hops_param, i2p_in_quant_param, i2p_out_hops_param, i2p_out_quant_param,
+					other_in_hops_param, other_in_quant_param, other_out_hops_param, other_out_quant_param
+				};
 			
 			for ( IntParameter p: tunnel_params ){
 				
 				p.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
 			}
-			
-			final Map<String,Object>	router_properties = new HashMap<String, Object>();
-			
-			ParameterListener rate_change_listener = 
-				new ParameterListener()
-				{
-					public void 
-					parameterChanged(
-						Parameter param) 
-					{
-						router_properties.put( I2PHelperRouter.PARAM_SEND_KBS, up_limit_param.getValue());
-						router_properties.put( I2PHelperRouter.PARAM_RECV_KBS, down_limit_param.getValue());
-						router_properties.put( I2PHelperRouter.PARAM_SHARE_PERCENT, share_percent_param.getValue());
-
-						router_properties.put( I2PHelperRouter.PARAM_MIX_INBOUND_HOPS, mix_in_hops_param.getValue());
-						router_properties.put( I2PHelperRouter.PARAM_MIX_INBOUND_QUANTITY, mix_in_quant_param.getValue());
-						router_properties.put( I2PHelperRouter.PARAM_MIX_OUTBOUND_HOPS, mix_out_hops_param.getValue());
-						router_properties.put( I2PHelperRouter.PARAM_MIX_OUTBOUND_QUANTITY, mix_out_quant_param.getValue());
-
-						router_properties.put( I2PHelperRouter.PARAM_I2P_INBOUND_HOPS, i2p_in_hops_param.getValue());
-						router_properties.put( I2PHelperRouter.PARAM_I2P_INBOUND_QUANTITY, i2p_in_quant_param.getValue());
-						router_properties.put( I2PHelperRouter.PARAM_I2P_OUTBOUND_HOPS, i2p_out_hops_param.getValue());
-						router_properties.put( I2PHelperRouter.PARAM_I2P_OUTBOUND_QUANTITY, i2p_out_quant_param.getValue());
-
-						router_properties.put( I2PHelperRouter.PARAM_OTHER_INBOUND_HOPS, other_in_hops_param.getValue());
-						router_properties.put( I2PHelperRouter.PARAM_OTHER_INBOUND_QUANTITY, other_in_quant_param.getValue());
-						router_properties.put( I2PHelperRouter.PARAM_OTHER_OUTBOUND_HOPS, other_out_hops_param.getValue());
-						router_properties.put( I2PHelperRouter.PARAM_OTHER_OUTBOUND_QUANTITY, other_out_quant_param.getValue());
-
-						I2PHelperRouter current_router = router;
-						
-						if ( current_router != null ){
-							
-							current_router.updateProperties();
-						}
-					}
-				};
-			
-			rate_change_listener.parameterChanged( null );
-
-			up_limit_param.addListener( rate_change_listener );
-			down_limit_param.addListener( rate_change_listener );
-			share_percent_param.addListener( rate_change_listener );
-
-				// these require a restart but whatever
-			
-			for ( IntParameter p: tunnel_params ){
-				p.addListener( rate_change_listener );
-			}
-			
 			
 			socks_port_param 	= config_model.addIntParameter2( "azi2phelper.socks.port", "azi2phelper.socks.port", 0 );
 			socks_port_param.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
@@ -967,6 +927,7 @@ I2PHelperPlugin
 			final BooleanParameter always_socks = config_model.addBooleanParameter2( "azi2phelper.socks.always", "azi2phelper.socks.always", false );
 		
 			final IntParameter 	cpu_throttle	= config_model.addIntParameter2( "azi2phelper.cpu.throttle", "azi2phelper.cpu.throttle", CPU_THROTTLE_DEFAULT, 0, 100 );
+			cpu_throttle.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
 
 			cpu_throttle.addListener(
 					new ParameterListener() 
@@ -981,6 +942,9 @@ I2PHelperPlugin
 			
 			cpu_throttle_factor = cpu_throttle.getValue();
 			
+			final IntParameter 		floodfill_param 		= config_model.addIntParameter2( "azi2phelper.floodfill.control", "azi2phelper.floodfill.control", I2PHelperRouter.PARAM_FLOODFILL_CONTROL_VUZE, 0, 4 );
+			floodfill_param.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
+
 			final BooleanParameter ext_i2p_param 		= config_model.addBooleanParameter2( "azi2phelper.use.ext", "azi2phelper.use.ext", false );
 			ext_i2p_param.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
 
@@ -990,6 +954,13 @@ I2PHelperPlugin
 			final IntParameter 		ext_i2p_port_param 		= config_model.addIntParameter2( "azi2phelper.use.ext.port", "azi2phelper.use.ext.port", 7654 );
 			ext_i2p_port_param.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
 
+				// tunnel config
+			
+			final BooleanParameter tunnel_auto_quantities_param = config_model.addBooleanParameter2( "azi2phelper.tunnel.quant.auto", "azi2phelper.tunnel.quant.auto", true );
+			tunnel_auto_quantities_param.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
+
+				// tunnel tab
+			
 			ParameterTabFolder	tunnel_tab = config_model.createTabFolder();
 			
 			ParameterGroup tunnel_tab1 = 
@@ -1017,14 +988,14 @@ I2PHelperPlugin
 			tunnel_tab.addTab( tunnel_tab2 );
 			tunnel_tab.addTab( tunnel_tab3 );
 
-			ParameterGroup tunnel_group = config_model.createGroup( "azi2phelper.tunnel.info", new Parameter[]{ tunnel_tab });
+			ParameterGroup tunnel_group = config_model.createGroup( "azi2phelper.tunnel.info", new Parameter[]{ tunnel_auto_quantities_param, tunnel_tab });
 			
 			tunnel_group.setMinimumRequiredUserMode( Parameter.MODE_ADVANCED );
 			
 			config_model.createGroup( 
 				"azi2phelper.internals.group",
 				new Parameter[]{ 
-						i2p_address_param, new_id, change_id, int_port_param, ext_port_param,
+						i2p_address_param, new_id, change_id, int_port_param, ext_port_param, floodfill_param,
 						tunnel_group,
 						socks_port_param, socks_allow_public_param,
 						port_info_param, use_upnp, always_socks, cpu_throttle, ext_i2p_param, ext_i2p_host_param, ext_i2p_port_param });
@@ -1114,6 +1085,7 @@ I2PHelperPlugin
 							int_port_param.setEnabled( enabled_not_ext );
 							ext_port_param.setEnabled( enabled_not_ext);
 							
+							tunnel_auto_quantities_param.setEnabled( plugin_enabled );
 							for ( IntParameter p: tunnel_params ){
 								p.setEnabled( plugin_enabled );
 							}
@@ -1126,8 +1098,10 @@ I2PHelperPlugin
 							cpu_throttle.setEnabled( enabled_not_ext );
 							
 							ext_i2p_param.setEnabled( plugin_enabled );
-							ext_i2p_host_param.setEnabled( plugin_enabled && !enabled_not_ext );
-							ext_i2p_port_param.setEnabled( plugin_enabled && !enabled_not_ext );
+							ext_i2p_host_param.setEnabled( !enabled_not_ext );
+							ext_i2p_port_param.setEnabled( !enabled_not_ext );
+							
+							floodfill_param.setEnabled( enabled_not_ext );
 							
 							command_text_param.setEnabled( plugin_enabled );
 							command_exec_param.setEnabled( plugin_enabled );
@@ -1140,42 +1114,99 @@ I2PHelperPlugin
 			
 			enabler_listener.parameterChanged( null );
 				
-			boolean	is_external_router = ext_i2p_param.getValue();
+			final Map<String,Object>	router_properties = new HashMap<String, Object>();
+			
+			ParameterListener router_config_change_listener = 
+				new ParameterListener()
+				{
+					public void 
+					parameterChanged(
+						Parameter param) 
+					{
+						router_properties.put( I2PHelperRouter.PARAM_SEND_KBS, up_limit_param.getValue());
+						router_properties.put( I2PHelperRouter.PARAM_RECV_KBS, down_limit_param.getValue());
+						router_properties.put( I2PHelperRouter.PARAM_SHARE_PERCENT, share_percent_param.getValue());
+						router_properties.put( I2PHelperRouter.PARAM_FLOODFILL_CONTROL, floodfill_param.getValue());
+
+						router_properties.put( I2PHelperRouter.PARAM_AUTO_QUANTITY_ADJUST, tunnel_auto_quantities_param.getValue());
+
+						router_properties.put( I2PHelperRouter.PARAM_MIX_INBOUND_HOPS, mix_in_hops_param.getValue());
+						router_properties.put( I2PHelperRouter.PARAM_MIX_INBOUND_QUANTITY, mix_in_quant_param.getValue());
+						router_properties.put( I2PHelperRouter.PARAM_MIX_OUTBOUND_HOPS, mix_out_hops_param.getValue());
+						router_properties.put( I2PHelperRouter.PARAM_MIX_OUTBOUND_QUANTITY, mix_out_quant_param.getValue());
+
+						router_properties.put( I2PHelperRouter.PARAM_I2P_INBOUND_HOPS, i2p_in_hops_param.getValue());
+						router_properties.put( I2PHelperRouter.PARAM_I2P_INBOUND_QUANTITY, i2p_in_quant_param.getValue());
+						router_properties.put( I2PHelperRouter.PARAM_I2P_OUTBOUND_HOPS, i2p_out_hops_param.getValue());
+						router_properties.put( I2PHelperRouter.PARAM_I2P_OUTBOUND_QUANTITY, i2p_out_quant_param.getValue());
+
+						router_properties.put( I2PHelperRouter.PARAM_OTHER_INBOUND_HOPS, other_in_hops_param.getValue());
+						router_properties.put( I2PHelperRouter.PARAM_OTHER_INBOUND_QUANTITY, other_in_quant_param.getValue());
+						router_properties.put( I2PHelperRouter.PARAM_OTHER_OUTBOUND_HOPS, other_out_hops_param.getValue());
+						router_properties.put( I2PHelperRouter.PARAM_OTHER_OUTBOUND_QUANTITY, other_out_quant_param.getValue());
+
+						I2PHelperRouter current_router = router;
+						
+						if ( current_router != null ){
+							
+							current_router.updateProperties();
+						}
+					}
+				};
+			
+			router_config_change_listener.parameterChanged( null );
+
+			up_limit_param.addListener( router_config_change_listener );
+			down_limit_param.addListener( router_config_change_listener );
+			share_percent_param.addListener( router_config_change_listener );
+			
+			floodfill_param.addListener( router_config_change_listener );
+
+				// these require a restart but whatever
+			
+			tunnel_auto_quantities_param.addListener( router_config_change_listener );
+			for ( IntParameter p: tunnel_params ){
+				p.addListener( router_config_change_listener );
+			}
+			
+			
+			
+			final boolean	is_external_router = ext_i2p_param.getValue();
 			
 			if ( plugin_enabled ){
 				
 				log( "Internal port=" + int_port +", external=" + ext_port + ", socks=" + sock_port );
 
 				message_handler = new I2PHelperMessageHandler( I2PHelperPlugin.this );
-				
-				if ( !is_external_router ){
-					
-						// we don't manage rate limits for external routers
-					
-					timer_event = 
-						SimpleTimer.addPeriodicEvent(
-							"i2phelper:checker",
-							60*1000,
-							new TimerEventPerformer()
-							{	
-								private long		last_total;
-								private long		last_active;
-								
-								@Override
-								public void 
-								perform(
-									TimerEvent event) 
-								{
-									if ( unloaded ){
+									
+				timer_event = 
+					SimpleTimer.addPeriodicEvent(
+						"i2phelper:checker",
+						60*1000,
+						new TimerEventPerformer()
+						{	
+							private long		last_total;
+							private long		last_active;
+							
+							@Override
+							public void 
+							perform(
+								TimerEvent event) 
+							{
+								if ( unloaded ){
+									
+									if ( timer_event != null ){
 										
-										if ( timer_event != null ){
-											
-											timer_event.cancel();
-										}
-										
-										return;
+										timer_event.cancel();
 									}
 									
+									return;
+								}
+								
+								if ( !is_external_router ){
+									
+										// we don't manage rate limits for external routers
+	
 									int mult;
 									
 									if ( link_rates_param.getValue()){
@@ -1214,8 +1245,10 @@ I2PHelperPlugin
 										}
 									}
 								}
-							});
-				}
+								
+								checkTunnelQuantities();
+							}
+						});
 				
 				alt_network_handler = new I2PHelperAltNetHandler();
 				
@@ -1624,6 +1657,186 @@ I2PHelperPlugin
 	getDHTCount()
 	{
 		return( dht_count );
+	}
+	
+	int		max_mix_peers	= 0;
+	int		max_pure_peers	= 0;
+	long	info_start_time = SystemTime.getMonotonousTime();
+	boolean	info_first		= true;
+	
+	private void
+	checkTunnelQuantities()
+	{
+		if ( SystemTime.getMonotonousTime() - info_start_time < 5*60*1000 ){
+			
+			return;
+		}
+		
+		if ( info_first ){
+			
+			info_first 		= false;
+			max_mix_peers	= 0;
+			max_pure_peers	= 0;
+		}
+		
+		List<DownloadManager> dms = AzureusCoreFactory.getSingleton().getGlobalManager().getDownloadManagers();
+		
+		int	mix_peers 	= 0;
+		int	pure_peers 	= 0;
+		
+		for ( DownloadManager dm: dms ){
+			
+			int state = dm.getState();
+			
+			if ( state == DownloadManager.STATE_DOWNLOADING || state == DownloadManager.STATE_SEEDING ){
+			
+				String[] nets = dm.getDownloadState().getNetworks();
+				
+				boolean is_i2p = false;
+				boolean is_pub = false;
+				
+				for ( String net: nets ){
+					
+					if ( net == AENetworkClassifier.AT_I2P ){
+						
+						is_i2p = true;
+						
+					}else if ( net == AENetworkClassifier.AT_PUBLIC ){
+						
+						is_pub = true;
+					}
+				}
+				
+				if ( is_i2p ){
+					
+					PEPeerManager pm = dm.getPeerManager();
+					
+					if ( pm != null ){
+						
+						List<PEPeer> peers = pm.getPeers();
+					
+						for ( PEPeer peer: peers ){
+							
+							int peer_state = peer.getPeerState();
+							
+							if ( peer_state == PEPeer.HANDSHAKING || peer_state == PEPeer.TRANSFERING ){
+								
+								if ( AENetworkClassifier.categoriseAddress( peer.getIp()) == AENetworkClassifier.AT_I2P ){
+									
+									if ( is_pub ){
+										
+										mix_peers++;
+										
+									}else{
+										
+										pure_peers++;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		
+		max_mix_peers 	= Math.max( max_mix_peers, mix_peers );
+		max_pure_peers 	= Math.max( max_pure_peers, pure_peers );
+		
+		I2PHelperRouter	r = router;
+
+		if ( r != null ){
+			
+			if ( r.getBooleanParameter( I2PHelperRouter.PARAM_AUTO_QUANTITY_ADJUST )){
+				
+				I2PHelperRouterDHT[] dhts = r.getAllDHTs();
+				
+				for ( I2PHelperRouterDHT dht: dhts ){
+		
+					if ( !dht.isDHTInitialised()){
+						
+						continue;
+					}
+					
+					if ( dht.getDHTIndex() == I2PHelperRouter.DHT_MIX ){
+					
+						int min = Math.max( r.getIntegerParameter( I2PHelperRouter.PARAM_MIX_INBOUND_QUANTITY ),  r.getIntegerParameter( I2PHelperRouter.PARAM_MIX_OUTBOUND_QUANTITY ));
+						
+						dht.updatePeerCount( mix_peers, min );
+						
+					}else{
+					
+						int min = Math.max( r.getIntegerParameter( I2PHelperRouter.PARAM_I2P_INBOUND_QUANTITY ),  r.getIntegerParameter( I2PHelperRouter.PARAM_I2P_OUTBOUND_QUANTITY ));
+	
+						dht.updatePeerCount( pure_peers, min );
+					}
+				}
+			}
+		}
+		
+		writePluginInfo();
+	}
+	
+	private void
+	readPluginInfo()
+	{
+		PluginConfig pc = plugin_interface.getPluginconfig();
+		
+		String str = pc.getPluginStringParameter( "plugin.info", "" );
+		
+		if ( str.length() > 0 ){
+			
+			String[] bits = str.split( "/" );
+			
+			if ( bits.length >= 3 ){
+				
+				String ver = bits[0];
+				
+				if ( ver.equals( "1" ) || ver.equals( "2" )){
+						
+					max_mix_peers 	= Integer.parseInt( bits[1] );
+					max_pure_peers 	= Integer.parseInt( bits[2] );
+				}
+			}
+		}
+	}
+	
+
+	private void
+	writePluginInfo()
+	{
+		String plugin_info = "2" + "/" + max_mix_peers + "/" + max_pure_peers;
+				
+		I2PHelperRouter	r = router;
+
+		if ( r != null ){
+			
+			String[] params = {
+					I2PHelperRouter.PARAM_SEND_KBS, I2PHelperRouter.PARAM_RECV_KBS, I2PHelperRouter.PARAM_SHARE_PERCENT,
+					I2PHelperRouter.PARAM_MIX_INBOUND_HOPS, I2PHelperRouter.PARAM_MIX_INBOUND_QUANTITY,
+					I2PHelperRouter.PARAM_I2P_INBOUND_HOPS, I2PHelperRouter.PARAM_I2P_INBOUND_QUANTITY };
+			
+			for ( String param: params ){
+				
+				plugin_info += "/" + r.getIntegerParameter( param );
+			}
+			
+			I2PHelperRouterDHT[] dhts = r.getAllDHTs();
+			
+			for ( I2PHelperRouterDHT dht: dhts ){
+				
+				plugin_info += "/" + dht.isDHTStarted();
+
+			}
+		}
+		
+		PluginConfig pc = plugin_interface.getPluginconfig();
+		
+		if ( !pc.getPluginStringParameter( "plugin.info", "" ).equals( plugin_info )){
+			
+			pc.setPluginParameter( "plugin.info", plugin_info );
+		
+			COConfigurationManager.save();
+		}
 	}
 	
 	public void 
@@ -4047,7 +4260,10 @@ I2PHelperPlugin
 								}
 							}else{
 								
-								reportLookupStatus( callback, TrackerPeerSource.ST_UNAVAILABLE );
+								reportLookupStatus( 
+									callback, 
+									TrackerPeerSource.ST_UNAVAILABLE, 
+									"DHT not found" );
 							}
 						}else{
 							
@@ -4061,7 +4277,10 @@ I2PHelperPlugin
 						}
 					}catch( Throwable e ){
 						
-						reportLookupStatus( callback, TrackerPeerSource.ST_UNAVAILABLE );
+						reportLookupStatus( 
+							callback, 
+							TrackerPeerSource.ST_UNAVAILABLE,
+							"Error: " + Debug.getNestedExceptionMessage(e));
 					}
 				}
 			});
@@ -4148,6 +4367,8 @@ I2PHelperPlugin
 		}
 		
 		try{
+			writePluginInfo();
+			
 			if ( router != null ){
 				
 				router.destroy();

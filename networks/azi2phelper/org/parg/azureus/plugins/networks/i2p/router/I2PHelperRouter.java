@@ -74,21 +74,31 @@ I2PHelperRouter
 	public static final int		PARAM_RECV_KBS_DEFAULT		= 50;
 	
 	public static final String	PARAM_SHARE_PERCENT			= "azi2phelper.share.percent";
-	public static final int		PARAM_SHARE_PERCENT_DEFAULT	= 33;
+	public static final int		PARAM_SHARE_PERCENT_DEFAULT	= 80;
 	
+	public static final String		PARAM_AUTO_QUANTITY_ADJUST			= "azi2phelper.auto.quantity.adjust";
+	public static final boolean		PARAM_AUTO_QUANTITY_ADJUST_DEFAULT	= true;
+	
+	public static final String		PARAM_FLOODFILL_CONTROL			= "azi2phelper.floodfill.control";
+	public static final int			PARAM_FLOODFILL_CONTROL_DEFAULT	= 0;
+
+	public static final int		PARAM_FLOODFILL_CONTROL_VUZE	= 0;
+	public static final int		PARAM_FLOODFILL_CONTROL_I2P		= 1;
+	public static final int		PARAM_FLOODFILL_CONTROL_ON		= 2;
+	public static final int		PARAM_FLOODFILL_CONTROL_OFF		= 3;
 		// mix defaults
 	
 	public static final String	PARAM_MIX_INBOUND_HOPS				= "azi2phelper.mix.inbound.hops";
-	public static final int		PARAM_MIX_INBOUND_HOPS_DEFAULT		= 2;	
+	public static final int		PARAM_MIX_INBOUND_HOPS_DEFAULT		= 1;	// little point in making this larger as mixed connections are inherently de-anonymisable
 	
 	public static final String	PARAM_MIX_INBOUND_QUANTITY			= "azi2phelper.mix.inbound.quantity";
-	public static final int		PARAM_MIX_INBOUND_QUANTITY_DEFAULT	= 4;
+	public static final int		PARAM_MIX_INBOUND_QUANTITY_DEFAULT	= 2;
 	
 	public static final String	PARAM_MIX_OUTBOUND_HOPS				= "azi2phelper.mix.outbound.hops";
-	public static final int		PARAM_MIX_OUTBOUND_HOPS_DEFAULT		= 2;	
+	public static final int		PARAM_MIX_OUTBOUND_HOPS_DEFAULT		= 1;	
 
 	public static final String	PARAM_MIX_OUTBOUND_QUANTITY			= "azi2phelper.mix.outbound.quantity";
-	public static final int		PARAM_MIX_OUTBOUND_QUANTITY_DEFAULT	= 4;
+	public static final int		PARAM_MIX_OUTBOUND_QUANTITY_DEFAULT	= 2;
 
 		// i2p only defaults
 	
@@ -96,13 +106,13 @@ I2PHelperRouter
 	public static final int		PARAM_I2P_INBOUND_HOPS_DEFAULT		= 3;	
 	
 	public static final String	PARAM_I2P_INBOUND_QUANTITY			= "azi2phelper.i2p.inbound.quantity";
-	public static final int		PARAM_I2P_INBOUND_QUANTITY_DEFAULT	= 4;
+	public static final int		PARAM_I2P_INBOUND_QUANTITY_DEFAULT	= 2;
 	
 	public static final String	PARAM_I2P_OUTBOUND_HOPS				= "azi2phelper.i2p.outbound.hops";
 	public static final int		PARAM_I2P_OUTBOUND_HOPS_DEFAULT		= 3;	
 
 	public static final String	PARAM_I2P_OUTBOUND_QUANTITY			= "azi2phelper.i2p.outbound.quantity";
-	public static final int		PARAM_I2P_OUTBOUND_QUANTITY_DEFAULT	= 4;
+	public static final int		PARAM_I2P_OUTBOUND_QUANTITY_DEFAULT	= 2;
 	
 		// other defaults
 	
@@ -183,7 +193,7 @@ I2PHelperRouter
 		}
 	}
 	
-	private int
+	public int
 	getIntegerParameter(
 		String		name )
 	{
@@ -201,7 +211,9 @@ I2PHelperRouter
 			
 			def = PARAM_SHARE_PERCENT_DEFAULT;
 			
+		}else if ( name == PARAM_FLOODFILL_CONTROL ){
 			
+			def = PARAM_FLOODFILL_CONTROL_DEFAULT;
 			
 			// mix
 			
@@ -283,6 +295,35 @@ I2PHelperRouter
 		return( String.valueOf( getIntegerParameter( name )));
 	}
 	
+	public boolean
+	getBooleanParameter(
+		String		name )
+	{
+		boolean	def;
+		
+		if ( name == PARAM_AUTO_QUANTITY_ADJUST ){
+			
+			def = PARAM_AUTO_QUANTITY_ADJUST_DEFAULT;
+			
+		}else{
+			
+			Debug.out( "Unknown parameter: " + name );
+			
+			return( false );
+		}
+		
+		Object val = router_properties.get( name );
+		
+		if ( val instanceof Boolean ){
+			
+			return(((Boolean)val).booleanValue());
+			
+		}else{
+			
+			return( def );
+		}
+	}
+	
 	private void
 	addRateLimitProperties(
 		Properties		props )
@@ -346,6 +387,35 @@ I2PHelperRouter
 		props.put( "i2np.bandwidth.outboundKBytesPerSecond", base_out );	
 		
 		props.put( "router.sharePercentage", share_pct );
+		
+		String floodfill_control_value;
+		
+		int floodfill_control = getIntegerParameter( PARAM_FLOODFILL_CONTROL );
+		
+		if ( floodfill_control == PARAM_FLOODFILL_CONTROL_VUZE ){
+			
+			if ( Math.min( base_in, base_out ) < 100 ){	// kick in auto if > 100KB/sec and leave it up to I2P
+				
+				floodfill_control_value = "false";
+				
+			}else{
+				
+				floodfill_control_value = "auto";
+			}
+		}else if ( floodfill_control == PARAM_FLOODFILL_CONTROL_I2P ){
+
+			floodfill_control_value = "auto";
+			
+		}else if ( floodfill_control == PARAM_FLOODFILL_CONTROL_ON ){
+			
+			floodfill_control_value = "true";
+			
+		}else{
+			
+			floodfill_control_value = "false";
+		}
+		
+		props.put( "router.floodfillParticipant", floodfill_control_value );
 	}
 	
 	public void
