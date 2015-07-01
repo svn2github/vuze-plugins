@@ -40,7 +40,6 @@ import org.gudy.azureus2.plugins.utils.*;
 import com.aelitis.azureus.core.AzureusCore;
 import com.aelitis.azureus.core.AzureusCoreFactory;
 import com.aelitis.azureus.core.networkmanager.admin.*;
-import com.aelitis.azureus.core.networkmanager.admin.impl.NetworkAdminProtocolImpl;
 import com.aelitis.azureus.core.proxy.AEProxySelector;
 import com.aelitis.azureus.core.proxy.AEProxySelectorFactory;
 import com.aelitis.azureus.util.JSONUtils;
@@ -110,6 +109,14 @@ public class CheckerPIA
 		} catch (UnknownHostException e) {
 		}
 
+	}
+	
+	public void destroy() {
+		if (timer != null) {
+			timer.destroy();
+			timer = null;
+		}
+		listeners.clear();
 	}
 
 	protected void buildTimer() {

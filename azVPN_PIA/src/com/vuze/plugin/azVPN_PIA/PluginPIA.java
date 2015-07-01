@@ -21,8 +21,6 @@ package com.vuze.plugin.azVPN_PIA;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.gudy.azureus2.core3.util.Constants;
-import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.PluginListener;
@@ -31,20 +29,17 @@ import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
-import org.gudy.azureus2.plugins.ui.config.*;
-import org.gudy.azureus2.plugins.ui.menus.MenuItem;
-import org.gudy.azureus2.plugins.ui.menus.MenuItemListener;
-import org.gudy.azureus2.plugins.ui.menus.MenuManager;
+import org.gudy.azureus2.plugins.ui.config.IntParameter;
+import org.gudy.azureus2.plugins.ui.config.Parameter;
+import org.gudy.azureus2.plugins.ui.config.ParameterListener;
+import org.gudy.azureus2.plugins.ui.config.PasswordParameter;
+import org.gudy.azureus2.plugins.ui.config.StringParameter;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 
-import com.aelitis.azureus.core.AzureusCoreFactory;
-import com.aelitis.azureus.ui.UIFunctionsManager;
-import com.aelitis.azureus.ui.mdi.MultipleDocumentInterface;
-
 public class PluginPIA
-	implements UnloadablePlugin
+	implements UnloadablePlugin, UIManagerListener, PluginListener
 {
 	private static final String CONFIG_SECTION_ID = "vpn_pia";
 
@@ -74,6 +69,14 @@ public class PluginPIA
 
 	public CheckerPIA checkerPIA;
 
+	private BasicPluginConfigModel configModel;
+
+	private BasicPluginViewModel model;
+
+	private UI ui;
+
+	private static long initializedOn;
+
 	/* (non-Javadoc)
 	 * @see org.gudy.azureus2.plugins.Plugin#initialize(org.gudy.azureus2.plugins.PluginInterface)
 	 */
@@ -81,71 +84,30 @@ public class PluginPIA
 			throws PluginException {
 		instance = this;
 
+		initializedOn = System.currentTimeMillis();
+
 		this.pi = plugin_interface;
 
 		checkerPIA = new CheckerPIA(pi);
 
-		plugin_interface.getUIManager().addUIListener(new UIManagerListener() {
-
-			public void UIDetached(UIInstance instance) {
-				uiInstance = null;
-			}
-
-			public void UIAttached(UIInstance instance) {
-				if (instance instanceof UISWTInstance) {
-					UISWTInstance swtInstance = (UISWTInstance) instance;
-					new UI(pi, swtInstance);
-				}
-				uiInstance = instance;
-			}
-
-		});
+		plugin_interface.getUIManager().addUIListener(this);
 
 		UIManager uiManager = pi.getUIManager();
 
 		logger = pi.getLogger().getTimeStampedChannel(CONFIG_SECTION_ID);
 
-		final BasicPluginViewModel model = uiManager.createLoggingViewModel(logger,
-				true);
+		model = uiManager.createLoggingViewModel(logger, true);
 		model.setConfigSectionID(CONFIG_SECTION_ID);
 
 		setupConfigModel(uiManager);
 
-		MenuItem menuItem = uiManager.getMenuManager().addMenuItem(
-				MenuManager.MENU_MENUBAR, "ConfigView.section.vpn_pia");
-		menuItem.addListener(new MenuItemListener() {
-
-			public void selected(MenuItem menu, Object target) {
-				MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
-				mdi.showEntryByID(UI.VIEW_ID);
-			}
-		});
-
-		pi.addListener(new PluginListener() {
-
-			public void initializationComplete() {
-				try {
-					checkerPIA.portBindingCheck();
-					checkerPIA.calcProtocolAddresses();
-				} catch (Throwable t) {
-					t.printStackTrace();
-				}
-				checkerPIA.buildTimer();
-			}
-
-			public void closedownInitiated() {
-			}
-
-			public void closedownComplete() {
-			}
-		});
+		pi.addListener(this);
 	}
 
 	private void setupConfigModel(UIManager uiManager) {
-		BasicPluginConfigModel configModel = uiManager.createBasicPluginConfigModel(
-				CONFIG_SECTION_ID);
+		configModel = uiManager.createBasicPluginConfigModel(CONFIG_SECTION_ID);
 
-		if (Constants.isWindows || Constants.isOSX) {
+		if (pi.getUtilities().isWindows() || pi.getUtilities().isOSX()) {
 			configModel.addDirectoryParameter2(CONFIG_PIA_MANAGER_DIR,
 					CONFIG_PIA_MANAGER_DIR, checkerPIA.getPIAManagerPath().toString());
 		}
@@ -172,8 +134,8 @@ public class PluginPIA
 		configModel.createGroup("login.group",
 				parameters.toArray(new Parameter[0]));
 
-		StringParameter paramRegex = configModel.addStringParameter2(CONFIG_VPN_IP_MATCHING,
-				CONFIG_VPN_IP_MATCHING, DEFAULT_VPN_IP_REGEX);
+		StringParameter paramRegex = configModel.addStringParameter2(
+				CONFIG_VPN_IP_MATCHING, CONFIG_VPN_IP_MATCHING, DEFAULT_VPN_IP_REGEX);
 		paramRegex.setMinimumRequiredUserMode(StringParameter.MODE_ADVANCED);
 	}
 
@@ -182,6 +144,77 @@ public class PluginPIA
 	 */
 	public void unload()
 			throws PluginException {
+
+		if (pi != null) {
+			UIManager uiManager = pi.getUIManager();
+			if (uiManager != null) {
+				uiManager.removeUIListener(this);
+			}
+			pi.removeListener(this);
+		}
+
+		if (ui != null) {
+			ui.destroy();
+			ui = null;
+		}
+
+		if (configModel != null) {
+			configModel.destroy();
+		}
+		if (model != null) {
+			model.destroy();
+		}
+
+		if (checkerPIA != null) {
+			checkerPIA.destroy();
+			checkerPIA = null;
+		}
+	}
+
+	/* (non-Javadoc)
+	 * @see org.gudy.azureus2.plugins.PluginListener#initializationComplete()
+	 */
+	public void initializationComplete() {
+		if (checkerPIA == null) {
+			return;
+		}
+		try {
+			checkerPIA.portBindingCheck();
+			checkerPIA.calcProtocolAddresses();
+		} catch (Throwable t) {
+			t.printStackTrace();
+		}
+		checkerPIA.buildTimer();
+	}
+
+	/* (non-Javadoc)
+	 * @see org.gudy.azureus2.plugins.PluginListener#closedownInitiated()
+	 */
+	public void closedownInitiated() {
+	}
+
+	/* (non-Javadoc)
+	 * @see org.gudy.azureus2.plugins.PluginListener#closedownComplete()
+	 */
+	public void closedownComplete() {
+	}
+
+	/* (non-Javadoc)
+	 * @see org.gudy.azureus2.plugins.ui.UIManagerListener#UIDetached(org.gudy.azureus2.plugins.ui.UIInstance)
+	 */
+	public void UIDetached(UIInstance instance) {
+		uiInstance = null;
+	}
+
+	/* (non-Javadoc)
+	 * @see org.gudy.azureus2.plugins.ui.UIManagerListener#UIAttached(org.gudy.azureus2.plugins.ui.UIInstance)
+	 */
+	public void UIAttached(UIInstance instance) {
+		if (instance instanceof UISWTInstance) {
+			UISWTInstance swtInstance = (UISWTInstance) instance;
+			ui = new UI(pi, swtInstance);
+		}
+		uiInstance = instance;
 	}
 
 	public static void log(String s) {
@@ -192,8 +225,7 @@ public class PluginPIA
 			s = s.substring(0, s.length() - 1);
 		}
 		if (LOG_TO_STDOUT || logger == null) {
-			long offsetTime = SystemTime.getCurrentTime()
-					- AzureusCoreFactory.getSingleton().getCreateTime();
+			long offsetTime = System.currentTimeMillis() - initializedOn;
 			System.out.println(offsetTime + "] LOGGER: " + s);
 		}
 		if (logger == null) {
