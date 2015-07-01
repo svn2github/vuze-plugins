@@ -911,7 +911,14 @@ RatingsUpdater
 			
 			byte[]	hash = rc.getHash();
 			
-			String uri = UrlUtils.getMagnetURI( hash, rc.getTitle(), rc.getNetworks());
+			String title = rc.getTitle();
+			
+			if ( title.length() > 150 ){
+				
+				title = title.substring( 0, 150 ) + "...";
+			}
+			
+			String uri = UrlUtils.getMagnetURI( hash, title, rc.getNetworks());
 			
 			String[] tags = rc.getTags();
 			
@@ -933,7 +940,14 @@ RatingsUpdater
 				
 			}else{
 			
-				file_str = "file '" + file.getTorrentFile().getRelativePath() + "'";
+				String path = file.getTorrentFile().getRelativePath();
+				
+				if ( path.length() > 150 ){
+					
+					path = "..." + path.substring( path.length() - 150 );
+				}
+				
+				file_str = "file '" + path + "'";
 			}
 			
 			String msg = "Download " + uri + " may also contain " + file_str;
