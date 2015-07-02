@@ -110,7 +110,7 @@ public class CheckerPIA
 		}
 
 	}
-	
+
 	public void destroy() {
 		if (timer != null) {
 			timer.destroy();
@@ -209,12 +209,16 @@ public class CheckerPIA
 			if (newStatusID != -1) {
 				currentStatusID = newStatusID;
 			}
+			String msgID = null;
 			if (newStatusID == STATUS_ID_BAD) {
-				sReply.insert(0, "VPN NOT SET UP CORRECTLY\n");
+				msgID = "pia.topline.bad";
 			} else if (newStatusID == STATUS_ID_OK) {
-				sReply.insert(0, "VPN OK!\n");
+				msgID = "pia.topline.ok";
 			} else if (newStatusID == STATUS_ID_WARN) {
-				sReply.insert(0, "VPN HAS WARNINGS\n");
+				msgID = "pia.topline.warn";
+			}
+			if (msgID != null) {
+				sReply.insert(0, texts.getLocalisedMessageText(msgID) + "\n");
 			}
 
 		} catch (Throwable t) {
@@ -590,12 +594,13 @@ public class CheckerPIA
 		try {
 			// Check if default routing goes through 10.*, by connecting to address
 			// via socket.  Address doesn't need to be reachable, just routable.
-			// This works on Windows, but on Mac returns a wildcard address
+			// This works on Windows (in some cases), but on Mac returns a wildcard 
+			// address
 			DatagramSocket socket = new DatagramSocket();
 			socket.connect(testSocketAddress, 0);
 			InetAddress localAddress = socket.getLocalAddress();
 			socket.close();
-			
+
 			if (!localAddress.isAnyLocalAddress()) {
 				NetworkInterface networkInterface = NetworkInterface.getByInetAddress(
 						localAddress);
@@ -920,26 +925,27 @@ public class CheckerPIA
 	protected File getPIAManagerPath() {
 		File pathPIAManager = null;
 		if (Constants.isWindows) {
-  		String pathProgFiles = System.getenv("ProgramFiles");
-  		if (pathProgFiles != null) {
-  			pathPIAManager = new File(pathProgFiles, "pia_manager");
-  		}
-  		if (pathPIAManager == null || !pathPIAManager.exists()) {
-  			String pathProgFiles86 = System.getenv("ProgramFiles");
-  			if (pathProgFiles == null && pathProgFiles86 != null) {
-  				pathProgFiles86 = pathProgFiles + "(x86)";
-  			}
-  			if (pathProgFiles86 != null) {
-  				pathPIAManager = new File(pathProgFiles86, "pia_manager");
-  			}
-  		}
-  		if (pathPIAManager == null || !pathPIAManager.exists()) {
-  			pathPIAManager = new File("C:\\Program Files\\pia_manager");
-  		}
+			String pathProgFiles = System.getenv("ProgramFiles");
+			if (pathProgFiles != null) {
+				pathPIAManager = new File(pathProgFiles, "pia_manager");
+			}
+			if (pathPIAManager == null || !pathPIAManager.exists()) {
+				String pathProgFiles86 = System.getenv("ProgramFiles");
+				if (pathProgFiles == null && pathProgFiles86 != null) {
+					pathProgFiles86 = pathProgFiles + "(x86)";
+				}
+				if (pathProgFiles86 != null) {
+					pathPIAManager = new File(pathProgFiles86, "pia_manager");
+				}
+			}
+			if (pathPIAManager == null || !pathPIAManager.exists()) {
+				pathPIAManager = new File("C:\\Program Files\\pia_manager");
+			}
 		} else {
-			pathPIAManager = new File(System.getProperty("user.home"), ".pia_manager");
+			pathPIAManager = new File(System.getProperty("user.home"),
+					".pia_manager");
 		}
-		
+
 		return pathPIAManager;
 	}
 
