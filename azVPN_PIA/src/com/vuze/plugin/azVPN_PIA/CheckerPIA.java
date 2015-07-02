@@ -901,14 +901,9 @@ public class CheckerPIA
 					PluginConfig.CORE_PARAM_STRING_LOCAL_BIND_IP, newConfigBindIP);
 			config.setUnsafeBooleanParameter("Enforce Bind IP", true);
 			config.setUnsafeBooleanParameter("Check Bind IP On Start", true);
-			// XXX What about turning off UPnP
-			/*
-			 * Vuze Core does this when generic VPN detected:
-			 		COConfigurationManager.setParameter( "User Mode", 2 );
-					COConfigurationManager.setParameter( "Bind IP", intf.getName());
-					COConfigurationManager.setParameter( "Enforce Bind IP", true );
-					COConfigurationManager.setParameter( "Check Bind IP On Start", true );
-			 */
+			
+			config.setUnsafeBooleanParameter("upnp.enable", false);
+			config.setUnsafeBooleanParameter("natpmp.enable", false);
 
 			addReply(sReply, CHAR_GOOD, "pia.change.binding", new String[] {
 				"" + newConfigBindIP,
