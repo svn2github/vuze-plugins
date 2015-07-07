@@ -20,24 +20,25 @@
 
 package com.maxmind.geoip;
 
-import java.util.Date;
-import java.text.SimpleDateFormat;
 import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 /**
- * Encapsulates metadata about the GeoIP database. The database has a date, is a premium or
- * standard version, and is one of the following types:
+ * Encapsulates metadata about the GeoIP database. The database has a date, is a
+ * premium or standard version, and is one of the following types:
  *
  * <ul>
- *      <li>Country edition -- this is the most common version of the database. It includes
- *          the name of the country and it's ISO country code given an IP address.
- *      <li>Region edition -- includes the country information as well as
- *          what U.S. state or Canadian province the IP address is from if the IP address
- *          is from the U.S. or Canada.
- *      <li>City edition --  includes country, region, city, postal code, latitude, and
- *          longitude information.
- *      <li>Org edition -- includes netblock owner.
- *      <li>ISP edition -- ISP information.
+ * <li>Country edition -- this is the most common version of the database. It
+ * includes the name of the country and it's ISO country code given an IP
+ * address.
+ * <li>Region edition -- includes the country information as well as what U.S.
+ * state or Canadian province the IP address is from if the IP address is from
+ * the U.S. or Canada.
+ * <li>City edition -- includes country, region, city, postal code, latitude,
+ * and longitude information.
+ * <li>Org edition -- includes netblock owner.
+ * <li>ISP edition -- ISP information.
  * </ul>
  *
  * @see com.maxmind.geoip.LookupService#getDatabaseInfo()
@@ -55,24 +56,24 @@ public class DatabaseInfo {
     public final static int PROXY_EDITION = 8;
     public final static int ASNUM_EDITION = 9;
     public final static int NETSPEED_EDITION = 10;
-    public final static int  DOMAIN_EDITION      = 11;
-   public final static int COUNTRY_EDITION_V6 = 12;
-   public final static int ASNUM_EDITION_V6         = 21;
-   public final static int ISP_EDITION_V6           = 22;
-   public final static int ORG_EDITION_V6           = 23;
-   public final static int DOMAIN_EDITION_V6        = 24;
-   public final static int CITY_EDITION_REV1_V6     = 30;
-   public final static int CITY_EDITION_REV0_V6     = 31;
-   public final static int NETSPEED_EDITION_REV1    = 32;
-   public final static int NETSPEED_EDITION_REV1_V6 = 33;
-   
+    public final static int DOMAIN_EDITION = 11;
+    public final static int COUNTRY_EDITION_V6 = 12;
+    public final static int ASNUM_EDITION_V6 = 21;
+    public final static int ISP_EDITION_V6 = 22;
+    public final static int ORG_EDITION_V6 = 23;
+    public final static int DOMAIN_EDITION_V6 = 24;
+    public final static int CITY_EDITION_REV1_V6 = 30;
+    public final static int CITY_EDITION_REV0_V6 = 31;
+    public final static int NETSPEED_EDITION_REV1 = 32;
+    public final static int NETSPEED_EDITION_REV1_V6 = 33;
 
-private static SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMdd");
+    private static SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMdd");
 
     private String info;
 
     /**
      * Creates a new DatabaseInfo object given the database info String.
+     *
      * @param info
      */
     public DatabaseInfo(String info) {
@@ -82,8 +83,7 @@ private static SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMdd");
     public int getType() {
         if (info == null || info.equals("")) {
             return COUNTRY_EDITION;
-        }
-        else {
+        } else {
             // Get the type code from the database info string and then
             // subtract 105 from the value to preserve compatability with
             // databases from April 2003 and earlier.
@@ -106,21 +106,22 @@ private static SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMdd");
      * @return the date of the database.
      */
     public Date getDate() {
-        for (int i=0; i<info.length()-9; i++) {
+        for (int i = 0; i < info.length() - 9; i++) {
             if (Character.isWhitespace(info.charAt(i))) {
-                String dateString = info.substring(i+1, i+9);
+                String dateString = info.substring(i + 1, i + 9);
                 try {
                     synchronized (formatter) {
                         return formatter.parse(dateString);
                     }
+                } catch (ParseException pe) {
                 }
-                catch (ParseException pe) {  }
                 break;
             }
         }
         return null;
     }
 
+    @Override
     public String toString() {
         return info;
     }
