@@ -23,6 +23,7 @@ import lbms.plugins.mldht.kad.DHT.DHTtype;
 import lbms.plugins.mldht.kad.DHT.LogLevel;
 import lbms.plugins.mldht.kad.messages.MessageBase.Method;
 import lbms.plugins.mldht.kad.messages.MessageBase.Type;
+import lbms.plugins.mldht.kad.utils.Token;
 
 /**
  * @author Damokles
@@ -157,7 +158,9 @@ public class MessageDecoder {
 			msg = new FindNodeResponse(mtid, (byte[]) args.get("nodes"),(byte[])args.get("nodes6"));
 			break;
 		case GET_PEERS:
-			byte[] token = (byte[]) args.get("token");
+			Object their_token = args.get("token");
+			
+			
 			byte[] nodes = (byte[]) args.get("nodes");
 			byte[] nodes6 = (byte[]) args.get("nodes6");
 			
@@ -193,7 +196,7 @@ public class MessageDecoder {
 
 			if (dbl != null || nodes != null || nodes6 != null)
 			{
-				GetPeersResponse resp = new GetPeersResponse(mtid, nodes, nodes6, token);
+				GetPeersResponse resp = new GetPeersResponse(mtid, nodes, nodes6, their_token==null?null:new Token.TheirToken( their_token ));
 				resp.setPeerItems(dbl);
 				msg = resp; 
 				break;
@@ -262,7 +265,7 @@ public class MessageDecoder {
 				}
 				Key infoHash = new Key(hash);
 
-				byte[] token = (byte[]) args.get("token");
+				Token token = new Token.OurToken((byte[]) args.get("token"));
 				
 				AnnounceRequest ann = new AnnounceRequest(infoHash, ((Long) args.get("port")).intValue(), token);
 				ann.setSeed(Long.valueOf(1).equals(args.get("seed")));

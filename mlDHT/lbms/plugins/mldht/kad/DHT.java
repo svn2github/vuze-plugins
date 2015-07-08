@@ -17,7 +17,6 @@
 package lbms.plugins.mldht.kad;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -31,9 +30,9 @@ import lbms.plugins.mldht.kad.messages.*;
 import lbms.plugins.mldht.kad.messages.ErrorMessage.ErrorCode;
 import lbms.plugins.mldht.kad.tasks.*;
 import lbms.plugins.mldht.kad.utils.AddressUtils;
-import lbms.plugins.mldht.kad.utils.ByteWrapper;
 import lbms.plugins.mldht.kad.utils.PopulationEstimator;
 import lbms.plugins.mldht.kad.utils.ThreadLocalUtils;
+import lbms.plugins.mldht.kad.utils.Token;
 
 /**
  * @author Damokles
@@ -252,7 +251,7 @@ public class DHT implements DHTBase {
 			
 
 		// generate a token
-		ByteWrapper token = db.genToken(r.getOrigin().getAddress(), r
+		Token token = db.genToken(r.getOrigin().getAddress(), r
 				.getOrigin().getPort(), r.getInfoHash());
 
 		KClosestNodesSearch kns4 = null; 
@@ -272,7 +271,7 @@ public class DHT implements DHTBase {
 		GetPeersResponse resp = new GetPeersResponse(r.getMTID(), 
 			kns4 != null ? kns4.pack() : null,
 			kns6 != null ? kns6.pack() : null,
-			db.insertForKeyAllowed(r.getInfoHash()) ? token.arr : null);
+			db.insertForKeyAllowed(r.getInfoHash()) ? token : null);
 		
 		if(r.isScrape())
 		{
@@ -298,7 +297,7 @@ public class DHT implements DHTBase {
 
 		node.recieved(this, r);
 		// first check if the token is OK
-		ByteWrapper token = new ByteWrapper(r.getToken());
+		Token token = r.getToken();
 		if (!db.checkToken(token, r.getOrigin().getAddress(), r
 				.getOrigin().getPort(), r.getInfoHash())) {
 			logDebug("DHT Received Announce Request with invalid token.");

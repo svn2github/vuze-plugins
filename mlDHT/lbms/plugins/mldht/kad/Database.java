@@ -18,22 +18,18 @@ package lbms.plugins.mldht.kad;
 
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.gudy.azureus2.core3.util.LightHashMap;
 import org.gudy.azureus2.core3.util.LightHashSet;
 import org.gudy.azureus2.core3.util.SHA1;
 
 import lbms.plugins.mldht.kad.DHT.DHTtype;
-import lbms.plugins.mldht.kad.utils.ByteWrapper;
 import lbms.plugins.mldht.kad.utils.ThreadLocalUtils;
+import lbms.plugins.mldht.kad.utils.Token;
 
 /**
  * @author Damokles
@@ -237,7 +233,7 @@ public class Database {
 	 *            The port of the peer
 	 * @return A Key
 	 */
-	ByteWrapper genToken(InetAddress ip, int port, Key lookupKey) {
+	Token genToken(InetAddress ip, int port, Key lookupKey) {
 		updateTokenTimestamps();
 		
 		byte[] tdata = new byte[ip.getAddress().length + 2 + 8 + Key.SHA1_HASH_LENGTH + sessionSecret.length];
@@ -249,7 +245,7 @@ public class Database {
 		bb.putLong(timestampCurrent.get());
 		bb.put(lookupKey.getHash());
 		bb.put(sessionSecret);
-		return new ByteWrapper(getHasher().digest(bb));
+		return new Token.OurToken(getHasher().digest(bb));
 	}
 	
 	private void updateTokenTimestamps() {
@@ -277,7 +273,7 @@ public class Database {
 	 *            The port of the sender
 	 * @return true if the token was given to this peer, false other wise
 	 */
-	boolean checkToken(ByteWrapper token, InetAddress ip, int port, Key lookupKey) {
+	boolean checkToken(Token token, InetAddress ip, int port, Key lookupKey) {
 		updateTokenTimestamps();
 		boolean valid = checkToken(token, ip, port, lookupKey, timestampCurrent.get()) || checkToken(token, ip, port, lookupKey, timestampPrevious);
 		if(!valid)
@@ -286,7 +282,7 @@ public class Database {
 	}
 
 
-	private boolean checkToken(ByteWrapper token, InetAddress ip, int port, Key lookupKey, long timeStamp) {
+	private boolean checkToken(Token token, InetAddress ip, int port, Key lookupKey, long timeStamp) {
 
 		byte[] tdata = new byte[ip.getAddress().length + 2 + 8 + Key.SHA1_HASH_LENGTH + sessionSecret.length];
 		ByteBuffer bb = ByteBuffer.wrap(tdata);
@@ -295,7 +291,7 @@ public class Database {
 		bb.putLong(timeStamp);
 		bb.put(lookupKey.getHash());
 		bb.put(sessionSecret);
-		return token.equals(new ByteWrapper(getHasher().digest(bb)));
+		return token.equals(new Token.OurToken(getHasher().digest(bb)));
 	}
 
 	/// Test wether or not the DB contains a key

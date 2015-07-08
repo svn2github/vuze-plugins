@@ -16,7 +16,7 @@
  */
 package lbms.plugins.mldht.kad;
 
-import lbms.plugins.mldht.kad.utils.ByteWrapper;
+import lbms.plugins.mldht.kad.utils.Token;
 
 /**
  * @author Damokles
@@ -24,18 +24,18 @@ import lbms.plugins.mldht.kad.utils.ByteWrapper;
  */
 public class KBucketEntryAndToken extends KBucketEntry {
 
-	private ByteWrapper		token;
+	private Token		token;
 
-	public KBucketEntryAndToken (KBucketEntry kbe, byte[] token) {
+	public KBucketEntryAndToken (KBucketEntry kbe, Token token) {
 		super(kbe);
-		this.token = new ByteWrapper(token);
+		this.token = token;
 	}
 
 	/**
 	 * @return the token
 	 */
-	public byte[] getToken () {
-		return token.arr;
+	public Token getToken () {
+		return token;
 	}
 
 	/* (non-Javadoc)

@@ -21,6 +21,7 @@ import java.util.*;
 
 import lbms.plugins.mldht.kad.*;
 import lbms.plugins.mldht.kad.DHT.DHTtype;
+import lbms.plugins.mldht.kad.utils.Token;
 
 /**
  * @author Damokles
@@ -28,7 +29,7 @@ import lbms.plugins.mldht.kad.DHT.DHTtype;
  */
 public class GetPeersResponse extends MessageBase {
 
-	private byte[]			token;
+	private Token			token;
 	private byte[]			nodes;
 	private byte[]			nodes6;
 	private byte[]			scrapeSeeds;
@@ -42,7 +43,7 @@ public class GetPeersResponse extends MessageBase {
 	 * @param nodes
 	 * @param token
 	 */
-	public GetPeersResponse (byte[] mtid, byte[] nodes, byte[] nodes6, byte[] token) {
+	public GetPeersResponse (byte[] mtid, byte[] nodes, byte[] nodes6, Token token) {
 		super(mtid, Method.GET_PEERS, Type.RSP_MSG);
 		this.nodes = nodes;
 		this.nodes6 = nodes6;
@@ -63,7 +64,7 @@ public class GetPeersResponse extends MessageBase {
 		Map<String, Object> innerMap = new TreeMap<String, Object>();
 		innerMap.put("id", id.getHash());
 		if(token != null)
-			innerMap.put("token", token);
+			innerMap.put("token", token.getValue());
 		if(nodes != null)
 			innerMap.put("nodes", nodes);
 		if(nodes6 != null)
@@ -125,7 +126,7 @@ public class GetPeersResponse extends MessageBase {
 		this.scrapePeers = scrapePeers != null ? scrapePeers.serialize() : null;
 	}
 
-	public byte[] getToken () {
+	public Token getToken () {
 		return token;
 	}
 

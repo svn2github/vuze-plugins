@@ -24,6 +24,7 @@ import java.util.TreeMap;
 import lbms.plugins.mldht.kad.DHT;
 import lbms.plugins.mldht.kad.DHTConstants;
 import lbms.plugins.mldht.kad.Key;
+import lbms.plugins.mldht.kad.utils.Token;
 
 /**
  * @author Damokles
@@ -33,7 +34,7 @@ public class AnnounceRequest extends GetPeersRequest {
 
 	protected int		port;
 	boolean				isSeed;
-	protected byte[]	token;
+	protected Token		token;
 
 	/**
 	 * @param id
@@ -41,7 +42,7 @@ public class AnnounceRequest extends GetPeersRequest {
 	 * @param port
 	 * @param token
 	 */
-	public AnnounceRequest (Key info_hash, int port, byte[] token) {
+	public AnnounceRequest (Key info_hash, int port, Token token) {
 		super(info_hash);
 		this.port = port;
 		this.token = token;
@@ -72,7 +73,7 @@ public class AnnounceRequest extends GetPeersRequest {
 		inner.put("id", id.getHash());
 		inner.put("info_hash", target.getHash());
 		inner.put("port", port);
-		inner.put("token", token);
+		inner.put("token", token.getValue());
 		inner.put("seed", Long.valueOf(isSeed ? 1 : 0));
 
 		return inner;
@@ -82,7 +83,7 @@ public class AnnounceRequest extends GetPeersRequest {
 	/**
 	 * @return the token
 	 */
-	public byte[] getToken () {
+	public Token getToken () {
 		return token;
 	}
 	
