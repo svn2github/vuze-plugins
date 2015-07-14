@@ -16,13 +16,14 @@ import java.io.OutputStreamWriter;
 import java.io.BufferedWriter;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Properties;
-
+import java.util.Set;
 /**
  * LocaleProperties class
  *   
@@ -58,7 +59,7 @@ public class LocaleProperties extends CommentedProperties
         return commentedProperties;
     }
 }
-class CommentedProperties extends Properties
+class CommentedProperties extends OrderedProperties
 {
     private static final long serialVersionUID = 1L;
     protected boolean loaded = false;
@@ -633,7 +634,7 @@ class CommentedProperties extends Properties
     {
         synchronized (this)
         {
-            for (Enumeration<Object> e = this.keys(); e.hasMoreElements();)
+            for (Enumeration<String> e = this.keys(); e.hasMoreElements();)
             {
                 String key = (String) e.nextElement();
                 String val = (String) this.get(key);
@@ -659,4 +660,70 @@ class CommentedProperties extends Properties
     {
         return this.loaded;
     }
+}
+
+class
+OrderedProperties
+{
+	private Map<String,String> map = Collections.synchronizedMap( new LinkedHashMap<String,String>());
+	
+	public void
+	clear()
+	{
+		map.clear();
+	}
+	
+	public String
+	get(
+		String	key )
+	{
+		return( map.get( key ));
+	}
+	
+	public String
+	put(
+		String	key,
+		String	value )
+	{
+		return( map.put( key, value ));
+	}
+	
+	public void
+	remove(
+		String		key )
+	{
+		map.remove( key );
+	}
+	
+	public String
+	getProperty(
+		String		key ) 
+	{
+		return( get( key ));
+	}
+	
+	public int
+	size()
+	{
+		return( map.size());
+	}
+	
+	public boolean
+	containsKey(
+		String		key )
+	{
+		return( map.containsKey(key));
+	}
+	
+	public Enumeration<String>
+	propertyNames()
+	{
+		return( keys());
+	}
+	
+	public Enumeration<String>
+	keys()
+	{
+		return( Collections.enumeration( map.keySet()));
+	}
 }
