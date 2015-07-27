@@ -551,6 +551,8 @@ I2PHelperRouterDHT
 			
 			dht_socket_manager_properties.putAll( props );
 			
+			adapter.log( "Updating options for " + dht_index + ": " + props );
+			
 			return( true );
 		}
 		

@@ -71,7 +71,7 @@ I2PHelperRouter
 	public static final int		PARAM_SEND_KBS_DEFAULT		= 50;
 	
 	public static final String	PARAM_RECV_KBS				= "azi2phelper.rate.recv.max";
-	public static final int		PARAM_RECV_KBS_DEFAULT		= 50;
+	public static final int		PARAM_RECV_KBS_DEFAULT		= PARAM_SEND_KBS_DEFAULT;
 	
 	public static final String	PARAM_SHARE_PERCENT			= "azi2phelper.share.percent";
 	public static final int		PARAM_SHARE_PERCENT_DEFAULT	= 80;
@@ -328,48 +328,56 @@ I2PHelperRouter
 	addRateLimitProperties(
 		Properties		props )
 	{
+		final long UNLIMITED = 100*1024;	// unlimited - 100MB/sec, have to use something
+		
 			// router bandwidth
 			
 		int mult 				= is_bootstrap_node?1:rate_multiplier;
 		
-		long	base_in 		= is_bootstrap_node?500:getIntegerParameter(PARAM_RECV_KBS);
+		long	raw_base_in 	= is_bootstrap_node?500:getIntegerParameter(PARAM_RECV_KBS);
+		
+		long	base_in	= raw_base_in;
 		
 		if ( base_in <= 0 ){
 			
-			base_in = 100*1024;	// unlimited - 100MB/sec
+			base_in = UNLIMITED;
 			
 		}else{
 			
 			base_in *= mult;
 			
-			base_in = Math.min( base_in, 100*1024 );
+			base_in = Math.min( base_in, UNLIMITED );
 		}
 		
 			// got to keep some bytes flowing here
 		
 		if ( base_in < 10 ){
+			
 			base_in = 10;
 		}
 		
 		long burst_in_ks 	= base_in+(base_in/10);
 		long burst_in_k		= burst_in_ks*20;
 		
-		long	base_out 		= is_bootstrap_node?500:getIntegerParameter(PARAM_SEND_KBS);
+		long	raw_base_out 		= is_bootstrap_node?500:getIntegerParameter(PARAM_SEND_KBS);
+		
+		long	base_out	= raw_base_out;
 		
 		if ( base_out <= 0 ){
 			
-			base_out = 100*1024;	// unlimited - 100MB/sec
+			base_out = UNLIMITED;	// unlimited - 100MB/sec
 			
 		}else{
 			
 			base_out *= mult;
 			
-			base_out = Math.min( base_out, 100*1024 );
+			base_out = Math.min( base_out, UNLIMITED );
 		}
 		
 			// got to keep some bytes flowing here
 		
 		if ( base_out < 10 ){
+			
 			base_out = 10;
 		}
 		
@@ -394,7 +402,7 @@ I2PHelperRouter
 		
 		if ( floodfill_control == PARAM_FLOODFILL_CONTROL_VUZE ){
 			
-			if ( Math.min( base_in, base_out ) < 100 ){	// kick in auto if > 100KB/sec and leave it up to I2P
+			if ( Math.min( raw_base_in, raw_base_out ) <= 100 ){	// kick in auto if > 100KB/sec and leave it up to I2P
 				
 				floodfill_control_value = "false";
 				
@@ -1065,25 +1073,27 @@ I2PHelperRouter
 			
 			I2PHelperDHT	dht		= dhts[i].getDHT();
 
+			String str = "";
+			
 			if( dhts.length > 1 ){
 				
-				adapter.log( "DHT " + i );
+				str = "DHT " + i;
 			}
+			
+			String dht_str;
 			
 			if ( dht == null ){
 				
-				adapter.log( "DHT is inactive" );
+				dht_str = "DHT is inactive";
 				
 			}else{
 				
-				String html = dht.renderStatusHTML();
-				
-				if ( html.length() > 0 ){
-					adapter.log( html );
-				}
-				
-				adapter.log( dht.getStats());
+				dht_str = dht.getStats();
 			}
+			
+			str += (str.length()==0?"":": ") + dht_str;
+							
+			adapter.log( str );
 		}
 		
 		if ( router == null ){

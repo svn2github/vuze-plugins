@@ -34,6 +34,7 @@ import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Text;
 import org.gudy.azureus2.core3.config.COConfigurationManager;
+import org.gudy.azureus2.core3.download.DownloadManagerStats;
 import org.gudy.azureus2.core3.peer.PEPeerManager;
 import org.gudy.azureus2.core3.peer.PEPeerSource;
 import org.gudy.azureus2.core3.util.AEMonitor;
@@ -2207,6 +2208,18 @@ I2PDHTTrackerPlugin
 				
 				if ( run_data == null || run_data[0] == REG_TYPE_DERIVED ){
 					
+		 			DownloadManagerStats stats = PluginCoreUtils.unwrap( download ).getStats();
+	    			
+	    				// hack atm rather than recording 'has ever been started' state just look at data
+	    				// might have been added for seeding etc so don't just use bytes downloaded
+		 				// this is to avoid scraping/registering downloads that have yet to be
+		 				// started (and might be having their enabled networks adjusted)
+	    			
+	    			if ( stats.getTotalDataBytesReceived() == 0 && stats.getPercentDoneExcludingDND() == 0 ){
+	    				
+	    				continue;
+	    			}
+	    			
 					boolean	force =  torrent.wasCreatedByUs();
 					
 					if ( !force ){

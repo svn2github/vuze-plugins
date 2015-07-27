@@ -89,7 +89,10 @@ I2PHelperNetworkMixer
 	
 	private static final int SEED_REQUEST_CHECK_PERIOD 		= 1*60*1000;
 	private static final int SEED_REQUEST_CHECK_TICKS 		= SEED_REQUEST_CHECK_PERIOD/TIMER_PERIOD;
-
+	
+	private static final int SEED_REQUEST_RESET_PERIOD		= 30*60*1000;
+	private static final int SEED_REQUEST_RESET_TICKS		= SEED_REQUEST_RESET_PERIOD/TIMER_PERIOD;
+			
 	private static final int SR_CODE_FAILED 	= -1;
 	private static final int SR_CODE_NOT_SET	= 0;
 	
@@ -202,6 +205,11 @@ I2PHelperNetworkMixer
 						if ( tick_count % SEED_REQUEST_CHECK_TICKS == 0 ){
 							
 							checkSeedRequests();
+						}
+						
+						if ( tick_count % SEED_REQUEST_RESET_TICKS == 0 ){
+							
+							resetSeedRequests();
 						}
 					}
 				});
@@ -384,12 +392,21 @@ I2PHelperNetworkMixer
 	private Object					seed_request_write_lock = new Object();
 	private volatile ChatInstance	seed_request_write_chat;
 	private Set<Download>			seed_requests_write_pending	= new HashSet<Download>();
+	private Set<Integer>			seed_request_recent_writes	= new HashSet<Integer>();
 	
 	private static final String seed_request_read_key = "Statistics: Announce: Summary[pk=AR4QZBLCNKCC7ONS2ZTHZJMIO6UB3AM2X3VRQDYYSBUBDDMBSEA5KXUTCUQID4AS5AP4AMUA4MUW67Y&ro=1]";
 	
 	private Object					seed_request_read_lock = new Object();
 	private volatile ChatInstance	seed_request_read_chat;
 
+	private void
+	resetSeedRequests()
+	{
+		synchronized( seed_request_recent_writes ){
+			
+			seed_request_recent_writes.clear();
+		}
+	}
 	
 	private void
 	checkSeedRequests()
@@ -694,6 +711,16 @@ I2PHelperNetworkMixer
 				int code = getSRCode( d );
 				
 				if ( code != SR_CODE_FAILED ){
+					
+					synchronized( seed_request_recent_writes ){
+						
+						if ( seed_request_recent_writes.contains( code )){
+							
+							continue;
+						}
+						
+						seed_request_recent_writes.add( code );
+					}
 					
 					message += (message.length()==0?"":" ") + Integer.toHexString( code );
 					
