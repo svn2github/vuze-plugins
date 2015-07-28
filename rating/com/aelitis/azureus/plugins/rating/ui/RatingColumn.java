@@ -24,10 +24,12 @@ package com.aelitis.azureus.plugins.rating.ui;
 
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.ImageData;
+import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.ui.Graphic;
 import org.gudy.azureus2.plugins.ui.tables.*;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
+import org.gudy.azureus2.ui.swt.Utils;
 import org.gudy.azureus2.ui.swt.plugins.UISWTGraphic;
 import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 
@@ -135,13 +137,25 @@ public class RatingColumn implements TableCellRefreshListener,
     cell.setToolTip(toolTip);
   }
 
-	public void dispose(TableCell cell) {
-    Graphic g = cell.getGraphic();
-    if (g instanceof UISWTGraphic) {
-    	Image img = ((UISWTGraphic)g).getImage();
-    	if (img != null && !img.isDisposed())
-    		img.dispose();
-    }
+	public void dispose(TableCell cell) 
+	{
+	    Graphic g = cell.getGraphic();
+	    if (g instanceof UISWTGraphic) {
+	    	final Image img = ((UISWTGraphic)g).getImage();
+	    	if (img != null && !img.isDisposed()){
+	    		Utils.execSWTThread(
+    				new AERunnable(){	
+    					public void 
+    					runSupport() 
+    					{
+    						if ( !img.isDisposed()){
+    							
+    							img.dispose();
+    						}
+    					}
+    				});
+	    	}
+    	}
 	}
 
 	public void cellMouseTrigger(TableCellMouseEvent event) {
