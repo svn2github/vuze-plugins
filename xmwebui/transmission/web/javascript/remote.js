@@ -295,6 +295,22 @@ TransmissionRemote.prototype =
 			{"move": true, "location": new_location}, callback, context);
 	},
 
+	/* Vuze:Tag list! */
+	getTagList: function(callback, context) {
+		var remote = this;
+		var o = {
+			method: 'tags-get-list',
+		};
+		this.sendRequest(o, function(response) {
+			var args = response['arguments'];
+			var tagArray = [];
+			args.tags.forEach(function(tag) {
+				tagArray[tag.uid] = tag;
+			});
+			callback.call (context, tagArray);
+		});
+	},
+
 	removeTorrents: function(torrent_ids, callback, context) {
 		this.sendTorrentActionRequests('torrent-remove', torrent_ids, callback, context);
 	},

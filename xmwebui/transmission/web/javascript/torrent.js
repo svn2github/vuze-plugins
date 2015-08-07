@@ -108,7 +108,8 @@ Torrent.Fields.StatsExtra = [
 	'haveValid',
 	'peers',
 	'startDate',
-	'trackerStats'
+	'trackerStats',
+	'tag-uids'
 ];
 
 /***
@@ -284,6 +285,9 @@ Torrent.prototype =
 	getSizeWhenDone: function() { return this.fields.sizeWhenDone; },
 	getStartDate: function() { return this.fields.startDate; },
 	getStatus: function() { return this.fields.status; },
+	/** >> Vuze */
+	getTagUIDs: function() { return this.fields['tag-uids']; },
+	/** << Vuze */
 	getTotalSize: function() { return this.fields.totalSize; },
 	getTrackers: function() { return this.fields.trackers; },
 	getUploadSpeed: function() { return this.fields.rateUpload; },

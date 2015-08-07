@@ -684,6 +684,16 @@ Transmission.prototype =
 		// schedule the next request
 		this.refreshTorrents();
 	},
+
+	updateTagList: function(callback) {
+		this.remote.getTagList (function(tags) {
+			this.tags = tags;
+			if (callback !== undefined) {
+				callback();
+			}
+		}, this);
+	},
+
 	/* << Vuze */
 
 	dragenter: function(ev) {

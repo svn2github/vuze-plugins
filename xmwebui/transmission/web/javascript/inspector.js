@@ -411,6 +411,34 @@ function Inspector(controller) {
             str = none;  
         setTextContent(e.comment_lb, str);
 
+        /* >> Vuze: Tags */
+        if(torrents.length < 1)
+            str = none;
+        else {
+            if (transmission.tags === undefined) {
+                str = 'Loading..';
+            	transmission.updateTagList(updateInfoPage);
+            } else {
+                str = '';
+            	var first = true;
+	            tagUIDS = torrents[0].getTagUIDs();
+	            tagUIDS.forEach(function(uid) {
+	            	if (first) {
+	            		first = false;
+	            	} else {
+	            		str += ", ";
+	            	}
+	            	if (transmission.tags[uid] === undefined) {
+	                	str += uid;
+	            	} else {
+	            		str += transmission.tags[uid].name;
+	            	}
+	            });
+            }
+        }
+        setTextContent(e.tags_lb, str);
+        /* << Vuze */
+
         //
         //  origin
         //
@@ -798,6 +826,8 @@ function Inspector(controller) {
         data.elements.privacy_lb        = $('#inspector-info-privacy')[0];
         data.elements.origin_lb         = $('#inspector-info-origin')[0];
         data.elements.comment_lb        = $('#inspector-info-comment')[0];
+        // Vuze: Tags
+        data.elements.tags_lb           = $('#inspector-info-tags')[0];
         data.elements.name_lb           = $('#torrent_inspector_name')[0];
 
         // force initial 'N/A' updates on all the pages
