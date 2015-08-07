@@ -422,18 +422,20 @@ function Inspector(controller) {
                 str = '';
             	var first = true;
 	            tagUIDS = torrents[0].getTagUIDs();
-	            tagUIDS.forEach(function(uid) {
-	            	if (first) {
-	            		first = false;
-	            	} else {
-	            		str += ", ";
-	            	}
-	            	if (transmission.tags[uid] === undefined) {
-	                	str += uid;
-	            	} else {
-	            		str += transmission.tags[uid].name;
-	            	}
-	            });
+	            if (tagsUIDS !== undefined) {
+		            tagUIDS.forEach(function(uid) {
+		            	if (first) {
+		            		first = false;
+		            	} else {
+		            		str += ", ";
+		            	}
+		            	if (transmission.tags[uid] === undefined) {
+		                	str += uid;
+		            	} else {
+		            		str += transmission.tags[uid].name;
+		            	}
+		            });
+	            }
             }
         }
         setTextContent(e.tags_lb, str);
