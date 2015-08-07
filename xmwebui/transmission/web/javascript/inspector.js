@@ -422,7 +422,7 @@ function Inspector(controller) {
                 str = '';
             	var first = true;
 	            tagUIDS = torrents[0].getTagUIDs();
-	            if (tagsUIDS !== undefined) {
+	            if (tagUIDS !== undefined) {
 		            tagUIDS.forEach(function(uid) {
 		            	if (first) {
 		            		first = false;
