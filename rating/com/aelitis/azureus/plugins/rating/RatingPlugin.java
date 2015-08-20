@@ -38,6 +38,7 @@ import org.gudy.azureus2.plugins.PluginListener;
 import org.gudy.azureus2.plugins.UnloadablePlugin;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabase;
 import org.gudy.azureus2.plugins.download.Download;
+import org.gudy.azureus2.plugins.download.DownloadAttributeListener;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.torrent.TorrentAttribute;
 import org.gudy.azureus2.plugins.ui.UIInstance;
@@ -153,7 +154,32 @@ public class RatingPlugin implements UnloadablePlugin, PluginListener {
   			
   				result = download.getDistributedDatabases();
   				
-  				download.setUserData( DDBS_KEY, result );
+  				if ( result != null ){
+  					
+	  				download.setUserData( DDBS_KEY, result );
+	  				
+	  					// handle change from no network to some network
+	  				
+	  				if ( result.size() == 0 ){
+	  					
+		  				download.addAttributeListener(
+		  					new DownloadAttributeListener(){
+								
+								public void 
+								attributeEventOccurred(
+									Download 			download,
+									TorrentAttribute 	attribute, 
+									int 				event_type) 
+								{
+									download.removeAttributeListener( this, ta_networks, DownloadAttributeListener.WRITTEN );
+									
+									download.setUserData( DDBS_KEY, null );
+								}
+							},
+							ta_networks,
+							DownloadAttributeListener.WRITTEN );
+	  				}
+  				}		
   			}
   			
   			return( result );
