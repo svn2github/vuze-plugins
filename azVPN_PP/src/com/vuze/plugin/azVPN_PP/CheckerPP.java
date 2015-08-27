@@ -133,8 +133,7 @@ public class CheckerPP
 			checkingPortBinding = true;
 		}
 
-		CheckerPPListener[] triggers = listeners.toArray(
-				new CheckerPPListener[0]);
+		CheckerPPListener[] triggers = listeners.toArray(new CheckerPPListener[0]);
 		for (CheckerPPListener l : triggers) {
 			try {
 				l.portCheckStart();
@@ -148,77 +147,10 @@ public class CheckerPP
 		try {
 			int newStatusID = findBindingAddress(sReply);
 
-			LineNumberReader lnr = null;
-
-			try {
-				PluginConfig pluginConfig = pi.getPluginconfig();
-				int coreTCPPort = pluginConfig.getCoreIntParameter(
-						PluginConfig.CORE_PARAM_INT_INCOMING_TCP_PORT);
-				int coreUDPPort = pluginConfig.getCoreIntParameter(
-						PluginConfig.CORE_PARAM_INT_INCOMING_UDP_PORT);
-
-				Process p = Runtime.getRuntime().exec(new String[] {
-					"reg",
-					"query",
-					"HKLM\\SYSTEM\\CurrentControlSet\\services\\SharedAccess\\Parameters\\FirewallPolicy\\FirewallRules",
-					"/t",
-					"REG_SZ",
-					"/f",
-					"\"Perfect Privacy\""
-				});
-
-				lnr = new LineNumberReader(new InputStreamReader(p.getInputStream()));
-
-				while (true) {
-
-					String line = lnr.readLine();
-
-					if (line == null) {
-
-						break;
-					}
-
-					if (line.contains("Perfect Privacy") && line.contains("LPort")) {
-
-						String[] split = line.split("\\|");
-						int port = -1;
-						for (String entry : split) {
-							if (entry.startsWith("LPort=")) {
-								int lport = Integer.parseInt(entry.substring(6));
-								if (lport == coreTCPPort && lport == coreUDPPort) {
-									port = lport;
-									break;
-								}
-								if (lport > port) {
-									port = lport;
-								}
-							}
-						}
-						
-						if (port > 0) {
-							addReply(sReply, CHAR_GOOD, "pp.port.in.registry", new String[] {
-								Integer.toString(port)
-							});
-							changePort(port, sReply);
-						} else {
-							if (newStatusID != STATUS_ID_BAD) {
-								newStatusID = STATUS_ID_WARN;
-
-								addReply(sReply, CHAR_WARN, "pp.port.forwarding.get.failed");
-							}
-						}
-
-						break;
-					}
-				}
-			} catch (Throwable e) {
-			} finally {
-				if (lnr != null) {
-					try {
-						lnr.close();
-					} catch (Throwable e) {
-					}
-				}
+			if (pi.getUtilities().isWindows()) {
+				newStatusID = portBindingCheckWin(newStatusID, sReply);
+			} else {
+				newStatusID = portBindingCheckNonWin(newStatusID, sReply);
 			}
 
 			if (newStatusID != -1) {
@@ -256,6 +188,136 @@ public class CheckerPP
 			checkingPortBinding = false;
 		}
 		return lastPortCheckStatus;
+	}
+
+	private int portBindingCheckWin(int newStatusID, StringBuilder sReply) {
+		LineNumberReader lnr = null;
+
+		try {
+			PluginConfig pluginConfig = pi.getPluginconfig();
+			int coreTCPPort = pluginConfig.getCoreIntParameter(
+					PluginConfig.CORE_PARAM_INT_INCOMING_TCP_PORT);
+			int coreUDPPort = pluginConfig.getCoreIntParameter(
+					PluginConfig.CORE_PARAM_INT_INCOMING_UDP_PORT);
+
+			Process p = Runtime.getRuntime().exec(new String[] {
+				"reg",
+				"query",
+				"HKLM\\SYSTEM\\CurrentControlSet\\services\\SharedAccess\\Parameters\\FirewallPolicy\\FirewallRules",
+				"/t",
+				"REG_SZ",
+				"/f",
+				"\"Perfect Privacy\""
+			});
+
+			lnr = new LineNumberReader(new InputStreamReader(p.getInputStream()));
+
+			while (true) {
+
+				String line = lnr.readLine();
+
+				if (line == null) {
+
+					break;
+				}
+
+				if (line.contains("Perfect Privacy") && line.contains("LPort")) {
+
+					String[] split = line.split("\\|");
+					int port = -1;
+					for (String entry : split) {
+						if (entry.startsWith("LPort=")) {
+							int lport = Integer.parseInt(entry.substring(6));
+							if (lport == coreTCPPort && lport == coreUDPPort) {
+								port = lport;
+								break;
+							}
+							if (lport > port) {
+								port = lport;
+							}
+						}
+					}
+
+					if (port > 0) {
+						addReply(sReply, CHAR_GOOD, "pp.port.in.registry", new String[] {
+							Integer.toString(port)
+						});
+						changePort(port, sReply);
+						return newStatusID;
+					} else {
+						return portBindingCheckNonWin(newStatusID, sReply);
+					}
+
+				}
+			}
+
+		} catch (Throwable e) {
+		} finally {
+			if (lnr != null) {
+				try {
+					lnr.close();
+				} catch (Throwable e) {
+				}
+			}
+		}
+		return portBindingCheckNonWin(newStatusID, sReply);
+	}
+
+	private int portBindingCheckNonWin(int newStatusID, StringBuilder sReply) {
+		/*
+		 * From Perfect Privacy's Javascript Port Calcaulator:
+
+		function check() {
+		str = jQuery('#form_ip_octet_3').val();
+		if (str == "") {
+		    return;
+		}
+		number = str.charAt(str.length - 1);
+		lastpart = jQuery('#form_ip_octet_4').val();
+		if (lastpart == "") {
+		    return;
+		}
+		if (lastpart.length == 2) {
+		    lastpart = "0" + lastpart;
+		}
+		if (lastpart.length == 1) {
+		    lastpart = "00" + lastpart;
+		}
+		port1 = "1" + number + lastpart;
+		port2 = "2" + number + lastpart;
+		port3 = "3" + number + lastpart;
+		
+		jQuery('#ports').html("<td>" + port1 + "</td><td>" + port2 + "</td><td>" + port3 + "</td>");
+		}
+		 */
+		
+		if (vpnIP != null) {
+			byte[] address = vpnIP.getAddress();
+			int number = (address[2] & 0xff) % 10; // last digit
+			String lastPart = "" + (address[3] & 0xff);
+			if (lastPart.length() == 2) {
+				lastPart = "0" + lastPart;
+			}
+			if (lastPart.length() == 1) {
+				lastPart = "00" + lastPart;
+			}
+			
+			String portString = "1" + number + lastPart;
+			int port = Integer.parseInt(portString);
+
+			addReply(sReply, CHAR_GOOD, "pp.port.calculated", new String[] {
+				Integer.toString(port)
+			});
+			changePort(port, sReply);
+		} else {
+			if (newStatusID != STATUS_ID_BAD) {
+				newStatusID = STATUS_ID_WARN;
+
+				addReply(sReply, CHAR_WARN, "pp.port.forwarding.get.failed");
+			}
+		}
+		
+		return newStatusID;
 	}
 
 	public String calcProtocolAddresses() {
@@ -311,8 +373,7 @@ public class CheckerPP
 
 		lastProtocolAddresses = sReply.toString();
 
-		CheckerPPListener[] triggers = listeners.toArray(
-				new CheckerPPListener[0]);
+		CheckerPPListener[] triggers = listeners.toArray(new CheckerPPListener[0]);
 		for (CheckerPPListener l : triggers) {
 			try {
 				l.protocolAddressesStatusChanged(lastProtocolAddresses);
