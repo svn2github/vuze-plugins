@@ -147,10 +147,15 @@ public class CheckerPP
 		try {
 			int newStatusID = findBindingAddress(sReply);
 
-			if (pi.getUtilities().isWindows()) {
-				newStatusID = portBindingCheckWin(newStatusID, sReply);
-			} else {
-				newStatusID = portBindingCheckNonWin(newStatusID, sReply);
+			boolean doPortForwarding = config.getPluginBooleanParameter(
+					PluginPP.CONFIG_DO_PORT_FORWARDING);
+
+			if (doPortForwarding) {
+				if (pi.getUtilities().isWindows()) {
+					newStatusID = portForwardingCheckWin(newStatusID, sReply);
+				} else {
+					newStatusID = portForwardingCheckNonWin(newStatusID, sReply);
+				}
 			}
 
 			if (newStatusID != -1) {
@@ -190,7 +195,7 @@ public class CheckerPP
 		return lastPortCheckStatus;
 	}
 
-	private int portBindingCheckWin(int newStatusID, StringBuilder sReply) {
+	private int portForwardingCheckWin(int newStatusID, StringBuilder sReply) {
 		LineNumberReader lnr = null;
 
 		try {
@@ -245,7 +250,7 @@ public class CheckerPP
 						changePort(port, sReply);
 						return newStatusID;
 					} else {
-						return portBindingCheckNonWin(newStatusID, sReply);
+						return portForwardingCheckNonWin(newStatusID, sReply);
 					}
 
 				}
@@ -260,13 +265,13 @@ public class CheckerPP
 				}
 			}
 		}
-		return portBindingCheckNonWin(newStatusID, sReply);
+		return portForwardingCheckNonWin(newStatusID, sReply);
 	}
 
-	private int portBindingCheckNonWin(int newStatusID, StringBuilder sReply) {
+	private int portForwardingCheckNonWin(int newStatusID, StringBuilder sReply) {
 		/*
 		 * From Perfect Privacy's Javascript Port Calcaulator:
-
+		
 		function check() {
 		str = jQuery('#form_ip_octet_3').val();
 		if (str == "") {
@@ -290,7 +295,7 @@ public class CheckerPP
 		jQuery('#ports').html("<td>" + port1 + "</td><td>" + port2 + "</td><td>" + port3 + "</td>");
 		}
 		 */
-		
+
 		if (vpnIP != null) {
 			byte[] address = vpnIP.getAddress();
 			int number = (address[2] & 0xff) % 10; // last digit
@@ -301,7 +306,7 @@ public class CheckerPP
 			if (lastPart.length() == 1) {
 				lastPart = "00" + lastPart;
 			}
-			
+
 			String portString = "1" + number + lastPart;
 			int port = Integer.parseInt(portString);
 
@@ -316,7 +321,7 @@ public class CheckerPP
 				addReply(sReply, CHAR_WARN, "pp.port.forwarding.get.failed");
 			}
 		}
-		
+
 		return newStatusID;
 	}
 

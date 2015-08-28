@@ -29,11 +29,7 @@ import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
-import org.gudy.azureus2.plugins.ui.config.IntParameter;
-import org.gudy.azureus2.plugins.ui.config.Parameter;
-import org.gudy.azureus2.plugins.ui.config.ParameterListener;
-import org.gudy.azureus2.plugins.ui.config.PasswordParameter;
-import org.gudy.azureus2.plugins.ui.config.StringParameter;
+import org.gudy.azureus2.plugins.ui.config.*;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
@@ -46,6 +42,8 @@ public class PluginPP
 	public static final String CONFIG_CHECK_MINUTES = "check.minutes";
 
 	public static final String CONFIG_VPN_IP_MATCHING = "vpn.ip.regex";
+
+	public static final String CONFIG_DO_PORT_FORWARDING = "vpn.port.forwarding";
 
 	private static final boolean LOG_TO_STDOUT = false;
 
@@ -113,6 +111,9 @@ public class PluginPP
 		StringParameter paramRegex = configModel.addStringParameter2(
 				CONFIG_VPN_IP_MATCHING, CONFIG_VPN_IP_MATCHING, DEFAULT_VPN_IP_REGEX);
 		paramRegex.setMinimumRequiredUserMode(StringParameter.MODE_ADVANCED);
+
+		configModel.addBooleanParameter2(
+				CONFIG_DO_PORT_FORWARDING, CONFIG_DO_PORT_FORWARDING, true);
 	}
 
 	/* (non-Javadoc)
