@@ -18,7 +18,7 @@
 
 package com.vuze.plugin.azVPN_PIA;
 
-public interface CheckerPIAListener
+public interface CheckerListener
 {
 	public void portCheckStart();
 	public void portCheckStatusChanged(String status);

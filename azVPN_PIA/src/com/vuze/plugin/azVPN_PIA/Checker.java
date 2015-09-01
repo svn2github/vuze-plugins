@@ -47,7 +47,7 @@ import com.aelitis.net.udp.uc.PRUDPPacketHandler;
 import com.aelitis.net.udp.uc.PRUDPPacketHandlerFactory;
 import com.aelitis.net.udp.uc.PRUDPReleasablePacketHandler;
 
-public class CheckerPIA
+public class Checker
 {
 	private static final char CHAR_GOOD = '\u2714';
 
@@ -77,7 +77,7 @@ public class CheckerPIA
 
 	private PluginInterface pi;
 
-	private List<CheckerPIAListener> listeners = new ArrayList<CheckerPIAListener>(
+	private List<CheckerListener> listeners = new ArrayList<CheckerListener>(
 			1);
 
 	private String lastProtocolAddresses = "";
@@ -94,7 +94,7 @@ public class CheckerPIA
 
 	private int currentStatusID = -1;
 
-	public CheckerPIA(PluginInterface pi) {
+	public Checker(PluginInterface pi) {
 		this.pi = pi;
 		this.config = pi.getPluginconfig();
 		this.texts = pi.getUtilities().getLocaleUtilities();
@@ -170,9 +170,9 @@ public class CheckerPIA
 			checkingPortBinding = true;
 		}
 
-		CheckerPIAListener[] triggers = listeners.toArray(
-				new CheckerPIAListener[0]);
-		for (CheckerPIAListener l : triggers) {
+		CheckerListener[] triggers = listeners.toArray(
+				new CheckerListener[0]);
+		for (CheckerListener l : triggers) {
 			try {
 				l.portCheckStart();
 			} catch (Exception e) {
@@ -228,8 +228,8 @@ public class CheckerPIA
 
 		lastPortCheckStatus = sReply.toString();
 
-		triggers = listeners.toArray(new CheckerPIAListener[0]);
-		for (CheckerPIAListener l : triggers) {
+		triggers = listeners.toArray(new CheckerListener[0]);
+		for (CheckerListener l : triggers) {
 			try {
 				l.portCheckStatusChanged(lastPortCheckStatus);
 			} catch (Exception e) {
@@ -376,9 +376,9 @@ public class CheckerPIA
 
 		lastProtocolAddresses = sReply.toString();
 
-		CheckerPIAListener[] triggers = listeners.toArray(
-				new CheckerPIAListener[0]);
-		for (CheckerPIAListener l : triggers) {
+		CheckerListener[] triggers = listeners.toArray(
+				new CheckerListener[0]);
+		for (CheckerListener l : triggers) {
 			try {
 				l.protocolAddressesStatusChanged(lastProtocolAddresses);
 			} catch (Exception e) {
@@ -971,7 +971,7 @@ public class CheckerPIA
 		}
 	}
 
-	public void addListener(CheckerPIAListener l) {
+	public void addListener(CheckerListener l) {
 		listeners.add(l);
 		try {
 			l.portCheckStatusChanged(lastPortCheckStatus);
@@ -981,7 +981,7 @@ public class CheckerPIA
 		}
 	}
 
-	public void removeListener(CheckerPIAListener l) {
+	public void removeListener(CheckerListener l) {
 		listeners.remove(l);
 	}
 

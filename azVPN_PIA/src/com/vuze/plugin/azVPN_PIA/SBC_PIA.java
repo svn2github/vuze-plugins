@@ -43,7 +43,7 @@ import com.aelitis.azureus.ui.swt.views.skin.SkinView;
 
 public class SBC_PIA
 	extends SkinView
-	implements CheckerPIAListener
+	implements CheckerListener
 {
 
 	private SWTSkinObjectText soAddresses;
@@ -157,7 +157,7 @@ public class SBC_PIA
 	}
 
 	/* (non-Javadoc)
-	 * @see com.vuze.plugin.azVPN_PIA.CheckerPIAListener#portCheckStatusChanged(java.lang.String)
+	 * @see com.vuze.plugin.azVPN_PIA.CheckerListener#portCheckStatusChanged(java.lang.String)
 	 */
 	public void portCheckStatusChanged(String status) {
 		soPFStatus.setText(status);
@@ -167,14 +167,14 @@ public class SBC_PIA
 	}
 
 	/* (non-Javadoc)
-	 * @see com.vuze.plugin.azVPN_PIA.CheckerPIAListener#protocolAddressesStatusChanged(java.lang.String)
+	 * @see com.vuze.plugin.azVPN_PIA.CheckerListener#protocolAddressesStatusChanged(java.lang.String)
 	 */
 	public void protocolAddressesStatusChanged(String status) {
 		soAddresses.setText(status);
 	}
 
 	/* (non-Javadoc)
-	 * @see com.vuze.plugin.azVPN_PIA.CheckerPIAListener#portCheckStart()
+	 * @see com.vuze.plugin.azVPN_PIA.CheckerListener#portCheckStart()
 	 */
 	public void portCheckStart() {
 		if (btnPFCheck != null) {

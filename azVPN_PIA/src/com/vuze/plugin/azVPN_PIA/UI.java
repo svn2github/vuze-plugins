@@ -116,13 +116,13 @@ public class UI implements MdiEntryCreationListener
 					
 					LocaleUtilities texts = UI.this.pi.getUtilities().getLocaleUtilities();
 
-					if (statusID == CheckerPIA.STATUS_ID_OK) {
+					if (statusID == Checker.STATUS_ID_OK) {
 						return texts.getLocalisedMessageText("pia.indicator.ok");
 					}
-					if (statusID == CheckerPIA.STATUS_ID_BAD) {
+					if (statusID == Checker.STATUS_ID_BAD) {
 						return texts.getLocalisedMessageText("pia.indicator.bad");
 					}
-					if (statusID == CheckerPIA.STATUS_ID_WARN) {
+					if (statusID == Checker.STATUS_ID_WARN) {
 						return texts.getLocalisedMessageText("pia.indicator.warn");
 					}
 					return null;
@@ -130,13 +130,13 @@ public class UI implements MdiEntryCreationListener
 				if (propertyID == ViewTitleInfo.TITLE_INDICATOR_COLOR) {
 					int statusID = PluginPIA.instance.checker.getCurrentStatusID();
 
-					if (statusID == CheckerPIA.STATUS_ID_OK) {
+					if (statusID == Checker.STATUS_ID_OK) {
 						return new int[] { 0, 80, 0 };
 					}
-					if (statusID == CheckerPIA.STATUS_ID_BAD) {
+					if (statusID == Checker.STATUS_ID_BAD) {
 						return new int[] { 128, 30, 30 };
 					}
-					if (statusID == CheckerPIA.STATUS_ID_WARN) {
+					if (statusID == Checker.STATUS_ID_WARN) {
 						return new int[] { 255, 140, 0 };
 					}
 					return null;
@@ -147,7 +147,7 @@ public class UI implements MdiEntryCreationListener
 		
 		entry.setViewTitleInfo(viewTitleInfo);
 
-		final CheckerPIAListener checkerListener = new CheckerPIAListener() {
+		final CheckerListener checkerListener = new CheckerListener() {
 
 			public void protocolAddressesStatusChanged(String status) {
 			}

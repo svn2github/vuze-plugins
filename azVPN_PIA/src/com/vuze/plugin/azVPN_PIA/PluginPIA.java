@@ -67,7 +67,7 @@ public class PluginPIA
 
 	public static PluginPIA instance;
 
-	public CheckerPIA checker;
+	public Checker checker;
 
 	private BasicPluginConfigModel configModel;
 
@@ -88,7 +88,7 @@ public class PluginPIA
 
 		this.pi = plugin_interface;
 
-		checker = new CheckerPIA(pi);
+		checker = new Checker(pi);
 
 		plugin_interface.getUIManager().addUIListener(this);
 
