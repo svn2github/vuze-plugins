@@ -93,7 +93,7 @@ public class SBC_PIA
 				Utils.getOffOfSWTThread(new AERunnable() {
 					@Override
 					public void runSupport() {
-						PluginPIA.instance.checkerPIA.calcProtocolAddresses();
+						PluginPIA.instance.checker.calcProtocolAddresses();
 						btnAddresses.setDisabled(false);
 						soAddresses.switchSuffix(null);
 					}
@@ -130,7 +130,7 @@ public class SBC_PIA
 				Utils.getOffOfSWTThread(new AERunnable() {
 					@Override
 					public void runSupport() {
-						PluginPIA.instance.checkerPIA.portBindingCheck();
+						PluginPIA.instance.checker.portBindingCheck();
 					}
 				});
 			}
@@ -147,11 +147,11 @@ public class SBC_PIA
 					SWTSkinObject skinObject, int stateMask) {
 				MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
 				mdi.showEntryByID(MultipleDocumentInterface.SIDEBAR_SECTION_CONFIG,
-						"vpn_pia");
+						PluginPIA.CONFIG_SECTION_ID);
 			}
 		});
 
-		PluginPIA.instance.checkerPIA.addListener(this);
+		PluginPIA.instance.checker.addListener(this);
 
 		return null;
 	}

@@ -41,7 +41,7 @@ import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 public class PluginPIA
 	implements UnloadablePlugin, UIManagerListener, PluginListener
 {
-	private static final String CONFIG_SECTION_ID = "vpn_pia";
+	public static final String CONFIG_SECTION_ID = "vpn_pia";
 
 	public static final String CONFIG_PIA_MANAGER_DIR = "pia_manager.dir";
 
@@ -67,7 +67,7 @@ public class PluginPIA
 
 	public static PluginPIA instance;
 
-	public CheckerPIA checkerPIA;
+	public CheckerPIA checker;
 
 	private BasicPluginConfigModel configModel;
 
@@ -88,7 +88,7 @@ public class PluginPIA
 
 		this.pi = plugin_interface;
 
-		checkerPIA = new CheckerPIA(pi);
+		checker = new CheckerPIA(pi);
 
 		plugin_interface.getUIManager().addUIListener(this);
 
@@ -109,7 +109,7 @@ public class PluginPIA
 
 		if (pi.getUtilities().isWindows() || pi.getUtilities().isOSX()) {
 			configModel.addDirectoryParameter2(CONFIG_PIA_MANAGER_DIR,
-					CONFIG_PIA_MANAGER_DIR, checkerPIA.getPIAManagerPath().toString());
+					CONFIG_PIA_MANAGER_DIR, checker.getPIAManagerPath().toString());
 		}
 
 		IntParameter checkMinsParameter = configModel.addIntParameter2(
@@ -117,7 +117,7 @@ public class PluginPIA
 				0, 60 * 24);
 		checkMinsParameter.addListener(new ParameterListener() {
 			public void parameterChanged(Parameter param) {
-				checkerPIA.buildTimer();
+				checker.buildTimer();
 			}
 		});
 
@@ -125,7 +125,7 @@ public class PluginPIA
 
 		parameters.add(configModel.addLabelParameter2("login.group.explain"));
 		StringParameter paramUser = configModel.addStringParameter2(CONFIG_USER,
-				"config.user", checkerPIA.getDefaultUsername());
+				"config.user", checker.getDefaultUsername());
 		parameters.add(paramUser);
 		PasswordParameter paramPass = configModel.addPasswordParameter2(CONFIG_P,
 				"config.pass", PasswordParameter.ET_PLAIN, new byte[] {});
@@ -165,9 +165,9 @@ public class PluginPIA
 			model.destroy();
 		}
 
-		if (checkerPIA != null) {
-			checkerPIA.destroy();
-			checkerPIA = null;
+		if (checker != null) {
+			checker.destroy();
+			checker = null;
 		}
 	}
 
@@ -175,16 +175,16 @@ public class PluginPIA
 	 * @see org.gudy.azureus2.plugins.PluginListener#initializationComplete()
 	 */
 	public void initializationComplete() {
-		if (checkerPIA == null) {
+		if (checker == null) {
 			return;
 		}
 		try {
-			checkerPIA.portBindingCheck();
-			checkerPIA.calcProtocolAddresses();
+			checker.portBindingCheck();
+			checker.calcProtocolAddresses();
 		} catch (Throwable t) {
 			t.printStackTrace();
 		}
-		checkerPIA.buildTimer();
+		checker.buildTimer();
 	}
 
 	/* (non-Javadoc)

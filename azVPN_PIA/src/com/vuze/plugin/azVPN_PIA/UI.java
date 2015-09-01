@@ -64,7 +64,8 @@ public class UI implements MdiEntryCreationListener
 
 		UIManager uiManager = pi.getUIManager();
 		menuItemShowView = uiManager.getMenuManager().addMenuItem(
-				MenuManager.MENU_MENUBAR, "ConfigView.section.vpn_pia");
+				MenuManager.MENU_MENUBAR,
+				"ConfigView.section." + PluginPIA.CONFIG_SECTION_ID);
 		menuItemShowView.addListener(new MenuItemListener() {
 
 			public void selected(MenuItem menu, Object target) {
@@ -106,12 +107,12 @@ public class UI implements MdiEntryCreationListener
 		final MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
 		MdiEntry entry = mdi.createEntryFromSkinRef(null, VIEW_ID, "piaview",
 				"PIA", null, null, true, null);
-		entry.setTitleID("ConfigView.section.vpn_pia");
+		entry.setTitleID("ConfigView.section." + PluginPIA.CONFIG_SECTION_ID);
 		
 		final ViewTitleInfo viewTitleInfo = new ViewTitleInfo() {
 			public Object getTitleInfoProperty(int propertyID) {
 				if (propertyID == ViewTitleInfo.TITLE_INDICATOR_TEXT) {
-					int statusID = PluginPIA.instance.checkerPIA.getCurrentStatusID();
+					int statusID = PluginPIA.instance.checker.getCurrentStatusID();
 					
 					LocaleUtilities texts = UI.this.pi.getUtilities().getLocaleUtilities();
 
@@ -127,7 +128,7 @@ public class UI implements MdiEntryCreationListener
 					return null;
 				}
 				if (propertyID == ViewTitleInfo.TITLE_INDICATOR_COLOR) {
-					int statusID = PluginPIA.instance.checkerPIA.getCurrentStatusID();
+					int statusID = PluginPIA.instance.checker.getCurrentStatusID();
 
 					if (statusID == CheckerPIA.STATUS_ID_OK) {
 						return new int[] { 0, 80, 0 };
@@ -158,12 +159,12 @@ public class UI implements MdiEntryCreationListener
 			public void portCheckStart() {
 			}
 		};
-		PluginPIA.instance.checkerPIA.addListener(checkerListener);
+		PluginPIA.instance.checker.addListener(checkerListener);
 
 		entry.addListener(new MdiCloseListener() {
 			public void mdiEntryClosed(MdiEntry entry, boolean userClosed) {
-				if (PluginPIA.instance.checkerPIA != null) {
-					PluginPIA.instance.checkerPIA.removeListener(checkerListener);
+				if (PluginPIA.instance.checker != null) {
+					PluginPIA.instance.checker.removeListener(checkerListener);
 				}
 			}
 		});
@@ -174,7 +175,7 @@ public class UI implements MdiEntryCreationListener
 	private void addSkinPaths() {
 		String path = "com/vuze/plugin/azVPN_PIA/skins/";
 
-		String sFile = path + "skin3_vpn_pia";
+		String sFile = path + "skin3_" + PluginPIA.CONFIG_SECTION_ID;
 
 		ClassLoader loader = PluginPIA.class.getClassLoader();
 
