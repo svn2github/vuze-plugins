@@ -79,7 +79,8 @@ public class Checker
 	private static final String VPN_LOGIN_URL = "https://" + VPN_DOMAIN
 			+ "/login";
 
-	private static final String VPN_PORTS_URL = "https://" + VPN_DOMAIN + "/ports/";
+	private static final String VPN_PORTS_URL = "https://" + VPN_DOMAIN
+			+ "/ports/";
 
 	private static final String REGEX_ActionURL = "action=\"([^\"]+)\"";
 
@@ -467,7 +468,6 @@ public class Checker
 			RequestConfig requestConfig;
 			StringBuffer token = new StringBuffer();
 
-
 			boolean skipLoginPage = false;
 			boolean alreadyLoggedIn = false;
 			PortInfo[] ports = null;
@@ -475,7 +475,8 @@ public class Checker
 			if (httpClientContext == null) {
 				httpClientContext = HttpClientContext.create();
 			} else {
-				PluginAir.log("Have existing context.  Trying to grab port list without logging in.");
+				PluginAir.log(
+						"Have existing context.  Trying to grab port list without logging in.");
 				ports = scrapePorts(bindIP, token);
 				// assume no token means we aren't logged in
 				if (token.length() > 0) {
@@ -486,7 +487,6 @@ public class Checker
 					ports = null;
 				}
 			}
-
 
 			if (!skipLoginPage) {
 				String loginURL = null;
@@ -499,100 +499,100 @@ public class Checker
 						bindIP).setConnectTimeout(10000).build();
 				getLoginPage.setConfig(requestConfig);
 
-
 				CloseableHttpClient httpClientLoginPage = HttpClients.createDefault();
-  			CloseableHttpResponse loginPageResponse = httpClientLoginPage.execute(
-  					getLoginPage, httpClientContext);
-  
-  			BufferedReader rd = new BufferedReader(
-  					new InputStreamReader(loginPageResponse.getEntity().getContent()));
-  
-  			Pattern patAuthKey = Pattern.compile(REGEX_AuthKey);
-  
-  			String line = "";
-  			while ((line = rd.readLine()) != null) {
-  				if (line.contains("<form") && line.matches(".*id=['\"]login['\"].*")) {
-  					Matcher matcher = Pattern.compile(REGEX_ActionURL).matcher(line);
-  					if (matcher.find()) {
-  						loginURL = matcher.group(1);
-  						if (authKey != null) {
-  							break;
-  						}
-  					}
-  				}
-  				Matcher matcherAuthKey = patAuthKey.matcher(line);
-  				if (matcherAuthKey.find()) {
-  					authKey = matcherAuthKey.group(1);
-  					if (loginURL != null) {
-  						break;
-  					}
-  				}
-  				
-  				if (line.contains("['member_id']") && line.matches(".*parseInt\\s*\\(\\s*[1-9][0-9]*\\s*.*")) {
-  					alreadyLoggedIn = true;
-  				}
-  			}
-  			rd.close();
-  
-  			if (loginURL == null) {
-  				PluginAir.log("Could not scrape Login URL.  Using default");
-  				loginURL = "https://airvpn.org/index.php?app=core&module=global&section=login&do=process";
-  			}
-  			if (authKey == null) {
-  				addReply(sReply, CHAR_WARN, "airvpn.rpc.noauthkey");
-  				return false;
-  			}
-  
-  			loginURL = UrlUtils.unescapeXML(loginURL);
+				CloseableHttpResponse loginPageResponse = httpClientLoginPage.execute(
+						getLoginPage, httpClientContext);
 
-  			///////////////////////////////
-  			
-  			if (alreadyLoggedIn) {
-  				PluginAir.log("Already Logged In");
-  			} else {
-  				PluginAir.log("Login URL:" + loginURL);
-  				//https://airvpn.org/index.php?app=core&module=global&section=login&do=process
-  				//https://airvpn.org/index.php?app=core&module=global&section=login&do=process
-  
-    			HttpPost httpPostLogin = new HttpPost(loginURL);
-    
-    			requestConfig = RequestConfig.custom().setLocalAddress(
-    					bindIP).setConnectTimeout(10000).build();
-    
-    			httpPostLogin.setConfig(requestConfig);
-    
-    			CloseableHttpClient httpClient = HttpClients.createDefault();
-    
-    			List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
-    			urlParameters.add(new BasicNameValuePair("ips_username", user));
-    			urlParameters.add(new BasicNameValuePair("ips_password", pass));
-    			urlParameters.add(new BasicNameValuePair("auth_key", authKey));
-    			urlParameters.add(new BasicNameValuePair("invisible", "1"));
-    			urlParameters.add(new BasicNameValuePair("inline_invisible", "1"));
-    
-    			httpPostLogin.setEntity(new UrlEncodedFormEntity(urlParameters));
-    
-    			CloseableHttpResponse response = httpClient.execute(httpPostLogin,
-    					httpClientContext);
-    
-    			rd = new BufferedReader(
-    					new InputStreamReader(response.getEntity().getContent()));
-    
-    			line = "";
-    			while ((line = rd.readLine()) != null) {
-    			}
-    
-    			PluginAir.log("Login Result: " + response.getStatusLine().toString());
-  			}
+				BufferedReader rd = new BufferedReader(
+						new InputStreamReader(loginPageResponse.getEntity().getContent()));
+
+				Pattern patAuthKey = Pattern.compile(REGEX_AuthKey);
+
+				String line = "";
+				while ((line = rd.readLine()) != null) {
+					if (line.contains("<form")
+							&& line.matches(".*id=['\"]login['\"].*")) {
+						Matcher matcher = Pattern.compile(REGEX_ActionURL).matcher(line);
+						if (matcher.find()) {
+							loginURL = matcher.group(1);
+							if (authKey != null) {
+								break;
+							}
+						}
+					}
+					Matcher matcherAuthKey = patAuthKey.matcher(line);
+					if (matcherAuthKey.find()) {
+						authKey = matcherAuthKey.group(1);
+						if (loginURL != null) {
+							break;
+						}
+					}
+
+					if (line.contains("['member_id']")
+							&& line.matches(".*parseInt\\s*\\(\\s*[1-9][0-9]*\\s*.*")) {
+						alreadyLoggedIn = true;
+					}
+				}
+				rd.close();
+
+				if (loginURL == null) {
+					PluginAir.log("Could not scrape Login URL.  Using default");
+					loginURL = "https://airvpn.org/index.php?app=core&module=global&section=login&do=process";
+				}
+				if (authKey == null) {
+					addReply(sReply, CHAR_WARN, "airvpn.rpc.noauthkey");
+					return false;
+				}
+
+				loginURL = UrlUtils.unescapeXML(loginURL);
+
+				///////////////////////////////
+
+				if (alreadyLoggedIn) {
+					PluginAir.log("Already Logged In");
+				} else {
+					PluginAir.log("Login URL:" + loginURL);
+					//https://airvpn.org/index.php?app=core&module=global&section=login&do=process
+					//https://airvpn.org/index.php?app=core&module=global&section=login&do=process
+
+					HttpPost httpPostLogin = new HttpPost(loginURL);
+
+					requestConfig = RequestConfig.custom().setLocalAddress(
+							bindIP).setConnectTimeout(10000).build();
+
+					httpPostLogin.setConfig(requestConfig);
+
+					CloseableHttpClient httpClient = HttpClients.createDefault();
+
+					List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
+					urlParameters.add(new BasicNameValuePair("ips_username", user));
+					urlParameters.add(new BasicNameValuePair("ips_password", pass));
+					urlParameters.add(new BasicNameValuePair("auth_key", authKey));
+					urlParameters.add(new BasicNameValuePair("invisible", "1"));
+					urlParameters.add(new BasicNameValuePair("inline_invisible", "1"));
+
+					httpPostLogin.setEntity(new UrlEncodedFormEntity(urlParameters));
+
+					CloseableHttpResponse response = httpClient.execute(httpPostLogin,
+							httpClientContext);
+
+					rd = new BufferedReader(
+							new InputStreamReader(response.getEntity().getContent()));
+
+					line = "";
+					while ((line = rd.readLine()) != null) {
+					}
+
+					PluginAir.log("Login Result: " + response.getStatusLine().toString());
+				}
 			}
 
 			////////////////////////////
 
-
 			if (ports == null) {
 				ports = scrapePorts(bindIP, token);
 			}
-			
+
 			PluginAir.log("Found Ports: " + Arrays.toString(ports));
 
 			int existingIndex = ourPortInList(ports);
@@ -629,14 +629,14 @@ public class Checker
 
 				PluginAir.log("Added a port. Ports: " + Arrays.toString(ports));
 
-				 existingIndex = ourPortInList(ports);
+				existingIndex = ourPortInList(ports);
 				if (existingIndex >= 0) {
-					addReply(sReply, CHAR_GOOD, "airvpn.port.from.rpc.match", new String[] {
-						ports[existingIndex].port
+					addReply(sReply, CHAR_GOOD, "airvpn.port.from.rpc.match",
+							new String[] {
+								ports[existingIndex].port
 					});
 					return true;
 				}
-
 
 				if ((ports.length > 0 && ports[0].ourBinding) || ports.length == 20) {
 					int port = Integer.parseInt(ports[0].port);
@@ -677,9 +677,8 @@ public class Checker
 		return true;
 	}
 
-	private PortInfo[] createPort(InetAddress bindIP,
-			StringBuffer token)
-					throws ClientProtocolException, IOException {
+	private PortInfo[] createPort(InetAddress bindIP, StringBuffer token)
+			throws ClientProtocolException, IOException {
 		HttpPost httpPostCreatePort = new HttpPost(VPN_PORTS_URL);
 
 		RequestConfig requestConfig = RequestConfig.custom().setLocalAddress(
@@ -716,7 +715,7 @@ public class Checker
 	}
 
 	private PortInfo[] scrapePorts(InetAddress bindIP, StringBuffer token)
-					throws ClientProtocolException, IOException {
+			throws ClientProtocolException, IOException {
 		String bindIPString = bindIP == null ? null : bindIP.getHostAddress();
 		HttpGet getPortsPage = new HttpGet(VPN_PORTS_URL);
 		RequestConfig requestConfig = RequestConfig.custom().setLocalAddress(
@@ -752,32 +751,30 @@ public class Checker
 			Matcher matcher = patPort.matcher(line);
 			boolean found = matcher.find();
 			if (found) {
-  			while (found) {
-  				lastPortFound = matcher.group(1);
-  				mapPorts.put(lastPortFound, new PortInfo(lastPortFound, false));
-  
-  				Matcher matcherFwdToIP = patFwdToIP.matcher(line);
-  				if (matcherFwdToIP.find()) {
-  					String ip = matcherFwdToIP.group(1);
-  					if (ip.equals(bindIPString)) {
-  						mapPorts.put(lastPortFound, new PortInfo(lastPortFound, true));
-  					}
-  					lastPortFound = null;
-  				}
+				while (found) {
+					lastPortFound = matcher.group(1);
+					mapPorts.put(lastPortFound, new PortInfo(lastPortFound, false));
 
-    			found = matcher.find();
-  			}
+					Matcher matcherFwdToIP = patFwdToIP.matcher(line);
+					if (matcherFwdToIP.find()) {
+						String ip = matcherFwdToIP.group(1);
+						if (ip.equals(bindIPString)) {
+							mapPorts.put(lastPortFound, new PortInfo(lastPortFound, true));
+						}
+					}
+
+					found = matcher.find();
+				}
 			} else {
-  			if (lastPortFound != null) {
-  				Matcher matcherFwdToIP = patFwdToIP.matcher(line);
-  				if (matcherFwdToIP.find()) {
-  					String ip = matcherFwdToIP.group(1);
-  					if (ip.equals(bindIPString)) {
-  						mapPorts.put(lastPortFound, new PortInfo(lastPortFound, true));
-  					}
-  					lastPortFound = null;
-  				}
-  			}
+				if (lastPortFound != null) {
+					Matcher matcherFwdToIP = patFwdToIP.matcher(line);
+					if (matcherFwdToIP.find()) {
+						String ip = matcherFwdToIP.group(1);
+						if (ip.equals(bindIPString)) {
+							mapPorts.put(lastPortFound, new PortInfo(lastPortFound, true));
+						}
+					}
+				}
 			}
 
 			if (token != null && token.length() == 0) {
@@ -1202,7 +1199,7 @@ public class Checker
 		}
 		return null;
 	}
-	
+
 	private int ourPortInList(PortInfo[] ports) {
 		PluginConfig pluginConfig = pi.getPluginconfig();
 		int coreTCPPort = pluginConfig.getCoreIntParameter(
@@ -1214,7 +1211,7 @@ public class Checker
 		}
 
 		boolean skipIfNotOurBinding = ports.length != 20;
-		
+
 		String sPort = Integer.toString(coreUDPPort);
 		for (int i = 0; i < ports.length; i++) {
 			PortInfo portInfo = ports[i];
@@ -1294,7 +1291,7 @@ public class Checker
 			this.port = port;
 			this.ourBinding = ourBinding;
 		}
-		
+
 		/* (non-Javadoc)
 		 * @see java.lang.Object#toString()
 		 */
