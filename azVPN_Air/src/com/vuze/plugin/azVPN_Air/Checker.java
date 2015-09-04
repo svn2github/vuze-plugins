@@ -756,7 +756,7 @@ public class Checker
 					mapPorts.put(lastPortFound, new PortInfo(lastPortFound, false));
 
 					Matcher matcherFwdToIP = patFwdToIP.matcher(line);
-					if (matcherFwdToIP.find()) {
+					while (matcherFwdToIP.find()) {
 						String ip = matcherFwdToIP.group(1);
 						if (ip.equals(bindIPString)) {
 							mapPorts.put(lastPortFound, new PortInfo(lastPortFound, true));
@@ -768,7 +768,7 @@ public class Checker
 			} else {
 				if (lastPortFound != null) {
 					Matcher matcherFwdToIP = patFwdToIP.matcher(line);
-					if (matcherFwdToIP.find()) {
+					while (matcherFwdToIP.find()) {
 						String ip = matcherFwdToIP.group(1);
 						if (ip.equals(bindIPString)) {
 							mapPorts.put(lastPortFound, new PortInfo(lastPortFound, true));
