@@ -34,14 +34,14 @@ import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 import com.aelitis.azureus.ui.UIFunctionsManager;
 import com.aelitis.azureus.ui.common.viewtitleinfo.ViewTitleInfo;
 import com.aelitis.azureus.ui.common.viewtitleinfo.ViewTitleInfoManager;
-import com.aelitis.azureus.ui.mdi.MdiCloseListener;
 import com.aelitis.azureus.ui.mdi.MdiEntry;
 import com.aelitis.azureus.ui.mdi.MdiEntryCreationListener;
 import com.aelitis.azureus.ui.mdi.MultipleDocumentInterface;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinFactory;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinProperties;
 
-public class UI implements MdiEntryCreationListener
+public class UI
+	implements MdiEntryCreationListener, CheckerListener
 {
 
 	public static final String VIEW_ID = "VPNHelper_View";
@@ -49,6 +49,8 @@ public class UI implements MdiEntryCreationListener
 	private PluginInterface pi;
 
 	private MenuItem menuItemShowView;
+
+	private ViewTitleInfo viewTitleInfo;
 
 	public UI(PluginInterface pi, UISWTInstance swtInstance) {
 		this.pi = pi;
@@ -74,15 +76,17 @@ public class UI implements MdiEntryCreationListener
 			}
 		});
 
+		PluginVPNHelper.instance.addListener(this);
+
 		//swtInstance.addView(UISWTInstance.VIEW_MAIN, VIEW_ID, view.class, swtInstance);
 	}
-	
+
 	public void destroy() {
 		if (menuItemShowView != null) {
 			menuItemShowView.remove();
 			menuItemShowView = null;
 		}
-		
+
 		MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
 		if (mdi == null) {
 			return;
@@ -98,7 +102,6 @@ public class UI implements MdiEntryCreationListener
 		// Requires 5610
 		mdi.deregisterEntry(VIEW_ID, this);
 	}
-	
 
 	/* (non-Javadoc)
 	 * @see com.aelitis.azureus.ui.mdi.MdiEntryCreationListener#createMDiEntry(java.lang.String)
@@ -107,13 +110,16 @@ public class UI implements MdiEntryCreationListener
 		final MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
 		MdiEntry entry = mdi.createEntryFromSkinRef(null, VIEW_ID, "vpnhelperview",
 				"VPNHelper", null, null, true, null);
-		entry.setTitleID("ConfigView.section." + PluginConstants.CONFIG_SECTION_ID);
-		
-		final ViewTitleInfo viewTitleInfo = new ViewTitleInfo() {
+		entry.setTitleID("vpnhelper.sidebar.title");
+
+		viewTitleInfo = new ViewTitleInfo() {
 			public Object getTitleInfoProperty(int propertyID) {
 				if (propertyID == ViewTitleInfo.TITLE_INDICATOR_TEXT) {
+					if (PluginVPNHelper.instance.checker == null) {
+						return null;
+					}
 					int statusID = PluginVPNHelper.instance.checker.getCurrentStatusID();
-					
+
 					LocaleUtilities texts = UI.this.pi.getUtilities().getLocaleUtilities();
 
 					if (statusID == CheckerCommon.STATUS_ID_OK) {
@@ -127,50 +133,48 @@ public class UI implements MdiEntryCreationListener
 					}
 					return null;
 				}
+				if (propertyID == ViewTitleInfo.TITLE_TEXT) {
+//					LocaleUtilities texts = UI.this.pi.getUtilities().getLocaleUtilities();
+//					return texts.getLocalisedMessageText(
+//							"ConfigView.section." + PluginConstants.CONFIG_SECTION_ID);
+				}
 				if (propertyID == ViewTitleInfo.TITLE_INDICATOR_COLOR) {
+					if (PluginVPNHelper.instance.checker == null) {
+						return null;
+					}
 					int statusID = PluginVPNHelper.instance.checker.getCurrentStatusID();
 
 					if (statusID == CheckerCommon.STATUS_ID_OK) {
-						return new int[] { 0, 80, 0 };
+						return new int[] {
+							0,
+							80,
+							0
+						};
 					}
 					if (statusID == CheckerCommon.STATUS_ID_BAD) {
-						return new int[] { 128, 30, 30 };
+						return new int[] {
+							128,
+							30,
+							30
+						};
 					}
 					if (statusID == CheckerCommon.STATUS_ID_WARN) {
-						return new int[] { 255, 140, 0 };
+						return new int[] {
+							255,
+							140,
+							0
+						};
 					}
 					return null;
 				}
 				return null;
 			}
 		};
-		
+
 		entry.setViewTitleInfo(viewTitleInfo);
 
-		final CheckerListener checkerListener = new CheckerListener() {
-
-			public void protocolAddressesStatusChanged(String status) {
-			}
-
-			public void portCheckStatusChanged(String status) {
-				ViewTitleInfoManager.refreshTitleInfo(viewTitleInfo);
-			}
-
-			public void portCheckStart() {
-			}
-		};
-		PluginVPNHelper.instance.checker.addListener(checkerListener);
-
-		entry.addListener(new MdiCloseListener() {
-			public void mdiEntryClosed(MdiEntry entry, boolean userClosed) {
-				if (PluginVPNHelper.instance.checker != null) {
-					PluginVPNHelper.instance.checker.removeListener(checkerListener);
-				}
-			}
-		});
 		return entry;
 	}
-
 
 	private void addSkinPaths() {
 		String path = "com/vuze/plugin/azVPN_Helper/skins/";
@@ -191,5 +195,19 @@ public class UI implements MdiEntryCreationListener
 
 			mre.printStackTrace();
 		}
+	}
+
+	public void protocolAddressesStatusChanged(String status) {
+	}
+
+	public void portCheckStatusChanged(String status) {
+		ViewTitleInfoManager.refreshTitleInfo(viewTitleInfo);
+	}
+
+	public void portCheckStart() {
+	}
+
+	public void checkerChanged(CheckerCommon checker) {
+		ViewTitleInfoManager.refreshTitleInfo(viewTitleInfo);
 	}
 }

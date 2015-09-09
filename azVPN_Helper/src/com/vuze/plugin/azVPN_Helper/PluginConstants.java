@@ -32,5 +32,7 @@ public class PluginConstants
 	public static final String CONFIG_P = "p.privx";
 
 	public static final String CONFIG_USER = "user";
+	
+	public static final String CONFIG_CURRENT_VPN = "vpn.current";
 
 }

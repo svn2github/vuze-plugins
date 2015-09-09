@@ -18,14 +18,19 @@
 
 package com.vuze.plugin.azVPN_Helper;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
-import org.gudy.azureus2.core3.internat.MessageText;
+import org.gudy.azureus2.core3.internat.IntegratedResourceBundle;
 import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.PluginListener;
 import org.gudy.azureus2.plugins.UnloadablePlugin;
+import org.gudy.azureus2.plugins.config.ConfigParameter;
+import org.gudy.azureus2.plugins.config.ConfigParameterListener;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManager;
@@ -45,6 +50,13 @@ public class PluginVPNHelper
 
 	private static final String DEFAULT_VPN_IP_REGEX = "10\\.[0-9]+\\.[0-9]+\\.[0-9]+";
 
+	private static String[] vpnIDs = new String[] {
+		"AirVPN",
+		"PIA",
+		"Mullvad",
+		""
+	};
+
 	private PluginInterface pi;
 
 	private static LoggerChannel logger;
@@ -55,6 +67,8 @@ public class PluginVPNHelper
 
 	public CheckerCommon checker;
 
+	public String checkerID;
+
 	private BasicPluginConfigModel configModel;
 
 	private BasicPluginViewModel model;
@@ -62,6 +76,12 @@ public class PluginVPNHelper
 	private UI ui;
 
 	private static long initializedOn;
+
+	private StringListParameter currentVPN;
+
+	protected List<CheckerListener> listeners = new ArrayList<CheckerListener>(1);
+
+	private HashMap<String, List<Parameter>> mapVPNConfigParams;
 
 	/* (non-Javadoc)
 	 * @see org.gudy.azureus2.plugins.Plugin#initialize(org.gudy.azureus2.plugins.PluginInterface)
@@ -73,70 +93,196 @@ public class PluginVPNHelper
 		initializedOn = System.currentTimeMillis();
 
 		this.pi = plugin_interface;
-		
-		LocaleUtilities i18n = pi.getUtilities().getLocaleUtilities();
-		i18n.integrateLocalisedMessageBundle("com.vuze.plugin.azVPN_Helper.internat.Messages_AirVPN");
-
-		checker = new Checker_AirVPN(pi);
-
-		plugin_interface.getUIManager().addUIListener(this);
 
 		UIManager uiManager = pi.getUIManager();
 
-		logger = pi.getLogger().getTimeStampedChannel(PluginConstants.CONFIG_SECTION_ID);
+		logger = pi.getLogger().getTimeStampedChannel(
+				PluginConstants.CONFIG_SECTION_ID);
 
 		model = uiManager.createLoggingViewModel(logger, true);
 		model.setConfigSectionID(PluginConstants.CONFIG_SECTION_ID);
 
 		setupConfigModel(uiManager);
 
-		pi.addListener(this);
-	}
+		LocaleUtilities i18n = pi.getUtilities().getLocaleUtilities();
 
-	private void setupConfigModel(UIManager uiManager) {
-		configModel = uiManager.createBasicPluginConfigModel(PluginConstants.CONFIG_SECTION_ID);
-
-		IntParameter checkMinsParameter = configModel.addIntParameter2(
-				PluginConstants.CONFIG_CHECK_MINUTES, "check.port.every.mins", DEFAULT_CHECK_EVERY_MINS,
-				0, 60 * 24);
-		checkMinsParameter.addListener(new ParameterListener() {
-			public void parameterChanged(Parameter param) {
-				checker.buildTimer();
+		for (String vpnID : vpnIDs) {
+			if (vpnID.length() == 0) {
+				continue;
 			}
-		});
+			try {
+				i18n.integrateLocalisedMessageBundle(
+						"com.vuze.plugin.azVPN_Helper.internat.Messages_" + vpnID);
 
-		BooleanParameter paramDoPortForwarding = configModel.addBooleanParameter2(
-				PluginConstants.CONFIG_DO_PORT_FORWARDING, PluginConstants.CONFIG_DO_PORT_FORWARDING, true);
+				Class<?> checkerCla = Class.forName(
+						"com.vuze.plugin.azVPN_Helper.Checker_" + vpnID);
 
-		if (checker.showLoginConfig()) {
-			List<Parameter> parameters = new ArrayList<Parameter>();
+				Method method = checkerCla.getMethod("setupConfigModel",
+						PluginInterface.class, BasicPluginConfigModel.class);
 
-			parameters.add(configModel.addLabelParameter2("login.group.explain"));
-			StringParameter paramUser = configModel.addStringParameter2(PluginConstants.CONFIG_USER,
-					"config.user", "");
-			parameters.add(paramUser);
-			PasswordParameter paramPass = configModel.addPasswordParameter2(PluginConstants.CONFIG_P,
-					"config.pass", PasswordParameter.ET_PLAIN, new byte[] {});
-			parameters.add(paramPass);
+				@SuppressWarnings("unchecked")
+				List<Parameter> listParams = (List<Parameter>) method.invoke(null, pi,
+						configModel);
 
-			Parameter[] parametersArray = parameters.toArray(new Parameter[0]);
-			ParameterGroup group = configModel.createGroup("login.group",
-					parametersArray);
+				boolean visible = vpnID.equals(checkerID);
+				if (listParams != null && listParams.size() > 0) {
+					for (Parameter configParameter : listParams) {
+						//configParameter.setVisible(visible);
+						configParameter.setEnabled(visible);
+					}
+				}
 
-			if (pi.getUtilities().compareVersions(pi.getAzureusVersion(),
-					"5.6.2.1") >= 0) {
-				paramDoPortForwarding.addEnabledOnSelection(group);
-			} else {
-				for (Parameter parameter : parametersArray) {
-					paramDoPortForwarding.addEnabledOnSelection(parameter);
+				mapVPNConfigParams.put(vpnID, listParams);
+
+			} catch (Throwable e) {
+				e.printStackTrace();
+			}
+		}
+
+		i18n.integrateLocalisedMessageBundle(
+				"com.vuze.plugin.azVPN_Helper.internat.Messages");
+
+		
+		String vpnID = currentVPN.getValue();
+		if (vpnID.length() > 0) {
+			i18n.integrateLocalisedMessageBundle(
+					"com.vuze.plugin.azVPN_Helper.internat.Messages_" + vpnID);
+
+			try {
+				Class<?> checkerCla = Class.forName(
+						"com.vuze.plugin.azVPN_Helper.Checker_" + vpnID);
+
+				checker = (CheckerCommon) checkerCla.getConstructor(
+						PluginInterface.class).newInstance(pi);
+				checkerID = vpnID;
+
+				CheckerListener[] triggers = getCheckerListeners();
+				for (CheckerListener l : triggers) {
+					try {
+						l.checkerChanged(checker);
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+				}
+
+			} catch (Throwable e) {
+				e.printStackTrace();
+			}
+
+			List<Parameter> list = mapVPNConfigParams.get(vpnID);
+			if (list != null && list.size() > 0) {
+				for (Parameter configParameter : list) {
+					//configParameter.setVisible(true);
+					configParameter.setEnabled(true);
 				}
 			}
 		}
 
+		pi.getUIManager().addUIListener(this);
+
+		pi.addListener(this);
+	}
+
+	private void setupConfigModel(UIManager uiManager) {
+		configModel = uiManager.createBasicPluginConfigModel(
+				PluginConstants.CONFIG_SECTION_ID);
+
+		currentVPN = configModel.addStringListParameter2(
+				PluginConstants.CONFIG_CURRENT_VPN, "vpnhelper.currentvpn", vpnIDs,
+				vpnIDs, "");
+		currentVPN.addConfigParameterListener(new ConfigParameterListener() {
+			public void configParameterChanged(ConfigParameter param) {
+				LocaleUtilities i18n = pi.getUtilities().getLocaleUtilities();
+				i18n.integrateLocalisedMessageBundle(
+						"com.vuze.plugin.azVPN_Helper.internat.Messages");
+
+				if (checker != null) {
+					checker.destroy();
+					checker = null;
+
+					List<Parameter> list = mapVPNConfigParams.get(checkerID);
+					if (list != null && list.size() > 0) {
+						for (Parameter configParameter : list) {
+							//configParameter.setVisible(false);
+							configParameter.setEnabled(false);
+						}
+					}
+
+					checkerID = null;
+				}
+
+				String vpnID = currentVPN.getValue();
+				if (vpnID.length() > 0) {
+					i18n.integrateLocalisedMessageBundle(
+							"com.vuze.plugin.azVPN_Helper.internat.Messages_" + vpnID);
+
+					try {
+						Class<?> checkerCla = Class.forName(
+								"com.vuze.plugin.azVPN_Helper.Checker_" + vpnID);
+
+						if (pi.getUtilities().compareVersions(pi.getAzureusVersion(),
+								"5.6.2.1") < 0) {
+							// replacing keys did not clear the UsedMessageMap until 5621
+							Class<?> claMT = Class.forName(
+									"org.gudy.azureus2.core3.internat.MessageText");
+							Field declaredField = claMT.getDeclaredField("RESOURCE_BUNDLE");
+							declaredField.setAccessible(true);
+							IntegratedResourceBundle RESOURCE_BUNDLE = (IntegratedResourceBundle) declaredField.get(
+									null);
+							RESOURCE_BUNDLE.clearUsedMessagesMap(1);
+						}
+
+						checker = (CheckerCommon) checkerCla.getConstructor(
+								PluginInterface.class).newInstance(pi);
+						checkerID = vpnID;
+
+						List<Parameter> list = mapVPNConfigParams.get(vpnID);
+						if (list != null && list.size() > 0) {
+							for (Parameter configParameter : list) {
+								//configParameter.setVisible(true);
+								configParameter.setEnabled(true);
+							}
+						}
+
+					} catch (Throwable e) {
+						e.printStackTrace();
+					}
+				}
+				CheckerListener[] triggers = getCheckerListeners();
+				for (CheckerListener l : triggers) {
+					try {
+						l.checkerChanged(checker);
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+				}
+
+				if (checker != null) {
+					checker.buildTimer();
+				}
+			}
+		});
+
+		IntParameter checkMinsParameter = configModel.addIntParameter2(
+				PluginConstants.CONFIG_CHECK_MINUTES, "check.port.every.mins",
+				DEFAULT_CHECK_EVERY_MINS, 0, 60 * 24);
+		checkMinsParameter.addListener(new ParameterListener() {
+			public void parameterChanged(Parameter param) {
+				if (checker != null) {
+					checker.buildTimer();
+				}
+			}
+		});
+
+		configModel.addBooleanParameter2(PluginConstants.CONFIG_DO_PORT_FORWARDING,
+				PluginConstants.CONFIG_DO_PORT_FORWARDING, true);
+
 		StringParameter paramRegex = configModel.addStringParameter2(
-				PluginConstants.CONFIG_VPN_IP_MATCHING, PluginConstants.CONFIG_VPN_IP_MATCHING, DEFAULT_VPN_IP_REGEX);
+				PluginConstants.CONFIG_VPN_IP_MATCHING,
+				PluginConstants.CONFIG_VPN_IP_MATCHING, DEFAULT_VPN_IP_REGEX);
 		paramRegex.setMinimumRequiredUserMode(StringParameter.MODE_ADVANCED);
 
+		mapVPNConfigParams = new HashMap<String, List<Parameter>>(1);
 	}
 
 	/* (non-Javadoc)
@@ -169,6 +315,8 @@ public class PluginVPNHelper
 			checker.destroy();
 			checker = null;
 		}
+
+		listeners.clear();
 	}
 
 	/* (non-Javadoc)
@@ -234,4 +382,23 @@ public class PluginVPNHelper
 		logger.log(s);
 	}
 
+	public final void addListener(CheckerListener l) {
+		listeners.add(l);
+		try {
+			if (checker != null) {
+				l.portCheckStatusChanged(checker.lastPortCheckStatus);
+				l.protocolAddressesStatusChanged(checker.lastProtocolAddresses);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public final void removeListener(CheckerListener l) {
+		listeners.remove(l);
+	}
+
+	public CheckerListener[] getCheckerListeners() {
+		return listeners.toArray(new CheckerListener[0]);
+	}
 }

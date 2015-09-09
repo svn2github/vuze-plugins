@@ -22,6 +22,11 @@ import java.net.*;
 import java.util.*;
 import java.util.regex.Pattern;
 
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpHead;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.conn.SystemDefaultDnsResolver;
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.PluginConfig;
@@ -31,12 +36,14 @@ import org.gudy.azureus2.plugins.utils.*;
 import com.aelitis.azureus.core.AzureusCore;
 import com.aelitis.azureus.core.AzureusCoreFactory;
 import com.aelitis.azureus.core.networkmanager.admin.*;
+import com.aelitis.azureus.core.proxy.AEProxySelector;
+import com.aelitis.azureus.core.proxy.AEProxySelectorFactory;
 import com.aelitis.net.udp.uc.PRUDPPacketHandler;
 import com.aelitis.net.udp.uc.PRUDPPacketHandlerFactory;
 import com.aelitis.net.udp.uc.PRUDPReleasablePacketHandler;
 
 /**
- * Common Checker_AirVPN class, shared amoungst azVPN_Air, azVPN_PIA, etc
+ * Common Checker class, shared amoungst azVPN_Air, azVPN_PIA, etc
  */
 public abstract class CheckerCommon
 {
@@ -54,11 +61,9 @@ public abstract class CheckerCommon
 
 	protected UTTimer timer;
 
-	protected PluginConfig config;
+	public PluginConfig config;
 
-	protected PluginInterface pi;
-
-	protected List<CheckerListener> listeners = new ArrayList<CheckerListener>(1);
+	public PluginInterface pi;
 
 	protected String lastProtocolAddresses = "";
 
@@ -95,12 +100,11 @@ public abstract class CheckerCommon
 
 	}
 
-	public final void destroy() {
+	public void destroy() {
 		if (timer != null) {
 			timer.destroy();
 			timer = null;
 		}
-		listeners.clear();
 	}
 
 	protected final void buildTimer() {
@@ -178,7 +182,7 @@ public abstract class CheckerCommon
 
 		lastProtocolAddresses = sReply.toString();
 
-		CheckerListener[] triggers = listeners.toArray(new CheckerListener[0]);
+		CheckerListener[] triggers = PluginVPNHelper.instance.getCheckerListeners();
 		for (CheckerListener l : triggers) {
 			try {
 				l.protocolAddressesStatusChanged(lastProtocolAddresses);
@@ -189,7 +193,7 @@ public abstract class CheckerCommon
 		return lastProtocolAddresses;
 	}
 
-	private boolean matchesVPNIP(InetAddress address) {
+	private final boolean matchesVPNIP(InetAddress address) {
 		if (address == null) {
 			return false;
 		}
@@ -429,7 +433,7 @@ public abstract class CheckerCommon
 	/**
 	 * @return rebind sucessful, or rebinding to already bound address
 	 */
-	private boolean rebindNetworkInterface(NetworkInterface networkInterface,
+	private final boolean rebindNetworkInterface(NetworkInterface networkInterface,
 			InetAddress onlyToAddress, final StringBuilder sReply) {
 		vpnIP = onlyToAddress;
 
@@ -554,20 +558,6 @@ public abstract class CheckerCommon
 		}
 	}
 
-	public final void addListener(CheckerListener l) {
-		listeners.add(l);
-		try {
-			l.portCheckStatusChanged(lastPortCheckStatus);
-			l.protocolAddressesStatusChanged(lastProtocolAddresses);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
-
-	public final void removeListener(CheckerListener l) {
-		listeners.remove(l);
-	}
-
 	public final int getCurrentStatusID() {
 		return currentStatusID;
 	}
@@ -596,7 +586,7 @@ public abstract class CheckerCommon
 		return newStatusID;
 	}
 
-	public String portBindingCheck() {
+	public final String portBindingCheck() {
 		synchronized (this) {
 			if (checkingPortBinding) {
 				return lastPortCheckStatus;
@@ -604,7 +594,7 @@ public abstract class CheckerCommon
 			checkingPortBinding = true;
 		}
 
-		CheckerListener[] triggers = listeners.toArray(new CheckerListener[0]);
+		CheckerListener[] triggers = PluginVPNHelper.instance.getCheckerListeners();
 		for (CheckerListener l : triggers) {
 			try {
 				l.portCheckStart();
@@ -614,7 +604,7 @@ public abstract class CheckerCommon
 		}
 
 		StringBuilder sReply = new StringBuilder();
-
+		
 		try {
 			int newStatusID = findBindingAddress(sReply);
 
@@ -637,6 +627,7 @@ public abstract class CheckerCommon
 				}
 			}
 
+			
 			if (newStatusID != -1) {
 				currentStatusID = newStatusID;
 			}
@@ -659,7 +650,7 @@ public abstract class CheckerCommon
 
 		lastPortCheckStatus = sReply.toString();
 
-		triggers = listeners.toArray(new CheckerListener[0]);
+		triggers = PluginVPNHelper.instance.getCheckerListeners();
 		for (CheckerListener l : triggers) {
 			try {
 				l.portCheckStatusChanged(lastPortCheckStatus);
@@ -678,6 +669,48 @@ public abstract class CheckerCommon
 			StringBuilder sReply);
 
 	protected abstract boolean canReach(InetAddress addressToReach);
+
+	protected boolean canReach(InetAddress addressToReach, URI uri) {
+		
+		InetAddress[] resolve = null;
+		try {
+			String domain = uri.getHost();
+
+			// If Vuze has a proxy set up (Tools->Options->Connection->Proxy), then
+  		// we'll need to disable it for the URL
+  		AEProxySelector selector = AEProxySelectorFactory.getSelector();
+  		if (selector != null) {
+  			resolve = SystemDefaultDnsResolver.INSTANCE.resolve(domain);
+  
+  			for (InetAddress address : resolve) {
+  				selector.setProxy(new InetSocketAddress(address, 443),
+  						Proxy.NO_PROXY);
+  			}
+  		}
+
+			HttpHead getHead = new HttpHead(uri);
+			RequestConfig requestConfig = RequestConfig.custom().setLocalAddress(
+					addressToReach).setConnectTimeout(10000).build();
+			getHead.setConfig(requestConfig);
+
+			CloseableHttpResponse response = HttpClients.createDefault().execute(getHead);
+			
+			response.close();
+
+
+		} catch (Throwable t) {
+			return false;
+		} finally {
+			AEProxySelector selector = AEProxySelectorFactory.getSelector();
+			if (selector != null && resolve != null) {
+				for (InetAddress address : resolve) {
+					AEProxySelectorFactory.getSelector().removeProxy(
+							new InetSocketAddress(address, 443));
+				}
+			}
+		}
+		return true;
+	}
 
 	private class BindableInterface
 		implements Comparable<BindableInterface>
@@ -721,6 +754,4 @@ public abstract class CheckerCommon
 			return i;
 		}
 	}
-
-	public abstract boolean showLoginConfig();
 }

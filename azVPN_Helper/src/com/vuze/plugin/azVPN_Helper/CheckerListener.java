@@ -20,6 +20,7 @@ package com.vuze.plugin.azVPN_Helper;
 
 public interface CheckerListener
 {
+	public void checkerChanged(CheckerCommon checker);
 	public void portCheckStart();
 	public void portCheckStatusChanged(String status);
 	public void protocolAddressesStatusChanged(String status);

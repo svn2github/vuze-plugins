@@ -22,9 +22,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.Proxy;
+import java.net.*;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -33,7 +31,9 @@ import org.apache.http.NameValuePair;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.*;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
@@ -48,6 +48,8 @@ import org.gudy.azureus2.platform.PlatformManagerFactory;
 import org.gudy.azureus2.plugins.PluginConfig;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.platform.PlatformManagerException;
+import org.gudy.azureus2.plugins.ui.config.*;
+import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.utils.xml.simpleparser.SimpleXMLParserDocument;
 import org.gudy.azureus2.plugins.utils.xml.simpleparser.SimpleXMLParserDocumentAttribute;
 import org.gudy.azureus2.plugins.utils.xml.simpleparser.SimpleXMLParserDocumentNode;
@@ -80,6 +82,8 @@ public class Checker_AirVPN
 
 	private static final String REGEX_NotConnected = "\"Not connected\"";
 
+	private static ParameterGroup paramGroupLogin;
+
 	private HttpClientContext httpClientContext;
 
 	public Checker_AirVPN() {
@@ -88,6 +92,47 @@ public class Checker_AirVPN
 
 	public Checker_AirVPN(PluginInterface pi) {
 		super(pi);
+	}
+
+	public static List<Parameter> setupConfigModel(PluginInterface pi,
+			BasicPluginConfigModel configModel) {
+		List<Parameter> params = new ArrayList<Parameter>(1);
+
+		List<Parameter> paramsLogin = new ArrayList<Parameter>();
+
+		paramsLogin.add(configModel.addLabelParameter2("airvpn.login.group.explain"));
+		StringParameter paramUser = configModel.addStringParameter2(
+				PluginConstants.CONFIG_USER, "config.user", "");
+		paramsLogin.add(paramUser);
+		PasswordParameter paramPass = configModel.addPasswordParameter2(
+				PluginConstants.CONFIG_P, "config.pass", PasswordParameter.ET_PLAIN,
+				new byte[] {});
+		paramsLogin.add(paramPass);
+
+		paramGroupLogin = configModel.createGroup("airvpn.login.group",
+				paramsLogin.toArray(new Parameter[0]));
+
+		params.addAll(paramsLogin);
+
+		Parameter[] allParams = configModel.getParameters();
+		for (Parameter param : allParams) {
+			if (param.getConfigKeyName().equals(
+					PluginConstants.CONFIG_DO_PORT_FORWARDING)) {
+				BooleanParameter paramDoPortForwarding = (BooleanParameter) param;
+
+				if (pi.getUtilities().compareVersions(pi.getAzureusVersion(),
+						"5.6.2.1") >= 0) {
+					paramDoPortForwarding.addEnabledOnSelection(paramGroupLogin);
+				} else {
+					for (Parameter paramLogin : paramsLogin) {
+						paramDoPortForwarding.addEnabledOnSelection(paramLogin);
+					}
+				}
+
+				break;
+			}
+		}
+		return params;
 	}
 
 	protected String getDefaultUsername() {
@@ -161,44 +206,14 @@ public class Checker_AirVPN
 			return "";
 		}
 	}
-	
+
 	protected boolean canReach(InetAddress addressToReach) {
-		InetAddress[] resolve = null;
 		try {
-  		// If Vuze has a proxy set up (Tools->Options->Connection->Proxy), then
-  		// we'll need to disable it for the URL
-  		AEProxySelector selector = AEProxySelectorFactory.getSelector();
-  		if (selector != null) {
-  			resolve = SystemDefaultDnsResolver.INSTANCE.resolve(VPN_DOMAIN);
-  
-  			for (InetAddress address : resolve) {
-  				selector.setProxy(new InetSocketAddress(address, 443),
-  						Proxy.NO_PROXY);
-  			}
-  		}
-
-			HttpHead getHead = new HttpHead("https://" + VPN_DOMAIN);
-			RequestConfig requestConfig = RequestConfig.custom().setLocalAddress(
-					addressToReach).setConnectTimeout(10000).build();
-			getHead.setConfig(requestConfig);
-
-			CloseableHttpResponse response = HttpClients.createDefault().execute(getHead);
-			
-			response.close();
-
-
-		} catch (Throwable t) {
+			URI canReachURL = new URI("https://" + VPN_DOMAIN);
+			return canReach(addressToReach, canReachURL);
+		} catch (URISyntaxException e) {
 			return false;
-		} finally {
-			AEProxySelector selector = AEProxySelectorFactory.getSelector();
-			if (selector != null && resolve != null) {
-				for (InetAddress address : resolve) {
-					AEProxySelectorFactory.getSelector().removeProxy(
-							new InetSocketAddress(address, 443));
-				}
-			}
 		}
-		return true;
 	}
 
 	@Override
@@ -210,9 +225,8 @@ public class Checker_AirVPN
 			String pass = null;
 			if (user == null || user.length() == 0) {
 				user = config.getPluginStringParameter(PluginConstants.CONFIG_USER);
-				pass = new String(
-						config.getPluginByteParameter(PluginConstants.CONFIG_P, new byte[0]),
-						"utf-8");
+				pass = new String(config.getPluginByteParameter(
+						PluginConstants.CONFIG_P, new byte[0]), "utf-8");
 			} else {
 				pass = getPassword();
 			}
@@ -237,7 +251,6 @@ public class Checker_AirVPN
 
 			RequestConfig requestConfig;
 			StringBuffer token = new StringBuffer();
-		
 
 			boolean skipLoginPage = false;
 			boolean alreadyLoggedIn = false;
@@ -354,7 +367,8 @@ public class Checker_AirVPN
 					while ((line = rd.readLine()) != null) {
 					}
 
-					PluginVPNHelper.log("Login Result: " + response.getStatusLine().toString());
+					PluginVPNHelper.log(
+							"Login Result: " + response.getStatusLine().toString());
 				}
 			}
 
@@ -368,8 +382,9 @@ public class Checker_AirVPN
 
 			int existingIndex = ourPortInList(ports);
 			if (existingIndex >= 0) {
-				addReply(sReply, CHAR_GOOD, "vpnhelper.port.from.rpc.match", new String[] {
-					ports[existingIndex].port
+				addReply(sReply, CHAR_GOOD, "vpnhelper.port.from.rpc.match",
+						new String[] {
+							ports[existingIndex].port
 				});
 				return true;
 			}
@@ -379,7 +394,8 @@ public class Checker_AirVPN
 			// There's a limit of 20 ports.  If [0] isn't ours and 20 of them are
 			// created, then assume our detection of "ours" is broke and just use
 			// the first one
-			if (ports != null && ((ports.length > 0 && ports[0].ourBinding) || ports.length == 20)) {
+			if (ports != null && ((ports.length > 0 && ports[0].ourBinding)
+					|| ports.length == 20)) {
 				int port = Integer.parseInt(ports[0].port);
 				gotPort = true;
 
@@ -555,7 +571,7 @@ public class Checker_AirVPN
 					token.append(matcherToken.group(1));
 				}
 			}
-			
+
 			Matcher matcherNC = patNotConnected.matcher(line);
 			if (matcherNC.find()) {
 				return null;

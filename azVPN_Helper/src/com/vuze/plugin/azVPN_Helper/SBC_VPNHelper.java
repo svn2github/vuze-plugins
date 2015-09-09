@@ -18,8 +18,6 @@
 
 package com.vuze.plugin.azVPN_Helper;
 
-import com.aelitis.azureus.ui.swt.skin.SWTSkinButtonUtility.ButtonListenerAdapter;
-
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.dnd.Clipboard;
 import org.eclipse.swt.dnd.TextTransfer;
@@ -36,6 +34,7 @@ import org.gudy.azureus2.ui.swt.Utils;
 import com.aelitis.azureus.ui.UIFunctionsManager;
 import com.aelitis.azureus.ui.mdi.MultipleDocumentInterface;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinButtonUtility;
+import com.aelitis.azureus.ui.swt.skin.SWTSkinButtonUtility.ButtonListenerAdapter;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinObject;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectButton;
 import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectText;
@@ -130,6 +129,9 @@ public class SBC_VPNHelper
 				Utils.getOffOfSWTThread(new AERunnable() {
 					@Override
 					public void runSupport() {
+						if (PluginVPNHelper.instance.checker == null) {
+							return;
+						}
 						PluginVPNHelper.instance.checker.portBindingCheck();
 					}
 				});
@@ -151,8 +153,17 @@ public class SBC_VPNHelper
 			}
 		});
 
-		PluginVPNHelper.instance.checker.addListener(this);
+		PluginVPNHelper.instance.addListener(this);
 
+		return null;
+	}
+	
+	/* (non-Javadoc)
+	 * @see com.aelitis.azureus.ui.swt.views.skin.SkinView#skinObjectDestroyed(com.aelitis.azureus.ui.swt.skin.SWTSkinObject, java.lang.Object)
+	 */
+	@Override
+	public Object skinObjectDestroyed(SWTSkinObject skinObject, Object params) {
+		PluginVPNHelper.instance.removeListener(this);
 		return null;
 	}
 
@@ -180,6 +191,13 @@ public class SBC_VPNHelper
 		if (btnPFCheck != null) {
 			btnPFCheck.setDisabled(true);
 		}
+	}
+
+	/* (non-Javadoc)
+	 * @see com.vuze.plugin.azVPN_Helper.CheckerListener#checkerChanged(com.vuze.plugin.azVPN_Helper.CheckerCommon)
+	 */
+	public void checkerChanged(CheckerCommon checker) {
+		soPFStatus.setText(""); 
 	}
 
 }
