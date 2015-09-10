@@ -114,24 +114,8 @@ public class Checker_AirVPN
 
 		params.addAll(paramsLogin);
 
-		Parameter[] allParams = configModel.getParameters();
-		for (Parameter param : allParams) {
-			if (param.getConfigKeyName().equals(
-					PluginConstants.CONFIG_DO_PORT_FORWARDING)) {
-				BooleanParameter paramDoPortForwarding = (BooleanParameter) param;
+		params.add(paramGroupLogin);
 
-				if (pi.getUtilities().compareVersions(pi.getAzureusVersion(),
-						"5.6.2.1") >= 0) {
-					paramDoPortForwarding.addEnabledOnSelection(paramGroupLogin);
-				} else {
-					for (Parameter paramLogin : paramsLogin) {
-						paramDoPortForwarding.addEnabledOnSelection(paramLogin);
-					}
-				}
-
-				break;
-			}
-		}
 		return params;
 	}
 
