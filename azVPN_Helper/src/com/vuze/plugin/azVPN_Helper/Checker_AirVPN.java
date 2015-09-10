@@ -233,7 +233,7 @@ public class Checker_AirVPN
 
 			if (user == null || user.length() == 0 || pass == null
 					|| pass.length() == 0) {
-				addReply(sReply, CHAR_WARN, "vpnhelper.rpc.nocreds");
+				addReply(sReply, CHAR_WARN, "airvpn.rpc.nocreds");
 				return false;
 			}
 
@@ -592,7 +592,7 @@ public class Checker_AirVPN
 
 		try {
 			File fDocPath = platformManager.getLocation(
-					PlatformManager.LOC_DOCUMENTS);
+					PlatformManager.LOC_USER_DATA);
 			if (fDocPath != null) {
 				File f = new File(fDocPath.getParentFile(),
 						Constants.isLinux ? ".airvpn" : "AirVPN");
@@ -618,12 +618,13 @@ public class Checker_AirVPN
 			appData = userhome + SystemProperties.SEP + "Library"
 					+ SystemProperties.SEP + "Application Support";
 
+			appData = userhome;
 		} else {
 			// unix type
 			appData = userhome;
 		}
 
-		File f = new File(appData, Constants.isLinux ? ".airvpn" : "AirVPN");
+		File f = new File(appData, Constants.isWindows ? "AirVPN" : ".airvpn");
 		if (f.isDirectory()) {
 			return f;
 		}
