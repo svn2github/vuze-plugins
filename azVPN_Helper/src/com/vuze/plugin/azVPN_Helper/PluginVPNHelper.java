@@ -83,6 +83,8 @@ public class PluginVPNHelper
 
 	private HashMap<String, List<Parameter>> mapVPNConfigParams;
 
+	private ParameterTabFolder tabFolder;
+
 	/* (non-Javadoc)
 	 * @see org.gudy.azureus2.plugins.Plugin#initialize(org.gudy.azureus2.plugins.PluginInterface)
 	 */
@@ -126,6 +128,11 @@ public class PluginVPNHelper
 
 				boolean visible = vpnID.equals(checkerID);
 				if (listParams != null && listParams.size() > 0) {
+
+					ParameterGroup group = configModel.createGroup("!" + vpnID + "!",
+							listParams.toArray(new Parameter[0]));
+					tabFolder.addTab(group);
+
 					for (Parameter configParameter : listParams) {
 						//configParameter.setVisible(visible);
 						configParameter.setEnabled(visible);
@@ -142,7 +149,6 @@ public class PluginVPNHelper
 		i18n.integrateLocalisedMessageBundle(
 				"com.vuze.plugin.azVPN_Helper.internat.Messages");
 
-		
 		String vpnID = currentVPN.getValue();
 		if (vpnID.length() > 0) {
 			i18n.integrateLocalisedMessageBundle(
@@ -283,6 +289,8 @@ public class PluginVPNHelper
 		paramRegex.setMinimumRequiredUserMode(StringParameter.MODE_ADVANCED);
 
 		mapVPNConfigParams = new HashMap<String, List<Parameter>>(1);
+
+		tabFolder = configModel.createTabFolder();
 	}
 
 	/* (non-Javadoc)

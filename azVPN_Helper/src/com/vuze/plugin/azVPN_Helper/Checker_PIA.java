@@ -73,21 +73,16 @@ public class Checker_PIA
 			params.add(configModel.addDirectoryParameter2(CONFIG_PIA_MANAGER_DIR,
 					CONFIG_PIA_MANAGER_DIR, getPIAManagerPath().toString()));
 		}
-		List<Parameter> parameters = new ArrayList<Parameter>();
 
-		parameters.add(configModel.addLabelParameter2("pia.login.group.explain"));
+		params.add(configModel.addLabelParameter2("pia.login.group.explain"));
 		StringParameter paramUser = configModel.addStringParameter2(
 				PluginConstants.CONFIG_USER, "config.user", getDefaultUsername(pi));
-		parameters.add(paramUser);
+		params.add(paramUser);
 		PasswordParameter paramPass = configModel.addPasswordParameter2(
 				PluginConstants.CONFIG_P, "config.pass", PasswordParameter.ET_PLAIN,
 				new byte[] {});
-		parameters.add(paramPass);
+		params.add(paramPass);
 
-		configModel.createGroup("pia.login.group",
-				parameters.toArray(new Parameter[0]));
-
-		params.addAll(parameters);
 		return params;
 	}
 

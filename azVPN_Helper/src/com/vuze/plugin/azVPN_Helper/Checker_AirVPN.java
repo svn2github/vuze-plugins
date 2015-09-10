@@ -82,8 +82,6 @@ public class Checker_AirVPN
 
 	private static final String REGEX_NotConnected = "\"Not connected\"";
 
-	private static ParameterGroup paramGroupLogin;
-
 	private HttpClientContext httpClientContext;
 
 	public Checker_AirVPN() {
@@ -94,27 +92,19 @@ public class Checker_AirVPN
 		super(pi);
 	}
 
+	// no groups
 	public static List<Parameter> setupConfigModel(PluginInterface pi,
 			BasicPluginConfigModel configModel) {
 		List<Parameter> params = new ArrayList<Parameter>(1);
 
-		List<Parameter> paramsLogin = new ArrayList<Parameter>();
-
-		paramsLogin.add(configModel.addLabelParameter2("airvpn.login.group.explain"));
+		params.add(configModel.addLabelParameter2("airvpn.login.group.explain"));
 		StringParameter paramUser = configModel.addStringParameter2(
 				PluginConstants.CONFIG_USER, "config.user", "");
-		paramsLogin.add(paramUser);
+		params.add(paramUser);
 		PasswordParameter paramPass = configModel.addPasswordParameter2(
 				PluginConstants.CONFIG_P, "config.pass", PasswordParameter.ET_PLAIN,
 				new byte[] {});
-		paramsLogin.add(paramPass);
-
-		paramGroupLogin = configModel.createGroup("airvpn.login.group",
-				paramsLogin.toArray(new Parameter[0]));
-
-		params.addAll(paramsLogin);
-
-		params.add(paramGroupLogin);
+		params.add(paramPass);
 
 		return params;
 	}
