@@ -67,6 +67,11 @@ I2PHelperRouter
 {
 	private static final String 	i2p_internal_host 	= "127.0.0.1";
 
+	public static final int SM_TYPE_ROUTER	= -1;
+	public static final int SM_TYPE_MIX		= 0;
+	public static final int SM_TYPE_PURE	= 1;
+	public static final int SM_TYPE_OTHER	= 2;
+	
 	public static final String	PARAM_SEND_KBS				= "azi2phelper.rate.send.max";
 	public static final int		PARAM_SEND_KBS_DEFAULT		= 50;
 	
@@ -88,6 +93,9 @@ I2PHelperRouter
 	public static final int		PARAM_FLOODFILL_CONTROL_OFF		= 3;
 		// mix defaults
 	
+	public static final String	PARAM_MIX_ENABLED					= "azi2phelper.mix.enabled";
+	public static final boolean	PARAM_MIX_ENABLED_DEFAULT			= true;
+
 	public static final String	PARAM_MIX_INBOUND_HOPS				= "azi2phelper.mix.inbound.hops";
 	public static final int		PARAM_MIX_INBOUND_HOPS_DEFAULT		= 1;	// little point in making this larger as mixed connections are inherently de-anonymisable
 	
@@ -102,20 +110,26 @@ I2PHelperRouter
 
 		// i2p only defaults
 	
-	public static final String	PARAM_I2P_INBOUND_HOPS				= "azi2phelper.i2p.inbound.hops";
-	public static final int		PARAM_I2P_INBOUND_HOPS_DEFAULT		= 3;	
-	
-	public static final String	PARAM_I2P_INBOUND_QUANTITY			= "azi2phelper.i2p.inbound.quantity";
-	public static final int		PARAM_I2P_INBOUND_QUANTITY_DEFAULT	= 2;
-	
-	public static final String	PARAM_I2P_OUTBOUND_HOPS				= "azi2phelper.i2p.outbound.hops";
-	public static final int		PARAM_I2P_OUTBOUND_HOPS_DEFAULT		= 3;	
+	public static final String	PARAM_PURE_ENABLED						= "azi2phelper.pure.enabled";
+	public static final boolean	PARAM_PURE_ENABLED_DEFAULT				= true;
 
-	public static final String	PARAM_I2P_OUTBOUND_QUANTITY			= "azi2phelper.i2p.outbound.quantity";
-	public static final int		PARAM_I2P_OUTBOUND_QUANTITY_DEFAULT	= 2;
+	public static final String	PARAM_PURE_INBOUND_HOPS					= "azi2phelper.i2p.inbound.hops";
+	public static final int		PARAM_PURE_INBOUND_HOPS_DEFAULT			= 3;	
+	
+	public static final String	PARAM_PURE_INBOUND_QUANTITY				= "azi2phelper.i2p.inbound.quantity";
+	public static final int		PARAM_PURE_INBOUND_QUANTITY_DEFAULT		= 2;
+	
+	public static final String	PARAM_PURE_OUTBOUND_HOPS				= "azi2phelper.i2p.outbound.hops";
+	public static final int		PARAM_PURE_OUTBOUND_HOPS_DEFAULT		= 3;	
+
+	public static final String	PARAM_PURE_OUTBOUND_QUANTITY			= "azi2phelper.i2p.outbound.quantity";
+	public static final int		PARAM_PURE_OUTBOUND_QUANTITY_DEFAULT	= 2;
 	
 		// other defaults
 	
+	public static final String	PARAM_OTHER_ENABLED					= "azi2phelper.other.enabled";
+	public static final boolean	PARAM_OTHER_ENABLED_DEFAULT			= true;
+
 	public static final String	PARAM_OTHER_INBOUND_HOPS				= "azi2phelper.other.inbound.hops";
 	public static final int		PARAM_OTHER_INBOUND_HOPS_DEFAULT		= 3;	
 	
@@ -156,7 +170,7 @@ I2PHelperRouter
 	
 	private Properties						sm_properties = new Properties();	
 	
-	private I2PHelperRouterDHT[]			dhts;
+	private final I2PHelperRouterDHT[]			dhts;
 	
 	private Map<String,ServerInstance>		servers = new HashMap<String, ServerInstance>();
 	
@@ -188,6 +202,15 @@ I2PHelperRouter
 		for ( int i=0;i<dhts.length;i++){
 		
 			I2PHelperRouterDHT dht = new I2PHelperRouterDHT( this, config_dir, i, is_bootstrap_node, is_vuze_dht, force_new_address, adapter );
+			
+			if ( i == DHT_MIX ){
+				
+				dht.setEnabled( getBooleanParameter( PARAM_MIX_ENABLED ));
+				
+			}else if ( i == DHT_NON_MIX ){
+				
+				dht.setEnabled( getBooleanParameter( PARAM_PURE_ENABLED ));
+			}
 			
 			dhts[i] = dht;
 		}
@@ -235,21 +258,21 @@ I2PHelperRouter
 			
 			// i2p
 			
-		}else if ( name == PARAM_I2P_INBOUND_HOPS ){
+		}else if ( name == PARAM_PURE_INBOUND_HOPS ){
 			
-			def = PARAM_I2P_INBOUND_HOPS_DEFAULT;
+			def = PARAM_PURE_INBOUND_HOPS_DEFAULT;
 			
-		}else if ( name == PARAM_I2P_INBOUND_QUANTITY ){
+		}else if ( name == PARAM_PURE_INBOUND_QUANTITY ){
 			
-			def = PARAM_I2P_INBOUND_QUANTITY_DEFAULT;
+			def = PARAM_PURE_INBOUND_QUANTITY_DEFAULT;
 			
-		}else if ( name == PARAM_I2P_OUTBOUND_HOPS ){
+		}else if ( name == PARAM_PURE_OUTBOUND_HOPS ){
 			
-			def = PARAM_I2P_OUTBOUND_HOPS_DEFAULT;
+			def = PARAM_PURE_OUTBOUND_HOPS_DEFAULT;
 			
-		}else if ( name == PARAM_I2P_OUTBOUND_QUANTITY ){
+		}else if ( name == PARAM_PURE_OUTBOUND_QUANTITY ){
 			
-			def = PARAM_I2P_OUTBOUND_QUANTITY_DEFAULT;
+			def = PARAM_PURE_OUTBOUND_QUANTITY_DEFAULT;
 			
 			
 			// other
@@ -268,8 +291,7 @@ I2PHelperRouter
 		}else if ( name == PARAM_OTHER_OUTBOUND_QUANTITY ){
 			
 			def = PARAM_OTHER_OUTBOUND_QUANTITY_DEFAULT;
-			
-			
+					
 		}else{
 			
 			Debug.out( "Unknown parameter: " + name );
@@ -305,6 +327,18 @@ I2PHelperRouter
 			
 			def = PARAM_AUTO_QUANTITY_ADJUST_DEFAULT;
 			
+		}else if ( name == PARAM_MIX_ENABLED ){
+			
+			def = PARAM_MIX_ENABLED_DEFAULT;
+			
+		}else if ( name == PARAM_PURE_ENABLED ){
+			
+			def = PARAM_PURE_ENABLED_DEFAULT;
+			
+		}else if ( name == PARAM_OTHER_ENABLED ){
+			
+			def = PARAM_OTHER_ENABLED_DEFAULT;
+					
 		}else{
 			
 			Debug.out( "Unknown parameter: " + name );
@@ -428,7 +462,7 @@ I2PHelperRouter
 	
 	public void
 	updateProperties()
-	{
+	{		
 		Properties props = new Properties();
 		
 		addRateLimitProperties( props );
@@ -459,6 +493,8 @@ I2PHelperRouter
 	private void
 	setupSMDefaultOpts(
 		RouterContext		router_ctx )
+		
+		throws Exception
 	{
 		Properties opts = sm_properties;
 				
@@ -509,7 +545,7 @@ I2PHelperRouter
         opts.setProperty( "i2p.streaming.disableRejectLogging", "false");
         opts.setProperty( "i2cp.dontPublishLeaseSet", "false" );
 
-        setupSMExplicitOpts( opts, "Vuze", 0 );
+        setupSMExplicitOpts( opts, "Vuze", SM_TYPE_ROUTER );
 	}
 	
 	protected void
@@ -517,28 +553,45 @@ I2PHelperRouter
 		Properties 	opts,
 		String		nickname,
 		int			sm_type )
+		
+		throws Exception
 	{
 		opts.setProperty( "outbound.nickname", nickname ); 
 
         opts.setProperty( "inbound.lengthVariance", "0" );
         opts.setProperty( "outbound.lengthVariance", "0" ); 
 
-        if ( sm_type == 0 ){
+        if ( sm_type == SM_TYPE_ROUTER || sm_type == SM_TYPE_MIX ){
+        	
+        	if ( sm_type == SM_TYPE_MIX && !getBooleanParameter( PARAM_MIX_ENABLED )){
+        		
+        		throw( new Exception( "Mix destination is disabled" ));
+        	}
         	
 	        opts.setProperty( "inbound.length", getIntegerParameterAsString( PARAM_MIX_INBOUND_HOPS ));
 	        opts.setProperty( "inbound.quantity", getIntegerParameterAsString( PARAM_MIX_INBOUND_QUANTITY )); 	
 	        opts.setProperty( "outbound.length", getIntegerParameterAsString( PARAM_MIX_OUTBOUND_HOPS )); 
 	        opts.setProperty( "outbound.quantity",  getIntegerParameterAsString( PARAM_MIX_OUTBOUND_QUANTITY ));
 	        
-        }else if (sm_type == 1 ){
+        }else if ( sm_type == SM_TYPE_PURE ){
         	
-	        opts.setProperty( "inbound.length", getIntegerParameterAsString( PARAM_I2P_INBOUND_HOPS ));	        
-	        opts.setProperty( "inbound.quantity", getIntegerParameterAsString( PARAM_I2P_INBOUND_QUANTITY )); 	
-	        opts.setProperty( "outbound.length", getIntegerParameterAsString( PARAM_I2P_OUTBOUND_HOPS )); 
-	        opts.setProperty( "outbound.quantity",  getIntegerParameterAsString( PARAM_I2P_OUTBOUND_QUANTITY ));
+        	if ( !getBooleanParameter( PARAM_PURE_ENABLED )){
+        		
+        		throw( new Exception( "Pure destination is disabled" ));
+        	}
+       	
+	        opts.setProperty( "inbound.length", getIntegerParameterAsString( PARAM_PURE_INBOUND_HOPS ));	        
+	        opts.setProperty( "inbound.quantity", getIntegerParameterAsString( PARAM_PURE_INBOUND_QUANTITY )); 	
+	        opts.setProperty( "outbound.length", getIntegerParameterAsString( PARAM_PURE_OUTBOUND_HOPS )); 
+	        opts.setProperty( "outbound.quantity",  getIntegerParameterAsString( PARAM_PURE_OUTBOUND_QUANTITY ));
 	
         }else{
         	
+        	if ( !getBooleanParameter( PARAM_OTHER_ENABLED )){
+        		
+        		throw( new Exception( "Other destination is disabled" ));
+        	}
+       	
 	        opts.setProperty( "inbound.length", getIntegerParameterAsString( PARAM_OTHER_INBOUND_HOPS ));
 	        opts.setProperty( "inbound.quantity", getIntegerParameterAsString( PARAM_OTHER_INBOUND_QUANTITY )); 	
 	        opts.setProperty( "outbound.length", getIntegerParameterAsString( PARAM_OTHER_OUTBOUND_HOPS )); 
@@ -778,7 +831,10 @@ I2PHelperRouter
 	{
 			// second DHT is lazy initialised if/when selected
 		
-		dhts[DHT_MIX].initialiseDHT( i2p_host, i2p_port, DHT_NAMES[DHT_MIX], sm_properties );
+		if ( dhts[DHT_MIX].isEnabled()){
+			
+			dhts[DHT_MIX].initialiseDHT( i2p_host, i2p_port, DHT_NAMES[DHT_MIX], sm_properties );
+		}
 	}
 	
 	public I2PHelperRouterDHT
@@ -871,6 +927,8 @@ I2PHelperRouter
 				dht.initialiseDHT( i2p_host, i2p_port, DHT_NAMES[DHT_NON_MIX], sm_properties );
 					
 			}catch( Throwable e ){
+				
+				Debug.out( e );
 			}
 		}
 			
@@ -896,6 +954,8 @@ I2PHelperRouter
 				dht.initialiseDHT( i2p_host, i2p_port, DHT_NAMES[index], sm_properties );
 				
 			}catch( Throwable e ){
+				
+				Debug.out( e );
 			}
 		}
 		
@@ -1246,6 +1306,11 @@ I2PHelperRouter
 			
 			throws Exception
 		{
+			if ( !getBooleanParameter( PARAM_OTHER_ENABLED )){
+			
+				throw( new Exception( "Other destinations not enabled" ));
+			}
+			
 			server_id			= _server_id;
 			server_adapter		= _adapter;
 			
@@ -1322,7 +1387,7 @@ I2PHelperRouter
 			    		
 			    		sm_props.putAll( sm_properties );
 			    		
-			    		setupSMExplicitOpts( sm_props, "Vuze: " + server_id, 2 );
+			    		setupSMExplicitOpts( sm_props, "Vuze: " + server_id, SM_TYPE_OTHER );
 			    		
 			    		sm = I2PSocketManagerFactory.createManager( is, i2p_host, i2p_port, sm_props );
 			    	

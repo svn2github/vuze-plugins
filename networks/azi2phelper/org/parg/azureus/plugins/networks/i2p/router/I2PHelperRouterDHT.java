@@ -72,6 +72,7 @@ I2PHelperRouterDHT
 
 	private Object				init_lock	= new Object();
 	
+	private volatile boolean	enabled;
 	private volatile boolean	started;
 	private volatile boolean	initialized;
 	private volatile boolean	destroyed;
@@ -95,6 +96,21 @@ I2PHelperRouterDHT
 		is_vuze_dht			= _is_vuze_dht;
 		force_new_address	= _force_new_address;
 		adapter				= _adapter;	
+		
+		enabled	= true;
+	}
+	
+	public void
+	setEnabled(
+		boolean		b )
+	{
+		enabled	= b;
+	}
+	
+	public boolean
+	isEnabled()
+	{
+		return( enabled );
 	}
 	
 	public int
@@ -124,13 +140,18 @@ I2PHelperRouterDHT
 		
 		throws Exception
 	{
+		if ( !enabled ){
+			
+			throw( new Exception( "DHT " + dht_index + " is not enabled" ));
+		}
+		
 		started = true;
 		
 		Properties sm_properties = new Properties();
 		
 		sm_properties.putAll( _sm_properties );
 		
-		router.setupSMExplicitOpts( sm_properties, "Vuze DHT: " + name, dht_index==0?0:1 ); 
+		router.setupSMExplicitOpts( sm_properties, "Vuze DHT: " + name, dht_index==0?I2PHelperRouter.SM_TYPE_MIX:I2PHelperRouter.SM_TYPE_PURE ); 
 
 		try{
 			synchronized( init_lock ){

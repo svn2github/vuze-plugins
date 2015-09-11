@@ -736,6 +736,11 @@ DHTTransportI2P
 	{
 		if ( TRACE ) trace( "receivePing" );
 
+		if ( request_handler == null ){
+			
+			throw( new Exception( "No request handler available" ));
+		}
+		
 		request_handler.pingRequest( originator );
 
 		Map<String, Object> map = new HashMap<String, Object>();
@@ -962,6 +967,11 @@ DHTTransportI2P
 	{
 		if ( TRACE ) trace( "receiveFindNode" );
 
+		if ( request_handler == null ){
+			
+			throw( new Exception( "No request handler available" ));
+		}
+		
 		DHTTransportContact[] contacts = request_handler.findNodeRequest( originator, target );
 
 		if ( contacts != null ){
@@ -1128,6 +1138,11 @@ DHTTransportI2P
 	{
 		if ( TRACE ) trace( "receiveFindValue" );
 
+		if ( request_handler == null ){
+			
+			throw( new Exception( "No request handler available" ));
+		}
+		
 		DHTTransportFindValueReply reply = request_handler.findValueRequest( originator, hash, NUM_WANT, (byte)0 );
 
 		if ( reply != null ){
@@ -1478,6 +1493,11 @@ DHTTransportI2P
 		throws Exception
 	{
 		if ( TRACE ) trace( "receiveStore" );
+		
+		if ( request_handler == null ){
+			
+			throw( new Exception( "No request handler available" ));
+		}
 		
 		byte[][]				keys 	= new byte[][]{ hash };
 		
