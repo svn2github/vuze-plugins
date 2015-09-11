@@ -31,6 +31,7 @@ import org.gudy.azureus2.core3.util.FileUtil;
 import org.gudy.azureus2.core3.util.SystemProperties;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.ui.config.Parameter;
+import org.gudy.azureus2.plugins.ui.config.StringParameter;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 
 import com.aelitis.azureus.core.proxy.AEProxySelector;
@@ -61,8 +62,9 @@ public class Checker_Mullvad
 			BasicPluginConfigModel configModel) {
 		List<Parameter> params = new ArrayList<Parameter>(1);
 		if (pi.getUtilities().isWindows() || pi.getUtilities().isOSX()) {
-			params.add(configModel.addStringParameter2(CONFIG_MULLVAD_ACCOUNT,
-					CONFIG_MULLVAD_ACCOUNT, getAccountID()));
+			StringParameter paramAccount = configModel.addStringParameter2(
+					CONFIG_MULLVAD_ACCOUNT, CONFIG_MULLVAD_ACCOUNT, getAccountID());
+			params.add(paramAccount);
 		}
 		return params;
 	}
@@ -93,8 +95,13 @@ public class Checker_Mullvad
 	protected boolean callRPCforPort(InetAddress bindIP, StringBuilder sReply) {
 		String id = config.getPluginStringParameter(CONFIG_MULLVAD_ACCOUNT);
 		if (id == null || id.length() == 0) {
-			// TODO: tell user to enter their account 
-			return false;
+			// It's possible the user started Vuze before getting an account id,
+			// so the default value may not be up to date
+			id = getAccountID();
+			if (id == null || id.length() == 0) {
+				addReply(sReply, CHAR_WARN, "mullvad.account.id.required");
+  			return false;
+			}
 		}
 
 		InetAddress[] resolve = null;
@@ -127,15 +134,15 @@ public class Checker_Mullvad
 					if (addPort > 0) {
 						gotPort = true;
 
-						addReply(sReply, CHAR_GOOD, "vpnhelper.port.from.rpc", new String[] {
-							Integer.toString(addPort)
+						addReply(sReply, CHAR_GOOD, "vpnhelper.port.from.rpc",
+								new String[] {
+									Integer.toString(addPort)
 						});
 
 						changePort(addPort, sReply);
 					}
 				}
 			}
-
 
 			if (!gotPort) {
 				addReply(sReply, CHAR_WARN, "vpnhelper.rpc.bad", new String[] {
@@ -163,7 +170,8 @@ public class Checker_Mullvad
 		return true;
 	}
 
-	private int addPort(String id) throws UnknownHostException, IOException {
+	private int addPort(String id)
+			throws UnknownHostException, IOException {
 		Socket soc = new Socket(RPC_DOMAIN, RPC_PORT);
 		BufferedReader br = new BufferedReader(
 				new InputStreamReader(soc.getInputStream()));
@@ -177,22 +185,22 @@ public class Checker_Mullvad
 
 		PluginVPNHelper.log("Added a port. " + Arrays.toString(answer));
 
-
 		if (answer != null && answer.length > 1) {
 			return Integer.parseInt(answer[1]);
 		}
-	
+
 		return -1;
 	}
-	
-	public String[] sendCommand(BufferedReader br, BufferedWriter bw, String command) throws IOException {
+
+	public String[] sendCommand(BufferedReader br, BufferedWriter bw,
+			String command)
+					throws IOException {
 
 		String data = String.format("%08X", command.length());
 
 		bw.write(data);
 		bw.write(command);
 		bw.flush();
-
 
 		StringBuilder answer = new StringBuilder();
 
@@ -213,14 +221,14 @@ public class Checker_Mullvad
 				}
 			}
 		} while (read >= 0);
-		
+
 		if (answer.length() > 8) {
 			if (answer.length() > 8) {
 				String[] split = answer.substring(8).split("%");
 				return split;
 			}
 		}
-		
+
 		return null;
 	}
 
