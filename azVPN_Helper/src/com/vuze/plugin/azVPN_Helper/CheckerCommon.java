@@ -299,6 +299,7 @@ public abstract class CheckerCommon
 					addReply(sReply, CHAR_GOOD, "vpnhelper.found.bindable.vpn",
 							new String[] {
 								"" + bi.address,
+								bi.networkInterface == null ? "null" :
 								bi.networkInterface.getName() + " ("
 										+ bi.networkInterface.getDisplayName() + ")"
 					});
@@ -306,6 +307,7 @@ public abstract class CheckerCommon
 					addReply(sReply, CHAR_WARN, "vpnhelper.not.reachable",
 							new String[] {
 								"" + bi.address,
+								bi.networkInterface == null ? "null" :
 								bi.networkInterface.getName() + " ("
 										+ bi.networkInterface.getDisplayName() + ")"
 					});
@@ -348,6 +350,7 @@ public abstract class CheckerCommon
 							addReply(sReply, CHAR_WARN, "vpnhelper.not.reachable",
 									new String[] {
 										"" + localAddress,
+										networkInterface == null ? "null" :
 										networkInterface.getName() + " ("
 												+ networkInterface.getDisplayName() + ")"
 							});
@@ -502,6 +505,7 @@ public abstract class CheckerCommon
 
 			addReply(sReply, CHAR_GOOD, "vpnhelper.change.binding", new String[] {
 				"" + newConfigBindIP,
+				networkInterface == null ? "null" :
 				networkInterface.getName() + " (" + networkInterface.getDisplayName()
 						+ ")"
 			});
