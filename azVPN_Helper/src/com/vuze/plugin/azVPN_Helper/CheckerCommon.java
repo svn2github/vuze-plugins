@@ -440,6 +440,11 @@ public abstract class CheckerCommon
 			InetAddress onlyToAddress, final StringBuilder sReply) {
 		vpnIP = onlyToAddress;
 
+		config.setUnsafeBooleanParameter("Enforce Bind IP", true);
+		config.setUnsafeBooleanParameter("Check Bind IP On Start", true);
+		config.setUnsafeBooleanParameter("Plugin.UPnP.upnp.enable", false);
+		config.setUnsafeBooleanParameter("Plugin.UPnP.natpmp.enable", false);
+
 		/**
 		if (true) {
 			sReply.append("Would rebind to " + networkInterface.getDisplayName()
@@ -447,6 +452,7 @@ public abstract class CheckerCommon
 			return false;
 		}
 		/**/
+
 		String ifName = networkInterface.getName();
 
 		String configBindIP = config.getCoreStringParameter(
@@ -497,11 +503,6 @@ public abstract class CheckerCommon
 			// We set up a PropertyChangeListener in case it ever becomes asynchronous
 			config.setCoreStringParameter(
 					PluginConfig.CORE_PARAM_STRING_LOCAL_BIND_IP, newConfigBindIP);
-			config.setUnsafeBooleanParameter("Enforce Bind IP", true);
-			config.setUnsafeBooleanParameter("Check Bind IP On Start", true);
-
-			config.setUnsafeBooleanParameter("upnp.enable", false);
-			config.setUnsafeBooleanParameter("natpmp.enable", false);
 
 			addReply(sReply, CHAR_GOOD, "vpnhelper.change.binding", new String[] {
 				"" + newConfigBindIP,
