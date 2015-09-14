@@ -115,10 +115,9 @@ public class UI
 		viewTitleInfo = new ViewTitleInfo() {
 			public Object getTitleInfoProperty(int propertyID) {
 				if (propertyID == ViewTitleInfo.TITLE_INDICATOR_TEXT) {
-					if (PluginVPNHelper.instance.checker == null) {
-						return null;
-					}
-					int statusID = PluginVPNHelper.instance.checker.getCurrentStatusID();
+					int statusID = PluginVPNHelper.instance.checker == null
+							? CheckerCommon.STATUS_ID_WARN
+							: PluginVPNHelper.instance.checker.getCurrentStatusID();
 
 					LocaleUtilities texts = UI.this.pi.getUtilities().getLocaleUtilities();
 
@@ -139,10 +138,9 @@ public class UI
 //							"ConfigView.section." + PluginConstants.CONFIG_SECTION_ID);
 				}
 				if (propertyID == ViewTitleInfo.TITLE_INDICATOR_COLOR) {
-					if (PluginVPNHelper.instance.checker == null) {
-						return null;
-					}
-					int statusID = PluginVPNHelper.instance.checker.getCurrentStatusID();
+					int statusID = PluginVPNHelper.instance.checker == null
+							? CheckerCommon.STATUS_ID_WARN
+							: PluginVPNHelper.instance.checker.getCurrentStatusID();
 
 					if (statusID == CheckerCommon.STATUS_ID_OK) {
 						return new int[] {
