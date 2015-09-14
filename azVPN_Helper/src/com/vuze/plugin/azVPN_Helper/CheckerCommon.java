@@ -418,7 +418,7 @@ public abstract class CheckerCommon
 			String configBindIP = config.getCoreStringParameter(
 					PluginConfig.CORE_PARAM_STRING_LOCAL_BIND_IP);
 			
-			if (configBindIP != null && !configBindIP.isEmpty()) {
+			if (configBindIP != null && configBindIP.length() > 0) {
 				addReply(sReply, CHAR_WARN, "vpnhelper" + (currentBindIP.isLoopbackAddress() ? ".existing.bind.kept.loopback" : ".existing.bind.kept"),
 						new String[] {
 							configBindIP
@@ -752,9 +752,9 @@ public abstract class CheckerCommon
 		 * @see java.lang.Comparable#compareTo(java.lang.Object)
 		 */
 		public int compareTo(BindableInterface o) {
-			int i = Boolean.compare(o.canReach, canReach);
+			int i = Boolean.valueOf(o.canReach).compareTo(Boolean.valueOf(canReach));
 			if (i == 0) {
-				i = Integer.compare(o.score, score);
+				i = Integer.valueOf(o.score).compareTo(Integer.valueOf(score));
 			}
 			return i;
 		}

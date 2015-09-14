@@ -563,8 +563,8 @@ public class Checker_AirVPN
 
 		PortInfo[] array = mapPorts.values().toArray(new PortInfo[0]);
 		Arrays.sort(array, new Comparator<PortInfo>() {
-			public int compare(PortInfo arg0, PortInfo arg1) {
-				return Boolean.compare(arg1.ourBinding, arg0.ourBinding);
+			public int compare(PortInfo x, PortInfo y) {
+				return Boolean.valueOf(x.ourBinding).compareTo(Boolean.valueOf(y.ourBinding));
 			}
 		});
 		return array;
