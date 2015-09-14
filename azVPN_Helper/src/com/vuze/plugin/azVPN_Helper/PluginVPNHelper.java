@@ -265,12 +265,13 @@ public class PluginVPNHelper
 
 				if (checker != null) {
 					checker.buildTimer();
+					checker.portBindingCheck();
 				}
 			}
 		});
 
 		IntParameter checkMinsParameter = configModel.addIntParameter2(
-				PluginConstants.CONFIG_CHECK_MINUTES, "check.port.every.mins",
+				PluginConstants.CONFIG_CHECK_MINUTES, "vpnhelper.check.port.every.mins",
 				DEFAULT_CHECK_EVERY_MINS, 0, 60 * 24);
 		checkMinsParameter.addListener(new ParameterListener() {
 			public void parameterChanged(Parameter param) {

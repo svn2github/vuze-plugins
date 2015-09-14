@@ -49,6 +49,14 @@ import com.aelitis.azureus.core.proxy.AEProxySelector;
 import com.aelitis.azureus.core.proxy.AEProxySelectorFactory;
 import com.aelitis.azureus.util.JSONUtils;
 
+/**
+ * Private Internet Access VPN
+ * https://www.privateinternetaccess.com
+ * 
+ * RPC Specs from their forum.
+ * 
+ * Only one Port, so port cycling is not an option.
+ */
 public class Checker_PIA
 	extends CheckerCommon
 {
@@ -76,11 +84,12 @@ public class Checker_PIA
 
 		params.add(configModel.addLabelParameter2("pia.login.group.explain"));
 		StringParameter paramUser = configModel.addStringParameter2(
-				PluginConstants.CONFIG_USER, "config.user", getDefaultUsername(pi));
+				PluginConstants.CONFIG_USER, "vpnhelper.config.user",
+				getDefaultUsername(pi));
 		params.add(paramUser);
 		PasswordParameter paramPass = configModel.addPasswordParameter2(
-				PluginConstants.CONFIG_P, "config.pass", PasswordParameter.ET_PLAIN,
-				new byte[] {});
+				PluginConstants.CONFIG_P, "vpnhelper.config.pass",
+				PasswordParameter.ET_PLAIN, new byte[] {});
 		params.add(paramPass);
 
 		return params;

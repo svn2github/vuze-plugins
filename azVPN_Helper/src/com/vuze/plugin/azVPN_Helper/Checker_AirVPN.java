@@ -58,6 +58,15 @@ import com.aelitis.azureus.core.proxy.AEProxySelector;
 import com.aelitis.azureus.core.proxy.AEProxySelectorFactory;
 import com.aelitis.azureus.util.MapUtils;
 
+/**
+ * AirVPN
+ * 
+ * https://airvpn.org/
+ * 
+ * No RPC for port forwarding, so we use https posting and scraping :(
+ * 
+ * TODO: Port Cycling
+ */
 public class Checker_AirVPN
 	extends CheckerCommon
 {
@@ -99,10 +108,10 @@ public class Checker_AirVPN
 
 		params.add(configModel.addLabelParameter2("airvpn.login.group.explain"));
 		StringParameter paramUser = configModel.addStringParameter2(
-				PluginConstants.CONFIG_USER, "config.user", "");
+				PluginConstants.CONFIG_USER, "vpnhelper.config.user", "");
 		params.add(paramUser);
 		PasswordParameter paramPass = configModel.addPasswordParameter2(
-				PluginConstants.CONFIG_P, "config.pass", PasswordParameter.ET_PLAIN,
+				PluginConstants.CONFIG_P, "vpnhelper.config.pass", PasswordParameter.ET_PLAIN,
 				new byte[] {});
 		params.add(paramPass);
 

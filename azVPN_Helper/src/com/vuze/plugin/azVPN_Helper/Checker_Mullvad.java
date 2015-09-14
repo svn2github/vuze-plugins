@@ -44,6 +44,7 @@ import com.aelitis.azureus.core.proxy.AEProxySelectorFactory;
  * RPC specs from Mulvad's open source client: class MullvadClient in mtunnel.py
  * 
  * TODO: Port cycling
+ * TODO: check the "connections" RPC, and if 0, report we aren't connected (instead of BAD) 
  */
 public class Checker_Mullvad
 	extends CheckerCommon

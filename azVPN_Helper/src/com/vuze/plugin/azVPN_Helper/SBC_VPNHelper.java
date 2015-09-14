@@ -197,7 +197,9 @@ public class SBC_VPNHelper
 	 * @see com.vuze.plugin.azVPN_Helper.CheckerListener#checkerChanged(com.vuze.plugin.azVPN_Helper.CheckerCommon)
 	 */
 	public void checkerChanged(CheckerCommon checker) {
-		soPFStatus.setText(""); 
+		soPFStatus.setTextID(checker == null ? "vpnhelper.select.vpn" : null); 
+		btnPFCheck.setDisabled(checker == null);
+		soAddresses.setText("");
 	}
 
 }
