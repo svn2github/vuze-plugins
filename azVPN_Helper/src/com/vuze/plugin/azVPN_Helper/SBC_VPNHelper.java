@@ -153,9 +153,10 @@ public class SBC_VPNHelper
 			}
 		});
 
+		checkerChanged(PluginVPNHelper.instance.checker);
+
 		PluginVPNHelper.instance.addListener(this);
 		
-		checkerChanged(PluginVPNHelper.instance.checker);
 
 		return null;
 	}
