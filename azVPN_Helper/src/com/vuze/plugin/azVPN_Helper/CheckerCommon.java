@@ -297,7 +297,7 @@ public abstract class CheckerCommon
 
 			for (BindableInterface bi : array) {
 				if (!bi.isValidPrefixLength(minSubnetMaskBitCount)) {
-					addReply(sReply, CHAR_GOOD, "vpnhelper.found.bindable.vpn",
+					addReply(sReply, CHAR_WARN, "vpnhelper.submask.too.broad",
 							new String[] {
 								"" + bi.address,
 								bi.networkInterface == null ? "null"
