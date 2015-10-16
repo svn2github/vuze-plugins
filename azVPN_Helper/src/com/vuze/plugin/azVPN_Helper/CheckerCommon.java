@@ -194,13 +194,46 @@ public abstract class CheckerCommon
 		return lastProtocolAddresses;
 	}
 
-	private final boolean matchesVPNIP(InetAddress address) {
+	private final boolean matchesVPNIP(InetAddress address, NetworkInterface networkInterface) {
 		if (address == null) {
 			return false;
 		}
+
+		String[] excludes = config.getPluginStringParameter(
+				PluginConstants.CONFIG_IGNORE_ADDRESS).split(";");
+		if (excludes != null && excludes.length > 0) {
+			String hostAddress = address.getHostAddress();
+  		for (String exclude : excludes) {
+  			if (hostAddress.equals(exclude)) {
+  				PluginVPNHelper.log(exclude + " matched and excluded");
+  				return false;
+  			}
+  		}
+		}
+
 		String regex = config.getPluginStringParameter(
 				PluginConstants.CONFIG_VPN_IP_MATCHING);
-		return Pattern.matches(regex, address.getHostAddress());
+		boolean matches = Pattern.matches(regex, address.getHostAddress());
+		
+		if (matches && excludes != null && excludes.length > 0) {
+			if (networkInterface == null) {
+				try {
+					networkInterface = NetworkInterface.getByInetAddress(address);
+				} catch (SocketException e) {
+				}
+			}
+			if (networkInterface != null) {
+  			String name = networkInterface.getName();
+    		for (String exclude : excludes) {
+    			if (exclude.equals(name)) {
+    				PluginVPNHelper.log(exclude + " matched and excluded");
+    				return false;
+    			}
+    		}
+			}
+		}
+		
+		return matches;
 	}
 
 	protected final int handleFindBindingAddress(InetAddress currentBindIP,
@@ -223,7 +256,7 @@ public abstract class CheckerCommon
 			addReply(sReply, CHAR_BAD, "vpnhelper.vuze.loopback");
 		} else {
 			// bound
-			boolean isGoodExistingBind = matchesVPNIP(currentBindIP);
+			boolean isGoodExistingBind = matchesVPNIP(currentBindIP, null);
 			if (isGoodExistingBind) {
 				String niName = "Unknown Interface";
 				try {
@@ -252,7 +285,7 @@ public abstract class CheckerCommon
 			InetAddress[] bindableAddresses = networkAdmin.getBindableAddresses();
 
 			for (InetAddress bindableAddress : bindableAddresses) {
-				if (matchesVPNIP(bindableAddress)) {
+				if (matchesVPNIP(bindableAddress, null)) {
 					String hostAddress = bindableAddress.getHostAddress();
 					BindableInterface bi = mapBindableInterfaces.get(hostAddress);
 					if (bi == null) {
@@ -278,7 +311,7 @@ public abstract class CheckerCommon
 				for (NetworkAdminNetworkInterfaceAddress a : addresses) {
 					InetAddress address = a.getAddress();
 					if (address instanceof Inet4Address) {
-						if (matchesVPNIP(address)) {
+						if (matchesVPNIP(address, null)) {
 							String hostAddress = address.getHostAddress();
 							BindableInterface bi = mapBindableInterfaces.get(hostAddress);
 							if (bi == null) {
@@ -353,7 +386,7 @@ public abstract class CheckerCommon
 				});
 
 				if ((localAddress instanceof Inet4Address)
-						&& matchesVPNIP(localAddress)) {
+						&& matchesVPNIP(localAddress, networkInterface)) {
 
 					if (newBind == null) {
 

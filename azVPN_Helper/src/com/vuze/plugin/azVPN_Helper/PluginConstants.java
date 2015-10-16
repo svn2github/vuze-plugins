@@ -25,6 +25,8 @@ public class PluginConstants
 
 	public static final String CONFIG_CHECK_MINUTES = "check.minutes";
 
+	public static final String CONFIG_IGNORE_ADDRESS = "vpn.ignore.address";
+
 	public static final String CONFIG_VPN_IP_MATCHING = "vpn.ip.regex";
 
 	public static final String CONFIG_DO_PORT_FORWARDING = "vpn.port.forwarding";

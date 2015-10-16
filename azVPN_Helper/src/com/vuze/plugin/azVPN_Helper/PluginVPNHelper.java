@@ -297,6 +297,12 @@ public class PluginVPNHelper
 				PluginConstants.CONFIG_VPN_IP_MATCHING, DEFAULT_VPN_IP_REGEX);
 		paramRegex.setMinimumRequiredUserMode(StringParameter.MODE_ADVANCED);
 
+
+		StringParameter paramIgnoreAddress = configModel.addStringParameter2(
+				PluginConstants.CONFIG_IGNORE_ADDRESS,
+				PluginConstants.CONFIG_IGNORE_ADDRESS, "");
+		paramIgnoreAddress.setMinimumRequiredUserMode(StringParameter.MODE_ADVANCED);
+
 		mapVPNConfigParams = new HashMap<String, List<Parameter>>(1);
 
 		tabFolder = configModel.createTabFolder();
