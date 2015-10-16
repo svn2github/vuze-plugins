@@ -302,7 +302,9 @@ public abstract class CheckerCommon
 								"" + bi.address,
 								bi.networkInterface == null ? "null"
 										: bi.networkInterface.getName() + " ("
-												+ bi.networkInterface.getDisplayName() + ")"
+												+ bi.networkInterface.getDisplayName() + ")",
+								"" + bi.networkPrefixLength,
+								"" + minSubnetMaskBitCount
 					});
 				} else if (bi.canReach) {
 					addReply(sReply, CHAR_GOOD, "vpnhelper.found.bindable.vpn",
@@ -316,9 +318,7 @@ public abstract class CheckerCommon
 					addReply(sReply, CHAR_WARN, "vpnhelper.not.reachable", new String[] {
 						"" + bi.address,
 						bi.networkInterface == null ? "null" : bi.networkInterface.getName()
-								+ " (" + bi.networkInterface.getDisplayName() + ")",
-						"" + bi.networkPrefixLength,
-						"" + minSubnetMaskBitCount
+								+ " (" + bi.networkInterface.getDisplayName() + ")"
 					});
 				}
 				PluginVPNHelper.log(
@@ -357,7 +357,20 @@ public abstract class CheckerCommon
 
 					if (newBind == null) {
 
-						if (!canReach(localAddress)) {
+						int networkPrefixLength = getNetworkPrefixLength(networkInterface,
+								localAddress);
+						if (networkPrefixLength >= 0
+								&& networkPrefixLength < minSubnetMaskBitCount) {
+							addReply(sReply, CHAR_WARN, "vpnhelper.submask.too.broad",
+									new String[] {
+										"" + localAddress,
+										networkInterface == null ? "null"
+												: networkInterface.getName() + " ("
+														+ networkInterface.getDisplayName() + ")",
+										"" + networkPrefixLength,
+										"" + minSubnetMaskBitCount
+							});
+						} else if (!canReach(localAddress)) {
 							addReply(sReply, CHAR_WARN, "vpnhelper.not.reachable",
 									new String[] {
 										"" + localAddress,
@@ -731,6 +744,27 @@ public abstract class CheckerCommon
 		this.minSubnetMaskBitCount = minSubnetBitCount;
 	}
 
+	public int getNetworkPrefixLength(NetworkInterface networkInterface,
+			InetAddress address) {
+		int networkPrefixLength = -1;
+		List<InterfaceAddress> interfaceAddresses = networkInterface.getInterfaceAddresses();
+		for (InterfaceAddress interfaceAddress : interfaceAddresses) {
+			if (!interfaceAddress.getAddress().equals(address)) {
+				continue;
+			}
+			networkPrefixLength = interfaceAddress.getNetworkPrefixLength();
+			// JDK-7107883 : getNetworkPrefixLength() does not return correct prefix length
+			// networkPrefixLength will be zero on Java <= 7 when there is no
+			// Broadcast address.
+			// I'm guessing there is no broadcast address returned when mask is 32
+			// on linux, but I can't confirm (I've seen it though)
+			if (networkPrefixLength == 0 && interfaceAddress.getBroadcast() == null) {
+				networkPrefixLength = 32;
+			}
+		}
+		return networkPrefixLength;
+	}
+
 	private class BindableInterface
 		implements Comparable<BindableInterface>
 	{
@@ -762,22 +796,7 @@ public abstract class CheckerCommon
 					score--;
 				}
 
-				List<InterfaceAddress> interfaceAddresses = networkInterface.getInterfaceAddresses();
-				for (InterfaceAddress interfaceAddress : interfaceAddresses) {
-					if (!interfaceAddress.getAddress().equals(address)) {
-						continue;
-					}
-					networkPrefixLength = interfaceAddress.getNetworkPrefixLength();
-					// JDK-7107883 : getNetworkPrefixLength() does not return correct prefix length
-					// networkPrefixLength will be zero on Java <= 7 when there is no
-					// Broadcast address.
-					// I'm guessing there is no broadcast address returned when mask is 32
-					// on linux, but I can't confirm (I've seen it though)
-					if (networkPrefixLength == 0
-							&& interfaceAddress.getBroadcast() == null) {
-						networkPrefixLength = 32;
-					}
-				}
+				networkPrefixLength = getNetworkPrefixLength(networkInterface, address);
 			}
 		}
 
@@ -798,14 +817,14 @@ public abstract class CheckerCommon
 						o.isValidPrefixLength(minSubnetMaskBitCount)).compareTo(
 								Boolean.valueOf(isValidPrefixLength(minSubnetMaskBitCount)));
 			}
-			
+
 			// Highest score at top
 			if (i == 0) {
 				i = Integer.valueOf(o.score).compareTo(Integer.valueOf(score));
 			}
-			
+
 			// most restrictive subnet mask at top
- 			if (i == 0) {
+			if (i == 0) {
 				i = Integer.valueOf(o.networkPrefixLength).compareTo(
 						Integer.valueOf(networkPrefixLength));
 			}
