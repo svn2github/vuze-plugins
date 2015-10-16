@@ -79,6 +79,7 @@ public abstract class CheckerCommon
 
 	protected int currentStatusID = -1;
 
+	private int minSubnetMaskBitCount = -1;
 
 	public CheckerCommon() {
 	}
@@ -295,27 +296,37 @@ public abstract class CheckerCommon
 			Arrays.sort(array);
 
 			for (BindableInterface bi : array) {
-				if (bi.canReach) {
+				if (!bi.isValidPrefixLength(minSubnetMaskBitCount)) {
 					addReply(sReply, CHAR_GOOD, "vpnhelper.found.bindable.vpn",
 							new String[] {
 								"" + bi.address,
-								bi.networkInterface == null ? "null" :
-								bi.networkInterface.getName() + " ("
-										+ bi.networkInterface.getDisplayName() + ")"
+								bi.networkInterface == null ? "null"
+										: bi.networkInterface.getName() + " ("
+												+ bi.networkInterface.getDisplayName() + ")"
 					});
-				} else {
-					addReply(sReply, CHAR_WARN, "vpnhelper.not.reachable",
+				} else if (bi.canReach) {
+					addReply(sReply, CHAR_GOOD, "vpnhelper.found.bindable.vpn",
 							new String[] {
 								"" + bi.address,
-								bi.networkInterface == null ? "null" :
-								bi.networkInterface.getName() + " ("
-										+ bi.networkInterface.getDisplayName() + ")"
+								bi.networkInterface == null ? "null"
+										: bi.networkInterface.getName() + " ("
+												+ bi.networkInterface.getDisplayName() + ")"
+					});
+				} else {
+					addReply(sReply, CHAR_WARN, "vpnhelper.not.reachable", new String[] {
+						"" + bi.address,
+						bi.networkInterface == null ? "null" : bi.networkInterface.getName()
+								+ " (" + bi.networkInterface.getDisplayName() + ")",
+						"" + bi.networkPrefixLength,
+						"" + minSubnetMaskBitCount
 					});
 				}
-				PluginVPNHelper.log("Score: " + bi.score);
-
+				PluginVPNHelper.log(
+						"subnet: " + bi.networkPrefixLength + "; Score: " + bi.score);
 			}
-			newBind = array.length > 0 && array[0].canReach ? array[0] : null;
+			newBind = array.length > 0 && array[0].canReach
+					&& array[0].isValidPrefixLength(minSubnetMaskBitCount) ? array[0]
+							: null;
 
 			InetAddress localAddress = null;
 
@@ -350,9 +361,9 @@ public abstract class CheckerCommon
 							addReply(sReply, CHAR_WARN, "vpnhelper.not.reachable",
 									new String[] {
 										"" + localAddress,
-										networkInterface == null ? "null" :
-										networkInterface.getName() + " ("
-												+ networkInterface.getDisplayName() + ")"
+										networkInterface == null ? "null"
+												: networkInterface.getName() + " ("
+														+ networkInterface.getDisplayName() + ")"
 							});
 						} else {
 							newBind = new BindableInterface(localAddress, networkInterface);
@@ -414,16 +425,18 @@ public abstract class CheckerCommon
 
 		if (newBind == null) {
 			addReply(sReply, CHAR_BAD, "vpnhelper.vpn.ip.detect.fail");
-			
+
 			String configBindIP = config.getCoreStringParameter(
 					PluginConfig.CORE_PARAM_STRING_LOCAL_BIND_IP);
-			
+
 			if (configBindIP != null && configBindIP.length() > 0) {
-				addReply(sReply, CHAR_WARN, "vpnhelper" + (currentBindIP.isLoopbackAddress() ? ".existing.bind.kept.loopback" : ".existing.bind.kept"),
+				addReply(sReply, CHAR_WARN,
+						"vpnhelper" + (currentBindIP.isLoopbackAddress()
+								? ".existing.bind.kept.loopback" : ".existing.bind.kept"),
 						new String[] {
 							configBindIP
-						});
-				
+				});
+
 			}
 
 			return STATUS_ID_BAD;
@@ -436,8 +449,9 @@ public abstract class CheckerCommon
 	/**
 	 * @return rebind sucessful, or rebinding to already bound address
 	 */
-	private final boolean rebindNetworkInterface(NetworkInterface networkInterface,
-			InetAddress onlyToAddress, final StringBuilder sReply) {
+	private final boolean rebindNetworkInterface(
+			NetworkInterface networkInterface, InetAddress onlyToAddress,
+			final StringBuilder sReply) {
 		vpnIP = onlyToAddress;
 
 		config.setUnsafeBooleanParameter("Enforce Bind IP", true);
@@ -474,9 +488,8 @@ public abstract class CheckerCommon
 				|| (bindNetworkInterfaceIndex >= 0 && configBindIP.equals(
 						ifName + "[" + bindNetworkInterfaceIndex + "]"))) {
 
-			addReply(sReply, CHAR_GOOD, "vpnhelper.already.bound.good",
-					new String[] {
-						ifName
+			addReply(sReply, CHAR_GOOD, "vpnhelper.already.bound.good", new String[] {
+				ifName
 			});
 		} else {
 			String newConfigBindIP = ifName;
@@ -506,9 +519,8 @@ public abstract class CheckerCommon
 
 			addReply(sReply, CHAR_GOOD, "vpnhelper.change.binding", new String[] {
 				"" + newConfigBindIP,
-				networkInterface == null ? "null" :
-				networkInterface.getName() + " (" + networkInterface.getDisplayName()
-						+ ")"
+				networkInterface == null ? "null" : networkInterface.getName() + " ("
+						+ networkInterface.getDisplayName() + ")"
 			});
 
 			sem.reserve(11000);
@@ -609,7 +621,7 @@ public abstract class CheckerCommon
 		}
 
 		StringBuilder sReply = new StringBuilder();
-		
+
 		try {
 			int newStatusID = findBindingAddress(sReply);
 
@@ -626,13 +638,11 @@ public abstract class CheckerCommon
 					if (newStatusID != STATUS_ID_BAD) {
 						newStatusID = STATUS_ID_WARN;
 
-						addReply(sReply, CHAR_WARN,
-								"vpnhelper.port.forwarding.get.failed");
+						addReply(sReply, CHAR_WARN, "vpnhelper.port.forwarding.get.failed");
 					}
 				}
 			}
 
-			
 			if (newStatusID != -1) {
 				currentStatusID = newStatusID;
 			}
@@ -676,32 +686,32 @@ public abstract class CheckerCommon
 	protected abstract boolean canReach(InetAddress addressToReach);
 
 	protected boolean canReach(InetAddress addressToReach, URI uri) {
-		
+
 		InetAddress[] resolve = null;
 		try {
 			String domain = uri.getHost();
 
 			// If Vuze has a proxy set up (Tools->Options->Connection->Proxy), then
-  		// we'll need to disable it for the URL
-  		AEProxySelector selector = AEProxySelectorFactory.getSelector();
-  		if (selector != null) {
-  			resolve = SystemDefaultDnsResolver.INSTANCE.resolve(domain);
-  
-  			for (InetAddress address : resolve) {
-  				selector.setProxy(new InetSocketAddress(address, 443),
-  						Proxy.NO_PROXY);
-  			}
-  		}
+			// we'll need to disable it for the URL
+			AEProxySelector selector = AEProxySelectorFactory.getSelector();
+			if (selector != null) {
+				resolve = SystemDefaultDnsResolver.INSTANCE.resolve(domain);
+
+				for (InetAddress address : resolve) {
+					selector.setProxy(new InetSocketAddress(address, 443),
+							Proxy.NO_PROXY);
+				}
+			}
 
 			HttpHead getHead = new HttpHead(uri);
 			RequestConfig requestConfig = RequestConfig.custom().setLocalAddress(
 					addressToReach).setConnectTimeout(10000).build();
 			getHead.setConfig(requestConfig);
 
-			CloseableHttpResponse response = HttpClients.createDefault().execute(getHead);
-			
-			response.close();
+			CloseableHttpResponse response = HttpClients.createDefault().execute(
+					getHead);
 
+			response.close();
 
 		} catch (Throwable t) {
 			return false;
@@ -717,12 +727,18 @@ public abstract class CheckerCommon
 		return true;
 	}
 
+	public void setMinSubnetMaskBitCount(int minSubnetBitCount) {
+		this.minSubnetMaskBitCount = minSubnetBitCount;
+	}
+
 	private class BindableInterface
 		implements Comparable<BindableInterface>
 	{
 		public InetAddress address;
 
 		public boolean canReach;
+
+		public int networkPrefixLength = -1;
 
 		public NetworkInterface networkInterface;
 
@@ -735,26 +751,63 @@ public abstract class CheckerCommon
 			this.canReach = canReach(address);
 
 			if (networkInterface != null) {
-  			String name = networkInterface.getName();
-  			String displayName = networkInterface.getDisplayName();
-  
-  			if (displayName.contains("VPN")) {
-  				score += 2;
-  			} else if (displayName.contains("TAP")) {
-  				score++;
-  			} else if (name.startsWith("eth")) {
-  				score--;
-  			}
+				String name = networkInterface.getName();
+				String displayName = networkInterface.getDisplayName();
+
+				if (displayName.contains("VPN")) {
+					score += 2;
+				} else if (displayName.contains("TAP")) {
+					score++;
+				} else if (name.startsWith("eth")) {
+					score--;
+				}
+
+				List<InterfaceAddress> interfaceAddresses = networkInterface.getInterfaceAddresses();
+				for (InterfaceAddress interfaceAddress : interfaceAddresses) {
+					if (!interfaceAddress.getAddress().equals(address)) {
+						continue;
+					}
+					networkPrefixLength = interfaceAddress.getNetworkPrefixLength();
+					// JDK-7107883 : getNetworkPrefixLength() does not return correct prefix length
+					// networkPrefixLength will be zero on Java <= 7 when there is no
+					// Broadcast address.
+					// I'm guessing there is no broadcast address returned when mask is 32
+					// on linux, but I can't confirm (I've seen it though)
+					if (networkPrefixLength == 0
+							&& interfaceAddress.getBroadcast() == null) {
+						networkPrefixLength = 32;
+					}
+				}
 			}
+		}
+
+		public boolean isValidPrefixLength(int minMask) {
+			return networkPrefixLength == -1 || networkPrefixLength >= minMask;
 		}
 
 		/* (non-Javadoc)
 		 * @see java.lang.Comparable#compareTo(java.lang.Object)
 		 */
 		public int compareTo(BindableInterface o) {
+			// canReach at top
 			int i = Boolean.valueOf(o.canReach).compareTo(Boolean.valueOf(canReach));
+
+			// Valid subnet masks at top
+			if (i == 0) {
+				i = Boolean.valueOf(
+						o.isValidPrefixLength(minSubnetMaskBitCount)).compareTo(
+								Boolean.valueOf(isValidPrefixLength(minSubnetMaskBitCount)));
+			}
+			
+			// Highest score at top
 			if (i == 0) {
 				i = Integer.valueOf(o.score).compareTo(Integer.valueOf(score));
+			}
+			
+			// most restrictive subnet mask at top
+ 			if (i == 0) {
+				i = Integer.valueOf(o.networkPrefixLength).compareTo(
+						Integer.valueOf(networkPrefixLength));
 			}
 			return i;
 		}

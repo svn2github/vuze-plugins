@@ -72,6 +72,7 @@ public class Checker_PIA
 
 	public Checker_PIA(PluginInterface pi) {
 		super(pi);
+		setMinSubnetMaskBitCount(30);
 	}
 
 	public static List<Parameter> setupConfigModel(PluginInterface pi,
