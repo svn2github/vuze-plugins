@@ -361,7 +361,8 @@ public abstract class CheckerCommon
 								localAddress);
 						if (networkPrefixLength >= 0
 								&& networkPrefixLength < minSubnetMaskBitCount) {
-							addReply(sReply, CHAR_WARN, "vpnhelper.submask.too.broad",
+							s = null;
+							addReply(sReply, CHAR_WARN, "vpnhelper.nonvuze.submask.too.broad",
 									new String[] {
 										"" + localAddress,
 										networkInterface == null ? "null"
@@ -408,7 +409,9 @@ public abstract class CheckerCommon
 										"default.routing.not.vpn.network.splitting.unbound");
 					}
 
-					addLiteralReply(sReply, s);
+					if (s != null) {
+						addLiteralReply(sReply, s);
+					}
 
 				} else {
 					s = CHAR_WARN + " " + s;
