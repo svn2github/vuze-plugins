@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 
 import org.gudy.azureus2.core3.internat.IntegratedResourceBundle;
+import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.PluginListener;
@@ -265,7 +266,14 @@ public class PluginVPNHelper
 
 				if (checker != null) {
 					checker.buildTimer();
-					checker.portBindingCheck();
+					pi.getUtilities().createThread("FirstVPNCheck", new AERunnable() {
+						@Override
+						public void runSupport() {
+							if (checker != null) {
+								checker.portBindingCheck();
+							}
+						}
+					});
 				}
 			}
 		});
@@ -332,16 +340,21 @@ public class PluginVPNHelper
 	 * @see org.gudy.azureus2.plugins.PluginListener#initializationComplete()
 	 */
 	public void initializationComplete() {
-		if (checker == null) {
-			return;
-		}
-		try {
-			checker.portBindingCheck();
-			checker.calcProtocolAddresses();
-		} catch (Throwable t) {
-			t.printStackTrace();
-		}
-		checker.buildTimer();
+		pi.getUtilities().createThread("FirstVPNCheck", new AERunnable() {
+			@Override
+			public void runSupport() {
+				if (checker == null) {
+					return;
+				}
+				try {
+					checker.portBindingCheck();
+					checker.calcProtocolAddresses();
+				} catch (Throwable t) {
+					t.printStackTrace();
+				}
+				checker.buildTimer();
+			}
+		});
 	}
 
 	/* (non-Javadoc)
