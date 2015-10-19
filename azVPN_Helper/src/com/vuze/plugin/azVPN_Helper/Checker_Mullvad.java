@@ -62,11 +62,10 @@ public class Checker_Mullvad
 	public static List<Parameter> setupConfigModel(PluginInterface pi,
 			BasicPluginConfigModel configModel) {
 		List<Parameter> params = new ArrayList<Parameter>(1);
-		if (pi.getUtilities().isWindows() || pi.getUtilities().isOSX()) {
-			StringParameter paramAccount = configModel.addStringParameter2(
-					CONFIG_MULLVAD_ACCOUNT, CONFIG_MULLVAD_ACCOUNT, getAccountID());
-			params.add(paramAccount);
-		}
+		StringParameter paramAccount = configModel.addStringParameter2(
+				CONFIG_MULLVAD_ACCOUNT, CONFIG_MULLVAD_ACCOUNT, getAccountID());
+		params.add(paramAccount);
+
 		return params;
 	}
 
