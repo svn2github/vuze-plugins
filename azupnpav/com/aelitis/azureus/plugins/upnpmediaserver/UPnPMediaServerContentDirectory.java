@@ -47,6 +47,7 @@ import org.gudy.azureus2.core3.util.HashWrapper;
 import org.gudy.azureus2.core3.util.StringInterner;
 import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.core3.util.TimeFormatter;
+import org.gudy.azureus2.core3.util.UrlUtils;
 import org.gudy.azureus2.plugins.disk.DiskManagerFileInfo;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.download.DownloadManager;
@@ -2119,7 +2120,7 @@ UPnPMediaServerContentDirectory
 			String	host,
 			int		stream_id )
 		{
-			return( "http://" + host + ":" + media_server.getContentServer().getPort() + "/Content/" + createResourceID( hash, getFile() ) + (stream_id==-1?"":("?sid=" + stream_id ))); 
+			return( "http://" + UrlUtils.convertIPV6Host( host ) + ":" + media_server.getContentServer().getPort() + "/Content/" + createResourceID( hash, getFile() ) + (stream_id==-1?"":("?sid=" + stream_id ))); 
 		}
 		
 		protected String
