@@ -29,6 +29,10 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.gudy.azureus2.core3.download.DownloadManager;
+import org.gudy.azureus2.core3.torrent.TOTorrent;
+import org.gudy.azureus2.core3.torrent.TOTorrentCreator;
+import org.gudy.azureus2.core3.torrent.TOTorrentFactory;
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.Base32;
 import org.gudy.azureus2.core3.util.Debug;
@@ -37,9 +41,11 @@ import org.gudy.azureus2.core3.util.FileUtil;
 import org.gudy.azureus2.core3.util.HashWrapper;
 import org.gudy.azureus2.core3.util.SHA1Simple;
 import org.gudy.azureus2.core3.util.SimpleTimer;
+import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.gudy.azureus2.core3.util.TimerEventPeriodic;
+import org.gudy.azureus2.core3.util.TorrentUtils;
 import org.gudy.azureus2.core3.util.UrlUtils;
 import org.gudy.azureus2.core3.xml.util.XUXmlWriter;
 import org.gudy.azureus2.plugins.*;
@@ -58,14 +64,17 @@ import org.gudy.azureus2.plugins.utils.xml.rss.*;
 import org.gudy.azureus2.plugins.utils.xml.simpleparser.SimpleXMLParserDocument;
 import org.gudy.azureus2.plugins.utils.xml.simpleparser.SimpleXMLParserDocumentAttribute;
 import org.gudy.azureus2.plugins.utils.xml.simpleparser.SimpleXMLParserDocumentNode;
+import org.gudy.azureus2.pluginsimpl.local.utils.resourcedownloader.ResourceDownloaderFactoryImpl;
 import org.gudy.azureus2.ui.swt.Utils;
 
+import com.aelitis.azureus.core.AzureusCoreFactory;
 import com.aelitis.azureus.core.subs.Subscription;
 import com.aelitis.azureus.core.subs.SubscriptionManagerFactory;
 import com.aelitis.azureus.core.subs.SubscriptionResult;
 import com.aelitis.azureus.plugins.net.buddy.BuddyPluginBeta;
 import com.aelitis.azureus.plugins.net.buddy.BuddyPluginUtils;
 import com.aelitis.azureus.plugins.net.buddy.BuddyPluginBeta.ChatInstance;
+import com.aelitis.azureus.util.ImportExportUtils;
 
 public class 
 RSSToChat
@@ -293,16 +302,19 @@ RSSToChat
 					throw( new Exception( "<mapping> element expected, got " + kid_name  ));
 				}
 				
-				SimpleXMLParserDocumentNode rss_node 		= kid.getChild( "rss" );
-				SimpleXMLParserDocumentNode subs_node 		= kid.getChild( "subscription" );
-				SimpleXMLParserDocumentNode chat_node 		= kid.getChild( "chat" );
-				SimpleXMLParserDocumentNode refresh_node 	= kid.getChild( "refresh" );
+				SimpleXMLParserDocumentNode rss_node 			= kid.getChild( "rss" );
+				SimpleXMLParserDocumentNode subs_node 			= kid.getChild( "subscription" );
+				SimpleXMLParserDocumentNode chat_node 			= kid.getChild( "chat" );
+				SimpleXMLParserDocumentNode presentation_node 	= kid.getChild( "presentation" );
+				SimpleXMLParserDocumentNode refresh_node 		= kid.getChild( "refresh" );
 				
 				String 	source;
 				boolean	is_rss;
 				
 				Pattern	desc_link_pattern 	= null;
 				String	link_type			= "magnet";
+				
+				String	presentation = "link";
 				
 				if ( rss_node != null && subs_node == null ){
 					
@@ -458,9 +470,39 @@ RSSToChat
 					}
 				}
 				
+				if ( presentation_node != null ){
+					
+					SimpleXMLParserDocumentNode p_type_node = presentation_node.getChild( "type" );
+					
+					if ( p_type_node == null ){
+						
+						throw( new Exception( "presentation node requires <type> child" ));
+					}
+					
+					String p_type = p_type_node.getValue().trim();
+					
+					if ( p_type.equals( "link" )){
+						
+						presentation = "link";
+						
+					}else if (  p_type.equals( "website" )){
+						
+						if ( !is_rss ){
+							
+							throw( new Exception( "presentation only currently supported for rss feeds" ));
+						}
+						
+						presentation = "website";
+						
+					}else{
+						
+						throw( new Exception( "presentation <type> value of '" + p_type + "' is invalid" ));
+					}
+				}
+				
 				for ( String network: networks ){
 					
-					Mapping mapping = new Mapping( source, is_rss, desc_link_pattern, link_type, network, key, type, refresh_mins );
+					Mapping mapping = new Mapping( source, is_rss, desc_link_pattern, link_type, network, key, type, presentation, refresh_mins );
 					
 					log( "    Mapping: " + mapping.getOverallName());
 					
@@ -579,7 +621,11 @@ RSSToChat
 				});
 			
 			int	posted = 0;
-						
+					
+			boolean presentation_is_link = mapping.getPresentation().equals( "link" );
+
+			boolean	site_updated = false;
+			
 			for ( RSSItem item: items ){
 				
 				Date 	item_date = item.getPublicationDate();
@@ -593,15 +639,19 @@ RSSToChat
 				
 				String title = item.getTitle();
 				
-				if ( title.length() > 80 ){
+				String title_short = title;
+				
+				if ( title_short.length() > 80 ){
 					
-					title = title.substring( 0, 80 ) + "...";
+					title_short = title_short.substring( 0, 80 ) + "...";
 				}
 				
 				String 	hash 		= "";
 				String	dl_link 	= null;
 				String	cdp_link 	= null;
+				String	thumb_link	= null;
 				
+				String	description		= null;
 				String	desc_dl_link	= null;
 
 				long	size 		= -1;
@@ -644,7 +694,7 @@ RSSToChat
 							}
 						}
 			
-					}else if ( lc_child_name.equals( "link" ) || lc_child_name.equals( "guid" )) {
+					}else if ( lc_child_name.equals( "link" ) || lc_child_name.equals( "guid" )){
 						
 						String lc_value = value.toLowerCase();
 														
@@ -725,11 +775,13 @@ RSSToChat
 						
 					}else if ( lc_child_name.equals( "description" )){
 								
+						description = value;
+						
 						Pattern pattern = mapping.desc_link_pattern;
 						
 						if ( pattern != null ){
 						
-							desc_dl_link = extractLinkFromDescription( pattern, value );
+							desc_dl_link = extractLinkFromDescription( pattern, description );
 						}
 					}else if ( lc_full_child_name.equals( "vuze:size" )){
 						
@@ -763,6 +815,10 @@ RSSToChat
 					}else if ( lc_full_child_name.equals( "vuze:assethash" )){
 
 						hash = value;
+						
+					}else if (  lc_full_child_name.equals( "media:thumbnail" )){
+						
+						thumb_link = child.getAttribute( "url" ).getValue().trim();
 					}
 				}
 				
@@ -781,7 +837,7 @@ RSSToChat
 					continue;
 				}
 					
-				String magnet = buildMagnetHead( dl_link, hash, title );
+				String magnet = buildMagnetHead( dl_link, hash, title_short );
 				
 				String history_key = magnet;
 				
@@ -790,24 +846,144 @@ RSSToChat
 					continue;
 				}
 				
-				magnet = buildMagnetTail(magnet, dl_link, cdp_link, title, size, item_time, seeds, leechers );
-				
-				inst.sendMessage( magnet, new HashMap<String, Object>());
-				
-				history.setPublished( history_key, item_time );
-				
-				posted++;
-				
-				if ( posted >= MAX_POSTS_PER_REFRESH ){
+				if ( presentation_is_link ){
 					
-					try_again = true;
+					magnet = buildMagnetTail(magnet, dl_link, cdp_link, title_short, size, item_time, seeds, leechers );
 					
-					break;
+					inst.sendMessage( magnet, new HashMap<String, Object>());
+					
+					history.setPublished( history_key, item_time );
+					
+					posted++;
+					
+					if ( posted >= MAX_POSTS_PER_REFRESH ){
+						
+						try_again = true;
+						
+						break;
+					}
+				}else{
+					
+					try{
+						File item_folder = history.getItemFolder( history_key, item_time );
+							
+						String item_key = Base32.encode( getKey( history_key ));
+						
+						String	torrent_file_name 	= null;
+						String	thumb_file_name 	= null;
+						
+						if ( dl_link != null ){
+							
+							try{
+								URL dl_url = new URL( dl_link );
+								
+								String protocol = dl_url.getProtocol();
+								String path 	= dl_url.getPath();
+								
+								if ( protocol.startsWith( "http" ) && path.endsWith( ".torrent" )){
+								
+									torrent_file_name = item_key + ".torrent";
+									
+									File torrent_file = new File( item_folder, torrent_file_name );
+								
+									if ( !torrent_file.exists()){
+								
+										FileUtil.copyFile( new ResourceDownloaderFactoryImpl().create( dl_url ).download(), torrent_file );
+								
+										log( "Download torrent: " + dl_url );
+									}
+								}
+							}catch( Throwable e ){
+								
+								log( "Failed to download torrent: " + thumb_link, e );
+							}
+						}
+			
+						if ( thumb_link != null ){
+							
+							try{
+								URL thumb_url = new URL( thumb_link );
+								
+								String path = thumb_url.getPath();
+								
+								int pos = path.lastIndexOf( "." );
+								
+								String ext;
+								
+								if ( pos != -1 ){
+									
+									ext = path.substring( pos+1 );
+									
+								}else{
+									
+									ext = "jpg";
+								}
+								
+								thumb_file_name = item_key + "." + ext;
+								
+								File thumb_file = new File( item_folder, thumb_file_name );
+								
+								if ( !thumb_file.exists()){
+								
+									FileUtil.copyFile( new ResourceDownloaderFactoryImpl().create( thumb_url ).download(), thumb_file);
+								
+									log( "Download thumb: " + thumb_url );
+								}
+							}catch( Throwable e ){
+								
+								log( "Failed to download thumb: " + thumb_link, e );
+							}
+						}
+						
+						File item_config = new File( item_folder, "item.config" );
+						
+						if ( !item_config.exists()){
+							
+							Map<String,Object>	map = new HashMap<String, Object>();
+							
+							map.put( "title", title );
+							map.put( "time", item_time );
+							map.put( "description", description );
+							map.put( "hash", hash );
+							map.put( "dl_link", dl_link );
+							map.put( "cdp_link", cdp_link );
+							map.put( "size", size );
+							
+							if ( thumb_file_name != null ){
+								
+								map.put( "thumb", thumb_file_name );
+							}
+							
+							if ( torrent_file_name != null ){
+								
+								map.put( "torrent", torrent_file_name );
+							}
+							
+							FileUtil.writeResilientFile( item_config, map );
+						}
+				
+						site_updated = true;
+						
+					}finally{
+						
+							// prevent continual failures for a given item
+						
+						history.setPublished( history_key, item_time );
+					}
 				}
 			}
 			
-			log( "    Posted " + posted + " new results" );
-			
+			if ( presentation_is_link ){
+				
+				log( "    Posted " + posted + " new results" );
+
+			}else{
+				
+				if ( site_updated ){
+					
+					updateSite( mapping, inst, history );
+				}
+			}
 		}catch( Throwable e ){
 			
 			try_again = true;
@@ -817,6 +993,112 @@ RSSToChat
 		
 		return( try_again );
 	}	
+	
+	private void
+	updateSite(
+		Mapping			mapping,
+		ChatInstance	inst,
+		History			history )
+	{
+		File items_folder = history.getItemsFolder();
+
+		File[] items = items_folder.listFiles();
+		
+		Arrays.sort(
+			items,
+			new Comparator<File>()
+			{
+				public int 
+				compare(
+					File file1, 
+					File file2) 
+				{
+					String name1 = file1.getName();
+					String name2 = file2.getName();
+					
+					long t1 = Long.parseLong( name1.substring( name1.lastIndexOf( "_" ) + 1 ));
+					long t2 = Long.parseLong( name2.substring( name2.lastIndexOf( "_" ) + 1 ));
+					
+					if ( t1 < t2 ){
+						return( 1 );
+					}else if ( t1 > t2 ){
+						return( -1 );
+					}else{
+						return( name2.compareTo( name1 ));
+					}
+				}		
+			});
+		
+		long	now = SystemTime.getCurrentTime();
+		
+		File site_folder = history.getSiteFolder( now );
+		
+		site_folder.mkdirs();
+		
+		try{
+			PrintWriter index = new PrintWriter( new OutputStreamWriter( new FileOutputStream( new File( site_folder, "index.html" )), "UTF-8" ));
+			
+			index.println( "<html><head><title>blah</title></head><body>" );
+			
+			try{
+				for ( File item: items ){
+					
+					try{
+						Map config = FileUtil.readResilientFile( new File( item, "item.config" ));
+						
+						String title = ImportExportUtils.importString( config, "title" );
+						
+						index.println( "<br>" + title );
+						
+					}catch( Throwable e ){
+						
+						e.printStackTrace();
+					}
+				}
+				
+				index.println( "</body></html>" );
+				
+			}finally{
+				
+				index.close();
+			}
+			
+			TOTorrentCreator tc = TOTorrentFactory.createFromFileOrDirWithComputedPieceLength( site_folder, TorrentUtils.getDecentralisedEmptyURL());
+						
+			TOTorrent torrent = tc.create();
+			
+			byte[] hash = torrent.getHash();
+			
+			TorrentUtils.setDecentralised( torrent );
+
+			File torrent_file = new File( site_folder.getParent(), site_folder.getName() + ".torrent" );
+			
+			torrent.serialiseToBEncodedFile( torrent_file );
+			
+			final DownloadManager dm = AzureusCoreFactory.getSingleton().getGlobalManager().addDownloadManager(
+					torrent_file.toString(),
+					hash,
+					site_folder.toString(),
+					DownloadManager.STATE_QUEUED, 
+					true, // persistent 
+					true,
+					null );
+			
+			dm.setForceStart( true );
+			
+			log( "Torrent created: " + torrent_file );
+			
+			String magnet = buildMagnetHead( null, Base32.encode( hash ), "Flarple" );
+			
+			inst.sendMessage( magnet, new HashMap<String, Object>());
+
+			log( "Posted site update" );
+			
+		}catch( Throwable e ){
+			
+			log( "Failed to update website", e );
+		}
+	}
 	
 	private boolean
 	updateSubscription(
@@ -1164,6 +1446,7 @@ RSSToChat
 		private final int			type;
 		private final String		network;
 		private final String		key;
+		private final String		presentation;
 		private final int			refresh;
 		
 		private ChatInstance	chat;
@@ -1181,6 +1464,7 @@ RSSToChat
 			String			_network,
 			String			_key,
 			int				_type,
+			String			_presentation,
 			int				_refresh )
 		{
 			source				= _source;
@@ -1190,6 +1474,7 @@ RSSToChat
 			network				= _network;
 			key					= _key;
 			type				= _type;
+			presentation		= _presentation;
 			refresh				= _refresh;
 			
 			retry_outstanding = true;		// initial load regardless
@@ -1357,6 +1642,12 @@ RSSToChat
 		}
 		
 		private String
+		getPresentation()
+		{
+			return( presentation );
+		}
+		
+		private String
 		getSourceName()
 		{
 			return( ( is_rss?"RSS":"Subscription") + ": " + source );
@@ -1372,7 +1663,10 @@ RSSToChat
 	private class
 	History
 	{
-		private File file;
+		private String	history_key;
+		
+		private File	dir;
+		private File 	file;
 		
 		private long 	latest_publish;
 		
@@ -1395,8 +1689,11 @@ RSSToChat
 		{
 			String	key = mapping.getSourceName() + "/" + mapping.getChatName();
 			
-			try{
-				file = new File( history_dir, Base32.encode( getKey( key )) + ".dat" );
+			history_key = Base32.encode( getKey( key ));
+			
+			try{				
+				dir 	= new File( history_dir, history_key );
+				file 	= new File( history_dir, history_key  + ".dat" );
 				
 			}catch( Throwable e ){
 				
@@ -1421,6 +1718,65 @@ RSSToChat
 					history.put( new HashWrapper( id ), "" );
 				}
 			}
+		}
+		
+		private File
+		getItemsFolder()
+		{			
+			File result = new File( dir, "items" );
+						
+			if ( !result.exists()){
+				
+				result.mkdirs();
+			}
+
+			return( result );
+		}
+		
+		private File
+		getItemFolder(
+			String		id,
+			long		time )
+		{			
+			File result = new File( dir, "items" );
+			
+			result = new File( result, new SimpleDateFormat( "yyyyMMdd").format( new Date( time )) + "_" + Base32.encode( getKey( id )) + "_" + time );
+			
+			if ( !result.exists()){
+				
+				result.mkdirs();
+			}
+
+			return( result );
+		}
+		
+		private File
+		getSitesFolder()
+		{			
+			File result = new File( dir, "sites" );
+						
+			if ( !result.exists()){
+				
+				result.mkdirs();
+			}
+
+			return( result );
+		}
+		
+		private File
+		getSiteFolder(
+			long		time )
+		{			
+			File result = new File( dir, "sites" );
+				
+			result = new File( result, new SimpleDateFormat( "yyyyMMdd").format( new Date( time )) + "_" + history_key + "_" + time );
+
+			if ( !result.exists()){
+				
+				result.mkdirs();
+			}
+
+			return( result );
 		}
 		
 		private String
