@@ -30,6 +30,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.gudy.azureus2.core3.download.DownloadManager;
+import org.gudy.azureus2.core3.download.DownloadManagerState;
+import org.gudy.azureus2.core3.global.GlobalManager;
 import org.gudy.azureus2.core3.torrent.TOTorrent;
 import org.gudy.azureus2.core3.torrent.TOTorrentCreator;
 import org.gudy.azureus2.core3.torrent.TOTorrentFactory;
@@ -51,6 +53,7 @@ import org.gudy.azureus2.core3.xml.util.XUXmlWriter;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
+import org.gudy.azureus2.plugins.torrent.TorrentAttribute;
 import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.components.UITextArea;
 import org.gudy.azureus2.plugins.ui.config.ActionParameter;
@@ -64,13 +67,19 @@ import org.gudy.azureus2.plugins.utils.xml.rss.*;
 import org.gudy.azureus2.plugins.utils.xml.simpleparser.SimpleXMLParserDocument;
 import org.gudy.azureus2.plugins.utils.xml.simpleparser.SimpleXMLParserDocumentAttribute;
 import org.gudy.azureus2.plugins.utils.xml.simpleparser.SimpleXMLParserDocumentNode;
+import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.gudy.azureus2.pluginsimpl.local.utils.resourcedownloader.ResourceDownloaderFactoryImpl;
 import org.gudy.azureus2.ui.swt.Utils;
+import org.gudy.azureus2.ui.swt.views.utils.ManagerUtils;
 
 import com.aelitis.azureus.core.AzureusCoreFactory;
 import com.aelitis.azureus.core.subs.Subscription;
 import com.aelitis.azureus.core.subs.SubscriptionManagerFactory;
 import com.aelitis.azureus.core.subs.SubscriptionResult;
+import com.aelitis.azureus.core.tag.Tag;
+import com.aelitis.azureus.core.tag.TagManagerFactory;
+import com.aelitis.azureus.core.tag.TagType;
+import com.aelitis.azureus.core.torrent.PlatformTorrentUtils;
 import com.aelitis.azureus.plugins.net.buddy.BuddyPluginBeta;
 import com.aelitis.azureus.plugins.net.buddy.BuddyPluginUtils;
 import com.aelitis.azureus.plugins.net.buddy.BuddyPluginBeta.ChatInstance;
@@ -83,6 +92,8 @@ RSSToChat
 	public static final int MAX_MESSAGE_SIZE		= 450;
 	public static final int MAX_POSTS_PER_REFRESH	= 10;
 	public static final int MAX_HISTORY_ENTRIES		= 1000;
+	
+	private TorrentAttribute		ta_website;
 	
 	private PluginInterface			plugin_interface;
 	private LoggerChannel 			log;
@@ -106,7 +117,9 @@ RSSToChat
 		throws PluginException 
 	{
 		plugin_interface = pi;
-				
+			
+		ta_website		= plugin_interface.getTorrentManager().getPluginAttribute( "website" );
+
 		File data_dir = plugin_interface.getPluginconfig().getPluginUserFile( "test" ).getParentFile();
 		
 		config_file = new File( data_dir, "config.xml" );
@@ -981,7 +994,7 @@ RSSToChat
 				
 				if ( site_updated ){
 					
-					updateSite( mapping, inst, history );
+					updateSite( mapping, inst, channel.getTitle(), history );
 				}
 			}
 		}catch( Throwable e ){
@@ -998,6 +1011,7 @@ RSSToChat
 	updateSite(
 		Mapping			mapping,
 		ChatInstance	inst,
+		String			channel_title,
 		History			history )
 	{
 		File items_folder = history.getItemsFolder();
@@ -1038,7 +1052,7 @@ RSSToChat
 		try{
 			PrintWriter index = new PrintWriter( new OutputStreamWriter( new FileOutputStream( new File( site_folder, "index.html" )), "UTF-8" ));
 			
-			index.println( "<html><head><title>blah</title></head><body>" );
+			index.println( "<html><head><title>" + XUXmlWriter.escapeXML( channel_title) + "</title></head><body>" );
 			
 			try{
 				for ( File item: items ){
@@ -1063,6 +1077,13 @@ RSSToChat
 				index.close();
 			}
 			
+			SimpleDateFormat date_format = 
+					new SimpleDateFormat("yyyy/MM/dd HH:mm:ss zzz", Locale.US );
+				
+			date_format.setTimeZone(TimeZone.getTimeZone("GMT"));
+				
+			String torrent_title = "WebSite for '" + channel_title + "': updated on " + date_format.format(new Date( now ));
+			
 			TOTorrentCreator tc = TOTorrentFactory.createFromFileOrDirWithComputedPieceLength( site_folder, TorrentUtils.getDecentralisedEmptyURL());
 						
 			TOTorrent torrent = tc.create();
@@ -1071,11 +1092,15 @@ RSSToChat
 			
 			TorrentUtils.setDecentralised( torrent );
 
+			PlatformTorrentUtils.setContentTitle( torrent, torrent_title );
+			
 			File torrent_file = new File( site_folder.getParent(), site_folder.getName() + ".torrent" );
 			
 			torrent.serialiseToBEncodedFile( torrent_file );
 			
-			final DownloadManager dm = AzureusCoreFactory.getSingleton().getGlobalManager().addDownloadManager(
+			GlobalManager global_manager = AzureusCoreFactory.getSingleton().getGlobalManager();
+			
+			DownloadManager new_dm = global_manager.addDownloadManager(
 					torrent_file.toString(),
 					hash,
 					site_folder.toString(),
@@ -1084,16 +1109,103 @@ RSSToChat
 					true,
 					null );
 			
-			dm.setForceStart( true );
+			String history_key = history.getHistoryKey();
+			
+			DownloadManagerState dm_state = new_dm.getDownloadState();
+			
+			dm_state.setFlag( DownloadManagerState.FLAG_ONLY_EVER_SEEDED, true );
+			dm_state.setFlag( DownloadManagerState.FLAG_DISABLE_AUTO_FILE_MOVE, true );
+			
+			PluginCoreUtils.wrap( new_dm ).setAttribute( ta_website, history_key );
+			
+			new_dm.setForceStart( true );
+						
+			TagType tt = TagManagerFactory.getTagManager().getTagType( TagType.TT_DOWNLOAD_MANUAL );
+			
+			String tag_name = "RSSToChat: Web Sites";
+			
+			Tag tag = tt.getTag( tag_name, true );
+			
+			if ( tag == null ){
+				
+				tag = tt.createTag( tag_name, true );
+			}
+			
+			tag.addTaggable( new_dm );
 			
 			log( "Torrent created: " + torrent_file );
 			
-			String magnet = buildMagnetHead( null, Base32.encode( hash ), "Flarple" );
+			String magnet = buildMagnetHead( null, Base32.encode( hash ), torrent_title );
+			
+			magnet += "&xl="  + torrent.getSize();
+			
+			magnet += "[[$dn]]";
 			
 			inst.sendMessage( magnet, new HashMap<String, Object>());
 
 			log( "Posted site update" );
 			
+			List<DownloadManager> dms = global_manager.getDownloadManagers();
+			
+			List<DownloadManager>	my_dms = new ArrayList<DownloadManager>();
+			
+			for ( DownloadManager dm: dms ){
+				
+				String key = PluginCoreUtils.wrap( dm ).getAttribute( ta_website );
+				
+				if ( key != null && key.equals( history.getHistoryKey())){
+				
+					my_dms.add( dm );
+				}
+			}
+			
+			Collections.sort(
+				my_dms,
+				new Comparator<DownloadManager>()
+				{
+					public int 
+					compare(
+						DownloadManager dm1,
+						DownloadManager dm2) 
+					{
+						long t1 = dm1.getDownloadState().getLongParameter( DownloadManagerState.PARAM_DOWNLOAD_ADDED_TIME );
+						long t2 = dm2.getDownloadState().getLongParameter( DownloadManagerState.PARAM_DOWNLOAD_ADDED_TIME );
+						
+						if ( t1 < t2 ){
+							
+							return( -1 );
+							
+						}else if ( t2 > t1 ){
+							
+							return( 1 );
+							
+						}else{
+							
+							return( dm1.getInternalName().compareTo( dm2.getInternalName()));
+						}
+					}
+				});
+				
+			int num_websites_to_retain = 7;
+			
+			for ( int i=0;i<my_dms.size();i++ ){
+				
+				DownloadManager dm = my_dms.get(i);
+				
+				long added = dm.getDownloadState().getLongParameter( DownloadManagerState.PARAM_DOWNLOAD_ADDED_TIME );
+
+				if ( now - added < 24*60*60*1000 ){
+					
+					continue;
+				}
+				
+				if ( i >= num_websites_to_retain ){
+					
+					ManagerUtils.asyncStopDelete( dm, DownloadManager.STATE_STOPPED, true, true, null );
+					
+					log( "Removed old web site: " + dm.getDisplayName());
+				}
+			}
 		}catch( Throwable e ){
 			
 			log( "Failed to update website", e );
@@ -1718,6 +1830,12 @@ RSSToChat
 					history.put( new HashWrapper( id ), "" );
 				}
 			}
+		}
+		
+		private String
+		getHistoryKey()
+		{
+			return( history_key );
 		}
 		
 		private File
