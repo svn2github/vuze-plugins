@@ -35,6 +35,7 @@ import org.gudy.azureus2.core3.global.GlobalManager;
 import org.gudy.azureus2.core3.torrent.TOTorrent;
 import org.gudy.azureus2.core3.torrent.TOTorrentCreator;
 import org.gudy.azureus2.core3.torrent.TOTorrentFactory;
+import org.gudy.azureus2.core3.torrent.TOTorrentFile;
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.Base32;
 import org.gudy.azureus2.core3.util.Debug;
@@ -498,13 +499,8 @@ RSSToChat
 						
 						presentation = "link";
 						
-					}else if (  p_type.equals( "website" )){
-						
-						if ( !is_rss ){
-							
-							throw( new Exception( "presentation only currently supported for rss feeds" ));
-						}
-						
+					}else if ( p_type.equals( "website" )){
+											
 						presentation = "website";
 						
 					}else{
@@ -877,112 +873,13 @@ RSSToChat
 					}
 				}else{
 					
-					try{
-						File item_folder = history.getItemFolder( history_key, item_time );
-							
-						String item_key = Base32.encode( getKey( history_key ));
+					extractSiteItem(
+						history, history_key, item_time,
+						title, description, hash, size,
+						seeds, leechers,
+						dl_link, cdp_link, thumb_link );
 						
-						String	torrent_file_name 	= null;
-						String	thumb_file_name 	= null;
-						
-						if ( dl_link != null ){
-							
-							try{
-								URL dl_url = new URL( dl_link );
-								
-								String protocol = dl_url.getProtocol();
-								String path 	= dl_url.getPath();
-								
-								if ( protocol.startsWith( "http" ) && path.endsWith( ".torrent" )){
-								
-									torrent_file_name = item_key + ".torrent";
-									
-									File torrent_file = new File( item_folder, torrent_file_name );
-								
-									if ( !torrent_file.exists()){
-								
-										FileUtil.copyFile( new ResourceDownloaderFactoryImpl().create( dl_url ).download(), torrent_file );
-								
-										log( "Download torrent: " + dl_url );
-									}
-								}
-							}catch( Throwable e ){
-								
-								log( "Failed to download torrent: " + thumb_link, e );
-							}
-						}
-			
-						if ( thumb_link != null ){
-							
-							try{
-								URL thumb_url = new URL( thumb_link );
-								
-								String path = thumb_url.getPath();
-								
-								int pos = path.lastIndexOf( "." );
-								
-								String ext;
-								
-								if ( pos != -1 ){
-									
-									ext = path.substring( pos+1 );
-									
-								}else{
-									
-									ext = "jpg";
-								}
-								
-								thumb_file_name = item_key + "." + ext;
-								
-								File thumb_file = new File( item_folder, thumb_file_name );
-								
-								if ( !thumb_file.exists()){
-								
-									FileUtil.copyFile( new ResourceDownloaderFactoryImpl().create( thumb_url ).download(), thumb_file);
-								
-									log( "Download thumb: " + thumb_url );
-								}
-							}catch( Throwable e ){
-								
-								log( "Failed to download thumb: " + thumb_link, e );
-							}
-						}
-						
-						File item_config = new File( item_folder, "item.config" );
-						
-						if ( !item_config.exists()){
-							
-							Map<String,Object>	map = new HashMap<String, Object>();
-							
-							map.put( "title", title );
-							map.put( "time", item_time );
-							map.put( "description", description );
-							map.put( "hash", hash );
-							map.put( "dl_link", dl_link );
-							map.put( "cdp_link", cdp_link );
-							map.put( "size", size );
-							
-							if ( thumb_file_name != null ){
-								
-								map.put( "thumb", thumb_file_name );
-							}
-							
-							if ( torrent_file_name != null ){
-								
-								map.put( "torrent", torrent_file_name );
-							}
-							
-							FileUtil.writeResilientFile( item_config, map );
-						}
-				
-						site_updated = true;
-						
-					}finally{
-						
-							// prevent continual failures for a given item
-						
-						history.setPublished( history_key, item_time );
-					}
+					site_updated = true;
 				}
 			}
 			
@@ -1007,211 +904,6 @@ RSSToChat
 		return( try_again );
 	}	
 	
-	private void
-	updateSite(
-		Mapping			mapping,
-		ChatInstance	inst,
-		String			channel_title,
-		History			history )
-	{
-		File items_folder = history.getItemsFolder();
-
-		File[] items = items_folder.listFiles();
-		
-		Arrays.sort(
-			items,
-			new Comparator<File>()
-			{
-				public int 
-				compare(
-					File file1, 
-					File file2) 
-				{
-					String name1 = file1.getName();
-					String name2 = file2.getName();
-					
-					long t1 = Long.parseLong( name1.substring( name1.lastIndexOf( "_" ) + 1 ));
-					long t2 = Long.parseLong( name2.substring( name2.lastIndexOf( "_" ) + 1 ));
-					
-					if ( t1 < t2 ){
-						return( 1 );
-					}else if ( t1 > t2 ){
-						return( -1 );
-					}else{
-						return( name2.compareTo( name1 ));
-					}
-				}		
-			});
-		
-		long	now = SystemTime.getCurrentTime();
-		
-		File site_folder = history.getSiteFolder( now );
-		
-		site_folder.mkdirs();
-		
-		try{
-			PrintWriter index = new PrintWriter( new OutputStreamWriter( new FileOutputStream( new File( site_folder, "index.html" )), "UTF-8" ));
-			
-			index.println( "<html><head><title>" + XUXmlWriter.escapeXML( channel_title) + "</title></head><body>" );
-			
-			try{
-				for ( File item: items ){
-					
-					try{
-						Map config = FileUtil.readResilientFile( new File( item, "item.config" ));
-						
-						String title = ImportExportUtils.importString( config, "title" );
-						
-						index.println( "<br>" + title );
-						
-					}catch( Throwable e ){
-						
-						e.printStackTrace();
-					}
-				}
-				
-				index.println( "</body></html>" );
-				
-			}finally{
-				
-				index.close();
-			}
-			
-			SimpleDateFormat date_format = 
-					new SimpleDateFormat("yyyy/MM/dd HH:mm:ss zzz", Locale.US );
-				
-			date_format.setTimeZone(TimeZone.getTimeZone("GMT"));
-				
-			String torrent_title = "WebSite for '" + channel_title + "': updated on " + date_format.format(new Date( now ));
-			
-			TOTorrentCreator tc = TOTorrentFactory.createFromFileOrDirWithComputedPieceLength( site_folder, TorrentUtils.getDecentralisedEmptyURL());
-						
-			TOTorrent torrent = tc.create();
-			
-			byte[] hash = torrent.getHash();
-			
-			TorrentUtils.setDecentralised( torrent );
-
-			PlatformTorrentUtils.setContentTitle( torrent, torrent_title );
-			
-			File torrent_file = new File( site_folder.getParent(), site_folder.getName() + ".torrent" );
-			
-			torrent.serialiseToBEncodedFile( torrent_file );
-			
-			GlobalManager global_manager = AzureusCoreFactory.getSingleton().getGlobalManager();
-			
-			DownloadManager new_dm = global_manager.addDownloadManager(
-					torrent_file.toString(),
-					hash,
-					site_folder.toString(),
-					DownloadManager.STATE_QUEUED, 
-					true, // persistent 
-					true,
-					null );
-			
-			String history_key = history.getHistoryKey();
-			
-			DownloadManagerState dm_state = new_dm.getDownloadState();
-			
-			dm_state.setFlag( DownloadManagerState.FLAG_ONLY_EVER_SEEDED, true );
-			dm_state.setFlag( DownloadManagerState.FLAG_DISABLE_AUTO_FILE_MOVE, true );
-			
-			PluginCoreUtils.wrap( new_dm ).setAttribute( ta_website, history_key );
-			
-			new_dm.setForceStart( true );
-						
-			TagType tt = TagManagerFactory.getTagManager().getTagType( TagType.TT_DOWNLOAD_MANUAL );
-			
-			String tag_name = "RSSToChat: Web Sites";
-			
-			Tag tag = tt.getTag( tag_name, true );
-			
-			if ( tag == null ){
-				
-				tag = tt.createTag( tag_name, true );
-			}
-			
-			tag.addTaggable( new_dm );
-			
-			log( "Torrent created: " + torrent_file );
-			
-			String magnet = buildMagnetHead( null, Base32.encode( hash ), torrent_title );
-			
-			magnet += "&xl="  + torrent.getSize();
-			
-			magnet += "[[$dn]]";
-			
-			inst.sendMessage( magnet, new HashMap<String, Object>());
-
-			log( "Posted site update" );
-			
-			List<DownloadManager> dms = global_manager.getDownloadManagers();
-			
-			List<DownloadManager>	my_dms = new ArrayList<DownloadManager>();
-			
-			for ( DownloadManager dm: dms ){
-				
-				String key = PluginCoreUtils.wrap( dm ).getAttribute( ta_website );
-				
-				if ( key != null && key.equals( history.getHistoryKey())){
-				
-					my_dms.add( dm );
-				}
-			}
-			
-			Collections.sort(
-				my_dms,
-				new Comparator<DownloadManager>()
-				{
-					public int 
-					compare(
-						DownloadManager dm1,
-						DownloadManager dm2) 
-					{
-						long t1 = dm1.getDownloadState().getLongParameter( DownloadManagerState.PARAM_DOWNLOAD_ADDED_TIME );
-						long t2 = dm2.getDownloadState().getLongParameter( DownloadManagerState.PARAM_DOWNLOAD_ADDED_TIME );
-						
-						if ( t1 < t2 ){
-							
-							return( -1 );
-							
-						}else if ( t2 > t1 ){
-							
-							return( 1 );
-							
-						}else{
-							
-							return( dm1.getInternalName().compareTo( dm2.getInternalName()));
-						}
-					}
-				});
-				
-			int num_websites_to_retain = 7;
-			
-			for ( int i=0;i<my_dms.size();i++ ){
-				
-				DownloadManager dm = my_dms.get(i);
-				
-				long added = dm.getDownloadState().getLongParameter( DownloadManagerState.PARAM_DOWNLOAD_ADDED_TIME );
-
-				if ( now - added < 24*60*60*1000 ){
-					
-					continue;
-				}
-				
-				if ( i >= num_websites_to_retain ){
-					
-					ManagerUtils.asyncStopDelete( dm, DownloadManager.STATE_STOPPED, true, true, null );
-					
-					log( "Removed old web site: " + dm.getDisplayName());
-				}
-			}
-		}catch( Throwable e ){
-			
-			log( "Failed to update website", e );
-		}
-	}
-	
 	private boolean
 	updateSubscription(
 		Mapping			mapping,
@@ -1219,10 +911,13 @@ RSSToChat
 		ChatInstance	chat,
 		History			history )
 	{
-		boolean	try_again = false;
+		boolean	try_again 		= false;
+		boolean	site_updated	= false;
 		
 		Subscription[] subscriptions = SubscriptionManagerFactory.getSingleton().getSubscriptions();
 		
+		boolean presentation_is_link = mapping.getPresentation().equals( "link" );
+
 		boolean	subs_found = false;
 		
 		for ( Subscription sub: subscriptions ){
@@ -1352,12 +1047,33 @@ RSSToChat
 							}
 						}
 						
-						String magnet = buildMagnetHead( dl_link, "", title );
-						
-						magnet = buildMagnetTail(magnet, dl_link, cdp_link, title, size, result_time, seeds, leechers );
+						if ( presentation_is_link ){
 							
-						chat.sendMessage( magnet, new HashMap<String, Object>());
+							String magnet = buildMagnetHead( dl_link, "", title );
 						
+							magnet = buildMagnetTail(magnet, dl_link, cdp_link, title, size, result_time, seeds, leechers );
+							
+							chat.sendMessage( magnet, new HashMap<String, Object>());
+						
+							history.setPublished( history_key, result_time );
+							
+							posted++;
+							
+							if ( posted >= MAX_POSTS_PER_REFRESH ){
+								
+								try_again = true;
+								
+								break;
+							}
+						}else{
+							
+							extractSiteItem(
+									history, history_key, result_time,
+									title, null, hash, size, seeds, leechers,
+									dl_link, cdp_link, null );
+									
+							site_updated = true;
+						}
 					}else{
 						
 						if ( hash == "" && dl_link == null ){
@@ -1365,28 +1081,49 @@ RSSToChat
 							continue;
 						}
 							
-						int	length_rem = MAX_MESSAGE_SIZE;
-						
-						String magnet = buildMagnetHead( dl_link, hash, title );
-						
-						magnet = buildMagnetTail(magnet, dl_link, cdp_link, title, size, result_time, seeds, leechers );
-						
-						chat.sendMessage( magnet, new HashMap<String, Object>());
-					}
-					
-					history.setPublished( history_key, result_time );
-					
-					posted++;
-					
-					if ( posted >= MAX_POSTS_PER_REFRESH ){
-						
-						try_again = true;
-						
-						break;
+						if ( presentation_is_link ){
+							
+							int	length_rem = MAX_MESSAGE_SIZE;
+							
+							String magnet = buildMagnetHead( dl_link, hash, title );
+							
+							magnet = buildMagnetTail(magnet, dl_link, cdp_link, title, size, result_time, seeds, leechers );
+							
+							chat.sendMessage( magnet, new HashMap<String, Object>());
+							
+							history.setPublished( history_key, result_time );
+							
+							posted++;
+							
+							if ( posted >= MAX_POSTS_PER_REFRESH ){
+								
+								try_again = true;
+								
+								break;
+							}
+						}else{
+							
+							extractSiteItem(
+									history, history_key, result_time,
+									title, null, hash, size, seeds, leechers,
+									dl_link, cdp_link, null );
+									
+							site_updated = true;
+						}
 					}
 				}
 				
-				log( "    Posted " + posted + " new results to " + chat.getName());
+				if ( presentation_is_link ){
+					
+					log( "    Posted " + posted + " new results" );
+
+				}else{
+					
+					if ( site_updated ){
+						
+						updateSite( mapping, chat, subscription_name, history );
+					}
+				}
 			}
 		}
 		
@@ -1397,6 +1134,496 @@ RSSToChat
 		
 		return( try_again );
 	}
+	
+	
+	
+	private void
+	extractSiteItem(
+		History		history,
+		String		history_key,
+		long		item_time,
+		String		title,
+		String		description,
+		String		hash,
+		long		size,
+		long		seeds,
+		long		leechers,
+		String		dl_link,
+		String		cdp_link,
+		String		thumb_link )
+	{
+		File item_folder = history.getItemFolder( history_key, item_time );
+			
+		String item_key = Base32.encode( getKey( history_key ));
+		
+		String	torrent_file_name 	= null;
+		String	thumb_file_name 	= null;
+		
+		if ( dl_link != null ){
+			
+			try{
+				URL dl_url = new URL( dl_link );
+				
+				String protocol = dl_url.getProtocol();
+				String path 	= dl_url.getPath();
+				
+				if ( protocol.startsWith( "http" ) && path.endsWith( ".torrent" )){
+				
+					torrent_file_name = item_key + ".torrent";
+					
+					File torrent_file = new File( item_folder, torrent_file_name );
+				
+					if ( !torrent_file.exists()){
+				
+						FileUtil.copyFile( new ResourceDownloaderFactoryImpl().create( dl_url ).download(), torrent_file );
+				
+						log( "Download torrent: " + dl_url );
+					}
+				}
+			}catch( Throwable e ){
+				
+				log( "Failed to download torrent: " + thumb_link, e );
+				
+				return;
+			}
+		}
+
+		if ( thumb_link != null ){
+			
+			try{
+				URL thumb_url = new URL( thumb_link );
+				
+				String path = thumb_url.getPath();
+				
+				int pos = path.lastIndexOf( "." );
+				
+				String ext;
+				
+				if ( pos != -1 ){
+					
+					ext = path.substring( pos+1 );
+					
+				}else{
+					
+					ext = "jpg";
+				}
+				
+				thumb_file_name = item_key + "." + ext;
+				
+				File thumb_file = new File( item_folder, thumb_file_name );
+				
+				if ( !thumb_file.exists()){
+				
+					FileUtil.copyFile( new ResourceDownloaderFactoryImpl().create( thumb_url ).download(), thumb_file);
+				
+					log( "Download thumb: " + thumb_url );
+				}
+			}catch( Throwable e ){
+				
+				log( "Failed to download thumb: " + thumb_link, e );
+				
+				return;
+			}
+		}
+		
+		File item_config = new File( item_folder, "item.config" );
+		
+		if ( !item_config.exists()){
+			
+			Map<String,Object>	map = new HashMap<String, Object>();
+			
+			map.put( "title", title );
+			map.put( "time", item_time );
+			map.put( "description", description );
+			map.put( "hash", hash );
+			map.put( "dl_link", dl_link );
+			map.put( "cdp_link", cdp_link );
+			map.put( "size", size );
+			map.put( "seeds", seeds );
+			map.put( "leechers", leechers );
+			
+			if ( thumb_file_name != null ){
+				
+				map.put( "thumb", thumb_file_name );
+			}
+			
+			if ( torrent_file_name != null ){
+				
+				map.put( "torrent", torrent_file_name );
+			}
+			
+			FileUtil.writeResilientFile( item_config, map );
+		}
+							
+		history.setPublished( history_key, item_time );
+	}
+	
+	private void
+	updateSite(
+		Mapping			mapping,
+		ChatInstance	inst,
+		String			channel_title,
+		History			history )
+	{
+		File items_folder = history.getItemsFolder();
+
+		File[] items = items_folder.listFiles();
+		
+		Arrays.sort(
+			items,
+			new Comparator<File>()
+			{
+				public int 
+				compare(
+					File file1, 
+					File file2) 
+				{
+					String name1 = file1.getName();
+					String name2 = file2.getName();
+					
+					long t1 = Long.parseLong( name1.substring( name1.lastIndexOf( "_" ) + 1 ));
+					long t2 = Long.parseLong( name2.substring( name2.lastIndexOf( "_" ) + 1 ));
+					
+					if ( t1 < t2 ){
+						return( 1 );
+					}else if ( t1 > t2 ){
+						return( -1 );
+					}else{
+						return( name2.compareTo( name1 ));
+					}
+				}		
+			});
+		
+		long	now = SystemTime.getCurrentTime();
+		
+		File site_folder = history.getSiteFolder( now );
+		
+		site_folder.mkdirs();
+		
+		try{
+			PrintWriter index = new PrintWriter( new OutputStreamWriter( new FileOutputStream( new File( site_folder, "index.html" )), "UTF-8" ));
+			
+			SimpleDateFormat title_date_format 	= new SimpleDateFormat("yyyy/MM/dd HH:mm:ss zzz", Locale.US );
+			SimpleDateFormat item_date_format 	= new SimpleDateFormat("yyyy/MM/dd", Locale.US );
+
+			title_date_format.setTimeZone(TimeZone.getTimeZone("GMT"));
+			item_date_format.setTimeZone(TimeZone.getTimeZone("GMT"));
+				
+			String torrent_title = "WebSite for '" + channel_title + "': updated on " + title_date_format.format(new Date( now ));
+
+			try{
+				index.println( 
+						"<html><head><meta charset=\"UTF-8\"><title>" +
+						escape( channel_title) + 
+						"</title></head><body>" );
+				
+				index.println( "<h1>" + escape( torrent_title ) + "</h1>" );
+				
+				index.println( "<table>" );
+
+				for ( File item: items ){
+					
+					try{
+						Map config = FileUtil.readResilientFile( new File( item, "item.config" ));
+						
+						String 	title 		= ImportExportUtils.importString( config, "title" );
+						long	time		= (Long)config.get( "time" );
+						String 	description	= ImportExportUtils.importString( config, "description" );
+						byte[]	hash		= (byte[])config.get( "hash" );
+						String 	dl_link 	= ImportExportUtils.importString( config, "dl_link" );
+						String 	cdp_link 	= ImportExportUtils.importString( config, "cdp_link" );
+						long	size		= (Long)config.get( "size" );
+						long	seeds		= (Long)config.get( "seeds" );
+						long	leechers	= (Long)config.get( "leechers" );
+						
+						String thumb 	= ImportExportUtils.importString( config, "thumb" );
+						String torrent 	= ImportExportUtils.importString( config, "torrent" );
+
+						if ( thumb != null ){
+
+							File thumb_file = new File( item, thumb );
+							
+							FileUtil.copyFile( thumb_file, new File( site_folder, thumb_file.getName()));
+						}
+						
+						if ( torrent != null ){
+
+							File torrent_file = new File( item, torrent );
+							
+							FileUtil.copyFile( torrent_file, new File( site_folder, torrent_file.getName()));
+						}
+						
+						index.println( "<tr>" );
+						
+							// thumb
+						
+						index.println( "<td>" );
+						
+						if ( thumb != null ){
+							
+							index.println( "<img src=\"" + thumb + "\">" );
+						}
+						
+						index.println( "</td>" );
+
+							// title
+						
+						index.println( "<td>" + escape( title ) + "</td>" );
+						
+							// desc
+						
+						index.println( "<td>" );
+						
+						if ( description != null ){
+							
+							index.println( escape( description ));
+						}
+						
+							// date
+						
+						index.println( "<td>" + item_date_format.format( new Date( time )) + "</td>" );
+				
+							// size 
+						
+						index.println( "<td>" + DisplayFormatters.formatByteCountToKiBEtc(size) + "</td>" );
+						
+							// seeds/peers
+						
+						index.println( "<td>" );
+						
+						if ( seeds + leechers >= 0 ){
+							
+							index.println( seeds + "/" + leechers );
+						}
+
+						index.println( "</td>" );
+
+							// cdp
+													
+						index.println( "<td>" );
+						
+						if ( cdp_link != null ){
+							
+							index.println( "<a href=\"" + cdp_link + "\">details</a>" );
+						}
+						
+						index.println( "</td>" );
+						
+							// download
+							
+						index.println( "<td>" );
+						
+						if ( dl_link != null && torrent == null ){
+							
+							index.println( "<a href=\"" + dl_link + "\">download</a>" );
+						}
+						
+						index.println( "</td>" );
+
+							// torrent
+						
+						index.println( "<td>" );
+						
+						if ( torrent != null ){
+							
+							index.println( "<a href=\"" + torrent + "\">torrent</a>" );
+						}
+						
+						index.println( "</td>" );
+
+							// play
+						
+						index.println( "<td>" );
+						
+						if ( torrent != null ){
+							
+							index.println( "<a href=\"content?vuze_source=" + torrent + "\">play (torrent)</a>" );
+							
+						}else if ( dl_link != null ){
+							
+							if ( dl_link.startsWith( "magnet" )){
+								
+								index.println( "<a href=\"content?vuze_source=" + UrlUtils.encode( dl_link ) + "\">play (magnet)</a>" );
+							}
+						}
+						
+						index.println( "</td>" );
+
+						index.println( "</tr>" );
+						
+					}catch( Throwable e ){
+						
+						Debug.out( e );
+					}
+				}
+				
+				index.println( "</table>" );
+
+				index.println( "</body></html>" );
+				
+			}finally{
+				
+				index.close();
+			}
+						
+			TOTorrentCreator tc = TOTorrentFactory.createFromFileOrDirWithComputedPieceLength( site_folder, TorrentUtils.getDecentralisedEmptyURL());
+						
+			TOTorrent torrent = tc.create();
+			
+			byte[] hash = torrent.getHash();
+			
+			TorrentUtils.setDecentralised( torrent );
+
+			int primary_file_index = 0;
+			
+			TOTorrentFile[] files = torrent.getFiles();
+			
+			for ( TOTorrentFile file: files ){
+				
+				byte[][] comps = file.getPathComponents();
+				
+				if ( comps.length == 1 ){
+					
+					String str = new String(comps[0], "UTF-8" );
+					
+					if ( str.equals( "index.html" )){
+						
+						primary_file_index = file.getIndex();
+						
+						break;
+					}
+				}
+			}
+			
+			PlatformTorrentUtils.setContentTitle( torrent, torrent_title );
+			PlatformTorrentUtils.setContentPrimaryFileIndex( torrent, primary_file_index );
+			
+			File torrent_file = new File( site_folder.getParent(), site_folder.getName() + ".torrent" );
+			
+			torrent.serialiseToBEncodedFile( torrent_file );
+			
+			GlobalManager global_manager = AzureusCoreFactory.getSingleton().getGlobalManager();
+			
+			DownloadManager new_dm = global_manager.addDownloadManager(
+					torrent_file.toString(),
+					hash,
+					site_folder.toString(),
+					DownloadManager.STATE_QUEUED, 
+					true, // persistent 
+					true,
+					null );
+			
+			String history_key = history.getHistoryKey();
+			
+			DownloadManagerState dm_state = new_dm.getDownloadState();
+			
+			dm_state.setFlag( DownloadManagerState.FLAG_ONLY_EVER_SEEDED, true );
+			dm_state.setFlag( DownloadManagerState.FLAG_DISABLE_AUTO_FILE_MOVE, true );
+			
+			PluginCoreUtils.wrap( new_dm ).setAttribute( ta_website, history_key );
+			
+			new_dm.setForceStart( true );
+						
+			TagType tt = TagManagerFactory.getTagManager().getTagType( TagType.TT_DOWNLOAD_MANUAL );
+			
+			String tag_name = "RSSToChat: Web Sites";
+			
+			Tag tag = tt.getTag( tag_name, true );
+			
+			if ( tag == null ){
+				
+				tag = tt.createTag( tag_name, true );
+			}
+			
+			tag.addTaggable( new_dm );
+			
+			log( "Torrent created: " + torrent_file );
+			
+			String magnet = buildMagnetHead( null, Base32.encode( hash ), torrent_title );
+			
+			magnet += "&xl="  + torrent.getSize();
+			
+			magnet += "[[$dn]]";
+			
+			inst.sendMessage( magnet, new HashMap<String, Object>());
+
+			log( "Posted site update" );
+			
+			List<DownloadManager> dms = global_manager.getDownloadManagers();
+			
+			List<DownloadManager>	my_dms = new ArrayList<DownloadManager>();
+			
+			for ( DownloadManager dm: dms ){
+				
+				String key = PluginCoreUtils.wrap( dm ).getAttribute( ta_website );
+				
+				if ( key != null && key.equals( history.getHistoryKey())){
+				
+					my_dms.add( dm );
+				}
+			}
+			
+			Collections.sort(
+				my_dms,
+				new Comparator<DownloadManager>()
+				{
+					public int 
+					compare(
+						DownloadManager dm1,
+						DownloadManager dm2) 
+					{
+						long t1 = dm1.getDownloadState().getLongParameter( DownloadManagerState.PARAM_DOWNLOAD_ADDED_TIME );
+						long t2 = dm2.getDownloadState().getLongParameter( DownloadManagerState.PARAM_DOWNLOAD_ADDED_TIME );
+						
+						if ( t1 < t2 ){
+							
+							return( -1 );
+							
+						}else if ( t2 > t1 ){
+							
+							return( 1 );
+							
+						}else{
+							
+							return( dm1.getInternalName().compareTo( dm2.getInternalName()));
+						}
+					}
+				});
+				
+			int num_websites_to_retain = 7;
+			
+			for ( int i=0;i<my_dms.size();i++ ){
+				
+				DownloadManager dm = my_dms.get(i);
+				
+				long added = dm.getDownloadState().getLongParameter( DownloadManagerState.PARAM_DOWNLOAD_ADDED_TIME );
+
+				if ( now - added < 24*60*60*1000 ){
+					
+					continue;
+				}
+				
+				if ( i >= num_websites_to_retain ){
+					
+					ManagerUtils.asyncStopDelete( dm, DownloadManager.STATE_STOPPED, true, true, null );
+					
+					log( "Removed old web site: " + dm.getDisplayName());
+				}
+			}
+		}catch( Throwable e ){
+			
+			log( "Failed to update website", e );
+		}
+	}
+	
+	private String
+	escape(
+		String	str )
+	{
+		return( XUXmlWriter.escapeXML( str ));
+	}
+	
+
 	
 	private String
 	buildMagnetHead(
