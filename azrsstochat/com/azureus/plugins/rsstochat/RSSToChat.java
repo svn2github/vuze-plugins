@@ -38,6 +38,7 @@ import org.gudy.azureus2.core3.torrent.TOTorrentFactory;
 import org.gudy.azureus2.core3.torrent.TOTorrentFile;
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.Base32;
+import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.DisplayFormatters;
 import org.gudy.azureus2.core3.util.FileUtil;
@@ -130,7 +131,7 @@ RSSToChat
 		
 		loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
 		
-		log	= plugin_interface.getLogger().getTimeStampedChannel( "Message Sync");
+		log	= plugin_interface.getLogger().getTimeStampedChannel( "RSSToChat");
 		
 		final UIManager	ui_manager = plugin_interface.getUIManager();
 		
@@ -605,6 +606,13 @@ RSSToChat
 			
 			log( "    RSS '" + rss_source + "' returned " + items.length + " total items" );
 			
+			final Map<RSSItem, Integer> item_map = new HashMap<RSSItem, Integer>();
+			
+			for ( int i=0;i<items.length;i++ ){
+				
+				item_map.put( items[i], i );
+			}
+			
 			Arrays.sort( 
 				items,
 				new Comparator<RSSItem>()
@@ -624,7 +632,7 @@ RSSToChat
 						}else if ( res > 0 ){
 							return( 1 );
 						}else{
-							return( 0 );
+							return( item_map.get( i1 ) - item_map.get( i2 ));
 						}
 					}
 				});
@@ -799,7 +807,7 @@ RSSToChat
 							
 						}catch( Throwable e ){
 						}
-					}else if ( lc_full_child_name.equals( "vuze:seeds" )){
+					}else if ( lc_full_child_name.equals( "vuze:seeds" ) || lc_full_child_name.equals( "torrent:seeds" )){
 						
 						try{
 							seeds = Long.parseLong( value );
@@ -807,7 +815,7 @@ RSSToChat
 						}catch( Throwable e ){
 						}
 					
-					}else if ( lc_full_child_name.equals( "vuze:peers" )){
+					}else if ( lc_full_child_name.equals( "vuze:peers" ) || lc_full_child_name.equals( "torrent:peers" )){
 						
 						try{
 							leechers = Long.parseLong( value );
@@ -823,8 +831,16 @@ RSSToChat
 						
 					}else if ( lc_full_child_name.equals( "vuze:assethash" )){
 
-						hash = value;
+						hash = value;	// base32
 						
+					}else if ( lc_full_child_name.equals( "torrent:infoHash" )){
+
+						hash = value;	// base 16, hmmmm, be consistent
+						
+						if ( hash.length() == 40 ){
+							
+							hash = Base32.encode( ByteFormatter.decodeString( hash ));
+						}
 					}else if (  lc_full_child_name.equals( "media:thumbnail" )){
 						
 						thumb_link = child.getAttribute( "url" ).getValue().trim();
@@ -1300,7 +1316,12 @@ RSSToChat
 		
 		site_folder.mkdirs();
 		
+		File from_resources = new File( plugin_interface.getPluginDirectoryName(), "resources" );
+		File to_resources 	= site_folder;
+				
 		try{
+			FileUtil.copyFileOrDirectory( from_resources, to_resources ); 
+
 			PrintWriter index = new PrintWriter( new OutputStreamWriter( new FileOutputStream( new File( site_folder, "index.html" )), "UTF-8" ));
 			
 			SimpleDateFormat title_date_format 	= new SimpleDateFormat("yyyy/MM/dd HH:mm:ss zzz", Locale.US );
@@ -1311,20 +1332,48 @@ RSSToChat
 				
 			String torrent_title = "WebSite for '" + channel_title + "': updated on " + title_date_format.format(new Date( now ));
 
+			String NL = "\r\n";
+			
 			try{
 				index.println( 
-						"<html><head><meta charset=\"UTF-8\"><title>" +
-						escape( channel_title) + 
-						"</title></head><body>" );
+						"<html><head>" + NL + 
+						"<meta http-equiv=\"content-type\" content=\"text/html; charset=UTF-8\">" + NL + 
+						"<script src=\"resources/js/jquery.min.js\"></script>" + NL + 
+						"<script src=\"resources/js/jquery.tablesorter.js\"></script>" + NL + 
+						"<link rel=\"stylesheet\" type=\"text/css\" href=\"resources/css/style.css\" media=\"screen\" />" + NL + 
+						"<title>" +	escape( channel_title) + "</title>" +  NL + 
+						"</head><body>" );
 				
-				index.println( "<h1>" + escape( torrent_title ) + "</h1>" );
+				index.println( "<h2>" + escape( torrent_title ) + "</h2>" );
 				
-				index.println( "<table>" );
+				index.println( "<script src=\"resources/js/init.js\"></script>" );
+				
+				index.println( "<table id=\"content\" class=\"tablesorter\">" );
 
+				index.println( "<thead><tr>" +
+					"<th width=\"10%\">Thumb</th>" +
+					"<th width=\"30%\">Title</th>" +
+					"<th width=\"20%\">Detail</th>" +
+					"<th width=\"8%\">Date</th>" +
+					"<th width=\"5%\">Size</th>" +
+					"<th width=\"7%\">Seeds/Peers</th>" +
+					"<th width=\"5%\">CDP</th>" +
+					"<th width=\"5%\">Download</th>" +
+					"<th width=\"5%\">Torrent</th>" +
+					"<th width=\"5%\">Play</th>" +
+					"</tr></thead><tbody>" );
+					
+				int	row_num = 0;
+				
 				for ( File item: items ){
 					
 					try{
 						Map config = FileUtil.readResilientFile( new File( item, "item.config" ));
+						
+						if ( config.isEmpty()){
+							
+							continue;
+						}
 						
 						String 	title 		= ImportExportUtils.importString( config, "title" );
 						long	time		= (Long)config.get( "time" );
@@ -1353,11 +1402,18 @@ RSSToChat
 							FileUtil.copyFile( torrent_file, new File( site_folder, torrent_file.getName()));
 						}
 						
+						row_num++;
+						
+						String row_str = String.valueOf( row_num );
+						while( row_str.length() < 6 ){
+							row_str = "0" + row_str;
+						}
 						index.println( "<tr>" );
 						
 							// thumb
 						
-						index.println( "<td>" );
+							// use hidden text values to force sort order
+						index.println( "<td><span style=\"display: none\">" + row_str + " </span>" );
 						
 						if ( thumb != null ){
 							
@@ -1385,15 +1441,28 @@ RSSToChat
 				
 							// size 
 						
-						index.println( "<td>" + DisplayFormatters.formatByteCountToKiBEtc(size) + "</td>" );
+						String size_str = String.valueOf( size );
+						while( size_str.length() < 12 ){
+							size_str = "0" + size_str;
+						}
+						
+						index.println( "<td><span style=\"display: none\">" + size_str + " </span>" + DisplayFormatters.formatByteCountToKiBEtc(size) + "</td>" );
 						
 							// seeds/peers
 						
 						index.println( "<td>" );
 						
-						if ( seeds + leechers >= 0 ){
+						if ( seeds >= 0 || leechers >= 0 ){
 							
-							index.println( seeds + "/" + leechers );
+							seeds 		= Math.max(0, seeds);
+							leechers 	= Math.max(0, leechers);
+							
+							String sl_str = String.valueOf( seeds+leechers );
+							while( sl_str.length() < 7 ){
+								sl_str = "0" + sl_str;
+							}
+
+							index.println( "<span style=\"display: none\">" + sl_str + " </span>" + seeds + "/" + leechers );
 						}
 
 						index.println( "</td>" );
@@ -1457,7 +1526,7 @@ RSSToChat
 					}
 				}
 				
-				index.println( "</table>" );
+				index.println( "</tbody></table>" );
 
 				index.println( "</body></html>" );
 				
@@ -2085,7 +2154,32 @@ RSSToChat
 		{			
 			File result = new File( dir, "items" );
 			
-			result = new File( result, new SimpleDateFormat( "yyyyMMdd").format( new Date( time )) + "_" + Base32.encode( getKey( id )) + "_" + time );
+			final String prefix = new SimpleDateFormat( "yyyyMMdd").format( new Date( time )) + "_" + Base32.encode( getKey( id )) + "_";
+			
+			if ( time == 0 ){
+			
+				File[] match = 
+					result.listFiles(
+						new FilenameFilter() {
+							
+							public boolean 
+							accept(
+								File dir, 
+								String filename) 
+							{
+								return( filename.startsWith( prefix ));
+							}
+						});
+				
+				if ( match != null && match.length == 1 ){
+					
+					return( match[0] );
+				}
+				
+				time = SystemTime.getCurrentTime();
+			}
+			
+			result = new File( result, prefix + time );
 			
 			if ( !result.exists()){
 				
