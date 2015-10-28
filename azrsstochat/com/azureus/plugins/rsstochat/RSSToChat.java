@@ -330,6 +330,8 @@ RSSToChat
 				String	link_type			= "magnet";
 				
 				String	presentation = "link";
+				int		website_retain_sites	= 7;
+				int		website_retain_items	= 2048;
 				
 				if ( rss_node != null && subs_node == null ){
 					
@@ -508,11 +510,39 @@ RSSToChat
 						
 						throw( new Exception( "presentation <type> value of '" + p_type + "' is invalid" ));
 					}
+					
+					SimpleXMLParserDocumentNode p_sites_node = presentation_node.getChild( "retain_sites" );
+
+					if ( p_sites_node != null ){
+						
+						try{
+							website_retain_sites = Integer.parseInt( p_sites_node.getValue().trim());
+							
+						}catch( Throwable e ){
+							
+							throw( new Exception( "presentation <retain_sites> value of '" + p_sites_node.getValue() + "' is invalid" ));
+
+						}
+					}
+					
+					SimpleXMLParserDocumentNode p_items_node = presentation_node.getChild( "retain_items" );
+
+					if ( p_items_node != null ){
+						
+						try{
+							website_retain_items = Integer.parseInt( p_items_node.getValue().trim());
+							
+						}catch( Throwable e ){
+							
+							throw( new Exception( "presentation <retain_items> value of '" + p_items_node.getValue() + "' is invalid" ));
+
+						}
+					}
 				}
 				
 				for ( String network: networks ){
 					
-					Mapping mapping = new Mapping( source, is_rss, desc_link_pattern, link_type, network, key, type, presentation, refresh_mins );
+					Mapping mapping = new Mapping( source, is_rss, desc_link_pattern, link_type, network, key, type, presentation, website_retain_sites, website_retain_items, refresh_mins );
 					
 					log( "    Mapping: " + mapping.getOverallName());
 					
@@ -1330,6 +1360,8 @@ RSSToChat
 			title_date_format.setTimeZone(TimeZone.getTimeZone("GMT"));
 			item_date_format.setTimeZone(TimeZone.getTimeZone("GMT"));
 				
+			String page_title = channel_title + ": updated on " + title_date_format.format(new Date( now ));
+			
 			String torrent_title = "WebSite for '" + channel_title + "': updated on " + title_date_format.format(new Date( now ));
 
 			String NL = "\r\n";
@@ -1344,7 +1376,7 @@ RSSToChat
 						"<title>" +	escape( channel_title) + "</title>" +  NL + 
 						"</head><body>" );
 				
-				index.println( "<h2>" + escape( torrent_title ) + "</h2>" );
+				index.println( "<h2>" + escape( page_title ) + "</h2>" );
 				
 				index.println( "<script src=\"resources/js/init.js\"></script>" );
 				
@@ -1365,7 +1397,20 @@ RSSToChat
 					
 				int	row_num = 0;
 				
+				int	items_to_retain = mapping.getItemsToRetain();
+				
 				for ( File item: items ){
+					
+					row_num++;
+
+					if ( row_num > items_to_retain ){
+						
+						log( "Deleting old item: " + item );
+						
+						FileUtil.recursiveDeleteNoCheck( item );
+						
+						continue;
+					}
 					
 					try{
 						Map config = FileUtil.readResilientFile( new File( item, "item.config" ));
@@ -1401,9 +1446,7 @@ RSSToChat
 							
 							FileUtil.copyFile( torrent_file, new File( site_folder, torrent_file.getName()));
 						}
-						
-						row_num++;
-						
+												
 						String row_str = String.valueOf( row_num );
 						while( row_str.length() < 6 ){
 							row_str = "0" + row_str;
@@ -1659,7 +1702,7 @@ RSSToChat
 					}
 				});
 				
-			int num_websites_to_retain = 7;
+			int num_websites_to_retain = mapping.getSitesToRetain();
 			
 			for ( int i=0;i<my_dms.size();i++ ){
 				
@@ -1820,6 +1863,20 @@ RSSToChat
 			
 		throws PluginException 
 	{
+		if ( config_model != null ){
+			
+			config_model.destroy();
+			
+			config_model = null;
+		}
+		
+		if ( view_model != null ){
+			
+			view_model.destroy();
+			
+			view_model = null;
+		}
+		
 		synchronized( mappings ){
 			
 			unloaded	= true;
@@ -1854,7 +1911,11 @@ RSSToChat
 		private final int			type;
 		private final String		network;
 		private final String		key;
+		
 		private final String		presentation;
+		private final int			retain_sites;
+		private final int			retain_items;
+		
 		private final int			refresh;
 		
 		private ChatInstance	chat;
@@ -1873,6 +1934,8 @@ RSSToChat
 			String			_key,
 			int				_type,
 			String			_presentation,
+			int				_retain_sites,
+			int				_retain_items,
 			int				_refresh )
 		{
 			source				= _source;
@@ -1882,7 +1945,11 @@ RSSToChat
 			network				= _network;
 			key					= _key;
 			type				= _type;
+			
 			presentation		= _presentation;
+			retain_sites		= _retain_sites;
+			retain_items		= _retain_items;
+			
 			refresh				= _refresh;
 			
 			retry_outstanding = true;		// initial load regardless
@@ -2053,6 +2120,18 @@ RSSToChat
 		getPresentation()
 		{
 			return( presentation );
+		}
+		
+		private int
+		getSitesToRetain()
+		{
+			return( retain_sites );
+		}
+		
+		private int
+		getItemsToRetain()
+		{
+			return( retain_items );
 		}
 		
 		private String
