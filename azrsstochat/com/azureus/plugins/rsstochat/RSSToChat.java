@@ -24,6 +24,7 @@ package com.azureus.plugins.rsstochat;
 
 import java.io.*;
 import java.net.URL;
+import java.net.URLDecoder;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -329,7 +330,8 @@ RSSToChat
 				Pattern	desc_link_pattern 	= null;
 				String	link_type			= "magnet";
 				
-				String	presentation = "link";
+				String	presentation 			= "link";
+				String	website_name			= null;
 				int		website_retain_sites	= 7;
 				int		website_retain_items	= 2048;
 				
@@ -511,6 +513,13 @@ RSSToChat
 						throw( new Exception( "presentation <type> value of '" + p_type + "' is invalid" ));
 					}
 					
+					SimpleXMLParserDocumentNode p_name_node = presentation_node.getChild( "name" );
+					
+					if ( p_name_node != null ){
+						
+						website_name = p_name_node.getValue().trim();
+					}
+					
 					SimpleXMLParserDocumentNode p_sites_node = presentation_node.getChild( "retain_sites" );
 
 					if ( p_sites_node != null ){
@@ -542,7 +551,7 @@ RSSToChat
 				
 				for ( String network: networks ){
 					
-					Mapping mapping = new Mapping( source, is_rss, desc_link_pattern, link_type, network, key, type, presentation, website_retain_sites, website_retain_items, refresh_mins );
+					Mapping mapping = new Mapping( source, is_rss, desc_link_pattern, link_type, network, key, type, presentation, website_name, website_retain_sites, website_retain_items, refresh_mins );
 					
 					log( "    Mapping: " + mapping.getOverallName());
 					
@@ -1211,19 +1220,52 @@ RSSToChat
 				URL dl_url = new URL( dl_link );
 				
 				String protocol = dl_url.getProtocol();
-				String path 	= dl_url.getPath();
 				
-				if ( protocol.startsWith( "http" ) && path.endsWith( ".torrent" )){
-				
-					torrent_file_name = item_key + ".torrent";
+				if ( protocol.equals( "magnet" )){
 					
-					File torrent_file = new File( item_folder, torrent_file_name );
-				
-					if ( !torrent_file.exists()){
-				
-						FileUtil.copyFile( new ResourceDownloaderFactoryImpl().create( dl_url ).download(), torrent_file );
-				
-						log( "Download torrent: " + dl_url );
+					String query = dl_url.getQuery();
+					
+					if ( query != null ){
+						
+						String[] args = query.split( "&" );
+						
+						for ( String arg: args ){
+							
+							String[] temp = arg.split( "=" );
+							
+							if ( temp[0].equals( "fl" )){
+								
+								dl_url = new URL( UrlUtils.decode( temp[1] ));
+								
+								torrent_file_name = item_key + ".torrent";
+								
+								File torrent_file = new File( item_folder, torrent_file_name );
+							
+								if ( !torrent_file.exists()){
+							
+									FileUtil.copyFile( new ResourceDownloaderFactoryImpl().create( dl_url ).download(), torrent_file );
+							
+									log( "Downloaded torrent: " + dl_url );
+								}
+							}
+						}
+					}
+				}else{
+					
+					String path 	= dl_url.getPath();
+					
+					if ( protocol.startsWith( "http" ) && path.endsWith( ".torrent" )){
+					
+						torrent_file_name = item_key + ".torrent";
+						
+						File torrent_file = new File( item_folder, torrent_file_name );
+					
+						if ( !torrent_file.exists()){
+					
+							FileUtil.copyFile( new ResourceDownloaderFactoryImpl().create( dl_url ).download(), torrent_file );
+					
+							log( "Downloaded torrent: " + dl_url );
+						}
 					}
 				}
 			}catch( Throwable e ){
@@ -1360,9 +1402,16 @@ RSSToChat
 			title_date_format.setTimeZone(TimeZone.getTimeZone("GMT"));
 			item_date_format.setTimeZone(TimeZone.getTimeZone("GMT"));
 				
-			String page_title = channel_title + ": updated on " + title_date_format.format(new Date( now ));
+			String website_title = mapping.getSiteName();
 			
-			String torrent_title = "WebSite for '" + channel_title + "': updated on " + title_date_format.format(new Date( now ));
+			if ( website_title == null ){
+				
+				website_title = channel_title;
+			}
+			
+			String page_title = website_title + ": updated on " + title_date_format.format(new Date( now ));
+			
+			String torrent_title = "WebSite for '" + website_title + "': updated on " + title_date_format.format(new Date( now ));
 
 			String NL = "\r\n";
 			
@@ -1373,7 +1422,7 @@ RSSToChat
 						"<script src=\"resources/js/jquery.min.js\"></script>" + NL + 
 						"<script src=\"resources/js/jquery.tablesorter.js\"></script>" + NL + 
 						"<link rel=\"stylesheet\" type=\"text/css\" href=\"resources/css/style.css\" media=\"screen\" />" + NL + 
-						"<title>" +	escape( channel_title) + "</title>" +  NL + 
+						"<title>" +	escape( website_title) + "</title>" +  NL + 
 						"</head><body>" );
 				
 				index.println( "<h2>" + escape( page_title ) + "</h2>" );
@@ -1669,7 +1718,7 @@ RSSToChat
 				
 				String key = PluginCoreUtils.wrap( dm ).getAttribute( ta_website );
 				
-				if ( key != null && key.equals( history.getHistoryKey())){
+				if ( key != null && key.equals( history_key )){
 				
 					my_dms.add( dm );
 				}
@@ -1689,11 +1738,11 @@ RSSToChat
 						
 						if ( t1 < t2 ){
 							
-							return( -1 );
-							
-						}else if ( t2 > t1 ){
-							
 							return( 1 );
+							
+						}else if ( t1 > t2 ){
+							
+							return( -1 );
 							
 						}else{
 							
@@ -1718,6 +1767,8 @@ RSSToChat
 				if ( i >= num_websites_to_retain ){
 					
 					ManagerUtils.asyncStopDelete( dm, DownloadManager.STATE_STOPPED, true, true, null );
+					
+					new File( dm.getSaveLocation() + ".torrent" ).delete();
 					
 					log( "Removed old web site: " + dm.getDisplayName());
 				}
@@ -1913,6 +1964,7 @@ RSSToChat
 		private final String		key;
 		
 		private final String		presentation;
+		private final String		website_name;
 		private final int			retain_sites;
 		private final int			retain_items;
 		
@@ -1934,6 +1986,7 @@ RSSToChat
 			String			_key,
 			int				_type,
 			String			_presentation,
+			String			_website_name,
 			int				_retain_sites,
 			int				_retain_items,
 			int				_refresh )
@@ -1947,6 +2000,7 @@ RSSToChat
 			type				= _type;
 			
 			presentation		= _presentation;
+			website_name		= _website_name;
 			retain_sites		= _retain_sites;
 			retain_items		= _retain_items;
 			
@@ -2120,6 +2174,12 @@ RSSToChat
 		getPresentation()
 		{
 			return( presentation );
+		}
+		
+		public String
+		getSiteName()
+		{
+			return( website_name );
 		}
 		
 		private int
