@@ -24,13 +24,13 @@ package com.azureus.plugins.rsstochat;
 
 import java.io.*;
 import java.net.URL;
-import java.net.URLDecoder;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.gudy.azureus2.core3.download.DownloadManager;
+import org.gudy.azureus2.core3.download.DownloadManagerInitialisationAdapter;
 import org.gudy.azureus2.core3.download.DownloadManagerState;
 import org.gudy.azureus2.core3.global.GlobalManager;
 import org.gudy.azureus2.core3.torrent.TOTorrent;
@@ -1348,7 +1348,7 @@ RSSToChat
 	
 	private void
 	updateSite(
-		Mapping			mapping,
+		final Mapping	mapping,
 		ChatInstance	inst,
 		String			channel_title,
 		History			history )
@@ -1524,7 +1524,26 @@ RSSToChat
 						
 						if ( description != null ){
 							
-							index.println( escape( description ));
+							String str = escape( description );
+							
+							str = str.replaceAll( "&lt;br&gt;", "<br>" );
+							str = str.replaceAll( "&lt;p&gt;", "<p>" );
+							str = str.replaceAll( "&lt;hr&gt;", "<hr>" );
+							
+							str = str.replaceAll( "&lt;b&gt;", "<b>" );
+							str = str.replaceAll( "&lt;/b&gt;", "</b>" );
+							
+							str = str.replaceAll( "&lt;i&gt;", "<i>" );
+							str = str.replaceAll( "&lt;/i&gt;", "</i>" );
+
+							str = str.replaceAll( "&lt;ol&gt;", "<ol>" );
+							str = str.replaceAll( "&lt;/ol&gt;", "</ol>" );
+							str = str.replaceAll( "&lt;ul&gt;", "<ul>" );
+							str = str.replaceAll( "&lt;/ul&gt;", "</ul>" );
+							str = str.replaceAll( "&lt;li&gt;", "<li>" );
+							str = str.replaceAll( "&lt;/li&gt;", "</li>" );
+						
+							index.println( str );
 						}
 						
 							// date
@@ -1672,7 +1691,50 @@ RSSToChat
 					DownloadManager.STATE_QUEUED, 
 					true, // persistent 
 					true,
-					null );
+					new DownloadManagerInitialisationAdapter() {
+						
+						public void 
+						initialised(
+							DownloadManager 	new_dm, 
+							boolean 			for_seeding) 
+						{
+							try{
+								TagType tt = TagManagerFactory.getTagManager().getTagType( TagType.TT_DOWNLOAD_MANUAL );
+								
+								String tag_name = "RSSToChat: Web Sites";
+								
+								Tag tag = tt.getTag( tag_name, true );
+								
+								if ( tag == null ){
+									
+									tag = tt.createTag( tag_name, true );
+								}
+								
+								tag.addTaggable( new_dm );
+								
+							}catch( Throwable e ){
+								
+							}
+							
+							if ( mapping.getNetwork() != AENetworkClassifier.AT_PUBLIC ){
+								
+								DownloadManagerState state = new_dm.getDownloadState();
+								
+								state.setNetworkEnabled( AENetworkClassifier.AT_PUBLIC , false );
+								
+								for ( String net: AENetworkClassifier.AT_NON_PUBLIC ){
+									
+									state.setNetworkEnabled( net, true );
+								}
+							}
+						}
+						
+						public int 
+						getActions() 
+						{
+							return( ACT_ASSIGNS_TAGS );
+						}
+					} );
 			
 			String history_key = history.getHistoryKey();
 			
@@ -1683,26 +1745,19 @@ RSSToChat
 			
 			PluginCoreUtils.wrap( new_dm ).setAttribute( ta_website, history_key );
 			
-			new_dm.setForceStart( true );
-						
-			TagType tt = TagManagerFactory.getTagManager().getTagType( TagType.TT_DOWNLOAD_MANUAL );
-			
-			String tag_name = "RSSToChat: Web Sites";
-			
-			Tag tag = tt.getTag( tag_name, true );
-			
-			if ( tag == null ){
-				
-				tag = tt.createTag( tag_name, true );
-			}
-			
-			tag.addTaggable( new_dm );
+			new_dm.setForceStart( true );					
 			
 			log( "Torrent created: " + torrent_file );
 			
 			String magnet = buildMagnetHead( null, Base32.encode( hash ), torrent_title );
 			
 			magnet += "&xl="  + torrent.getSize();
+			magnet += "&pfi=" + primary_file_index;
+			
+			if ( mapping.getNetwork() != AENetworkClassifier.AT_PUBLIC ){
+				
+				magnet += "&net=I2P";
+			}
 			
 			magnet += "[[$dn]]";
 			
@@ -2192,6 +2247,12 @@ RSSToChat
 		getItemsToRetain()
 		{
 			return( retain_items );
+		}
+		
+		private String
+		getNetwork()
+		{
+			return( network );
 		}
 		
 		private String
