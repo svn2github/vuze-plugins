@@ -1255,9 +1255,9 @@ MsgSyncHandler
 		
 		final long start 	= SystemTime.getMonotonousTime();
 		
-		Long	l_timeout = ((Number)options.get( "timeout" )).longValue();
+		Number	n_timeout = (Number)options.get( "timeout" );
 		
-		final long timeout = l_timeout==null?60*1000:l_timeout;
+		final long timeout = n_timeout==null?60*1000:n_timeout.longValue();
 		
 		dht.get(
 			dht_listen_key,
