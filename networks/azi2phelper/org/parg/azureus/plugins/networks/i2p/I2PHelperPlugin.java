@@ -503,15 +503,24 @@ I2PHelperPlugin
 
 									long calls_per_sec = ms_avail/average;
 									
-									sleep = 1000/calls_per_sec;
+									int SLEEP_MAX = 100;
+									
+									if ( calls_per_sec == 0 ){
+									
+										sleep = SLEEP_MAX;
+										
+									}else{
+										
+										sleep = 1000/calls_per_sec;
+									}
 									
 									if ( sleep <= 0 ){
 										
 										sleep = 1;
 										
-									}else if ( sleep > 100 ){
+									}else if ( sleep > SLEEP_MAX ){
 										
-										sleep = 100;
+										sleep = SLEEP_MAX;
 									}
 									
 									if ( call_count == 1000 ){

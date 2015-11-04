@@ -32,6 +32,7 @@ import java.util.*;
 
 import net.i2p.CoreVersion;
 import net.i2p.I2PAppContext;
+import net.i2p.client.I2PClient;
 import net.i2p.client.I2PClientFactory;
 import net.i2p.client.I2PSession;
 import net.i2p.client.naming.NamingService;
@@ -545,6 +546,9 @@ I2PHelperRouter
         opts.setProperty( "i2p.streaming.disableRejectLogging", "false");
         opts.setProperty( "i2cp.dontPublishLeaseSet", "false" );
 
+        if (opts.getProperty(I2PClient.PROP_SIGTYPE) == null)
+        	opts.setProperty(I2PClient.PROP_SIGTYPE, "EdDSA_SHA512_Ed25519");
+        
         setupSMExplicitOpts( opts, "Vuze", SM_TYPE_ROUTER );
 	}
 	
