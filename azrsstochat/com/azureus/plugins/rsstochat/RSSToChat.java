@@ -690,7 +690,13 @@ RSSToChat
 				
 				if ( item_time > 0 && item_time < history.getLatestPublish()){
 					
-					continue;
+						// allow out-of-order item addition for website presentations they may well be
+						// assembled from downloads added at varying times
+					
+					if ( presentation_is_link ){
+					
+						continue;
+					}
 				}
 				
 				String title = item.getTitle();
