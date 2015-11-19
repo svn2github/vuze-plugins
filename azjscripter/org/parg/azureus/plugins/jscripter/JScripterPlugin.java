@@ -114,9 +114,7 @@ JScripterPlugin
 							
 						}catch( Throwable e ){
 							
-							text_area.appendText( e.getMessage());
-							
-							log.log( e );
+							log( e );
 						}
 					}
 				});
@@ -195,6 +193,34 @@ JScripterPlugin
 		return( evaluateScript(script, bindings ));
 	}
 	
+	private void
+	log(
+		String		str )
+	{
+		text_area.appendText( str );
+		
+		log.log( str );
+	}
+	
+	private void
+	log(
+		Throwable	e )
+	{
+		text_area.appendText( e.getMessage());
+		
+		log.log( e );
+	}
+	
+	private void
+	log(
+		String		str,
+		Throwable	e )
+	{
+		text_area.appendText( str + ": " + e.getMessage());
+		
+		log.log( str, e );
+	}
+	
 	private synchronized Object
 	evaluateScript(
 		String				script,
@@ -219,9 +245,7 @@ JScripterPlugin
 		
 		String str = (intent==null?"?":intent) + " -> " + result;
 		
-		text_area.appendText( str );
-		
-		log.log( str );
+		log( str );
 		
 		return( result );
 	}
@@ -266,18 +290,14 @@ JScripterPlugin
 								
 								String str = new String( chars, 0, num );
 								
+								str = str.replaceAll( "\r", "" );
+								
 								if ( str.endsWith( "\n" )){
 									
 									str = str.substring( 0, str.length()-1 );
-									
-								}else if ( str.endsWith( "\r\n" )){
-									
-									str = str.substring( 0, str.length()-2 );
 								}
-								
-								log.log( str );
-								
-								text_area.appendText( str );
+							
+								log( str );
 							}
 						}catch( Throwable e ){
 							
@@ -293,6 +313,18 @@ JScripterPlugin
 				Bindings bindings = engine.getBindings( ScriptContext.ENGINE_SCOPE );
 				
 				bindings.put( "pi", plugin_interface );
+				bindings.put( "engine", engine );
+				
+				engine.eval( "function loadScript( abs_path ){ engine.eval( new java.io.FileReader( abs_path )); }" );
+				engine.eval( "function loadPluginScript( rel_path ){ engine.eval( new java.io.FileReader( new java.io.File( pi.getPluginDirectoryName(), rel_path ))); }" );
+				
+				try{
+					engine.eval( "loadPluginScript( 'init.js' )" );
+					
+				}catch( Throwable e ){
+					
+					log( "Failed to load 'init.js'", e );
+				}
 				
 				String initial_script = script_param.getValue().trim();
 				
@@ -331,6 +363,11 @@ JScripterPlugin
 			
 			view_model = null;
 		}	
+		
+		if ( engine != null ){
+			
+			engine = null;
+		}
 		
 		if ( plugin_interface != null && provider != null ){
 			
