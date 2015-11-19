@@ -25,6 +25,7 @@ package org.parg.azureus.plugins.jscripter;
 import java.io.PipedReader;
 import java.io.PipedWriter;
 import java.io.Writer;
+import java.util.HashMap;
 import java.util.Map;
 
 import javax.script.Bindings;
@@ -32,6 +33,7 @@ import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
+import org.gudy.azureus2.core3.logging.Logger;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.PluginException;
@@ -60,9 +62,13 @@ JScripterPlugin
 	private BasicPluginViewModel	view_model;
 	private LocaleUtilities			loc_utils;
 	
+	private UITextArea 				text_area;
+	private StringParameter			script_param;
+	
 	private ScriptProvider			provider;
 	
-	private ScriptEngine engine;
+	private boolean			engine_load_attempted;
+	private ScriptEngine 	engine;
 	
 	@Override
 	public void 
@@ -88,14 +94,33 @@ JScripterPlugin
 
 		view_model.setConfigSectionID( "azjscripter.name" );
 
-		final StringParameter script_param = config_model.addStringParameter2( "azjscripter.script", "azjscripter.script",  "print( pi.getAzureusVersion())");
+		script_param = config_model.addStringParameter2( "azjscripter.script", "azjscripter.script",  "print( pi.getAzureusVersion())");
 		
 		script_param.setMultiLine( 20 );
 		
 		ActionParameter	exec = config_model.addActionParameter2( "azjscripter.exec", "azjscripter.exec" );
-
 		
-		final UITextArea text_area = config_model.addTextArea( "azjscripter.log");
+		text_area = config_model.addTextArea( "azjscripter.log");
+
+		exec.addListener(
+				new ParameterListener() 
+				{
+					public void 
+					parameterChanged(
+						Parameter param ) 
+					{
+						try{
+							evaluateScript( script_param.getValue());
+							
+						}catch( Throwable e ){
+							
+							text_area.appendText( e.getMessage());
+							
+							log.log( e );
+						}
+					}
+				});
+		
 		
 		log.addListener(
 				new LoggerChannelListener()
@@ -105,7 +130,10 @@ JScripterPlugin
 						int		type,
 						String	content )
 					{
-						view_model.getLogArea().appendText( content + "\n" );
+						if ( !content.endsWith( "\n" )){
+							content += "\n";
+						}
+						view_model.getLogArea().appendText( content );
 					}
 					
 					public void
@@ -119,74 +147,7 @@ JScripterPlugin
 				});
 		
 		try{
-			ScriptEngineManager engineManager = new ScriptEngineManager();
-			
-			engine = engineManager.getEngineByName( "nashorn" );
-			
-			exec.addListener(
-					new ParameterListener() 
-					{
-						public void 
-						parameterChanged(
-							Parameter param ) 
-						{
-							try{
-								engine.eval( script_param.getValue());
-								
-							}catch( Throwable e ){
-								
-								text_area.appendText( e.getMessage());
-								
-								log.log( e );
-							}
-						}
-					});
 
-			final PipedReader reader = new PipedReader();
-			
-			Writer out = new PipedWriter( reader );
-				
-			new AEThread2("")
-			{
-				public void
-				run()
-				{
-					try{
-						while( true ){
-						
-							char[] chars = new char[1024];
-							
-							int num = reader.read( chars );
-							
-							if ( num <= 0 ){
-								
-								break;
-							}
-							String str = new String( chars, 0, num );
-							
-							log.log( str );
-							
-							text_area.appendText( str );
-						}
-					}catch( Throwable e ){
-						
-						log.log( e );
-						
-						Debug.out( e );
-					}
-				}
-			}.start();
-			
-			engine.getContext().setWriter( out );
-			
-			Bindings bindings = engine.getBindings( ScriptContext.ENGINE_SCOPE );
-			
-			bindings.put( "pi", plugin_interface );
-					
-			//engine.eval( "function sum(a, b) { return a + b; }" );
-			
-			//System.out.println(engine.eval( "print( pi.getAzureusVersion())" ));
-			
 			provider = 
 				new ScriptProvider()
 				{
@@ -209,7 +170,7 @@ JScripterPlugin
 						
 						throws Exception
 					{
-						return( null );
+						return( evaluateScript( script, bindings ));
 					}
 				};
 					
@@ -219,6 +180,137 @@ JScripterPlugin
 			
 			Debug.out( e );
 		}
+	}
+	
+	private Object
+	evaluateScript(
+		String		script )
+		
+		throws Exception
+	{
+		Map<String,Object> bindings = new HashMap<String,Object>();
+		
+		bindings.put( "intent", "Load" );
+		
+		return( evaluateScript(script, bindings ));
+	}
+	
+	private synchronized Object
+	evaluateScript(
+		String				script,
+		Map<String,Object>	bindings_in )
+		
+		throws Exception
+	{
+		ScriptEngine	engine = getEngine();
+		
+		if ( engine == null ){
+			
+			throw( new Exception( "JavaScript engine unavailable" ));
+		}
+		
+		String intent = (String)bindings_in.get( "intent" );
+		
+		Bindings bindings = engine.getBindings( ScriptContext.ENGINE_SCOPE );
+		
+		bindings.putAll( bindings_in );
+		
+		Object result = engine.eval(script);
+		
+		String str = (intent==null?"?":intent) + " -> " + result;
+		
+		text_area.appendText( str );
+		
+		log.log( str );
+		
+		return( result );
+	}
+	
+	private synchronized ScriptEngine
+	getEngine()
+	{
+		if ( engine != null || engine_load_attempted ){
+			
+			return( engine );
+		}
+		
+		engine_load_attempted = true;
+		
+		ScriptEngineManager engineManager = new ScriptEngineManager();
+		
+		engine = engineManager.getEngineByName( "nashorn" );
+		
+		if ( engine != null ){
+
+			try{
+				final PipedReader reader = new PipedReader();
+				
+				Writer out = new PipedWriter( reader );
+					
+				new AEThread2("")
+				{
+					public void
+					run()
+					{
+						try{
+							while( true ){
+							
+								char[] chars = new char[1024];
+								
+								int num = reader.read( chars );
+								
+								if ( num <= 0 ){
+									
+									break;
+								}
+								
+								String str = new String( chars, 0, num );
+								
+								if ( str.endsWith( "\n" )){
+									
+									str = str.substring( 0, str.length()-1 );
+									
+								}else if ( str.endsWith( "\r\n" )){
+									
+									str = str.substring( 0, str.length()-2 );
+								}
+								
+								log.log( str );
+								
+								text_area.appendText( str );
+							}
+						}catch( Throwable e ){
+							
+							log.log( e );
+							
+							Debug.out( e );
+						}
+					}
+				}.start();
+				
+				engine.getContext().setWriter( out );
+				
+				Bindings bindings = engine.getBindings( ScriptContext.ENGINE_SCOPE );
+				
+				bindings.put( "pi", plugin_interface );
+				
+				String initial_script = script_param.getValue().trim();
+				
+				if ( initial_script != null ){
+					
+					engine.eval( initial_script );
+				}
+			}catch( Throwable e ){
+				
+				Debug.out( e );
+			}
+		//engine.eval( "function sum(a, b) { return a + b; }" );
+		
+		//System.out.println(engine.eval( "print( pi.getAzureusVersion())" ));
+		
+		}
+		
+		return( engine );
 	}
 	
 	@Override
