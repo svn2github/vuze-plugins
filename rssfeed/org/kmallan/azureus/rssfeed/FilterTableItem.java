@@ -82,6 +82,7 @@ public class FilterTableItem extends TableItem {
     view.filtRateUpload.setText(Integer.toString(data.getRateUpload()));
     view.filtRateDownload.setText(Integer.toString(data.getRateDownload()));
     view.filtCategory.setText(data.getCategory());
+    view.filtExclude.setText(data.getExclude());
     view.filtFeed.removeAll();
     long curFeed = data.getFeed();
     view.filtFeed.add("All");
@@ -159,6 +160,7 @@ public class FilterTableItem extends TableItem {
     data.setRateUpload(Integer.parseInt(view.filtRateUpload.getText()));
     data.setRateDownload(Integer.parseInt(view.filtRateDownload.getText()));
     data.setCategory(view.filtCategory.getText());
+    data.setExclude(view.filtExclude.getText());
     if(view.filtFeed.getSelectionIndex() > 0 && item != null) {
       UrlBean urlBean = item.config.getUrl(view.filtFeed.getSelectionIndex() - 1);
       data.setFeed(urlBean.getID());

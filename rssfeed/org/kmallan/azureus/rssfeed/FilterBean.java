@@ -22,13 +22,15 @@ package org.kmallan.azureus.rssfeed;
 import org.gudy.azureus2.plugins.download.Download;
 
 import java.io.*;
+import java.util.*;
 import java.util.regex.*;
 
 public class FilterBean implements Serializable {
 
   static final long serialVersionUID = -979691945084080240L;
 
-  private String name, storeDir, expression, category, type, mode;
+  private String name, storeDir, expression, exclude, category, type, mode;
+  private List<String> excludes;
   private int state, priority, rateUpload, rateDownload, startSeason, startEpisode, endSeason, endEpisode;
   private long filtId, urlId = 0;
   private boolean isRegex, isFilename, matchTitle, matchLink, moveTop, customRate, renameFile, renameIncEpisode, disableAfter, cleanFile, enabled;
@@ -196,6 +198,23 @@ public class FilterBean implements Serializable {
     this.rateDownload = rateDownload;
   }
 
+  public String getExclude() {
+    if(exclude == null) exclude = "";
+    return exclude;
+  }
+
+  public void setExclude(String exclude) {
+    this.exclude = exclude;
+    excludes = new ArrayList<String>();
+    final String[] split = exclude.split("[,;]");
+    for (String s : split) {
+      final String trim = s.trim();
+      if (trim.length() > 0 ) {
+        excludes.add(trim.toLowerCase());
+      }
+    }
+  }
+
   public String getCategory() {
     if(category == null) category = "";
     return category;
@@ -311,6 +330,14 @@ public class FilterBean implements Serializable {
     if((getMatchTitle()) && (match(title))) matched = true;
     else if((getMatchLink()) && (match(link))) matched = true;
     if(!matched) return false;
+
+    if (excludes != null) {
+      for (String e : excludes) {
+        if ((matchTitle && title.contains(e)) || (matchLink && link.contains(e))) {
+          return false;
+        }
+      }
+    }
 
     if(getType().equalsIgnoreCase("TVShow") && getStartSeason() + getEndSeason() >= 0) {
       Episode e = getSeason(title);

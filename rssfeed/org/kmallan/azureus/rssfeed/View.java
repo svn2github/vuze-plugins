@@ -73,7 +73,7 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
   public Button btnUrlStoreDir, urlObeyTTL, urlLocRef, urlUseCookie;
 
   public Composite filtRatesCustom, filtRatesNone;
-  public Text filtName, filtStoreDir, filtExpression, filtRateUpload, filtRateDownload, filtCategory, filtStartSeason, filtStartEpisode, filtEndSeason, filtEndEpisode, filtTestMatch, filtMinTorrentSize, filtMaxTorrentSize;
+  public Text filtName, filtStoreDir, filtExpression, filtExclude, filtRateUpload, filtRateDownload, filtCategory, filtStartSeason, filtStartEpisode, filtEndSeason, filtEndEpisode, filtTestMatch, filtMinTorrentSize, filtMaxTorrentSize;
   public Button filtIsRegex, filtIsFilename, filtMatchTitle, filtMatchLink, filtMoveTop, filtRateUseCustom, filtRename, filtRenameEppTitle, filtDisable, filtCleanup, filtEnabled, filtSmartHist;
   public Combo filtState, filtPriority, filtType, filtMode, filtFeed;
 
@@ -471,7 +471,10 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
     layoutData.horizontalSpan = 2;
     filtMoveTop.setLayoutData(layoutData);
 
-   		// min/max file size
+    setupLabel(filtParamComp, "RSSFeed.Options.Filter.filtExclude", 130);
+    (filtExclude = new Text(filtParamComp, SWT.BORDER)).setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+
+    // min/max file size
     
     setupLabel(filtParamComp, "RSSFeed.Options.Filter.MinTorrentSize", 75);
     Composite minOpts = setupComposite(filtParamComp, setupGridLayout(2, 4, 0, 0, 0), -1);
@@ -1034,10 +1037,11 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
 	  tmpBean.setEndSeason(item.getEndSeason());
 	  tmpBean.setExpression(item.getExpression());
 	  tmpBean.setFeed(item.getFeed());
-	  tmpBean.setIsRegex(item.getIsRegex());
-	  tmpBean.setIsFilename(item.getIsFilename());
-	  tmpBean.setMoveTop(item.getMoveTop());
-	  tmpBean.setPriority(item.getPriority());
+    tmpBean.setIsRegex(item.getIsRegex());
+    tmpBean.setIsFilename(item.getIsFilename());
+    tmpBean.setMoveTop(item.getMoveTop());
+    tmpBean.setExclude(item.getExclude());
+    tmpBean.setPriority(item.getPriority());
 	  tmpBean.setRateDownload(item.getRateDownload());
 	  tmpBean.setRateUseCustom(item.getRateUseCustom());
 	  tmpBean.setRenameFile(item.getRenameFile());
