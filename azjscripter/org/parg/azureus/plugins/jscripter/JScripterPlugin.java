@@ -33,7 +33,7 @@ import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
-import org.gudy.azureus2.core3.logging.Logger;
+import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.PluginException;
@@ -65,87 +65,23 @@ JScripterPlugin
 	private UITextArea 				text_area;
 	private StringParameter			script_param;
 	
-	private ScriptProvider			provider;
 	
-	private boolean			engine_load_attempted;
-	private ScriptEngine 	engine;
+	private boolean					engine_load_attempted;
+	private volatile ScriptEngine 	engine;
+
+	private boolean					unloaded;
 	
-	@Override
-	public void 
-	initialize(
-		PluginInterface _plugin_interface )
-		
-		throws PluginException 
+	private static AESemaphore		init_sem = new AESemaphore("jscripter:init");
+	
+	private static volatile JScripterPlugin		plugin_instance;
+	
+	private static ScriptProvider		provider;
+
+	public static void 
+	load(
+		PluginInterface plugin_interface )
 	{	
-		plugin_interface = _plugin_interface;
-		
-		log	= plugin_interface.getLogger().getTimeStampedChannel( "JScripter");
-		
-		final UIManager	ui_manager = plugin_interface.getUIManager();
-		
-		loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
-
-		view_model = ui_manager.createBasicPluginViewModel( loc_utils.getLocalisedMessageText( "azjscripter.name" ));
-
-		view_model.getActivity().setVisible( false );
-		view_model.getProgress().setVisible( false );
-									
-		config_model = ui_manager.createBasicPluginConfigModel( "plugins", "azjscripter.name" );
-
-		view_model.setConfigSectionID( "azjscripter.name" );
-
-		script_param = config_model.addStringParameter2( "azjscripter.script", "azjscripter.script",  "print( pi.getAzureusVersion())");
-		
-		script_param.setMultiLine( 20 );
-		
-		ActionParameter	exec = config_model.addActionParameter2( "azjscripter.exec", "azjscripter.exec" );
-		
-		text_area = config_model.addTextArea( "azjscripter.log");
-
-		exec.addListener(
-				new ParameterListener() 
-				{
-					public void 
-					parameterChanged(
-						Parameter param ) 
-					{
-						try{
-							evaluateScript( script_param.getValue());
-							
-						}catch( Throwable e ){
-							
-							log( e );
-						}
-					}
-				});
-		
-		
-		log.addListener(
-				new LoggerChannelListener()
-				{
-					public void
-					messageLogged(
-						int		type,
-						String	content )
-					{
-						if ( !content.endsWith( "\n" )){
-							content += "\n";
-						}
-						view_model.getLogArea().appendText( content );
-					}
-					
-					public void
-					messageLogged(
-						String		str,
-						Throwable	error )
-					{
-						view_model.getLogArea().appendText( str + "\n" );
-						view_model.getLogArea().appendText( error.toString() + "\n" );
-					}
-				});
-		
 		try{
-
 			provider = 
 				new ScriptProvider()
 				{
@@ -168,7 +104,24 @@ JScripterPlugin
 						
 						throws Exception
 					{
-						return( evaluateScript( script, bindings ));
+						JScripterPlugin inst = plugin_instance;
+						
+						if ( inst == null ){
+							
+							if ( !init_sem.reserve( 60*1000 )){
+							
+								throw( new Exception( "Plugin initialisation timeout" ));
+							}
+							
+							inst = plugin_instance;
+							
+							if ( inst == null ){
+								
+								throw( new Exception( "Plugin initialisation failed" ));
+							}
+						}
+						
+						return( inst.evaluateScript( script, bindings ));
 					}
 				};
 					
@@ -177,6 +130,100 @@ JScripterPlugin
 		}catch( Throwable e ){
 			
 			Debug.out( e );
+		}
+	}
+	
+	@Override
+	public void 
+	initialize(
+		PluginInterface _plugin_interface )
+		
+		throws PluginException 
+	{	
+		try{
+			plugin_instance = this;
+			
+			plugin_interface = _plugin_interface;
+			
+			log	= plugin_interface.getLogger().getTimeStampedChannel( "JScripter");
+			
+			final UIManager	ui_manager = plugin_interface.getUIManager();
+			
+			loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
+	
+			view_model = ui_manager.createBasicPluginViewModel( loc_utils.getLocalisedMessageText( "azjscripter.name" ));
+	
+			view_model.getActivity().setVisible( false );
+			view_model.getProgress().setVisible( false );
+										
+			config_model = ui_manager.createBasicPluginConfigModel( "plugins", "azjscripter.name" );
+	
+			view_model.setConfigSectionID( "azjscripter.name" );
+	
+			script_param = config_model.addStringParameter2( "azjscripter.script", "azjscripter.script",  "print( pi.getAzureusVersion())");
+			
+			script_param.setMultiLine( 20 );
+			
+			ActionParameter	exec = config_model.addActionParameter2( "azjscripter.load", "azjscripter.exec" );
+			
+			text_area = config_model.addTextArea( "azjscripter.log");
+	
+			exec.addListener(
+					new ParameterListener() 
+					{
+						public void 
+						parameterChanged(
+							Parameter param ) 
+						{
+							try{
+								evaluateScript( script_param.getValue());
+								
+							}catch( Throwable e ){
+								
+								log( e );
+							}
+						}
+					});
+			
+			ActionParameter	clear = config_model.addActionParameter2( "azjscripter.clear.log", "azjscripter.clear" );
+			
+			clear.addListener(
+					new ParameterListener() 
+					{
+						public void 
+						parameterChanged(
+							Parameter param ) 
+						{
+							text_area.setText( "" );
+						}
+					});
+			
+			log.addListener(
+					new LoggerChannelListener()
+					{
+						public void
+						messageLogged(
+							int		type,
+							String	content )
+						{
+							if ( !content.endsWith( "\n" )){
+								content += "\n";
+							}
+							view_model.getLogArea().appendText( content );
+						}
+						
+						public void
+						messageLogged(
+							String		str,
+							Throwable	error )
+						{
+							view_model.getLogArea().appendText( str + "\n" );
+							view_model.getLogArea().appendText( error.toString() + "\n" );
+						}
+					});
+		}finally{
+			
+			init_sem.releaseForever();
 		}
 	}
 	
@@ -228,6 +275,11 @@ JScripterPlugin
 		
 		throws Exception
 	{
+		if ( unloaded ){
+			
+			throw( new Exception( "Plugin unloaded" ));
+		}
+		
 		ScriptEngine	engine = getEngine();
 		
 		if ( engine == null ){
@@ -268,20 +320,22 @@ JScripterPlugin
 
 			try{
 				final PipedReader reader = new PipedReader();
-				
-				Writer out = new PipedWriter( reader );
-					
+									
 				new AEThread2("")
 				{
+					final ScriptEngine my_engine = engine;
+					
+					PipedReader current_reader = reader;
+					
 					public void
 					run()
 					{
-						try{
-							while( true ){
-							
+						while( my_engine == engine ){
+					
+							try{
 								char[] chars = new char[1024];
 								
-								int num = reader.read( chars );
+								int num = current_reader.read( chars );
 								
 								if ( num <= 0 ){
 									
@@ -298,16 +352,33 @@ JScripterPlugin
 								}
 							
 								log( str );
+							
+							}catch( Throwable e ){
+							
+									// for some reason getting spurious pipe fails
+								
+								current_reader = new PipedReader();
+								
+								try{
+									Writer out = new PipedWriter( current_reader );
+
+									my_engine.getContext().setWriter( out );
+									
+									Thread.sleep( 500 );
+									
+								}catch( Throwable f ){
+									
+									log( f );
+									
+									break;
+								}
 							}
-						}catch( Throwable e ){
-							
-							log.log( e );
-							
-							Debug.out( e );
 						}
 					}
 				}.start();
 				
+				Writer out = new PipedWriter( reader );
+
 				engine.getContext().setWriter( out );
 				
 				Bindings bindings = engine.getBindings( ScriptContext.ENGINE_SCOPE );
@@ -336,10 +407,6 @@ JScripterPlugin
 				
 				Debug.out( e );
 			}
-		//engine.eval( "function sum(a, b) { return a + b; }" );
-		
-		//System.out.println(engine.eval( "print( pi.getAzureusVersion())" ));
-		
 		}
 		
 		return( engine );
@@ -350,6 +417,13 @@ JScripterPlugin
 	unload() 
 		throws PluginException 
 	{
+		unloaded	= true;
+		
+		if ( plugin_interface != null && provider != null ){
+			
+			plugin_interface.getUtilities().unregisterScriptProvider( provider );
+		}
+				
 		if ( config_model != null ){
 			
 			config_model.destroy();
@@ -364,14 +438,20 @@ JScripterPlugin
 			view_model = null;
 		}	
 		
-		if ( engine != null ){
-			
+		ScriptEngine current_engine = engine;
+		
+		if ( current_engine != null ){
+						
 			engine = null;
+			
+			try{
+				current_engine.getContext().getWriter().close();
+				
+			}catch( Throwable e ){
+			}
 		}
 		
-		if ( plugin_interface != null && provider != null ){
-			
-			plugin_interface.getUtilities().unregisterScriptProvider( provider );
-		}
+		plugin_instance 	= null;
+		init_sem 			= new AESemaphore( "jscripter:reinit" );
 	}
 }
