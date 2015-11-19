@@ -539,8 +539,8 @@ Updater
 				
 				if ( command.equals( "move" )){
 					
-					File	from_file 	= new File(tok.nextToken());
-					File	to_file		= new File(tok.nextToken());
+					File	from_file 	= new File( unescapeFile(tok.nextToken()));
+					File	to_file		= new File( unescapeFile(tok.nextToken()));
 					
 						// if something screws up with the update process (e.g. another copy of Azureus starts
 						// while an update is in progress) it is possible for the origin files to be removed
@@ -595,7 +595,7 @@ Updater
 					
 				}else if ( command.equals( "remove" )){
 					
-					File	file 	= new File(tok.nextToken());
+					File	file 	= new File(unescapeFile(tok.nextToken()));
 					
 					if ( file.exists()){
 						
@@ -609,7 +609,7 @@ Updater
 					
 					String rights = tok.nextToken();
 					
-					String fileName = tok.nextToken();
+					String fileName = unescapeFile(tok.nextToken());
 					
 					chMod(fileName,rights);
 					
@@ -646,6 +646,15 @@ Updater
 		}
 	}
 
+  	private String
+  	unescapeFile(
+  		String		file )
+  	{
+  		file = file.replaceAll( "&#0002C;", "," );
+  		
+  		return( file );
+  	}
+  	
   	private void
   	writeError(
   		File		inst_dir,
