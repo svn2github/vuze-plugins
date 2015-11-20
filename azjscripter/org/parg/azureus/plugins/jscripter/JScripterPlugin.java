@@ -22,6 +22,7 @@
 
 package org.parg.azureus.plugins.jscripter;
 
+import java.io.IOException;
 import java.io.PipedReader;
 import java.io.PipedWriter;
 import java.io.Writer;
@@ -44,6 +45,7 @@ import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
 import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.components.UITextArea;
 import org.gudy.azureus2.plugins.ui.config.ActionParameter;
+import org.gudy.azureus2.plugins.ui.config.BooleanParameter;
 import org.gudy.azureus2.plugins.ui.config.Parameter;
 import org.gudy.azureus2.plugins.ui.config.ParameterListener;
 import org.gudy.azureus2.plugins.ui.config.StringParameter;
@@ -64,6 +66,7 @@ JScripterPlugin
 	
 	private UITextArea 				text_area;
 	private StringParameter			script_param;
+	private BooleanParameter		log_calls;
 	
 	
 	private boolean					engine_load_attempted;
@@ -185,6 +188,9 @@ JScripterPlugin
 						}
 					});
 			
+			
+			log_calls = config_model.addBooleanParameter2( "azjscripter.log.calls.enable", "azjscripter.log.calls.enable", true );
+
 			ActionParameter	clear = config_model.addActionParameter2( "azjscripter.clear.log", "azjscripter.clear" );
 			
 			clear.addListener(
@@ -198,6 +204,23 @@ JScripterPlugin
 						}
 					});
 			
+			config_model.addLabelParameter2( "azjscripter.new.info" );
+			
+			ActionParameter	new_engine = config_model.addActionParameter2( "azjscripter.new.engine", "azjscripter.new" );
+			
+			new_engine.addListener(
+					new ParameterListener() 
+					{
+						public void 
+						parameterChanged(
+							Parameter param ) 
+						{
+							engine 					= null;
+							engine_load_attempted 	= false;
+							
+							getEngine();
+						}
+					});
 			log.addListener(
 					new LoggerChannelListener()
 					{
@@ -243,10 +266,15 @@ JScripterPlugin
 	private void
 	log(
 		String		str )
-	{
-		text_area.appendText( str );
-		
+	{		
 		log.log( str );
+		
+		if ( !str.endsWith( "\n" )){
+			
+			str += "\n";
+		}
+		
+		text_area.appendText( str );
 	}
 	
 	private void
@@ -295,9 +323,12 @@ JScripterPlugin
 		
 		Object result = engine.eval(script);
 		
-		String str = (intent==null?"?":intent) + " -> " + result;
+		if ( log_calls.getValue()){
 		
-		log( str );
+			String str = (intent==null?"?":intent) + " -> " + result;
+		
+			log( str );
+		}
 		
 		return( result );
 	}
@@ -319,13 +350,16 @@ JScripterPlugin
 		if ( engine != null ){
 
 			try{
+				/*
 				final PipedReader reader = new PipedReader();
-									
-				new AEThread2("")
+				final PipedWriter writer = new PipedWriter( reader );
+					
+				new AEThread2("jscripter:reader")
 				{
 					final ScriptEngine my_engine = engine;
 					
 					PipedReader current_reader = reader;
+					PipedWriter current_writer = writer;
 					
 					public void
 					run()
@@ -339,7 +373,8 @@ JScripterPlugin
 								
 								if ( num <= 0 ){
 									
-									break;
+									throw( new Exception( "Reader EOF" ));
+
 								}
 								
 								String str = new String( chars, 0, num );
@@ -355,14 +390,28 @@ JScripterPlugin
 							
 							}catch( Throwable e ){
 							
+								Debug.out( e );
+								
 									// for some reason getting spurious pipe fails
+								
+								try{
+									current_reader.close();
+									
+								}catch( Throwable f ){									
+								}
+								
+								try{
+									current_writer.close();
+									
+								}catch( Throwable f ){
+								}
 								
 								current_reader = new PipedReader();
 								
 								try{
-									Writer out = new PipedWriter( current_reader );
+									current_writer = new PipedWriter( current_reader );
 
-									my_engine.getContext().setWriter( out );
+									my_engine.getContext().setWriter( current_writer );
 									
 									Thread.sleep( 500 );
 									
@@ -376,10 +425,58 @@ JScripterPlugin
 						}
 					}
 				}.start();
+				*/
 				
-				Writer out = new PipedWriter( reader );
-
-				engine.getContext().setWriter( out );
+				engine.getContext().setWriter( 
+					new Writer()
+					{
+						private String buffer = "";
+						
+						@Override
+						public void 
+						write(
+							char[] 		cbuf, 
+							int 		off, 
+							int 		len )
+								
+							throws IOException 
+						{
+							String str = new String( cbuf, off, len );
+						
+							str = str.replaceAll( "\r", "" );
+							
+							buffer += str;
+							
+							int pos = buffer.lastIndexOf( "\n" );
+							
+							if ( pos >= 0 ){
+								
+								log( buffer.substring( 0, pos+1 ));
+								
+								buffer = buffer.substring( pos+1 );
+							}
+						}
+						
+						@Override
+						public void 
+						close() 
+							throws IOException 
+						{
+						}
+						
+						@Override
+						public void 
+						flush() 
+							throws IOException 
+						{
+							if ( buffer.length() > 0 ){
+								
+								log( buffer );
+								
+								buffer = "";
+							}
+						}
+					});
 				
 				Bindings bindings = engine.getBindings( ScriptContext.ENGINE_SCOPE );
 				
