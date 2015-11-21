@@ -34,6 +34,7 @@ import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
+import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
@@ -163,6 +164,8 @@ JScripterPlugin
 	
 			view_model.setConfigSectionID( "azjscripter.name" );
 	
+			config_model.addHyperlinkParameter2( "azjscripter.wiki.link", loc_utils.getLocalisedMessageText( "azjscripter.wiki.link.url" ));
+
 			script_param = config_model.addStringParameter2( "azjscripter.script", "azjscripter.script",  "print( pi.getAzureusVersion())");
 			
 			script_param.setMultiLine( 20 );
@@ -179,6 +182,8 @@ JScripterPlugin
 							Parameter param ) 
 						{
 							try{
+								COConfigurationManager.setDirty();
+								
 								evaluateScript( script_param.getValue());
 								
 							}catch( Throwable e ){
@@ -350,83 +355,6 @@ JScripterPlugin
 		if ( engine != null ){
 
 			try{
-				/*
-				final PipedReader reader = new PipedReader();
-				final PipedWriter writer = new PipedWriter( reader );
-					
-				new AEThread2("jscripter:reader")
-				{
-					final ScriptEngine my_engine = engine;
-					
-					PipedReader current_reader = reader;
-					PipedWriter current_writer = writer;
-					
-					public void
-					run()
-					{
-						while( my_engine == engine ){
-					
-							try{
-								char[] chars = new char[1024];
-								
-								int num = current_reader.read( chars );
-								
-								if ( num <= 0 ){
-									
-									throw( new Exception( "Reader EOF" ));
-
-								}
-								
-								String str = new String( chars, 0, num );
-								
-								str = str.replaceAll( "\r", "" );
-								
-								if ( str.endsWith( "\n" )){
-									
-									str = str.substring( 0, str.length()-1 );
-								}
-							
-								log( str );
-							
-							}catch( Throwable e ){
-							
-								Debug.out( e );
-								
-									// for some reason getting spurious pipe fails
-								
-								try{
-									current_reader.close();
-									
-								}catch( Throwable f ){									
-								}
-								
-								try{
-									current_writer.close();
-									
-								}catch( Throwable f ){
-								}
-								
-								current_reader = new PipedReader();
-								
-								try{
-									current_writer = new PipedWriter( current_reader );
-
-									my_engine.getContext().setWriter( current_writer );
-									
-									Thread.sleep( 500 );
-									
-								}catch( Throwable f ){
-									
-									log( f );
-									
-									break;
-								}
-							}
-						}
-					}
-				}.start();
-				*/
-				
 				engine.getContext().setWriter( 
 					new Writer()
 					{
@@ -462,6 +390,7 @@ JScripterPlugin
 						close() 
 							throws IOException 
 						{
+							log( "stdout closed" );
 						}
 						
 						@Override
