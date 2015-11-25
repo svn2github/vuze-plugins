@@ -166,7 +166,7 @@ JScripterPlugin
 	
 			config_model.addHyperlinkParameter2( "azjscripter.wiki.link", loc_utils.getLocalisedMessageText( "azjscripter.wiki.link.url" ));
 
-			script_param = config_model.addStringParameter2( "azjscripter.script", "azjscripter.script",  "print( pi.getAzureusVersion())");
+			script_param = config_model.addStringParameter2( "azjscripter.script", "azjscripter.script",  "");
 			
 			script_param.setMultiLine( 20 );
 			
@@ -252,6 +252,19 @@ JScripterPlugin
 		}finally{
 			
 			init_sem.releaseForever();
+		}
+		
+		String script = script_param.getValue().trim();
+		
+		if ( script.length() > 0 ){
+			
+			try{
+				evaluateScript( script );
+				
+			}catch( Throwable e ){
+				
+				log( e );
+			}
 		}
 	}
 	
