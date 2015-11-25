@@ -125,7 +125,7 @@ JScripterPlugin
 							}
 						}
 						
-						return( inst.evaluateScript( script, bindings ));
+						return( inst.evaluateScript( script, bindings, false ));
 					}
 				};
 					
@@ -184,7 +184,7 @@ JScripterPlugin
 							try{
 								COConfigurationManager.setDirty();
 								
-								evaluateScript( script_param.getValue());
+								evaluateScript( script_param.getValue(), true );
 								
 							}catch( Throwable e ){
 								
@@ -223,7 +223,7 @@ JScripterPlugin
 							engine 					= null;
 							engine_load_attempted 	= false;
 							
-							getEngine();
+							getEngine( true );
 						}
 					});
 			log.addListener(
@@ -254,12 +254,14 @@ JScripterPlugin
 			init_sem.releaseForever();
 		}
 		
+			// see if we need to initialise the script engine now
+		
 		String script = script_param.getValue().trim();
 		
 		if ( script.length() > 0 ){
 			
 			try{
-				evaluateScript( script );
+				getEngine( true );
 				
 			}catch( Throwable e ){
 				
@@ -270,7 +272,8 @@ JScripterPlugin
 	
 	private Object
 	evaluateScript(
-		String		script )
+		String		script,
+		boolean		is_general_script )
 		
 		throws Exception
 	{
@@ -278,7 +281,7 @@ JScripterPlugin
 		
 		bindings.put( "intent", "Load" );
 		
-		return( evaluateScript(script, bindings ));
+		return( evaluateScript(script, bindings, is_general_script ));
 	}
 	
 	private void
@@ -317,7 +320,8 @@ JScripterPlugin
 	private synchronized Object
 	evaluateScript(
 		String				script,
-		Map<String,Object>	bindings_in )
+		Map<String,Object>	bindings_in,
+		boolean				is_general_script )
 		
 		throws Exception
 	{
@@ -326,7 +330,7 @@ JScripterPlugin
 			throw( new Exception( "Plugin unloaded" ));
 		}
 		
-		ScriptEngine	engine = getEngine();
+		ScriptEngine	engine = getEngine( !is_general_script );
 		
 		if ( engine == null ){
 			
@@ -352,7 +356,8 @@ JScripterPlugin
 	}
 	
 	private synchronized ScriptEngine
-	getEngine()
+	getEngine(
+		boolean	eval_general_script )
 	{
 		if ( engine != null || engine_load_attempted ){
 			
@@ -436,11 +441,14 @@ JScripterPlugin
 					log( "Failed to load 'init.js'", e );
 				}
 				
-				String initial_script = script_param.getValue().trim();
-				
-				if ( initial_script != null ){
+				if ( eval_general_script ){
 					
-					engine.eval( initial_script );
+					String initial_script = script_param.getValue().trim();
+					
+					if ( initial_script.length() > 0 ){
+						
+						engine.eval( initial_script );
+					}
 				}
 			}catch( Throwable e ){
 				
