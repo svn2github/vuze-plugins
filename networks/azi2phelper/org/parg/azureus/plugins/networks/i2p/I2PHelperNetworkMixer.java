@@ -80,7 +80,10 @@ I2PHelperNetworkMixer
 	private int						incomplete_limit;
 	private int						complete_limit;
 	
-	private static final int TIMER_PERIOD 	= 1*60*1000;
+	private static final int TIMER_PERIOD 	= 30*1000;
+	
+	private static final int PRI_PEER_CHECK_PERIOD 	= 30*1000;
+	private static final int PRI_PEER_CHECK_TICKS 	= PRI_PEER_CHECK_PERIOD/TIMER_PERIOD;
 
 	private static final int MIX_CHECK_PERIOD_MIN 	= 60*1000;
 	
@@ -197,8 +200,13 @@ I2PHelperNetworkMixer
 					{
 						tick_count++;
 						
-						if ( tick_count % MIX_CHECK_TICKS == 0 ){
+						if ( tick_count % PRI_PEER_CHECK_TICKS == 0 ){
+							
+							checkPriorityPeers();
+						}
 						
+						if ( tick_count % MIX_CHECK_TICKS == 0 ){
+							
 							checkMixedDownloads();
 						}
 						
@@ -798,6 +806,88 @@ I2PHelperNetworkMixer
 		synchronized( seed_request_write_lock ){
 			
 			seed_requests_write_pending.remove( download );
+		}
+	}
+	
+	private void
+	checkPriorityPeers()
+	{
+		DownloadManager dm = plugin_interface.getDownloadManager();
+		
+		Download[]	downloads = dm.getDownloads();
+				
+		for ( Download download: downloads ){
+			
+			if ( download.getState() == Download.ST_SEEDING ){
+				
+				String[] nets = PluginCoreUtils.unwrap( download ).getDownloadState().getNetworks();
+				
+				if ( nets.length == 1 ){
+					
+					continue;
+				}
+				
+				boolean	found_pub = false;
+				
+				for ( String net: nets ){
+					
+					if ( net == AENetworkClassifier.AT_PUBLIC ){
+						
+						found_pub = true;
+					}
+				}
+				
+				if ( !found_pub ){
+					
+					continue;
+				}
+				
+				PeerManager pm = download.getPeerManager();
+				
+				if ( pm == null ){
+					
+					continue;
+				}
+				
+				Peer[] peers = pm.getPeers();
+				
+				List<Peer> i2p_peers = new ArrayList<Peer>(peers.length);
+				
+				int	priority = 0;
+				
+				for ( Peer peer: peers ){
+					
+					String cat =  AENetworkClassifier.categoriseAddress( peer.getIp());
+					
+					if ( cat != AENetworkClassifier.AT_PUBLIC ){
+						
+						i2p_peers.add( peer );
+						
+						if ( peer.isPriorityConnection()){
+							
+							priority++;
+						}
+					}
+				}
+				
+				if ( i2p_peers.size() > 0 && priority < 2 ){
+					
+					for ( Peer peer: i2p_peers ){
+						
+						if ( !peer.isPriorityConnection()){
+							
+							peer.setPriorityConnection( true );
+							
+							priority++;
+							
+							if ( priority == 2 ){
+								
+								break;
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 	
