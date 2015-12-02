@@ -52,6 +52,7 @@ import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.plugins.ui.tables.TableContextMenuItem;
 import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.plugins.ui.tables.TableRow;
+import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 
 import com.aelitis.azureus.plugins.upnp.UPnPPlugin;
 
@@ -72,6 +73,8 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 	private LoggerChannelListener	logListener;
 	private UIManagerListener		uiListener;
 
+	private LocaleUtilities			locale_utils;
+	
 	private AlternativeContactHandler	alt_contact_handler;
 	
 	//private Display					display;
@@ -100,6 +103,9 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 		
 		this.pluginInterface = pluginInterface;
 		UIManager ui_manager = pluginInterface.getUIManager();
+		
+		locale_utils = pluginInterface.getUtilities().getLocaleUtilities();
+		
 		config_model = ui_manager.createBasicPluginConfigModel("plugins",
 				"plugin.mldht");
 
@@ -340,6 +346,13 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 		return logger;
 	}
 
+	public String
+	getMessageText(
+		String	key )
+	{
+		return( locale_utils.getLocalisedMessageText( key ));
+	}
+	
 	public void
 	showConfig()
 	{

@@ -182,7 +182,7 @@ public class SWTHelper implements UIHelper, UIManagerListener, PopulationListene
 			DecimalFormat	format	= new DecimalFormat();
 			
 			final StringBuilder text = new StringBuilder("mlDHT: ");
-			final StringBuilder tooltip = new StringBuilder("Node Estimate:");
+			final StringBuilder tooltip = new StringBuilder( plugin.getMessageText( "mldht.node.estimate" ));
 			for(DHTtype type : DHTtype.values())
 			{
 				DHT dht = plugin.getDHT(type);
@@ -195,7 +195,18 @@ public class SWTHelper implements UIHelper, UIManagerListener, PopulationListene
 					tooltip.append(format.format(dht.getEstimator().getEstimate()));
 				} else {
 					text.append("\u2718");	// unicode not avail on some platforms
-					tooltip.append(status);
+					
+					String status_str;
+					
+					if ( status == DHTStatus.Initializing ){
+						status_str = plugin.getMessageText( "mldht.initializing" );
+					}else if (status == DHTStatus.Running){
+						status_str = plugin.getMessageText( "mldht.running" );
+					}else{
+						status_str = plugin.getMessageText( "mldht.stopped" );
+					}
+					
+					tooltip.append(status_str);
 				}
 				
 			}
