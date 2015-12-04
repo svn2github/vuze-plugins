@@ -672,7 +672,7 @@ class Util
 
         for (int i = 0; i < references.size(); i++)
         {
-            Refs.add((String) references.get(0).getValue());
+            Refs.add((String) references.get(i).getValue());
         }
         return Refs.toArray(new String[Refs.size()]);
     }

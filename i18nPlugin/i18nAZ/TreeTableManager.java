@@ -580,7 +580,7 @@ class TreeTableManager
             public void controlResized(ControlEvent e)
             {
                 TargetLocale targetLocale  =  (TargetLocale) e.widget.getData(View.DATAKEY_TARGET_LOCALE);
-                if(targetLocale.isVisible() == false)
+                if(targetLocale==null || targetLocale.isVisible() == false)
                 {
                     return;
                 }

@@ -4370,8 +4370,9 @@ class View implements UISWTViewCoreEventListener
         this.footerComposite.setVisible(true);
 
         // get default locales
-        TargetLocale defaultTargetLocale = (TargetLocale) TreeTableManager.getColumn(1).getData(View.DATAKEY_TARGET_LOCALE);
-        TargetLocale selectedTargetLocale = (TargetLocale) TreeTableManager.getColumn(selectedColumn).getData(View.DATAKEY_TARGET_LOCALE);
+        final TargetLocale defaultTargetLocale = (TargetLocale) TreeTableManager.getColumn(1).getData(View.DATAKEY_TARGET_LOCALE);
+        
+        final TargetLocale selectedTargetLocale = (TargetLocale) TreeTableManager.getColumn(selectedColumn).getData(View.DATAKEY_TARGET_LOCALE);
 
         // get prebuild
         PrebuildItem prebuildItem = (PrebuildItem) selectedRow.getData(TreeTableManager.DATAKEY_PREBUILD_ITEM);
@@ -4423,7 +4424,42 @@ class View implements UISWTViewCoreEventListener
         String referencesInfo = "";
         if (selectedColumn >= 2)
         {
+        	String[] ref_suffixes = { "._vuze", "._classic", "._windows", "._mac", "._linux" };
+        	
+        	class
+        	RefResolver
+        	{
+        		public String
+        		resolve(
+        			String	ref )
+        		{
+        			String	value;
+        			
+                    if (selectedTargetLocale.getProperties().containsKey(ref))
+                    {
+                        value = (String) selectedTargetLocale.getProperties().get(ref);
+                    }
+                    else if (defaultTargetLocale.getProperties().containsKey(ref))
+                    {
+                        value = (String) defaultTargetLocale.getProperties().get(ref);
+                    }
+                    else if (i18nAZ.getPluginInterface().getUtilities().getLocaleUtilities().hasLocalisedMessageText(ref))
+                    {
+                        value = i18nAZ.getPluginInterface().getUtilities().getLocaleUtilities().getLocalisedMessageText(ref);
+                    }
+                    else
+                    {
+                        value = null;
+                    }
+                    
+                    return( value );
+        		}
+        	}
+        	
+        	RefResolver ref_resolver = new RefResolver();
+        	
             String[] refs = Util.getReferences((String) defaultTargetLocale.getProperties().get(prebuildItem.getKey()));
+            
             while (true)
             {
                 if (refs.length > 0)
@@ -4433,22 +4469,29 @@ class View implements UISWTViewCoreEventListener
                     {
                         referencesInfo += refs[i] + " => ";
                         String ref = refs[i].substring(1, refs[i].length() - 1);
-                        String value = "";
-                        if (selectedTargetLocale.getProperties().containsKey(ref))
-                        {
-                            value = (String) selectedTargetLocale.getProperties().get(ref);
+                         
+                        String suffix_info = "";
+                        
+                        for ( String rs: ref_suffixes ){
+                        
+                        	String value = ref_resolver.resolve(ref + rs );
+                        	
+                        	if ( value != null ){
+                        		suffix_info += (suffix_info.length()==0?"":", ") + ref + rs + " => " + value;
+                        	}
                         }
-                        else if (defaultTargetLocale.getProperties().containsKey(ref))
-                        {
-                            value = (String) defaultTargetLocale.getProperties().get(ref);
-                        }
-                        else if (i18nAZ.getPluginInterface().getUtilities().getLocaleUtilities().hasLocalisedMessageText(ref))
-                        {
-                            value = i18nAZ.getPluginInterface().getUtilities().getLocaleUtilities().getLocalisedMessageText(ref);
-                        }
-                        else
-                        {
-                            value = "???";
+                        
+                        String value = ref_resolver.resolve(ref);
+                        
+                        if ( value == null ){
+                        
+                            value = suffix_info.length()==0?"???":suffix_info;
+                            
+                        }else{
+                        	if ( suffix_info.length() > 0 ){
+                        		
+                        		value += ": " + suffix_info;
+                        	}
                         }
                         if (View.this.multilineEditor == false)
                         {
@@ -4536,7 +4579,7 @@ class View implements UISWTViewCoreEventListener
                     }
                     for (int j = 0; j < styleRanges.length; j++)
                     {
-                        if (styleRanges[j].background.getRGB().equals(Display.getCurrent().getSystemColor(SWT.COLOR_YELLOW).getRGB()))
+                        if (styleRanges[j].background != null && styleRanges[j].background.getRGB().equals(Display.getCurrent().getSystemColor(SWT.COLOR_YELLOW).getRGB()))
                         {
                             continue;
                         }
