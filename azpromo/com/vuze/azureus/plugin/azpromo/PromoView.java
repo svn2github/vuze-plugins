@@ -20,17 +20,23 @@
 
 package com.vuze.azureus.plugin.azpromo;
 
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.Locale;
+import java.util.Map;
 
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.browser.*;
 import org.eclipse.swt.events.MouseEvent;
 import org.eclipse.swt.events.MouseListener;
 import org.eclipse.swt.layout.FormAttachment;
 import org.eclipse.swt.layout.FormData;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Label;
-
+import org.gudy.azureus2.core3.util.*;
 import org.gudy.azureus2.plugins.PluginConfig;
+import org.gudy.azureus2.ui.swt.BrowserWrapper;
 import org.gudy.azureus2.ui.swt.Utils;
 import org.gudy.azureus2.ui.swt.plugins.UISWTView;
 import org.gudy.azureus2.ui.swt.plugins.UISWTViewEvent;
@@ -42,7 +48,12 @@ import com.aelitis.azureus.ui.swt.skin.SWTSkinObjectSash;
 import com.aelitis.azureus.ui.swt.utils.FontUtils;
 import com.aelitis.azureus.ui.swt.views.skin.SBC_PlusFTUX;
 import com.aelitis.azureus.ui.swt.views.skin.sidebar.SideBar;
-import com.appadx.adcontrol.*;
+import com.aelitis.azureus.util.JSONUtils;
+import com.aelitis.azureus.util.MapUtils;
+import com.appadx.adcontrol.AdControlEventListener;
+import com.appadx.adcontrol.AdControlException;
+import com.appadx.adcontrol.AdControlSWT;
+import com.appadx.adcontrol.IAdControlOptions;
 
 /**
  * @created Sep 29, 2014
@@ -51,9 +62,17 @@ import com.appadx.adcontrol.*;
 public class PromoView
 	implements UISWTViewEventListener
 {
+	private static final String URL_JSON = "http://misc20150831.s3-website-us-east-1.amazonaws.com/test.json";
+
 	private AdControlSWT adControl;
 
+	private Browser adBrowser;
+
 	private UISWTView view;
+
+	private boolean tuxTest = false;
+
+	private Map mapJSON;
 
 	public PromoView() {
 	}
@@ -149,19 +168,23 @@ public class PromoView
 		lblText.addMouseListener(new MouseListener() {
 
 			public void mouseUp(MouseEvent e) {
+				if (PromoPlugin.pluginInterface == null) {
+					return;
+				}
 
 				PromoPlugin.pluginInterface.getUtilities().createThread("LoadPromo",
 						new Runnable() {
 
-							public void run() {
-								try {
-									log("loadclick");
-									adControl.loadAd();
-								} catch (Throwable t) {
-								}
-							}
-						});
+					public void run() {
+						try {
+							log("loadclick");
+							adControl.loadAd();
+						} catch (Throwable t) {
+						}
+					}
+				});
 
+				setTuxText(false);
 			}
 
 			public void mouseDown(MouseEvent e) {
@@ -176,6 +199,38 @@ public class PromoView
 		fd.height = 254;
 		fd.top = new FormAttachment(lblClose, 2);
 		adControl.setLayoutData(fd);
+
+		adBrowser = new Browser(ourParent, SWT.NO_SCROLL);
+		adBrowser.setVisible(false);
+		adBrowser.addOpenWindowListener(new OpenWindowListener() {
+			public void open(WindowEvent event) {
+				final BrowserWrapper subBrowser = Utils.createSafeBrowser(ourParent,
+						Utils.getInitialBrowserStyle(SWT.NONE));
+				subBrowser.addLocationListener(new LocationListener() {
+					public void changed(LocationEvent arg0) {
+					}
+
+					public void changing(LocationEvent event) {
+						if (event.location == null || !event.location.startsWith("http")) {
+							return;
+						}
+						event.doit = false;
+						Utils.launch(event.location);
+
+						Utils.execSWTThreadLater(1000, new AERunnable() {
+							public void runSupport() {
+								subBrowser.dispose();
+							}
+						});
+					}
+				});
+				subBrowser.setBrowser(event);
+			}
+		});
+		fd = Utils.getFilledFormData();
+		fd.height = 254;
+		fd.top = new FormAttachment(lblClose, 2);
+		adBrowser.setLayoutData(fd);
 
 		fd = Utils.getFilledFormData();
 		fd.bottom = new FormAttachment(adControl, -1);
@@ -214,7 +269,7 @@ public class PromoView
 
 		String pubID = PromoPlugin.pluginInterface.getPluginProperties().getProperty(
 				"PubID", "mawra2ag1");
-		
+
 		//int reloadTime = Integer.parseInt(PromoPlugin.pluginInterface.getPluginProperties().getProperty(
 		//		"ReloadSecs", "86400"));
 		//log("pubID len=" + pubID.length() + ";reload in " + reloadTime);
@@ -224,7 +279,8 @@ public class PromoView
 		options.setPlayerOption(IAdControlOptions.Player.AUTO_MUTE, true);
 		options.setPubID(pubID);
 		options.setPageName("vuze");
-		options.setPubConfigURL("http://vuze-pubcfg.desktopadx.com/service/pubcfg/get.php?id=");
+		options.setPubConfigURL(
+				"http://vuze-pubcfg.desktopadx.com/service/pubcfg/get.php?id=");
 		options.setRequestDomain("btpr.vuze.com");
 
 		//options.setPublisherDefaultAdReloadTime(reloadTime);
@@ -260,6 +316,54 @@ public class PromoView
 					}
 				});
 		adControl.getShell().layout(true, true);
+
+		PromoPlugin.pluginInterface.getUtilities().createThread("pv",
+				new Runnable() {
+					public void run() {
+						if (PromoPlugin.pluginInterface == null) {
+							return;
+						}
+						boolean first = mapJSON == null;
+						String json = readStringFromUrl(URL_JSON);
+						mapJSON = JSONUtils.decodeJSON(json);
+
+						if (first) {
+							int firstShowInMS = MapUtils.getMapInt(mapJSON, "first-show-ms",
+									1000 * 60 * ((Math.random() > 0.8) ? 0 : 2));
+							flipTest(firstShowInMS);
+						} else {
+							flipTest(0);
+						}
+
+						int showEvery = mapJSON == null ? 1000 * 60 * 15
+								: MapUtils.getMapInt(mapJSON, "show-every-ms", 1000 * 60 * 5);
+						SimpleTimer.addEvent("pv", SystemTime.getOffsetTime(showEvery),
+								new TimerEventPerformer() {
+							@Override
+							public void perform(TimerEvent event) {
+								run();
+							}
+						});
+
+					}
+				});
+
+	}
+
+	protected void flipTest(int delay) {
+		Utils.execSWTThreadLater(delay, new AERunnable() {
+			public void runSupport() {
+				if (PromoPlugin.pluginInterface == null) {
+					return;
+				}
+
+				if (adBrowser == null || adBrowser.isDisposed()) {
+					return;
+				}
+
+				setTuxText(!tuxTest);
+			}
+		});
 	}
 
 	protected void temporaryClose() {
@@ -276,7 +380,7 @@ public class PromoView
 				new String[] {
 					"Not Now",
 					"Upgrade"
-				}, 1);
+		}, 1);
 
 		if (result == 1) {
 			SBC_PlusFTUX.setSourceRef("dlg-promo");
@@ -291,6 +395,45 @@ public class PromoView
 	}
 
 	private void refresh(final UISWTView view) {
+	}
+
+	private void setTuxText(boolean on) {
+		long showUntil = MapUtils.getMapLong(mapJSON, "show-until", 0);
+		if (showUntil > 0 && System.currentTimeMillis() > showUntil) {
+			tuxTest = false;
+		} else {
+			tuxTest = on;
+		}
+		adBrowser.setVisible(tuxTest);
+		adControl.setVisible(!tuxTest);
+		if (tuxTest) {
+			adBrowser.setText(MapUtils.getMapString(mapJSON, "html", null));
+		}
+	}
+
+	public static String readStringFromUrl(String url) {
+		StringBuffer sb = new StringBuffer();
+		try {
+			URL _url = new URL(url);
+			HttpURLConnection con = (HttpURLConnection) _url.openConnection();
+
+			con.setConnectTimeout(30000);
+			con.setReadTimeout(30000);
+			InputStream is = con.getInputStream();
+
+			byte[] buffer = new byte[256];
+
+			int read = 0;
+
+			while ((read = is.read(buffer)) != -1) {
+				sb.append(new String(buffer, 0, read));
+			}
+			con.disconnect();
+
+		} catch (Throwable e) {
+			e.printStackTrace();
+		}
+		return sb.toString();
 	}
 
 }

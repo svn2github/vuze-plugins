@@ -237,6 +237,8 @@ public class PromoPlugin
 			configModel.destroy();
 			configModel = null;
 		}
+		
+		pluginInterface = null;
 	}
 
 	public static void logEvent(String event) {
