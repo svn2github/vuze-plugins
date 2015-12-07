@@ -391,7 +391,7 @@ public class PromoView
 	}
 
 	protected void log(String string) {
-		System.out.println("PromoView: " + string);
+		PromoPlugin.log(string);
 	}
 
 	private void refresh(final UISWTView view) {

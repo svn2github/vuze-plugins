@@ -42,6 +42,7 @@ import org.gudy.azureus2.platform.PlatformManagerFactory;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.config.ConfigParameter;
 import org.gudy.azureus2.plugins.config.ConfigParameterListener;
+import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.UIManagerListener;
@@ -66,7 +67,9 @@ public class PromoPlugin
 
 	public static UISWTInstance swtInstance = null;
 	private BasicPluginConfigModel configModel;
-	
+
+	private static LoggerChannel logger;
+
 	public static PluginInterface pluginInterface;
 
 	public static String readStringFromUrl(String url) {
@@ -133,6 +136,9 @@ public class PromoPlugin
 		}
 		
 		UIManager uiManager = pluginInterface.getUIManager();
+
+		logger = pi.getLogger().getTimeStampedChannel(VIEWID);
+
 		configModel = uiManager.createBasicPluginConfigModel("ConfigView.Section."
 				+ VIEWID);
 		BooleanParameter paramEnabled = configModel.addBooleanParameter2("enabled",
@@ -237,6 +243,8 @@ public class PromoPlugin
 			configModel.destroy();
 			configModel = null;
 		}
+		
+		logger = null;
 		
 		pluginInterface = null;
 	}
@@ -398,6 +406,11 @@ public class PromoPlugin
 	}
 	
 	
-	
+
+	public static void log(String s) {
+		if (logger != null) {
+			logger.log(s);
+		}
+	}
 	
 }
