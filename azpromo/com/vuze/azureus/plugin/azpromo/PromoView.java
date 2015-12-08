@@ -25,6 +25,10 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Locale;
 import java.util.Map;
+import java.util.logging.Handler;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.browser.*;
@@ -33,6 +37,7 @@ import org.eclipse.swt.events.MouseListener;
 import org.eclipse.swt.layout.FormAttachment;
 import org.eclipse.swt.layout.FormData;
 import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Label;
 import org.gudy.azureus2.core3.util.*;
 import org.gudy.azureus2.plugins.PluginConfig;
@@ -195,11 +200,76 @@ public class PromoView
 		});
 
 		adControl = new AdControlSWT(ourParent, SWT.NO_SCROLL);
+		
+		
+		Logger logger = Logger.getLogger( "com.appadx.adcontrol" );
+		
+		logger.setUseParentHandlers( false );
+		
+		//Logger.getLogger( "com.appadx.adcontrol" ).setLevel(Level.OFF);
+		
+		logger.addHandler(
+			new Handler() {
+				
+				@Override
+				public void 
+				publish( LogRecord record ) 
+				{
+					String text = new SimpleFormatter().format(record).trim();
+					
+					text = text.replace( '\r',  ' ' );
+					text = text.replace( '\n',  ' ' );
+					
+					text = text.replaceAll( "  ", " " );
+					
+					log( text);
+				}
+				
+				@Override
+				public void flush() {
+					// TODO Auto-generated method stub
+					
+				}
+				
+				@Override
+				public void close() {
+					// TODO Auto-generated method stub
+					
+				}
+			});
+
+		
 		fd = Utils.getFilledFormData();
 		fd.height = 254;
 		fd.top = new FormAttachment(lblClose, 2);
 		adControl.setLayoutData(fd);
 
+		Browser theirBrowser = findBrowser( ourParent );
+		
+		if ( theirBrowser != null ){
+							
+			theirBrowser.addLocationListener(new LocationListener() {
+				public void changed(LocationEvent arg0) {
+				}
+
+				public void changing(LocationEvent event) {
+					
+					String str = String.valueOf( event );
+					
+					if ( str.contains( "://mono.vizu.com" )){
+						
+						event.doit = false;
+					}
+					
+					if ( Constants.getCurrentVersion().endsWith( "_CVS" )){
+						
+						log( str );
+					}
+				}
+			});
+		}
+		
+		
 		adBrowser = new Browser(ourParent, SWT.NO_SCROLL);
 		adBrowser.setVisible(false);
 		adBrowser.addOpenWindowListener(new OpenWindowListener() {
@@ -266,7 +336,7 @@ public class PromoView
 				super.onAdStarted();
 			}
 		});
-
+		
 		String pubID = PromoPlugin.pluginInterface.getPluginProperties().getProperty(
 				"PubID", "mawra2ag1");
 
@@ -324,22 +394,33 @@ public class PromoView
 							return;
 						}
 						boolean first = mapJSON == null;
-						String json = readStringFromUrl(URL_JSON);
-						mapJSON = JSONUtils.decodeJSON(json);
-
-						if (first) {
-							int firstShowInMS = MapUtils.getMapInt(mapJSON, "first-show-ms",
-									1000 * 60 * ((Math.random() > 0.8) ? 0 : 2));
-							flipTest(firstShowInMS);
-						} else {
-							flipTest(0);
+						
+						int showEvery = 1000 * 60 * 15;
+								
+						String json = readStringFromUrl(URL_JSON).trim();
+						
+						if ( json.startsWith( "{" )){
+							mapJSON = JSONUtils.decodeJSON(json);
+	
+							if (first){
+								
+								int firstShowInMS = MapUtils.getMapInt(mapJSON, "first-show-ms",
+										1000 * 60 * ((Math.random() > 0.8) ? 0 : 2));
+								flipTest(firstShowInMS);
+								
+							} else {
+								
+								flipTest(0);
+							}
+							
+							 showEvery = mapJSON == null ? 1000 * 60 * 15
+									: MapUtils.getMapInt(mapJSON, "show-every-ms", 1000 * 60 * 5);
 						}
-
-						int showEvery = mapJSON == null ? 1000 * 60 * 15
-								: MapUtils.getMapInt(mapJSON, "show-every-ms", 1000 * 60 * 5);
+						
+						
 						SimpleTimer.addEvent("pv", SystemTime.getOffsetTime(showEvery),
 								new TimerEventPerformer() {
-							@Override
+						
 							public void perform(TimerEvent event) {
 								run();
 							}
@@ -350,6 +431,32 @@ public class PromoView
 
 	}
 
+	private Browser
+	findBrowser(
+		Control comp )
+	{
+		if ( comp instanceof Browser ){
+			
+			return((Browser)comp);
+			
+		}else if ( comp instanceof Composite ){
+			
+			Control[] kids = ((Composite)comp).getChildren();
+				
+			for ( Control c: kids ){
+				
+				Browser b = findBrowser( c );
+				
+				if ( b != null ){
+					
+					return( b );
+				}
+			}
+		}
+			
+		return( null );
+	}
+	
 	protected void flipTest(int delay) {
 		Utils.execSWTThreadLater(delay, new AERunnable() {
 			public void runSupport() {
@@ -391,6 +498,7 @@ public class PromoView
 	}
 
 	protected void log(String string) {
+
 		PromoPlugin.log(string);
 	}
 
@@ -431,7 +539,7 @@ public class PromoView
 			con.disconnect();
 
 		} catch (Throwable e) {
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 		return sb.toString();
 	}
