@@ -36,6 +36,7 @@ import java.util.Set;
 
 import org.gudy.azureus2.core3.util.AERunnable;
 import org.gudy.azureus2.core3.util.AESemaphore;
+import org.gudy.azureus2.core3.util.Average;
 import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.BEncoder;
 import org.gudy.azureus2.core3.util.ByteFormatter;
@@ -166,6 +167,13 @@ DHTTransportI2P
 	private ThreadPool	destination_lookup_pool_lp 	= new ThreadPool("DHTTransportI2P::destlookup-lp", 5, true );
 	private ThreadPool	destination_lookup_pool_hp 	= new ThreadPool("DHTTransportI2P::destlookup-hp", 10, true );
 
+	private static final boolean TRACE_DEST_LOOKUPS = false;
+	
+	private static Average		dest_lookup_rate = Average.getInstance( 1000, 10 );
+	private static long			dest_lookup_count;
+	private static long			dest_lookup_count_start;
+	private static long			dest_lookup_count_log;
+	
 	private volatile boolean			destroyed;
 	
 	protected
@@ -1773,6 +1781,36 @@ DHTTransportI2P
 					{
 						try{
 							long	start = SystemTime.getMonotonousTime();
+							
+							if ( TRACE_DEST_LOOKUPS ){
+								
+								synchronized( dest_lookup_rate ){
+									
+									dest_lookup_rate.addValue(1);
+								
+									dest_lookup_count++;
+									
+									if ( start - dest_lookup_count_log > 10*1000 ){
+										
+										dest_lookup_count_log = start;
+	
+										String lta = "";
+										
+										if ( dest_lookup_count_start == 0 ){
+											
+											dest_lookup_count_start = start;
+											
+										}else{
+											
+											long elapsed = start-dest_lookup_count_start;
+											
+											lta = " (" + (dest_lookup_count*1000f)/(elapsed) + ", " + elapsed/(60*1000) + ")";
+										}
+	
+										System.out.println( dest_lookup_rate.getAverage() + ", " + dest_lookup_count + lta);
+									}
+								}
+							}
 							
 							Destination dest = session.lookupDest( node.getHash(), DHTUtilsI2P.DEST_LOOKUP_TIMEOUT );
             

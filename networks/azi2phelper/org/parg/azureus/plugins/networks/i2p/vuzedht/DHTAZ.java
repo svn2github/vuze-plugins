@@ -102,6 +102,9 @@ DHTAZ
 	
 		props.put( DHT.PR_ENABLE_RANDOM_LOOKUP, 	0 );		// don't need random DHT poking as we use the basis for this
 
+		props.put( DHT.PR_CONTACTS_PER_NODE, 			10 );		// K
+		props.put( DHT.PR_NODE_SPLIT_FACTOR, 			2 );		// B
+
 		dht = DHTFactory.create( 
 					transport, 
 					props,

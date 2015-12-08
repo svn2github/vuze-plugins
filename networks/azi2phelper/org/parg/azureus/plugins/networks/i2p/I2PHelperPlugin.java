@@ -62,12 +62,15 @@ import net.i2p.client.streaming.I2PSocketOptions;
 import net.i2p.data.Base32;
 import net.i2p.data.Base64;
 import net.i2p.data.Destination;
+import net.i2p.router.Router;
 import net.i2p.util.NativeBigInteger;
 
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.download.DownloadManager;
 import org.gudy.azureus2.core3.peer.PEPeer;
 import org.gudy.azureus2.core3.peer.PEPeerManager;
+import org.gudy.azureus2.core3.stats.transfer.LongTermStats;
+import org.gudy.azureus2.core3.stats.transfer.StatsFactory;
 import org.gudy.azureus2.core3.torrent.TOTorrent;
 import org.gudy.azureus2.core3.torrent.TOTorrentFactory;
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
@@ -1694,6 +1697,7 @@ I2PHelperPlugin
 	int		max_pure_peers	= 0;
 	long	info_start_time = SystemTime.getMonotonousTime();
 	boolean	info_first		= true;
+	String	uptime_history	= "";
 	
 	private void
 	checkTunnelQuantities()
@@ -1827,6 +1831,11 @@ I2PHelperPlugin
 					max_mix_peers 	= Integer.parseInt( bits[1] );
 					max_pure_peers 	= Integer.parseInt( bits[2] );
 				}
+				
+				if ( ver.equals( "3" ) && bits.length > 12 ){
+										
+					uptime_history = bits[12];
+				}
 			}
 		}
 	}
@@ -1835,7 +1844,10 @@ I2PHelperPlugin
 	private void
 	writePluginInfo()
 	{
-		String plugin_info = "2" + "/" + max_mix_peers + "/" + max_pure_peers;
+		// version 2 max_mix_peers max_pure_peers {router params} {dhts started}
+		// version 3 added capabilities
+		
+		String plugin_info = "3" + "/" + max_mix_peers + "/" + max_pure_peers;
 				
 		I2PHelperRouter	r = router;
 
@@ -1853,12 +1865,65 @@ I2PHelperPlugin
 			
 			I2PHelperRouterDHT[] dhts = r.getAllDHTs();
 			
+			String sep = "/";
+			
 			for ( I2PHelperRouterDHT dht: dhts ){
 				
-				plugin_info += "/" + dht.isDHTStarted();
-
+				plugin_info += sep + dht.isDHTStarted();
+				
+				sep = ";";
 			}
+			
+			Router i2p_router = r.getRouter();
+			
+			String 	rinf 	= null;
+			
+			String up_str = uptime_history;
+			
+			if ( i2p_router != null ){
+				
+				try{
+					rinf 	= i2p_router.getRouterInfo().getCapabilities();
+					
+					long up = i2p_router.getUptime();
+					
+					up_str += (up_str.isEmpty()?"":";") + (up/(60*1000));
+					
+					String[] bits = up_str.split( ";" );
+					
+					if ( bits.length > 5 ){
+						
+						up_str = "";
+						
+						for ( int i=bits.length-5;i<bits.length;i++){
+							
+							up_str += (up_str.isEmpty()?"":";") + bits[i];
+						}
+					}
+				}catch( Throwable e ){
+				}
+			}
+			
+			plugin_info += "/" + (rinf==null?"-":rinf);	
+			plugin_info += "/" + up_str;
 		}
+		
+		LongTermStats lts = StatsFactory.getLongTermStats();
+		
+		if ( lts != null ){
+			
+			long[] stats = lts.getTotalUsageInPeriod( LongTermStats.PT_SLIDING_WEEK, 1.0 );
+			
+			long total_up = stats[LongTermStats.ST_PROTOCOL_UPLOAD] + stats[LongTermStats.ST_DATA_UPLOAD];
+			long total_do = stats[LongTermStats.ST_PROTOCOL_DOWNLOAD] + stats[LongTermStats.ST_DATA_DOWNLOAD];
+	
+			total_up = total_up/(1024*1024);
+			total_do = total_do/(1024*1024);
+			
+			plugin_info += "/" + total_up + ";" + total_do;
+		}
+		
+		//System.out.println( plugin_info );
 		
 		PluginConfig pc = plugin_interface.getPluginconfig();
 		

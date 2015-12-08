@@ -148,15 +148,8 @@ DHTI2P
 		props.put( DHT.PR_ORIGINAL_REPUBLISH_INTERVAL, 	new Integer( REPUBLISH_PERIOD ));
 		props.put( DHT.PR_ENCODE_KEYS, 					0 );		// raw keys, no sha1'ing them
 
-		/*
-		int		K 		= getProp( PR_CONTACTS_PER_NODE, 			DHTControl.K_DEFAULT );
-		int		B 		= getProp( PR_NODE_SPLIT_FACTOR, 			DHTControl.B_DEFAULT );
-		int		max_r	= getProp( PR_MAX_REPLACEMENTS_PER_NODE, 	DHTControl.MAX_REP_PER_NODE_DEFAULT );
-		int		s_conc 	= getProp( PR_SEARCH_CONCURRENCY, 			DHTControl.SEARCH_CONCURRENCY_DEFAULT );
-		int		l_conc 	= getProp( PR_LOOKUP_CONCURRENCY, 			DHTControl.LOOKUP_CONCURRENCY_DEFAULT );
-		int		o_rep 	= getProp( PR_ORIGINAL_REPUBLISH_INTERVAL, 	DHTControl.ORIGINAL_REPUBLISH_INTERVAL_DEFAULT );
-		int		c_rep 	= getProp( PR_CACHE_REPUBLISH_INTERVAL, 	DHTControl.CACHE_REPUBLISH_INTERVAL_DEFAULT );
-		*/
+		props.put( DHT.PR_CONTACTS_PER_NODE, 			10 );		// K
+		props.put( DHT.PR_NODE_SPLIT_FACTOR, 			2 );		// B
 		
 		dht = DHTFactory.create( 
 				transport, 

@@ -1025,6 +1025,12 @@ I2PHelperRouter
 		return( dhts[DHT_MIX].lookupDestination( hash ));
 	}
 	
+	public Router
+	getRouter()
+	{
+		return( router );
+	}
+	
 	public ServerInstance 
 	createServer(
 		final String			server_id,
