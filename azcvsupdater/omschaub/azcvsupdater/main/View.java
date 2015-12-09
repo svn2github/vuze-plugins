@@ -6,8 +6,6 @@ import omschaub.azcvsupdater.utilities.DirectoryUtils;
 import omschaub.azcvsupdater.utilities.DownloaderMain;
 import omschaub.azcvsupdater.utilities.imagerepository.ImageRepository;
 
-// This breaks encapsulation - we need to provide this in the plugin API!
-
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.CTabFolder;
 import org.eclipse.swt.custom.CTabItem;
@@ -324,11 +322,12 @@ public static void syncExec(Runnable r) {
 }
 
 public static String getJARFileDestination() {
-	if (pi_static.getUtilities().isOSX()) {
-	    return DirectoryUtils.getInstallDirectory() + "/" + PluginManager.getDefaults().getApplicationName() + ".app/Contents/Resources/Java/Azureus2.jar";
+	String installDir = DirectoryUtils.getInstallDirectory();
+	if (pi_static.getUtilities().isOSX() && !new java.io.File(installDir, "Azureus2.jar").exists()) {
+	    return installDir + "/" + PluginManager.getDefaults().getApplicationName() + ".app/Contents/Resources/Java/Azureus2.jar";
 	}
 	else {
-	    return new java.io.File(DirectoryUtils.getInstallDirectory(), "Azureus2.jar").getPath(); 
+	    return new java.io.File(installDir, "Azureus2.jar").getPath(); 
 	}
 
 }
