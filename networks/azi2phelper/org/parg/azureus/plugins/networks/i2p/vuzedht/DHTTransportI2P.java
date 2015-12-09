@@ -160,7 +160,7 @@ DHTTransportI2P
 				removeEldestEntry(
 			   		Map.Entry<HashWrapper,NodeInfo> eldest) 
 				{
-					return size() > TOKEN_MAP_MAX;
+					return( size() > TOKEN_MAP_MAX );
 				}
 			};
 	
@@ -173,6 +173,26 @@ DHTTransportI2P
 	private static long			dest_lookup_count;
 	private static long			dest_lookup_count_start;
 	private static long			dest_lookup_count_log;
+	
+	private static Map<Long,String[]>	dest_lookup_tracker	= new HashMap<Long, String[]>();
+	private static long					dest_lookup_consec_fail_count;
+	private static long					dest_lookup_consec_fail_60_count;
+	
+	private static final int DEST_LOOKUP_NEGATIVE_CACHE_MAX = 8000;
+	
+	private Map<Long,DestLookupNegativeCacheEntry>	dest_lookup_negative_cache =
+			new LinkedHashMap<Long,DestLookupNegativeCacheEntry>(DEST_LOOKUP_NEGATIVE_CACHE_MAX,0.75f,true)
+			{
+				protected boolean 
+				removeEldestEntry(
+			   		Map.Entry<Long,DestLookupNegativeCacheEntry> eldest) 
+				{
+					return( size() > DEST_LOOKUP_NEGATIVE_CACHE_MAX );
+				}
+			};
+	
+	
+	
 	
 	private volatile boolean			destroyed;
 	
@@ -1746,7 +1766,7 @@ DHTTransportI2P
     	   	
     	Destination	dest = node.getDestination();
     	
-    	if ( dest == null ) {
+    	if ( dest == null ){
     		
     			// shortcut 'anonymous' contacts (zero hash and port of 1)
     		
@@ -1780,7 +1800,55 @@ DHTTransportI2P
 					runSupport() 
 					{
 						try{
+							byte[] hash = node.getHash().getData();
+							
+							int i1 = 	((hash[0] & 0xff) << 24) | ((hash[1] & 0xff) << 16) |
+										((hash[2] & 0xff) << 8)  | (hash[3] & 0xff);
+							
+							int i2 = 	((hash[4] & 0xff) << 24) | ((hash[5] & 0xff) << 16) |
+										((hash[6] & 0xff) << 8)  | (hash[7] & 0xff);
+
+							long l_hash = ((i1 & 0xffffffffL) << 32) | (i2 & 0xffffffffL);
+
 							long	start = SystemTime.getMonotonousTime();
+
+							synchronized( dest_lookup_negative_cache ){
+								
+								DestLookupNegativeCacheEntry entry = dest_lookup_negative_cache.get( l_hash );
+								
+								if ( entry != null ){
+																		
+									int num_fails = entry.num_fails;
+									
+									int	delay = 60*1000;
+											
+									for ( int i=1;i<num_fails;i++){
+										
+										delay *= 2;
+										
+										if ( delay > 14*60*1000 ){
+											
+											delay = 14*60*1000;
+											
+											break;
+										}
+									}
+									
+									if ( start < entry.first_fail + delay ){
+										
+										if ( TRACE_DEST_LOOKUPS ){
+
+											System.out.println( ByteFormatter.encodeString(hash, 0, 8) + ": denied (" + num_fails + ")" );
+										}
+										
+										throw( new DHTTransportException( "Destination lookup failed (negative cache)" ));
+										
+									}else{
+										
+										entry.first_fail = start;
+									}
+								}
+							}
 							
 							if ( TRACE_DEST_LOOKUPS ){
 								
@@ -1807,13 +1875,103 @@ DHTTransportI2P
 											lta = " (" + (dest_lookup_count*1000f)/(elapsed) + ", " + elapsed/(60*1000) + ")";
 										}
 	
-										System.out.println( dest_lookup_rate.getAverage() + ", " + dest_lookup_count + lta);
+										System.out.println( dest_lookup_rate.getAverage() + ", " + dest_lookup_count + lta + ": hist=" + dest_lookup_tracker.size() + "/" + dest_lookup_consec_fail_count + "/" + dest_lookup_consec_fail_60_count  );
 									}
 								}
 							}
 							
-							Destination dest = session.lookupDest( node.getHash(), DHTUtilsI2P.DEST_LOOKUP_TIMEOUT );
-            
+							
+							//dest_lookup_negative_cache
+							
+							Destination dest = null;
+							
+							try{
+								dest = session.lookupDest( node.getHash(), DHTUtilsI2P.DEST_LOOKUP_TIMEOUT );
+								
+							}finally{
+								
+								synchronized( dest_lookup_negative_cache ){
+
+									if ( dest == null ){
+									
+										DestLookupNegativeCacheEntry entry = dest_lookup_negative_cache.get( l_hash );
+										
+										if ( entry == null ){
+											
+											dest_lookup_negative_cache.put( l_hash, new DestLookupNegativeCacheEntry( start, 1 ));
+											
+										}else{
+											
+											entry.num_fails++;
+										}
+									}else{
+										
+										dest_lookup_negative_cache.remove( l_hash );
+									}
+								}
+
+								if ( TRACE_DEST_LOOKUPS ){
+									
+	
+									synchronized( dest_lookup_rate ){
+										
+										String mark = dest==null?".":"X";
+										
+										String[] hit = dest_lookup_tracker.get( l_hash );
+										
+										if ( hit == null ){
+											
+											hit = new String[]{ mark, "0", "" };
+											
+											dest_lookup_tracker.put( l_hash, hit );
+											
+										}else{
+											
+											hit[0] += mark;
+										}
+										
+										long now = SystemTime.getMonotonousTime();
+											
+										if ( dest == null ){
+											
+											System.out.println( "fail in " + (( now - start )/1000 ));
+										}
+										String hist = hit[0];
+										
+										String extra = "";
+										
+										if ( hist.endsWith( ".." )){
+											
+											dest_lookup_consec_fail_count++;
+											
+											long prev_fail = Long.parseLong( hit[1]);
+											
+											long secs = (now - prev_fail )/1000;
+											
+											if ( secs > 60 ){
+												
+												dest_lookup_consec_fail_60_count++;
+											}
+											
+											String s = hit[2];
+											
+											s += (s.length()==0?"":",") + secs;
+											
+											hit[2] = s;
+											
+											extra = " (" + s + ")";
+										}
+										
+										if ( dest == null ){
+											
+											hit[1] = String.valueOf( now );
+										}
+
+										System.out.println( ByteFormatter.encodeString(hash, 0, 8) + ": " + hit[0] + extra);
+									}
+								}
+							}
+							
 							if ( dest != null ){
             
 								if ( TRACE ) trace( "Destination lookup ok - elapsed=" + (SystemTime.getMonotonousTime()-start));
@@ -2781,5 +2939,21 @@ DHTTransportI2P
 		failed(
 			DHTTransportContactI2P		contact,
 			DHTTransportException		error );
+	}
+	
+	static class
+	DestLookupNegativeCacheEntry
+	{
+		private long	first_fail;
+		private int		num_fails;
+		
+		private
+		DestLookupNegativeCacheEntry(
+			long		_first_fail,
+			int			_num_fails )
+		{
+			first_fail	= _first_fail;
+			num_fails	= _num_fails;
+		}
 	}
 }

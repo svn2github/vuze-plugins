@@ -1176,7 +1176,7 @@ I2PHelperRouter
 			
 			RouterContext router_ctx = router.getContext();
 			
-			adapter.log( "Known routers=" + router_ctx.netDb().getKnownRouters() + ", lease-sets=" + router_ctx.netDb().getKnownLeaseSets());
+			adapter.log( "Known routers=" + router_ctx.netDb().getKnownRouters() + ", lease-sets=" + router_ctx.netDb().getKnownLeaseSets() + ", caps=" + router.getRouterInfo().getCapabilities());
 			
 			TunnelManagerFacade tunnel_manager = router_ctx.tunnelManager();
 			

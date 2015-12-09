@@ -1219,8 +1219,12 @@ I2PHelperPlugin
 						60*1000,
 						new TimerEventPerformer()
 						{	
+							private int			tick_count;
+							
 							private long		last_total;
 							private long		last_active;
+							
+							private boolean		try_floodfill;
 							
 							@Override
 							public void 
@@ -1236,6 +1240,8 @@ I2PHelperPlugin
 									
 									return;
 								}
+								
+								tick_count++;
 								
 								if ( !is_external_router ){
 									
@@ -1265,6 +1271,19 @@ I2PHelperPlugin
 										boolean	is_active = now - last_active <= 5*60*1000;
 										
 										mult = is_active?limit_multiplier_param.getValue():1;
+										
+										if ( mult == 1 ){
+											
+											if ((!try_floodfill) && tick_count%10 == 0 ){
+																							
+												try_floodfill = tryFloodfill();
+											}
+											
+											if ( try_floodfill ){
+												
+												mult = 2;
+											}
+										}
 									}
 									
 									I2PHelperRouter current_router = router;
@@ -1811,6 +1830,91 @@ I2PHelperPlugin
 		writePluginInfo();
 	}
 	
+	private boolean
+	tryFloodfill()
+	{
+		I2PHelperRouter	r = router;
+
+		if ( r == null ){
+			
+			return( false );
+		}
+		
+		Router i2p_router = r.getRouter();
+		
+		if ( i2p_router == null ){
+			
+			return( false );
+		}
+		
+		long uptime = i2p_router.getUptime();
+		
+		if ( uptime < 3*60*60*1000 ){
+			
+			return( false );
+		}
+		
+		String caps = i2p_router.getRouterInfo().getCapabilities();
+		
+		if ( caps.contains( "f" ) || caps.contains( "U" )){
+			
+			return( false );
+		}
+		
+		if ( uptime < 6*60*60*1000 ){
+			
+			boolean ok = false;
+			
+			String[] ups = uptime_history.split( ";" );
+			
+			for ( String up: ups ){
+				
+				if ( !up.isEmpty()){
+					
+					try{
+						int mins = Integer.parseInt( up );
+					
+						if (  mins >= 360 ){
+							
+							ok = true;
+							
+							break;
+						}
+					}catch( Throwable e ){
+						
+					}
+				}
+			}
+			
+			if ( !ok ){
+				
+				return( false );
+			}
+		}
+		
+		LongTermStats lts = StatsFactory.getLongTermStats();
+		
+		if ( lts == null ){
+			
+			return( false );
+		}
+		
+		long[] stats = lts.getTotalUsageInPeriod( LongTermStats.PT_SLIDING_WEEK, 1.0 );
+		
+		long total_up = stats[LongTermStats.ST_PROTOCOL_UPLOAD] + stats[LongTermStats.ST_DATA_UPLOAD];
+		long total_do = stats[LongTermStats.ST_PROTOCOL_DOWNLOAD] + stats[LongTermStats.ST_DATA_DOWNLOAD];
+
+		total_up = total_up/(1024*1024);	// MB
+		total_do = total_do/(1024*1024);
+		
+		if ( total_up + total_do < 20*1024 ){
+			
+			return( false );
+		}
+		
+		return( true );
+	}
+	
 	private void
 	readPluginInfo()
 	{
@@ -1845,7 +1949,7 @@ I2PHelperPlugin
 	writePluginInfo()
 	{
 		// version 2 max_mix_peers max_pure_peers {router params} {dhts started}
-		// version 3 added capabilities
+		// version 3 added capabilities, uptime hist, xfer stats
 		
 		String plugin_info = "3" + "/" + max_mix_peers + "/" + max_pure_peers;
 				
