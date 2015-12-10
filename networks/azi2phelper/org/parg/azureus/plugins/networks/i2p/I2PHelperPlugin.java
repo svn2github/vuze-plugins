@@ -1832,6 +1832,8 @@ I2PHelperPlugin
 	private boolean
 	tryFloodfill()
 	{
+			// See FloodfillMonitorJob.java for details of how the router handles floodfill activation
+		
 		I2PHelperRouter	r = router;
 
 		if ( r == null ){
