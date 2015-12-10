@@ -165,8 +165,10 @@ I2PHelperRouter
 	private String		i2p_host;
 	private int			i2p_port;
 	
-	private int			rate_multiplier = 1;
-	
+	private int			rate_multiplier 		= 1;
+	private boolean		floodfill_capable		= false;
+	private String 		floodfill_control_value	= "";
+
 	private volatile Router 			router;
 	
 	private Properties						sm_properties = new Properties();	
@@ -430,20 +432,25 @@ I2PHelperRouter
 		props.put( "i2np.bandwidth.outboundKBytesPerSecond", base_out );	
 		
 		props.put( "router.sharePercentage", share_pct );
-		
-		String floodfill_control_value;
-		
+				
 		int floodfill_control = getIntegerParameter( PARAM_FLOODFILL_CONTROL );
 		
 		if ( floodfill_control == PARAM_FLOODFILL_CONTROL_VUZE ){
 			
-			if ( Math.min( raw_base_in, raw_base_out ) <= 100 ){	// kick in auto if > 100KB/sec and leave it up to I2P
-				
-				floodfill_control_value = "false";
-				
-			}else{
+			if ( floodfill_capable ){
 				
 				floodfill_control_value = "auto";
+
+			}else{
+				
+				if ( Math.min( raw_base_in, raw_base_out ) <= 100 ){	// kick in auto if > 100KB/sec and leave it up to I2P
+					
+					floodfill_control_value = "false";
+					
+				}else{
+					
+					floodfill_control_value = "auto";
+				}
 			}
 		}else if ( floodfill_control == PARAM_FLOODFILL_CONTROL_I2P ){
 
@@ -489,6 +496,19 @@ I2PHelperRouter
 	getRateMultiplier()
 	{
 		return( rate_multiplier );
+	}
+	
+	public void
+	setFloodfillCapable(
+		boolean		b )
+	{
+		floodfill_capable = b;
+	}
+	
+	public boolean
+	getFloodfillCapable()
+	{
+		return( floodfill_capable );
 	}
 	
 	private void
@@ -1176,7 +1196,7 @@ I2PHelperRouter
 			
 			RouterContext router_ctx = router.getContext();
 			
-			adapter.log( "Known routers=" + router_ctx.netDb().getKnownRouters() + ", lease-sets=" + router_ctx.netDb().getKnownLeaseSets() + ", caps=" + router.getRouterInfo().getCapabilities());
+			adapter.log( "Known routers=" + router_ctx.netDb().getKnownRouters() + ", lease-sets=" + router_ctx.netDb().getKnownLeaseSets() + ", caps=" + router.getRouterInfo().getCapabilities() + ",ff=" + floodfill_control_value );
 			
 			TunnelManagerFacade tunnel_manager = router_ctx.tunnelManager();
 			

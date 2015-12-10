@@ -1224,7 +1224,7 @@ I2PHelperPlugin
 							private long		last_total;
 							private long		last_active;
 							
-							private boolean		try_floodfill;
+							private boolean		floodfill_capable;
 							
 							@Override
 							public void 
@@ -1271,18 +1271,15 @@ I2PHelperPlugin
 										boolean	is_active = now - last_active <= 5*60*1000;
 										
 										mult = is_active?limit_multiplier_param.getValue():1;
-										
-										if ( mult == 1 ){
-											
-											if ((!try_floodfill) && tick_count%10 == 0 ){
+																					
+										if ((!floodfill_capable) && tick_count%10 == 0 ){
 																							
-												try_floodfill = tryFloodfill();
-											}
+											floodfill_capable = tryFloodfill();
+										}
 											
-											if ( try_floodfill ){
+										if ( floodfill_capable && mult < 2){
 												
-												mult = 2;
-											}
+											mult = 2;
 										}
 									}
 									
@@ -1290,9 +1287,11 @@ I2PHelperPlugin
 									
 									if ( current_router != null ){
 										
-										if ( current_router.getRateMultiplier() != mult ){
+										if ( current_router.getRateMultiplier() != mult || current_router.getFloodfillCapable() != floodfill_capable ){
 										
 											current_router.setRateMultiplier( mult );
+											
+											current_router.setFloodfillCapable( floodfill_capable );
 											
 											current_router.updateProperties();
 										}
@@ -1849,7 +1848,7 @@ I2PHelperPlugin
 		
 		long uptime = i2p_router.getUptime();
 		
-		if ( uptime < 3*60*60*1000 ){
+		if ( uptime < 2*60*60*1000 ){
 			
 			return( false );
 		}
@@ -1860,6 +1859,8 @@ I2PHelperPlugin
 			
 			return( false );
 		}
+		
+			// check we have a history of being up for a reasonable time
 		
 		if ( uptime < 6*60*60*1000 ){
 			
@@ -1907,7 +1908,9 @@ I2PHelperPlugin
 		total_up = total_up/(1024*1024);	// MB
 		total_do = total_do/(1024*1024);
 		
-		if ( total_up + total_do < 20*1024 ){
+		if ( total_up + total_do < 16*1024 ){
+			
+				// < 16gb in the last week, ignore
 			
 			return( false );
 		}
@@ -1988,6 +1991,11 @@ I2PHelperPlugin
 				
 				try{
 					rinf 	= i2p_router.getRouterInfo().getCapabilities();
+					
+					if ( r.getFloodfillCapable()){
+						
+						rinf += "+";
+					}
 					
 					long up = i2p_router.getUptime();
 					
