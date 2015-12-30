@@ -24,6 +24,7 @@ package org.parg.azureus.plugins.webtorrent;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -37,17 +38,28 @@ import org.gudy.azureus2.core3.logging.Logger;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.FileUtil;
+import org.gudy.azureus2.core3.util.RandomUtils;
+import org.gudy.azureus2.core3.util.SimpleTimer;
 import org.gudy.azureus2.core3.util.ThreadPool;
 import org.gudy.azureus2.core3.util.ThreadPoolTask;
+import org.gudy.azureus2.core3.util.TimerEvent;
+import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.gudy.azureus2.core3.util.UrlUtils;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.ipc.IPCException;
+import org.gudy.azureus2.ui.swt.Utils;
+import org.parg.azureus.plugins.webtorrent.WebSocketServer.SessionWrapper;
 
 public class 
 WebTorrentPlugin 
 	implements Plugin
 {
+	private static final long rand = RandomUtils.nextSecureAbsoluteLong();
+	
 	private int filter_port;
+	
+	private WebSocketServer	ws_server;
 	
 	@Override
 	public void 
@@ -59,19 +71,72 @@ WebTorrentPlugin
 		setupServer();
 		
 		setupURLHandler();
+		
+		getControlConnection();
+		
+		SimpleTimer.addPeriodicEvent(
+			"WSTimer",
+			5*1000,
+			new TimerEventPerformer() {
+				
+				@Override
+				public void perform(TimerEvent event) {
+				
+					if ( ws_server != null ){
+						
+						SessionWrapper session = ws_server.getSession( rand, 10*1000 );
+						
+						if ( session != null ){
+							
+							try{
+								session.send( "toot!" );
+								
+							}catch( Throwable e ){
+								
+								Debug.out( e );
+							}
+						}
+					}
+					
+				}
+			});
 	}
 	
 	private void
 	setupServer()
 	{
 		try{
-			WebSocketServer server = new WebSocketServer();
+			ws_server = new WebSocketServer();
 			
-			server.runServer();
+			ws_server.runServer();
 			
 		}catch( Throwable e ){
 			
+			ws_server = null;
+			
 			Debug.out( e );
+		}
+	}
+	
+	private void
+	getControlConnection()
+	{
+		if ( filter_port != 0 ){
+			
+			new AEThread2( "")
+			{
+				public void
+				run()
+				{
+					try{
+						Utils.launch( new URL( "http://127.0.0.1:" + filter_port + "/index.html?id=" + rand ));
+						
+					}catch( Throwable e ){
+						
+						Debug.out( e );
+					}
+				}
+			}.start();
 		}
 	}
 	
@@ -244,6 +309,51 @@ WebTorrentPlugin
 				
 				System.out.println( "Got request: " + get );
 				
+				String resource 		= null;
+				String content_type 	= null;
+				
+				if ( get.contains( "/index.html?id=" + rand )){
+					
+					resource 		= "index.html";
+					content_type	= "text/html";
+					
+				}else if ( get.contains( "/script.js" )){
+					
+					resource 		= "script.js";
+					content_type	= "application/javascript;charset=UTF-8";
+					
+				}else if ( get.contains( "/favicon.ico" )){
+
+					resource 		= "favicon.ico";
+					content_type	= "image/x-icon";
+				}
+				
+				OutputStream	os = socket.getOutputStream();
+
+				if ( resource != null ){
+					
+					InputStream res = getClass().getResourceAsStream( "/org/parg/azureus/plugins/webtorrent/resources/" + resource );
+					
+					byte[] bytes = FileUtil.readInputStreamAsByteArray( res );
+					
+					try{
+						
+						os.write( 
+							( 	"HTTP/1.1 200 OK" + NL +
+								"Content-Type: " + content_type + NL + 
+								"Set-Cookie: vuze-ws-id=" + rand + "; path=/" + NL +
+								"Connection: close" + NL +
+								"Content-Length: " + bytes.length + NL + NL ).getBytes());
+						
+						os.write( bytes );
+						
+						os.flush();						
+						
+					}finally{
+						
+						res.close();
+					}
+				}
 			}catch( Throwable e ){
 				
 			}finally{
