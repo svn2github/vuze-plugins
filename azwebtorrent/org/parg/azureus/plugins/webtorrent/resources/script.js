@@ -64,27 +64,111 @@ for ( var i=0;i<cookiearray.length; i++){
 
 var control_ws = new WebSocket("ws://127.0.0.1:8025/websockets/vuze?type=control" + "&id=" + ws_id );
 
-var the_peer = {};
+var peers = {};
 
 control_ws.onmessage = 
 	function( event ) 
 	{
-	  console.log(event.data);
-	 
-	  var x = JSON.parse( event.data );
+		var x = JSON.parse( event.data );
 	  
-	  console.log( x );
-	  
-	  if ( x.type == 'answer' ){
-	  
-		  var browser_rtc = getBrowserRTC();
-
-		  var remoteSessionDescription = new browser_rtc.RTCSessionDescription( x );
+		if ( x.type == undefined ){
+			
+			return;
+		}
 		
-		  console.log( "remote sdp: " + remoteSessionDescription );
+		console.log( x );
+
+		var	offer_id = x.offer_id;
+
+		if ( x.type == 'create_offer' ){
 		  
-		  the_peer.setRemoteDescription( remoteSessionDescription );
-	  }
+			var browser_rtc = getBrowserRTC();
+			
+			var peer_config = {"iceServers": [{"url": "stun:stun.l.google.com:19302"}]};
+			
+			var peer = new browser_rtc.RTCPeerConnection( peer_config );
+			
+			peers[offer_id]	= peer;
+			
+			peer.onicecandidate = 
+				function (event) 
+				{ 
+					if ( event.candidate ){
+						
+						var message = {};
+						
+						message.type 		= "ice_candidate";
+						message.offer_id	= offer_id;
+						message.candidate 	= event.candidate.candidate;
+						
+						control_ws.send( JSON.stringify( message ));
+						
+					}else{
+						
+						var message = {};
+						
+						message.type 		= "ice_candidate";
+						message.offer_id	= offer_id;
+						message.candidate 	= "";
+						
+						control_ws.send( JSON.stringify( message ));
+					}
+				}
+			
+			function setLocalAndSendMessage(sessionDescription) {
+				 
+				var message = {};
+				
+				message.type 		= "sdp";
+				message.offer_id	= offer_id;
+
+				message.sdp = sessionDescription.sdp;
+				
+				control_ws.send( JSON.stringify( message ));
+								
+				peer.setLocalDescription(sessionDescription);
+				 
+			}
+			
+			var channel = peer.createDataChannel( "vuzedc" );
+			
+			channel.onopen = function () {
+				console.log("datachannel open");
+			};
+			
+			channel.onclose = function () {
+				console.log("datachannel close");
+			};
+				
+			channel.onerror = function () {
+				console.log("datachannel error");
+			};
+				
+			channel.onmessage = 
+				function( event )
+				{
+					console.log( "datachannel message: " + ab2str( event.data ));
+				};
+					
+			var offerOptions = {};
+			
+			peer.createOffer(setLocalAndSendMessage, null, offerOptions );
+		  
+		}else if ( x.type == 'answer' ){
+	  
+			var peer = peers[offer_id];
+		  
+			if ( peer ){
+			  
+				var browser_rtc = getBrowserRTC();
+	
+				var remoteSessionDescription = new browser_rtc.RTCSessionDescription( x );
+			
+				console.log( "remote sdp: " + remoteSessionDescription );
+			  
+				peer.setRemoteDescription( remoteSessionDescription );
+			}	
+		}
 	}
 
 control_ws.onerror = 
@@ -96,81 +180,5 @@ control_ws.onerror =
 control_ws.onopen = 
 	function( event )
 	{
-		var browser_rtc = getBrowserRTC();
-		
-		var peer_config = {"iceServers": [{"url": "stun:stun.l.google.com:19302"}]};
-		
-		var peer = new browser_rtc.RTCPeerConnection( peer_config );
-		
-		the_peer = peer;
-		
-		peer.onicecandidate = 
-			function (event) 
-			{ 
-				if ( event.candidate ){
-					
-					var message = {};
-					
-					message.type 		= "ice_candidate";				
-					message.candidate 	= event.candidate.candidate;
-					
-					control_ws.send( JSON.stringify( message ));
-					
-				}else{
-					
-					var message = {};
-					
-					message.type 		= "ice_candidate";
-					message.candidate 	= "";
-					
-					control_ws.send( JSON.stringify( message ));
-				}
-			}
-		
-		function setLocalAndSendMessage(sessionDescription) {
-			 
-			var message = {};
-			
-			message.type = "sdp";
-			
-			message.sdp = sessionDescription.sdp;
-			
-			control_ws.send( JSON.stringify( message ));
-			
-			//console.log( sessionDescription.sdp );
-			
-			peer.setLocalDescription(sessionDescription);
-			 
-		}
-		
-		var channel = peer.createDataChannel( "bleh" );
-		
-		channel.addEventListener(
-			'message',
-			function( event )
-			{
-				console.log( "channel: " + ab2str( event.data ));
-			});
-				
-		var offerOptions = {};
-		
-		peer.createOffer(setLocalAndSendMessage, null, offerOptions );
 	}
 
-
-/*
-var client = new WebTorrent()
-
-var magnetUri = 'magnet:?xt=urn:btih:NKLVTP75LQFPMUYZS6P3PAZBRH2PHQ25&dn=sintel.mp4&tr=wss%3A%2F%2Ftracker.webtorrent.io&tr=wss%3A%2F%2Ftracker.btorrent.xyz&ws=https%3A%2F%2Fwebtorrent.io%2Ftorrents%2Fsintel-1024-surround.mp4&tag=kimchi'
-
-client.add(magnetUri, function (torrent) {
-  // Got torrent metadata!
-  console.log('Client is downloading:', torrent.infoHash)
-
-  torrent.files.forEach(function (file) {
-    // Display the file by appending it to the DOM. Supports video, audio, images, and
-    // more. Specify a container element (CSS selector or reference to DOM node).
-    file.appendTo('body')
-  })
-})
-*/
