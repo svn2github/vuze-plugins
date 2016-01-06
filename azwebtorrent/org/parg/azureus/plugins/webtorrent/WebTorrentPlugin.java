@@ -77,13 +77,14 @@ WebTorrentPlugin
 				    	
 				    	public void
 				    	gotOffer(
-				    		byte[]		hash,
-				    		String		offer_id,
-				    		String		sdp )
+				    		byte[]							hash,
+				    		String							offer_id,
+				    		String							sdp,
+				    		JavaScriptProxy.AnswerListener 	listener )
 				    		
 				    		throws Exception
 				    	{
-				    		js_proxy.gotOffer( offer_id, sdp );
+				    		js_proxy.gotOffer( offer_id, sdp, listener );
 				    	}
 					});
 			

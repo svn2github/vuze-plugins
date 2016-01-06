@@ -36,8 +36,9 @@ JavaScriptProxy
 	
 	public void
 	gotOffer(
-		String		offer_id,
-		String		sdp );
+		String			offer_id,
+		String			sdp,
+		AnswerListener	listener );
 	
 	public interface
 	Offer
@@ -47,5 +48,23 @@ JavaScriptProxy
 		
 		public String
 		getSDP();
+	}
+	
+	public interface
+	Answer
+	{
+		public String
+		getOfferID();
+		
+		public String
+		getSDP();
+	}
+	
+	public interface
+	AnswerListener
+	{
+		public void
+		gotAnswer(
+			Answer		answer );
 	}
 }

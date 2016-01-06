@@ -39,8 +39,11 @@ import org.bouncycastle.jce.provider.JDKAlgorithmParameterGenerator.AES;
 import org.glassfish.tyrus.client.ClientManager;
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.BEncoder;
+import org.gudy.azureus2.core3.util.ByteArrayHashMap;
+import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.SystemTime;
+import org.parg.azureus.plugins.webtorrent.JavaScriptProxy.Answer;
 import org.parg.azureus.plugins.webtorrent.JavaScriptProxy.Offer;
 
 import com.aelitis.azureus.util.JSONUtils;
@@ -53,6 +56,8 @@ TrackerProxy
 	
 	private Map<String,ClientSession>	client_sessions = new HashMap<String, ClientSession>();
 
+	private ByteArrayHashMap<byte[]>	hash_to_peer_id_map = new ByteArrayHashMap<>();
+	
 	protected
 	TrackerProxy(
 		Listener		_listener )
@@ -115,6 +120,11 @@ TrackerProxy
 				}		
 			}
 			
+			synchronized( hash_to_peer_id_map ){
+			
+				hash_to_peer_id_map.put( info_hash, peer_id );
+			}
+			
 			Offer	offer = listener.getOffer( 60*1000 );
 			
 			if ( offer != null ){
@@ -167,6 +177,8 @@ TrackerProxy
 	        			",\"peer_id\":\"" + encodeCrap( peer_id ) + "\"" +
 	        			",\"offers\":[" + offer_str + "]}";
 				
+	        	//System.out.println( announce );
+	        	
 	        	ClientSession	client_session = null;
 				
 				synchronized( client_sessions ){
@@ -216,14 +228,18 @@ TrackerProxy
 				                            			                            	
 				                            	if ( map.containsKey( "answer" )){
 				                            	
-				                            		Map answer = (Map)map.get( "answer" );
-				                            		
-				                            		String offer_id = (String)map.get( "offer_id" );
-				                            		
 				                            		try{
+				                            			Map answer = (Map)map.get( "answer" );
+				                            		
+				                            			String offer_id = (String)map.get( "offer_id" );
+				                            		
+				                            			String hash_str = (String)map.get( "info_hash" );
+					                            		
+					                            		byte[] hash = hash_str.getBytes( "ISO-8859-1" );
+					                            		
 				                            			String sdp = (String)answer.get( "sdp" );
 				                            		
-				                            			listener.gotAnswer( null, offer_id, sdp );
+				                            			listener.gotAnswer( hash, offer_id, sdp );
 				                            			
 				                            		}catch( Throwable e ){
 				                            			
@@ -231,14 +247,56 @@ TrackerProxy
 				                            		}
 				                            	}else if ( map.containsKey( "offer" )){
 				                            		
-				                            		Map answer = (Map)map.get( "offer" );
-				                            		
-				                            		String offer_id = (String)map.get( "offer_id" );
-				                            		
 				                            		try{
-				                            			String sdp = (String)answer.get( "sdp" );
+					                            		Map offer = (Map)map.get( "offer" );
+					                            		
+					                            		String offer_id = (String)map.get( "offer_id" );
+					                            		
+					                            		final String to_peer_id = (String)map.get( "peer_id" );
+					                            		
+					                            		final String info_hash = (String)map.get( "info_hash" );
+					                            		
+					                            		final byte[] hash = info_hash.getBytes( "ISO-8859-1" );
+				                            							                            		
+				                            			String sdp = (String)offer.get( "sdp" );
 				                            		
-				                            			listener.gotOffer( null, offer_id, sdp );
+				                            			final byte[]	peer_id;
+				                            		
+				                            			synchronized( hash_to_peer_id_map ){
+				                            				
+				                            				peer_id = hash_to_peer_id_map.get( hash );
+				                            			}
+				                            			
+				                            			listener.gotOffer( 
+				                            				hash, 
+				                            				offer_id, 
+				                            				sdp,
+				                            				new JavaScriptProxy.AnswerListener() {
+																
+																@Override
+																public void 
+																gotAnswer(
+																	Answer answer ) 
+																{
+																	String answer_str = "{\"answer\":{\"type\":\"answer\",\"sdp\":\"" + 
+																			encodeCrap( answer.getSDP()) + "\"}," + 
+																			"\"offer_id\":\"" + encodeCrap( answer.getOfferID()) + "\"," + 
+																			"\"peer_id\":\"" + encodeCrap( peer_id ) + "\"," + 
+																			"\"to_peer_id\":\"" + to_peer_id + "\"," + 
+																			"\"info_hash\":\"" + encodeCrap( hash ) + "\"" + 
+																			"}";
+
+																	// System.out.println( answer_str );
+																	
+																	try{
+																		session.getBasicRemote().sendText( answer_str );
+																		
+																	 }catch( Throwable e ){
+									                            			
+										                            		Debug.out( e );
+																	 }
+																}
+															});
 				                            			
 				                            		}catch( Throwable e ){
 				                            			
@@ -253,15 +311,23 @@ TrackerProxy
 								                		 
 								                		 if ( s.getSession() == session ){
 								                			 
-								                			 s.announceReceived( map );
+								                			 try{
+							                            		String hash_str = (String)map.get( "info_hash" );
+
+								                            	byte[] hash = hash_str.getBytes( "ISO-8859-1" );
+								                			 
+								                            	s.announceReceived( hash, map );
+								                            	
+								                			 }catch( Throwable e ){
+							                            			
+							                            		Debug.out( e );
+							                            	}
 								                		 }
 								                	 }
 				                            	}                              
 				                            }
 				                        });
-				                      
-				                    	System.out.println( announce );
-				                    	
+				                      				                    	
 				                        session.getBasicRemote().sendText( announce );
 				                        
 				                    }catch( IOException e ){
@@ -318,7 +384,7 @@ TrackerProxy
 		            }
 				}   
 				
-				Map reply = client_session.waitForAnnounce( 30*1000 );
+				Map reply = client_session.waitForAnnounce( info_hash, 30*1000 );
 				
 				if ( reply == null ){
 					
@@ -342,6 +408,7 @@ TrackerProxy
 				os.write( "\r\n" .getBytes( "ISO-8859-1" ));
 				
 				os.write( x );
+				
 			}else{
 				
 				throw( new Exception( "WebSocket proxy offer not available" ));
@@ -453,9 +520,10 @@ TrackerProxy
     	
     	public void
     	gotOffer(
-    		byte[]		hash,
-    		String		offer_id,
-    		String		sdp )
+    		byte[]							hash,
+    		String							offer_id,
+    		String							sdp,
+    		JavaScriptProxy.AnswerListener	listener )
     		
     		throws Exception;
     }
@@ -465,10 +533,8 @@ TrackerProxy
     {
     	private Session		session;
     	
-    	private Map			last_announce;
-    	private long		last_announce_time;
-    	private AESemaphore	announce_sem;
-    	
+    	private ByteArrayHashMap<AnnounceData>	announce_map = new ByteArrayHashMap<>();
+    	    	
     	protected
     	ClientSession(
     		Session		_session )
@@ -499,45 +565,67 @@ TrackerProxy
     	
     	private void
     	announceReceived(
-    		Map		map )
+    		byte[]		hash,
+    		Map			map )
     	{
     		synchronized( this ){
-    			last_announce 		= map;
-    			last_announce_time	= SystemTime.getMonotonousTime();
     			
-    			if ( announce_sem != null ){
+    			AnnounceData	ad = announce_map.get( hash );
+    			
+    			if ( ad == null ){
     				
-    				announce_sem.releaseForever();
+    				ad = new AnnounceData();
     				
-    				announce_sem = null;
+    				announce_map.put( hash, ad );
+    			}
+    			
+    			ad.last_announce 		= map;
+    			ad.last_announce_time	= SystemTime.getMonotonousTime();
+    			
+    			if ( ad.announce_sem != null ){
+    				
+    				ad.announce_sem.releaseForever();
+    				
+    				ad.announce_sem = null;
     			}
     		}
     	}
     	
     	private Map
     	waitForAnnounce(
+    		byte[]		hash,
     		long		timeout )
     	{
-    		AESemaphore sem;
+    		AnnounceData	ad;
+    		AESemaphore 	sem;
     		
     		synchronized( this ){
     			
-    			if ( last_announce != null && SystemTime.getMonotonousTime() - last_announce_time < 10000 ){
+    			ad = announce_map.get( hash );
+    			
+    			if ( ad == null ){
     				
-    				return( last_announce );
+    				ad = new AnnounceData();
+    				
+    				announce_map.put( hash, ad );
     			}
     			
-    			if ( announce_sem == null ){
+    			if ( ad.last_announce != null && SystemTime.getMonotonousTime() - ad.last_announce_time < 10000 ){
     				
-    				announce_sem = new AESemaphore( "" );
+    				return( ad.last_announce );
     			}
     			
-    			sem = announce_sem;
+    			if ( ad.announce_sem == null ){
+    				
+    				ad.announce_sem = new AESemaphore( "" );
+    			}
+    			
+    			sem = ad.announce_sem;
     		}
     		
     		sem.reserve( timeout );
     		
-    		return( last_announce );
+    		return( ad.last_announce );
     	}
     	
     	private void
@@ -550,5 +638,14 @@ TrackerProxy
     			
     		}
     	}
+    }
+    
+    private class
+    AnnounceData
+    {
+    	private Map			last_announce;
+    	private long		last_announce_time;
+    	private AESemaphore	announce_sem;
+
     }
 }

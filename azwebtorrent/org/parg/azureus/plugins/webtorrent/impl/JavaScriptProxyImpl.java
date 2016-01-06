@@ -22,27 +22,20 @@
 
 package org.parg.azureus.plugins.webtorrent.impl;
 
-import java.io.IOException;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.websocket.Session;
 
 import org.gudy.azureus2.core3.util.AESemaphore;
-import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.SimpleTimer;
 import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
-import org.gudy.azureus2.ui.swt.Utils;
 import org.parg.azureus.plugins.webtorrent.JavaScriptProxy;
 
-import com.aelitis.azureus.util.JSONUtils;
 
 public class 
 JavaScriptProxyImpl 
@@ -62,7 +55,7 @@ JavaScriptProxyImpl
 	private JavaScriptProxyInstance		current_instance;
 	private AESemaphore					current_instance_sem = new AESemaphore("");
 	
-	private Map<String,OfferImpl>		offer_map = new HashMap<>();
+	private Map<String,OfferAnswerImpl>		offer_answer_map = new HashMap<>();
 	
 	public
 	JavaScriptProxyImpl(
@@ -194,7 +187,7 @@ JavaScriptProxyImpl
     		
     		String	offer_id = (String)message.get( "offer_id" );
     		
-    		OfferImpl offer = offer_map.get( offer_id );
+    		OfferAnswerImpl offer = offer_answer_map.get( offer_id );
     		
     		if ( offer != null ){
     			
@@ -216,7 +209,7 @@ JavaScriptProxyImpl
 			
 			String	offer_id;
 			
-			OfferImpl	offer;
+			OfferAnswerImpl	offer;
 			
 			synchronized( lock ){
 			
@@ -229,9 +222,9 @@ JavaScriptProxyImpl
 				
 				offer_id = String.valueOf( next_offer_id++ );
 				
-				offer = new OfferImpl( inst, offer_id );
+				offer = new OfferAnswerImpl( inst, offer_id );
 				
-				offer_map.put( offer_id, offer );
+				offer_answer_map.put( offer_id, offer );
 			}
 				
 			try{
@@ -246,7 +239,7 @@ JavaScriptProxyImpl
 					
 					synchronized( lock ){
 						
-						offer_map.remove( offer_id );
+						offer_answer_map.remove( offer_id );
 					}
 					
 					return( offer );
@@ -260,7 +253,7 @@ JavaScriptProxyImpl
 				
 				synchronized( lock ){
 					
-					offer_map.remove( offer_id );
+					offer_answer_map.remove( offer_id );
 				}
 			}
 		}
@@ -297,25 +290,68 @@ JavaScriptProxyImpl
 				
 				Debug.out( e );
 			}
-			
 		}
 	}
 	
 	@Override
 	public void 
 	gotOffer(
-		String 			offer_id, 
-		String 			sdp) 
+		String 							external_offer_id, 
+		String 							sdp,
+		JavaScriptProxy.AnswerListener	listener )
 	{
-		System.out.println( "TODO: gotOffer: " + offer_id );
+		if ( current_instance_sem.reserve( 10*1000 )){
+			
+			JavaScriptProxyInstance	inst;
+			
+			String	internal_offer_id;
+			
+			OfferAnswerImpl	offer;
+			
+			synchronized( lock ){
+			
+				inst = current_instance;
+				
+				if ( inst == null ){
+					
+					return;
+				}
+				
+				internal_offer_id = String.valueOf( next_offer_id++ );
+				
+				offer = new OfferAnswerImpl( inst, external_offer_id, listener );
+				
+				offer_answer_map.put( internal_offer_id, offer );
+			}
+		
+			try{
+				Map<String,Object> to_send = new HashMap<>();
+				
+				to_send.put( "type", "offer" );
+				to_send.put( "offer_id", internal_offer_id );
+				to_send.put( "sdp", sdp );
+			
+				inst.sendMessage( to_send );
+						
+			}catch( Throwable e ){
+				
+				Debug.out( e );
+				
+				synchronized( lock ){
+					
+					offer_answer_map.remove( internal_offer_id );
+				}
+			}
+		}
 	}
 	
     public class
-    OfferImpl
-    	implements Offer
+    OfferAnswerImpl
+    	implements Offer, Answer
     {
     	private final JavaScriptProxyInstance		inst;
-    	private final String						offer_id;
+    	private final String						external_offer_id;
+    	private final AnswerListener				listener;
     	
     	private String			sdp 			= null;
     	private List<String>	candidates 		= new ArrayList<>();
@@ -324,13 +360,23 @@ JavaScriptProxyImpl
     	
     	private boolean	destroyed;
     	
-    	private
-    	OfferImpl(
-    		JavaScriptProxyInstance		_inst,
-    		String						_offer_id )
+       	private
+    	OfferAnswerImpl(
+    		JavaScriptProxyInstance		inst,
+    		String						external_offer_id )
     	{
-    		inst			= _inst;
-    		offer_id		= _offer_id;
+       		this( inst, external_offer_id, null );
+    	}
+       	
+    	private
+    	OfferAnswerImpl(
+    		JavaScriptProxyInstance		_inst,
+    		String						_external_offer_id,
+    		AnswerListener				_listener )
+    	{
+    		inst					= _inst;
+    		external_offer_id		= _external_offer_id;
+    		listener				= _listener;
     	}
     	
     	protected boolean
@@ -368,6 +414,11 @@ JavaScriptProxyImpl
     			}else{
     				
     				offer_sem.releaseForever();
+    				
+    				if ( listener != null ){
+    					
+    					listener.gotAnswer( this );
+    				}
     			}
     		}
     	}
@@ -418,7 +469,7 @@ JavaScriptProxyImpl
     	public String
     	getOfferID()
     	{
-    		return( offer_id );
+    		return( external_offer_id );
     	}
     }	
 }

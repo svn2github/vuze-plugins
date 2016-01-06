@@ -152,8 +152,87 @@ control_ws.onmessage =
 					
 			var offerOptions = {};
 			
-			peer.createOffer(setLocalAndSendMessage, null, offerOptions );
-		  
+			peer.createOffer(setLocalAndSendMessage, null, offerOptions );	  
+			
+		}else if ( x.type == 'offer' ){
+				  
+			var browser_rtc = getBrowserRTC();
+			
+			var peer_config = {"iceServers": [{"url": "stun:stun.l.google.com:19302"}]};
+			
+			var peer = new browser_rtc.RTCPeerConnection( peer_config );
+			
+			peers[offer_id]	= peer;
+			
+			peer.onicecandidate = 
+				function (event) 
+				{ 
+					if ( event.candidate ){
+						
+						var message = {};
+						
+						message.type 		= "ice_candidate";
+						message.offer_id	= offer_id;
+						message.candidate 	= event.candidate.candidate;
+						
+						control_ws.send( JSON.stringify( message ));
+						
+					}else{
+						
+						var message = {};
+						
+						message.type 		= "ice_candidate";
+						message.offer_id	= offer_id;
+						message.candidate 	= "";
+						
+						control_ws.send( JSON.stringify( message ));
+					}
+				}
+			
+			function setLocalAndSendMessage(sessionDescription) {
+				 
+				var message = {};
+				
+				message.type 		= "sdp";
+				message.offer_id	= offer_id;
+
+				message.sdp = sessionDescription.sdp;
+				
+				control_ws.send( JSON.stringify( message ));
+								
+				peer.setLocalDescription(sessionDescription); 
+			}
+			
+			var channel = peer.createDataChannel( "vuzedc" );
+			
+			channel.onopen = function () {
+				console.log("datachannel2 open");
+			};
+			
+			channel.onclose = function () {
+				console.log("datachannel2 close");
+			};
+				
+			channel.onerror = function () {
+				console.log("datachannel2 error");
+			};
+				
+			channel.onmessage = 
+				function( event )
+				{
+					console.log( "datachannel2 message: " + ab2str( event.data ));
+				};
+				
+			var remoteSessionDescription = new browser_rtc.RTCSessionDescription( x );
+			
+			console.log( "offer: remote sdp: " + remoteSessionDescription );
+			
+			peer.setRemoteDescription( remoteSessionDescription );
+			
+			var answerOptions = {};
+			
+			peer.createAnswer(setLocalAndSendMessage, null, answerOptions );
+			
 		}else if ( x.type == 'answer' ){
 	  
 			var peer = peers[offer_id];
@@ -164,7 +243,7 @@ control_ws.onmessage =
 	
 				var remoteSessionDescription = new browser_rtc.RTCSessionDescription( x );
 			
-				console.log( "remote sdp: " + remoteSessionDescription );
+				console.log( "answer: remote sdp: " + remoteSessionDescription );
 			  
 				peer.setRemoteDescription( remoteSessionDescription );
 			}	
