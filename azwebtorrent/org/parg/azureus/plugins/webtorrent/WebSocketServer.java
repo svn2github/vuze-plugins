@@ -33,6 +33,8 @@ import javax.websocket.server.ServerEndpoint;
 import org.glassfish.tyrus.server.Server;
 import org.gudy.azureus2.core3.util.AESemaphore;
 
+import com.aelitis.azureus.util.JSONUtils;
+
 @ServerEndpoint("/vuze")
 public class 
 WebSocketServer
@@ -59,6 +61,9 @@ WebSocketServer
 	private static Map<Session,SessionWrapper>	session_map = new IdentityHashMap<Session,SessionWrapper>();
 	
 	private static Map<Long,Object[]>		id_map	= new HashMap<Long,Object[]>();
+	
+	private Session				my_session;
+	private	SessionWrapper		my_wrapper;
 	
 	
 	public SessionWrapper
@@ -103,6 +108,8 @@ WebSocketServer
     			
     	throws IOException 
     {
+		my_session = session;
+		
 		System.out.println( "onOpen: " + session );
 		
 		String query = session.getRequestURI().getQuery();
@@ -137,6 +144,8 @@ WebSocketServer
 				
 				session_map.put( session, wrapper );
 				
+				my_wrapper	= wrapper;
+				
 				Object[] entry = id_map.get( id );
 				
 				if ( entry == null ){
@@ -160,7 +169,11 @@ WebSocketServer
     onMessage(
     	String message) 
     {
-        return message + " (from your server)";
+    	Map map = JSONUtils.decodeJSON( message );
+    	
+    	my_wrapper.addMessage( map );
+    	
+    	return( "{}" );
     }
 
     @OnError
@@ -202,6 +215,11 @@ WebSocketServer
     	private final Session		session;
     	private final long			id;
     	
+    	private String			sdp 			= null;
+    	private List<String>	candidates 		= new ArrayList<>();
+    	
+    	private AESemaphore		offer_sem = new AESemaphore( "" );
+    	
     	private boolean	destroyed;
     	
     	private
@@ -220,6 +238,81 @@ WebSocketServer
     		throws Exception
     	{
     		session.getBasicRemote().sendText( str );
+    	}
+    	
+    	public void
+    	addMessage(
+    		Map		msg )
+    	{
+    		String	type = (String)msg.get( "type" );
+    		
+    		if ( type.equals( "sdp" )){
+    			
+    			sdp	= (String)msg.get( "sdp" );
+    			    	
+    			candidates.clear();
+    			
+    		}else if ( type.equals( "ice_candidate" )){
+    			
+    			String candidate = (String)msg.get( "candidate" );
+    			    			
+    			if ( candidate.length() > 0 ){
+    				
+    				candidates.add( candidate );
+    				
+    			}else{
+    				
+    				offer_sem.releaseForever();
+    			}
+    		}
+    	}
+    	
+    	public String
+    	getOfferSDP(
+    		long		timeout )
+    	{
+    		if ( !offer_sem.reserve( timeout )){
+    			
+    			return( null );
+    		}
+    		
+    		String offer = "";
+    		
+    		String[] bits = sdp.split( "\n" );
+    		
+    		boolean	 done_candidates = false;
+    		
+    		for ( String bit: bits ){
+    			
+    			bit = bit.trim();
+    			
+    			if ( bit.length() == 0 ){
+    				
+    				continue;
+    			}
+    			
+    			if ( bit.startsWith( "a=" ) && !bit.startsWith( "a=msid-" ) && !done_candidates){
+    				
+    				done_candidates = true;
+    				
+    				for ( String candidate: candidates ){
+    					
+    					offer += "a=" + candidate + "\r\n";
+    				}
+    			}
+    			
+    			offer += bit + "\r\n";
+    		}
+    		
+    		if ( !done_candidates ){
+    			
+    			for ( String candidate: candidates ){
+					
+					offer += "a=" + candidate + "\r\n";
+				}
+    		}
+    		    		    		
+    		return( offer );
     	}
     	
     	private long

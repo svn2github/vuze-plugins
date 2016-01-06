@@ -19,6 +19,18 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
  */
 
+function ab2str(buf) {
+  return String.fromCharCode.apply(null, new Uint8Array(buf));
+}
+
+function str2ab(str) {
+  var buf = new ArrayBuffer(str.length*2); // 2 bytes for each char
+  var bufView = new Uint16Array(buf);
+  for (var i=0, strLen=str.length; i<strLen; i++) {
+    bufView[i] = str.charCodeAt(i);
+  }
+  return buf;
+}
 
 function getBrowserRTC () {
   if (typeof window === 'undefined') return null
@@ -52,10 +64,27 @@ for ( var i=0;i<cookiearray.length; i++){
 
 var control_ws = new WebSocket("ws://127.0.0.1:8025/websockets/vuze?type=control" + "&id=" + ws_id );
 
+var the_peer = {};
+
 control_ws.onmessage = 
 	function( event ) 
 	{
 	  console.log(event.data);
+	 
+	  var x = JSON.parse( event.data );
+	  
+	  console.log( x );
+	  
+	  if ( x.type == 'answer' ){
+	  
+		  var browser_rtc = getBrowserRTC();
+
+		  var remoteSessionDescription = new browser_rtc.RTCSessionDescription( x );
+		
+		  console.log( "remote sdp: " + remoteSessionDescription );
+		  
+		  the_peer.setRemoteDescription( remoteSessionDescription );
+	  }
 	}
 
 control_ws.onerror = 
@@ -73,27 +102,56 @@ control_ws.onopen =
 		
 		var peer = new browser_rtc.RTCPeerConnection( peer_config );
 		
+		the_peer = peer;
+		
 		peer.onicecandidate = 
 			function (event) 
 			{ 
 				if ( event.candidate ){
 					
-					control_ws.send( JSON.stringify( event.candidate.candidate ));
+					var message = {};
+					
+					message.type 		= "ice_candidate";				
+					message.candidate 	= event.candidate.candidate;
+					
+					control_ws.send( JSON.stringify( message ));
 					
 				}else{
 					
-					control_ws.send( JSON.stringify( {} ));
+					var message = {};
+					
+					message.type 		= "ice_candidate";
+					message.candidate 	= "";
+					
+					control_ws.send( JSON.stringify( message ));
 				}
 			}
 		
 		function setLocalAndSendMessage(sessionDescription) {
 			 
+			var message = {};
+			
+			message.type = "sdp";
+			
+			message.sdp = sessionDescription.sdp;
+			
+			control_ws.send( JSON.stringify( message ));
+			
+			//console.log( sessionDescription.sdp );
+			
 			peer.setLocalDescription(sessionDescription);
 			 
 		}
 		
-		peer.createDataChannel( "bleh" );
+		var channel = peer.createDataChannel( "bleh" );
 		
+		channel.addEventListener(
+			'message',
+			function( event )
+			{
+				console.log( "channel: " + ab2str( event.data ));
+			});
+				
 		var offerOptions = {};
 		
 		peer.createOffer(setLocalAndSendMessage, null, offerOptions );
