@@ -23,14 +23,14 @@
 package org.parg.azureus.plugins.webtorrent.impl;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.websocket.DeploymentException;
 import javax.websocket.OnClose;
 import javax.websocket.OnError;
 import javax.websocket.OnMessage;
@@ -39,8 +39,8 @@ import javax.websocket.Session;
 import javax.websocket.server.ServerEndpoint;
 
 import org.glassfish.tyrus.server.Server;
-import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.RandomUtils;
 
 import com.aelitis.azureus.util.JSONUtils;
 
@@ -69,7 +69,7 @@ JavaScriptProxyInstance
 	
 	private static Listener		listener;
 	
-    protected static void 
+    protected static int 
     startServer(
     	Listener		_listener ) 
     
@@ -77,13 +77,40 @@ JavaScriptProxyInstance
     {
     	listener	= _listener;
     	
-    	Server server = new Server("localhost", 8025, "/websockets", null, JavaScriptProxyInstance.class);
+    	int[] potential_ports = new int[32];
+    	
+    	potential_ports[0] = 8025;		// default
+    	
+    	for ( int i=1;i<potential_ports.length;i++){
+    		
+    		potential_ports[i] = 2000 + (RandomUtils.nextAbsoluteInt()%60000);
+    	}
+    	
+    	Exception last_error = null;
+    	
+    	for ( int port: potential_ports ){
+    	
+    		try{
+    			Server server = new Server( "127.0.0.1", port, "/websockets", null, JavaScriptProxyInstance.class);
         
-    	server.start();
+    			server.start();
+    	
+    			return( port );
+    			
+    		}catch( DeploymentException e ){
+    			
+    			last_error = e;
+    		}
+    	}
+    	
+    	throw( last_error );
     }
     
 
     private long		instance_id;
+    private long		offer_id;
+    private boolean		is_peer;
+    
     private Session		session;
     private boolean		destroyed;
     
@@ -91,6 +118,12 @@ JavaScriptProxyInstance
 	getInstanceID()
 	{
 		return( instance_id );
+	}
+	
+	protected long
+	getOfferID()
+	{
+		return( offer_id );
 	}
 	
 	protected boolean
@@ -114,8 +147,9 @@ JavaScriptProxyInstance
 		
 		String[] args = query.split( "&" );
 		
-		String	type 	= null;
-		long	id		= -1;
+		String	type 		= null;
+		long	id			= -1;
+		long	oid			= 0;
 		
 		for ( String arg: args ){
 			
@@ -131,6 +165,10 @@ JavaScriptProxyInstance
 			}else if ( lhs.equals( "id" )){
 				
 				id = Long.parseLong( rhs );
+				
+			}else if ( lhs.equals( "offer_id" )){
+				
+				oid = Long.parseLong( rhs );
 			}
 		}
 		
@@ -138,7 +176,15 @@ JavaScriptProxyInstance
 			
 			instance_id	= id;
 			
-			listener.instanceCreated( this );
+			listener.controlCreated( this );
+			
+		}else if ( type.equals( "peer" )){
+
+			instance_id	= id;
+			offer_id	= oid;
+			is_peer		= true;
+			
+			listener.peerCreated( this );
 		}
     }
 
@@ -149,13 +195,21 @@ JavaScriptProxyInstance
     {
     	Map<String,Object> map = JSONUtils.decodeJSON( message );
     	
-    	Map<String,Object> result = listener.receiveMessage( this, map );
+    	Map<String,Object> result = listener.receiveControlMessage( this, map );
     	
     	return( JSONUtils.encodeToJSON( result ));
     }
 
+    @OnMessage
+    public void 
+    onMessage(
+    	ByteBuffer 	message ) 
+    {
+    	 listener.receivePeerMessage( this, message );
+    }
+    	
     protected void
-    sendMessage(
+    sendControlMessage(
     	Map<String,Object>			message )
     	
     	throws Throwable
@@ -176,6 +230,28 @@ JavaScriptProxyInstance
     	}
     }
     
+    protected void
+    sendPeerMessage(
+    	ByteBuffer		buffer )
+    	
+    	throws Throwable
+    {
+    	if ( isDestroyed()){
+    		
+    		throw( new Exception( "Destroyed" ));
+    	}
+    	
+    	try{
+    		session.getBasicRemote().sendBinary( buffer );
+    		
+    	}catch( Throwable e ){
+    		
+    		onError( e );
+    		
+    		throw( e );
+    	}
+    }
+    
     @OnError
     public void 
     onError(
@@ -185,7 +261,14 @@ JavaScriptProxyInstance
     	
     	destroy();
     	
-    	listener.instanceDestroyed( this );
+    	if ( is_peer ){
+    		
+    		listener.peerDestroyed( this );
+    		
+    	}else{
+    		
+    		listener.controlDestroyed( this );
+    	}
     }
 
     @OnClose
@@ -195,7 +278,14 @@ JavaScriptProxyInstance
     {
     	destroyed	= true;
     	
-    	listener.instanceDestroyed( this );
+    	if ( is_peer ){
+    		
+    		listener.peerDestroyed( this );
+    		
+    	}else{
+    		
+    		listener.controlDestroyed( this );
+    	}
     }
     
     protected void
@@ -216,16 +306,29 @@ JavaScriptProxyInstance
     Listener
     {
     	public void
-    	instanceCreated(
+    	controlCreated(
     		JavaScriptProxyInstance		inst );
     	
     	public Map<String,Object>
-    	receiveMessage(
+    	receiveControlMessage(
     		JavaScriptProxyInstance		inst,
     		Map<String,Object>			message );
     	
     	public void
-    	instanceDestroyed(
+    	controlDestroyed(
+    		JavaScriptProxyInstance		inst );
+    	
+       	public void
+    	peerCreated(
+    		JavaScriptProxyInstance		inst );
+    	
+    	public void
+    	receivePeerMessage(
+    		JavaScriptProxyInstance		inst,
+    		ByteBuffer					message );
+    	
+    	public void
+    	peerDestroyed(
     		JavaScriptProxyInstance		inst );
     }
 }

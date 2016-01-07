@@ -28,25 +28,16 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.URI;
-import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.websocket.ClientEndpointConfig;
-import javax.websocket.Endpoint;
-import javax.websocket.EndpointConfig;
-import javax.websocket.MessageHandler;
-import javax.websocket.Session;
 
-import org.glassfish.tyrus.client.ClientManager;
 import org.gudy.azureus2.core3.logging.LogAlert;
 import org.gudy.azureus2.core3.logging.Logger;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Constants;
-import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.FileUtil;
 import org.gudy.azureus2.core3.util.ThreadPool;
 import org.gudy.azureus2.core3.util.ThreadPoolTask;
@@ -57,6 +48,19 @@ import com.aelitis.azureus.util.JSONUtils;
 public class 
 LocalWebServer 
 {
+		// http://olegh.ftp.sh/public-stun.txt
+
+	private static String[] ice_urls = {
+		"stun:stun.l.google.com:19302",
+		"stun:stun1.l.google.com:19302",
+		"stun:stun2.l.google.com:19302",
+		"stun:stun3.l.google.com:19302",
+		"stun:stun4.l.google.com:19302",
+	};
+
+	
+	private String		ws_config;
+	
 	private long		instance_id;
 	private Listener	listener;
 	private int			filter_port;
@@ -65,12 +69,37 @@ LocalWebServer
 	public
 	LocalWebServer(
 		long		_instance_id,
+		int			_ws_port,
 		Listener	_listener )
 		
 		throws Exception
 	{
 		instance_id		= _instance_id;
 		listener		= _listener;
+		
+		Map<String,Object> config_map = new HashMap<>();
+		
+		config_map.put( "id", String.valueOf( instance_id ));
+		config_map.put( "url_prefix", "ws://127.0.0.1:" + _ws_port + "/websockets/vuze" );
+		
+		Map<String,Object>	peer_config = new HashMap<>();
+		
+		config_map.put( "peer_config", peer_config );
+		
+		List<Map<String,Object>>	ice_servers = new ArrayList<>();
+		
+		peer_config.put( "iceServers", ice_servers);
+		
+		for ( String url: ice_urls ){
+			
+			Map<String,Object> m = new HashMap<>();
+			
+			ice_servers.add( m );
+			
+			m.put( "url", url );
+		}
+		
+		ws_config = JSONUtils.encodeToJSON( config_map );
 		
 		create();
 	}
@@ -262,7 +291,7 @@ LocalWebServer
 						os.write( 
 							( 	"HTTP/1.1 200 OK" + NL +
 								"Content-Type: " + content_type + NL + 
-								"Set-Cookie: vuze-ws-id=" + instance_id + "; path=/" + NL +
+								"Set-Cookie: vuze-ws-config=" + ws_config + "; path=/" + NL +
 								"Connection: close" + NL +
 								"Content-Length: " + bytes.length + NL + NL ).getBytes());
 						

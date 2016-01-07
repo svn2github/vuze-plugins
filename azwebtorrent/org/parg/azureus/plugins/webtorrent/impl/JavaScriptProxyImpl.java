@@ -22,10 +22,12 @@
 
 package org.parg.azureus.plugins.webtorrent.impl;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 
 
 import org.gudy.azureus2.core3.util.AESemaphore;
@@ -52,6 +54,8 @@ JavaScriptProxyImpl
 	
 	private final long	instance_id;	
 	
+	private int	current_port;
+	
 	private JavaScriptProxyInstance		current_instance;
 	private AESemaphore					current_instance_sem = new AESemaphore("");
 	
@@ -71,34 +75,60 @@ JavaScriptProxyImpl
 			
 			if ( !server_started ){
 								
-				JavaScriptProxyInstance.startServer(
-					new JavaScriptProxyInstance.Listener()
-					{
-						@Override
-						public void 
-						instanceCreated(
-							JavaScriptProxyInstance inst ) 
+				current_port = 
+					JavaScriptProxyInstance.startServer(
+						new JavaScriptProxyInstance.Listener()
 						{
-							current_proxy.instanceCreated( inst );
-						}
-						
-						@Override
-						public void 
-						instanceDestroyed(
-							JavaScriptProxyInstance inst) 
-						{
-							current_proxy.instanceDestroyed( inst );
-						}
-						
-						@Override
-						public Map<String,Object>
-				    	receiveMessage(
-				    		JavaScriptProxyInstance		inst,
-				    		Map<String,Object>			message )
-				    	{
-							return( current_proxy.receiveMessage( inst, message ));
-						}
-					});
+							@Override
+							public void 
+							controlCreated(
+								JavaScriptProxyInstance inst ) 
+							{
+								current_proxy.instanceCreated( inst );
+							}
+							
+							@Override
+							public void 
+							controlDestroyed(
+								JavaScriptProxyInstance inst) 
+							{
+								current_proxy.instanceDestroyed( inst );
+							}
+							
+							@Override
+							public Map<String,Object>
+					    	receiveControlMessage(
+					    		JavaScriptProxyInstance		inst,
+					    		Map<String,Object>			message )
+					    	{
+								return( current_proxy.receiveMessage( inst, message ));
+							}
+							
+							@Override
+					       	public void
+					    	peerCreated(
+					    		JavaScriptProxyInstance		inst )
+					    	{
+								addPeer( inst );
+					    	}
+					    	
+							@Override
+					    	public void
+					    	receivePeerMessage(
+					    		JavaScriptProxyInstance		inst,
+					    		ByteBuffer					message )
+					    	{
+								
+					    	}
+					    	
+							@Override
+					    	public void
+					    	peerDestroyed(
+					    		JavaScriptProxyInstance		inst )
+					    	{
+								
+					    	}
+						});
 				
 				server_started = true;
 
@@ -111,25 +141,29 @@ JavaScriptProxyImpl
 							public void perform(TimerEvent event) {
 							
 								if ( current_instance != null ){
-									
-										
+
 									try{
 										Map ping = new HashMap();
-										
+
 										ping.put( "type", "ping" );
-										
-										current_instance.sendMessage( ping );
-										
+
+										current_instance.sendControlMessage( ping );
+
 									}catch( Throwable e ){
-										
+
 										Debug.out( e );
 									}
 								}
-								
 							}
 						});
 			}
 		}
+	}
+	
+	public int
+	getPort()
+	{
+		return( current_port );
 	}
 	
 	public void
@@ -220,7 +254,14 @@ JavaScriptProxyImpl
 					return( null );
 				}
 				
-				offer_id = String.valueOf( next_offer_id++ );
+				long oid = next_offer_id++;
+				
+				if ( oid == 0 ){
+					
+					oid = next_offer_id++;
+				}
+				
+				offer_id = String.valueOf( oid );
 				
 				offer = new OfferAnswerImpl( inst, offer_id );
 				
@@ -233,7 +274,7 @@ JavaScriptProxyImpl
 				message.put( "type", "create_offer" );
 				message.put( "offer_id", offer_id );
 					
-				inst.sendMessage( message );
+				inst.sendControlMessage( message );
 				
 				if ( offer.waitFor( timeout )){
 					
@@ -284,7 +325,7 @@ JavaScriptProxyImpl
 		if ( inst != null ){
 		
 			try{
-				inst.sendMessage( to_send );
+				inst.sendControlMessage( to_send );
 				
 			}catch( Throwable e ){
 				
@@ -317,7 +358,14 @@ JavaScriptProxyImpl
 					return;
 				}
 				
-				internal_offer_id = String.valueOf( next_offer_id++ );
+				long oid = next_offer_id++;
+				
+				if ( oid == 0 ){
+					
+					oid = next_offer_id++;
+				}
+				
+				internal_offer_id = String.valueOf( oid );
 				
 				offer = new OfferAnswerImpl( inst, external_offer_id, listener );
 				
@@ -331,7 +379,7 @@ JavaScriptProxyImpl
 				to_send.put( "offer_id", internal_offer_id );
 				to_send.put( "sdp", sdp );
 			
-				inst.sendMessage( to_send );
+				inst.sendControlMessage( to_send );
 						
 			}catch( Throwable e ){
 				

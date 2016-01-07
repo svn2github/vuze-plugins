@@ -25,6 +25,9 @@ package org.parg.azureus.plugins.webtorrent;
 public interface 
 JavaScriptProxy 
 {
+	public int
+	getPort();
+	
 	public Offer
 	getOffer(
 		long		timeout );

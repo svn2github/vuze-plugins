@@ -88,7 +88,7 @@ WebTorrentPlugin
 				    	}
 					});
 			
-			web_server = new LocalWebServer( instance_id, tracker_proxy );
+			web_server = new LocalWebServer( instance_id, js_proxy.getPort(), tracker_proxy );
 										
 			new AEThread2( "")
 			{

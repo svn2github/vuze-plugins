@@ -46,7 +46,7 @@ function getBrowserRTC () {
   return wrtc
 }
 
-var ws_id = "";
+var ws_config 	= {};
 
 var allcookies = document.cookie;
 
@@ -56,15 +56,58 @@ for ( var i=0;i<cookiearray.length; i++){
 	
 	var bits = cookiearray[i].split('=');
    
-	if ( bits[0].trim() == "vuze-ws-id" ){
+	if ( bits[0].trim() == "vuze-ws-config" ){
 	   
-		ws_id = bits[1].trim();
+		ws_config = JSON.parse( bits[1].trim());
 	}
 }
 
-var control_ws = new WebSocket("ws://127.0.0.1:8025/websockets/vuze?type=control" + "&id=" + ws_id );
+var ws_id	= ws_config.id;
+
+var peer_config = ws_config.peer_config;
+
+var ws_url_prefix = ws_config.url_prefix;
+
+var control_ws = new WebSocket( ws_url_prefix + "?type=control" + "&id=" + ws_id );
 
 var peers = {};
+
+
+function createPeer( offer_id )
+{
+	var browser_rtc = getBrowserRTC();
+	
+	var peer = new browser_rtc.RTCPeerConnection( peer_config );
+		
+	peer.offer_id = offer_id;
+	
+	addPeer( peer );
+	
+	return( peer );
+}
+
+function addPeer( peer )
+{	
+	var offer_id = peer.offer_id;
+	
+	peers[ offer_id ] = peer;
+	
+	console.log( "addPeer: " + offer_id + " -> " + Object.keys(peers).length );
+}
+
+function removePeer( peer )
+{
+	var offer_id = peer.offer_id;
+	
+	if ( peers[ offer_id ] ){
+		
+		peer.close();
+		
+		delete peers[ peer.offer_id ];
+		
+		console.log( "removePeer: " + offer_id + " -> " + Object.keys(peers).length );
+	}
+}
 
 control_ws.onmessage = 
 	function( event ) 
@@ -80,15 +123,9 @@ control_ws.onmessage =
 
 		var	offer_id = x.offer_id;
 
-		if ( x.type == 'create_offer' ){
-		  
-			var browser_rtc = getBrowserRTC();
-			
-			var peer_config = {"iceServers": [{"url": "stun:stun.l.google.com:19302"}]};
-			
-			var peer = new browser_rtc.RTCPeerConnection( peer_config );
-			
-			peers[offer_id]	= peer;
+		if ( x.type == 'create_offer' || x.type == 'offer' ){
+		  						
+			var peer = createPeer( offer_id );
 			
 			peer.onicecandidate = 
 				function (event) 
@@ -115,79 +152,22 @@ control_ws.onmessage =
 					}
 				}
 			
-			function setLocalAndSendMessage(sessionDescription) {
-				 
-				var message = {};
-				
-				message.type 		= "sdp";
-				message.offer_id	= offer_id;
-
-				message.sdp = sessionDescription.sdp;
-				
-				control_ws.send( JSON.stringify( message ));
-								
-				peer.setLocalDescription(sessionDescription);
-				 
-			}
-			
-			var channel = peer.createDataChannel( "vuzedc" );
-			
-			channel.onopen = function () {
-				console.log("datachannel open");
-			};
-			
-			channel.onclose = function () {
-				console.log("datachannel close");
-			};
-				
-			channel.onerror = function () {
-				console.log("datachannel error");
-			};
-				
-			channel.onmessage = 
-				function( event )
-				{
-					console.log( "datachannel message: " + ab2str( event.data ));
-				};
+			peer.oniceconnectionstatechange = 
+				function (event) 
+				{ 
+					var state = peer.iceConnectionState;
+					console.log( "ice_state=" + state );
 					
-			var offerOptions = {};
-			
-			peer.createOffer(setLocalAndSendMessage, null, offerOptions );	  
-			
-		}else if ( x.type == 'offer' ){
-				  
-			var browser_rtc = getBrowserRTC();
-			
-			var peer_config = {"iceServers": [{"url": "stun:stun.l.google.com:19302"}]};
-			
-			var peer = new browser_rtc.RTCPeerConnection( peer_config );
-			
-			peers[offer_id]	= peer;
-			
-			peer.onicecandidate = 
-				function (event) 
-				{ 
-					if ( event.candidate ){
+					if ( state == 'failed' || state == 'closed' ){
 						
-						var message = {};
-						
-						message.type 		= "ice_candidate";
-						message.offer_id	= offer_id;
-						message.candidate 	= event.candidate.candidate;
-						
-						control_ws.send( JSON.stringify( message ));
-						
-					}else{
-						
-						var message = {};
-						
-						message.type 		= "ice_candidate";
-						message.offer_id	= offer_id;
-						message.candidate 	= "";
-						
-						control_ws.send( JSON.stringify( message ));
+						if ( peers[ offer_id ] ){
+							
+							console.log( "icestate->" + state );
+							
+							removePeer( peer );
+						}
 					}
-				}
+				};
 			
 			function setLocalAndSendMessage(sessionDescription) {
 				 
@@ -203,36 +183,29 @@ control_ws.onmessage =
 				peer.setLocalDescription(sessionDescription); 
 			}
 			
-			var channel = peer.createDataChannel( "vuzedc" );
-			
-			channel.onopen = function () {
-				console.log("datachannel2 open");
-			};
-			
-			channel.onclose = function () {
-				console.log("datachannel2 close");
-			};
+			createChannel( peer, offer_id );
 				
-			channel.onerror = function () {
-				console.log("datachannel2 error");
-			};
+			if ( x.type == 'create_offer' ){
 				
-			channel.onmessage = 
-				function( event )
-				{
-					console.log( "datachannel2 message: " + ab2str( event.data ));
-				};
+				var offerOptions = {};
 				
-			var remoteSessionDescription = new browser_rtc.RTCSessionDescription( x );
+				peer.createOffer(setLocalAndSendMessage, null, offerOptions );
+				
+			}else{
 			
-			console.log( "offer: remote sdp: " + remoteSessionDescription );
-			
-			peer.setRemoteDescription( remoteSessionDescription );
-			
-			var answerOptions = {};
-			
-			peer.createAnswer(setLocalAndSendMessage, null, answerOptions );
-			
+				var browser_rtc = getBrowserRTC();
+				
+				var remoteSessionDescription = new browser_rtc.RTCSessionDescription( x );
+				
+				console.log( "offer: remote sdp: " + remoteSessionDescription );
+				
+				peer.setRemoteDescription( remoteSessionDescription );
+				
+				var answerOptions = {};
+				
+				peer.createAnswer(setLocalAndSendMessage, null, answerOptions );
+			}
+
 		}else if ( x.type == 'answer' ){
 	  
 			var peer = peers[offer_id];
@@ -261,3 +234,69 @@ control_ws.onopen =
 	{
 	}
 
+function createChannel( peer, offer_id )
+{
+	var channel = peer.createDataChannel( "vuzedc" );
+	
+	peer.vuzedc = channel;
+	
+	channel.onopen = function (){
+		console.log("datachannel open");
+		
+		var peer_ws = new WebSocket( ws_url_prefix + "?type=peer" + "&id=" + ws_id + "&offer_id=" + offer_id  );
+
+		peer_ws.onmessage = 
+			function( event ) 
+			{
+				console.log( "got message from peer_ws" );
+			};
+			
+		peer_ws.onerror = 
+			function( event )
+			{
+				console.log("peerws error");
+				
+				peer_ws.close();
+				
+				channel.close();
+			
+				removePeer( peer );
+			}
+		
+		peer_ws.onclose = 
+			function( event )
+			{
+				console.log("peerws close");
+				
+				channel.close();
+			
+				removePeer( peer );
+			}
+		
+		channel.onmessage = 
+			function( event )
+			{
+				console.log( "datachannel message: " + ab2str( event.data ));
+				
+				peer_ws.send( event.data );
+			};
+	};
+	
+	channel.onclose = 
+		function ()
+		{
+			console.log("datachannel close");
+		
+			removePeer( peer );
+		};
+		
+	channel.onerror = 
+		function () 
+		{
+			console.log("datachannel error");
+		
+			channel.close();
+			
+			removePeer( peer );
+		};
+}
