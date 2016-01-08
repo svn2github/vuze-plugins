@@ -56,7 +56,7 @@ JavaScriptProxyPeerBridge
 		
 		byte[] reserved = new byte[]{0, 0, 0, 0, 0, (byte)16, 0, 0 }; 
 		
-		System.arraycopy( reserved,0,fake_header_and_reserved,20, 8 );
+		System.arraycopy( reserved,0,fake_header_and_reserved, 20, 8 );
 	}
 	
 	private Map<JavaScriptProxyInstance,Connection>		peer_map = new HashMap<>();
@@ -169,7 +169,19 @@ JavaScriptProxyPeerBridge
 				
 					// we need to pass the peer_ip to the core so that it doesn't just see '127.0.0.1'
 				
-				mapping = AEProxyFactory.getAddressMapper().registerPortMapping( local_port, "websocket." + local_port );
+				String remote_ip = proxy.getRemoteIP();
+				
+				Debug.outNoStack( "remote-ip disabled for testing" );
+				//if ( remote_ip == null ){
+					
+					remote_ip = "websocket." + ( proxy.isIncoming()?1:0) + local_port;
+				//}
+				
+				Map<String,Object>	props = new HashMap<String, Object>();
+				
+				props.put( AEProxyAddressMapper.MAP_PROPERTY_DISABLE_AZ_MESSAGING, true );
+					
+				mapping = AEProxyFactory.getAddressMapper().registerPortMapping( local_port, remote_ip, props );
 				
 				InetAddress bind = NetworkAdmin.getSingleton().getSingleHomedServiceBindAddress();
 				
@@ -189,16 +201,17 @@ JavaScriptProxyPeerBridge
 					os.write( fake_header_and_reserved );
 					
 					os.write( proxy.getInfoHash());
-					
+					/*
 					byte[] peer_id = new byte[20];
 					
 					RandomUtils.nextBytes( peer_id );
 					
 					os.write( peer_id );
+					*/
 					
 					os.flush();
 					
-					to_skip = fake_header_and_reserved.length + 40;
+					to_skip = fake_header_and_reserved.length + 20;
 					
 				}
 				
@@ -221,7 +234,7 @@ JavaScriptProxyPeerBridge
 									break;
 								}
 								
-								if ( total_sent == 0 && len >= 68 ){
+								if ( total_sent == 11111 && len >= 68 ){
 									
 									proxy.sendPeerMessage( ByteBuffer.wrap( buffer, 0, 68 ));
 									

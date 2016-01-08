@@ -261,89 +261,41 @@ function setupChannel( peer, channel, offer_id, hash, incoming )
 	peer.vuzedc = channel;
 
 	channel.onopen = function (){
-		console.log("datachannel open: pid=" + peer.peerIdentity );
+		console.log("datachannel open" );
 		
-		var peer_ws = new WebSocket( ws_url_prefix + "?type=peer" + "&id=" + ws_id + "&offer_id=" + offer_id + "&hash=" + hash + "&incoming=" + incoming );
+		peer.getStats(
+			function( stats )
+			{
+				var remote_ip = "";
 
-		peer_ws.binaryType = "arraybuffer";
+				stats.result().forEach(
+					function( result ){
+						var item = {}
+						result.names().forEach(
+							function (name) {
+								item[name] = result.stat(name)
+							});
+						
+						item.id = result.id
+						item.type = result.type
+						item.timestamp = result.timestamp
+										
+						if ( item.type == 'remotecandidate' ){
+													
+							remote_ip += (remote_ip==""?"":",") + item.ipAddress;
+						}
+					});
+				
+				setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )	
+				
+				//console.log( items );
+			}, null, 
+			function( stats )
+			{
+				setupChannelWS( peer, channel, offer_id, hash, incoming, "" )
+			});
+		};
 		
-		peer_ws.onmessage = 
-			function( event ) 
-			{
-				//console.log( "got message from peer_ws" );
-				
-				var array_buffer = event.data;
-				
-				console.log( "datachannel send: " + ab2str( array_buffer ));
-				
-				try{
-					channel.send( array_buffer );
-				
-				}catch( err ){
-					
-					peer_ws.close();
-					
-					channel.close();
-				
-					removePeer( peer );
-				}
-				/*
-				var fr = new FileReader();
-				
-				fr.onload = function(){
-					
-					var array_buffer = this.result;
-					
-					console.log( "datachannel send: " + ab2str( array_buffer ));
-					
-					channel.send( array_buffer );
-				};
-				
-				fr.readAsArrayBuffer( event.data );	// it's a Blob		
-				*/
-			};
-			
-		peer_ws.onerror = 
-			function( event )
-			{
-				// console.log("peerws error");
-				
-				peer_ws.close();
-				
-				channel.close();
-			
-				removePeer( peer );
-			}
-		
-		peer_ws.onclose = 
-			function( event )
-			{
-				// console.log("peerws close");
-				
-				channel.close();
-			
-				removePeer( peer );
-			}
-		
-		channel.onmessage = 
-			function( event )
-			{
-				console.log( "datachannel recv: " + ab2str( event.data ));
-				
-				try{
-					peer_ws.send( event.data );
-					
-				}catch( err ){
-					
-					peer_ws.close();
-					
-					channel.close();
-				
-					removePeer( peer );
-				}
-			};
-	};
-	
 	channel.onclose = 
 		function ()
 		{
@@ -360,5 +312,88 @@ function setupChannel( peer, channel, offer_id, hash, incoming )
 			channel.close();
 			
 			removePeer( peer );
+		};
+}
+		
+function setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )
+{
+	var peer_ws = new WebSocket( ws_url_prefix + "?type=peer" + "&id=" + ws_id + "&offer_id=" + offer_id + "&hash=" + hash + "&incoming=" + incoming + "&remote=" + remote_ip );
+
+	peer_ws.binaryType = "arraybuffer";
+	
+	peer_ws.onmessage = 
+		function( event ) 
+		{
+			//console.log( "got message from peer_ws" );
+			
+			var array_buffer = event.data;
+			
+			console.log( "datachannel send: " + ab2str( array_buffer ));
+			
+			try{
+				channel.send( array_buffer );
+			
+			}catch( err ){
+				
+				peer_ws.close();
+				
+				channel.close();
+			
+				removePeer( peer );
+			}
+			/*
+			var fr = new FileReader();
+			
+			fr.onload = function(){
+				
+				var array_buffer = this.result;
+				
+				console.log( "datachannel send: " + ab2str( array_buffer ));
+				
+				channel.send( array_buffer );
+			};
+			
+			fr.readAsArrayBuffer( event.data );	// it's a Blob		
+			*/
+		};
+		
+	peer_ws.onerror = 
+		function( event )
+		{
+			// console.log("peerws error");
+			
+			peer_ws.close();
+			
+			channel.close();
+		
+			removePeer( peer );
+		}
+	
+	peer_ws.onclose = 
+		function( event )
+		{
+			// console.log("peerws close");
+			
+			channel.close();
+		
+			removePeer( peer );
+		}
+	
+	channel.onmessage = 
+		function( event )
+		{
+			console.log( "datachannel recv: " + ab2str( event.data ));
+			
+			try{
+				peer_ws.send( event.data );
+				
+			}catch( err ){
+				
+				peer_ws.close();
+				
+				channel.close();
+			
+				removePeer( peer );
+			}
 		};
 }

@@ -23,6 +23,7 @@
 package org.parg.azureus.plugins.webtorrent.impl;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -111,6 +112,7 @@ JavaScriptProxyInstance
     private long		instance_id;
     private long		offer_id;
     private boolean		is_peer;
+    private String		remote_ip;
     private boolean		is_incoming;
     private byte[]		info_hash;
     
@@ -133,6 +135,12 @@ JavaScriptProxyInstance
 	isIncoming()
 	{
 		return( is_incoming );
+	}
+	
+	protected String
+	getRemoteIP()
+	{
+		return( remote_ip );
 	}
 	
 	protected byte[]
@@ -167,13 +175,14 @@ JavaScriptProxyInstance
 		long		oid			= 0;
 		boolean		inc			= false;
 		byte[]		hash	 	= null;
+		String		remote		= "";
 		
 		for ( String arg: args ){
 			
 			String[]	bits = arg.split( "=" );
 			
 			String lhs 	= bits[0].trim();
-			String rhs	= bits[1].trim();
+			String rhs	= bits.length==1?"":bits[1].trim();
 			
 			if ( lhs.equals( "type" )){
 				
@@ -194,6 +203,10 @@ JavaScriptProxyInstance
 			}else if ( lhs.equals( "hash" )){
 					
 				hash = Base32.decode( rhs );
+				
+			}else if ( lhs.equals( "remote" )){
+				
+				remote = rhs.length()==0?null:rhs;
 			}
 		}
 		
@@ -210,6 +223,28 @@ JavaScriptProxyInstance
 			is_peer		= true;
 			is_incoming	= inc;
 			info_hash	= hash;
+			
+			if ( remote != null ){
+				
+				String[] ips = remote.split(",");
+				
+				for ( String ip: ips ){
+					
+					try{
+						InetAddress ia = InetAddress.getByName( ip );
+						
+						if ( 	ia.isLoopbackAddress() ||
+								ia.isLinkLocalAddress() ||
+								ia.isSiteLocalAddress() ){
+							
+						}else{
+							
+							remote_ip = ip;
+						}
+					}catch( Throwable e ){
+					}
+				}
+			}
 			
 			listener.peerCreated( this );
 		}

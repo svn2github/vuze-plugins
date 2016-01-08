@@ -35,14 +35,15 @@ import javax.websocket.EndpointConfig;
 import javax.websocket.MessageHandler;
 import javax.websocket.Session;
 
-import org.bouncycastle.jce.provider.JDKAlgorithmParameterGenerator.AES;
 import org.glassfish.tyrus.client.ClientManager;
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.BEncoder;
 import org.gudy.azureus2.core3.util.ByteArrayHashMap;
-import org.gudy.azureus2.core3.util.ByteFormatter;
+import org.gudy.azureus2.core3.util.ByteEncodedKeyHashMap;
+import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.SystemTime;
+import org.gudy.azureus2.pluginsimpl.local.clientid.ClientIDManagerImpl;
 import org.parg.azureus.plugins.webtorrent.JavaScriptProxy.Answer;
 import org.parg.azureus.plugins.webtorrent.JavaScriptProxy.Offer;
 
@@ -56,7 +57,8 @@ TrackerProxy
 	
 	private Map<String,ClientSession>	client_sessions = new HashMap<String, ClientSession>();
 
-	private ByteArrayHashMap<byte[]>	hash_to_peer_id_map = new ByteArrayHashMap<>();
+	private ByteArrayHashMap<byte[]>	hash_to_peer_id_map 		= new ByteArrayHashMap<>();
+	private ByteArrayHashMap<byte[]>	hash_to_scrape_peer_id_map 	= new ByteArrayHashMap<>();
 	
 	protected
 	TrackerProxy(
@@ -120,14 +122,50 @@ TrackerProxy
 				}		
 			}
 			
-			synchronized( hash_to_peer_id_map ){
-			
-				hash_to_peer_id_map.put( info_hash, peer_id );
+			if ( info_hash == null ){
+				
+				throw( new Exception( "hash missing" ));
 			}
 			
-			Offer	offer = listener.getOffer( info_hash, 60*1000 );
+			boolean	is_stop = event != null && event.equals( "stopped" );
 			
-			if ( offer != null ){
+			final boolean scrape = peer_id == null;
+			
+			Offer	offer;
+			
+			if ( scrape ){
+				
+				offer = null;
+				
+				synchronized( hash_to_scrape_peer_id_map ){
+					
+					peer_id = hash_to_scrape_peer_id_map.get( info_hash );
+					
+					if ( peer_id == null ){
+				
+						peer_id = ClientIDManagerImpl.getSingleton().generatePeerID( info_hash, true );
+						
+						hash_to_scrape_peer_id_map.put( info_hash, peer_id );
+					}
+				}
+			}else{
+				
+				synchronized( hash_to_peer_id_map ){
+				
+					hash_to_peer_id_map.put( info_hash, peer_id );
+				}
+				
+				if ( is_stop ){
+				
+					offer = null;
+					
+				}else{
+					
+					offer = listener.getOffer( info_hash, 60*1000 );
+				}
+			}
+			
+			if ( offer != null || scrape || is_stop ){
 				
 												
 				/*
@@ -166,7 +204,7 @@ TrackerProxy
 				
 					// roll it by hand, something in the above fucks up
 				
-				String offer_str = "{\"offer\":{\"type\":\"offer\",\"sdp\":\"" + encodeCrap( offer.getSDP()) + "\"},\"offer_id\":\"" + offer.getOfferID() + "\"}";
+				String offer_str = offer==null?"":"{\"offer\":{\"type\":\"offer\",\"sdp\":\"" + encodeCrap( offer.getSDP()) + "\"},\"offer_id\":\"" + offer.getOfferID() + "\"}";
 				
 	        	final String announce = 
 	        			"{\"numwant\":" + numwant + 
@@ -267,37 +305,39 @@ TrackerProxy
 				                            				peer_id = hash_to_peer_id_map.get( hash );
 				                            			}
 				                            			
-				                            			listener.gotOffer( 
-				                            				hash, 
-				                            				offer_id, 
-				                            				sdp,
-				                            				new JavaScriptProxy.AnswerListener() {
-																
-																@Override
-																public void 
-																gotAnswer(
-																	Answer answer ) 
-																{
-																	String answer_str = "{\"answer\":{\"type\":\"answer\",\"sdp\":\"" + 
-																			encodeCrap( answer.getSDP()) + "\"}," + 
-																			"\"offer_id\":\"" + encodeCrap( answer.getOfferID()) + "\"," + 
-																			"\"peer_id\":\"" + encodeCrap( peer_id ) + "\"," + 
-																			"\"to_peer_id\":\"" + to_peer_id + "\"," + 
-																			"\"info_hash\":\"" + encodeCrap( hash ) + "\"" + 
-																			"}";
-
-																	// System.out.println( answer_str );
+				                            			if ( peer_id != null ){
+				                            				
+					                            			listener.gotOffer( 
+					                            				hash, 
+					                            				offer_id, 
+					                            				sdp,
+					                            				new JavaScriptProxy.AnswerListener() {
 																	
-																	try{
-																		session.getBasicRemote().sendText( answer_str );
+																	@Override
+																	public void 
+																	gotAnswer(
+																		Answer answer ) 
+																	{
+																		String answer_str = "{\"answer\":{\"type\":\"answer\",\"sdp\":\"" + 
+																				encodeCrap( answer.getSDP()) + "\"}," + 
+																				"\"offer_id\":\"" + encodeCrap( answer.getOfferID()) + "\"," + 
+																				"\"peer_id\":\"" + encodeCrap( peer_id ) + "\"," + 
+																				"\"to_peer_id\":\"" + to_peer_id + "\"," + 
+																				"\"info_hash\":\"" + encodeCrap( hash ) + "\"" + 
+																				"}";
+	
+																		// System.out.println( answer_str );
 																		
-																	 }catch( Throwable e ){
-									                            			
-										                            		Debug.out( e );
-																	 }
-																}
-															});
-				                            			
+																		try{
+																			session.getBasicRemote().sendText( answer_str );
+																			
+																		 }catch( Throwable e ){
+										                            			
+											                            		Debug.out( e );
+																		 }
+																	}
+																});
+				                            			}
 				                            		}catch( Throwable e ){
 				                            			
 				                            			Debug.out( e );
@@ -391,12 +431,30 @@ TrackerProxy
 					throw( new Exception( "Timeout" ));
 				}
 				
-				byte[] x = BEncoder.encode( reply );
+				byte[] reply_bytes;
+				
+				if ( scrape ){
+					
+					Map<String,Object>	root = new HashMap<>();
+					
+					ByteEncodedKeyHashMap<String, Object>	files = new ByteEncodedKeyHashMap<>();
+					
+					root.put( "files", files );
+					
+					files.put( new String( info_hash,Constants.BYTE_ENCODING ), reply );
+					
+					reply_bytes = BEncoder.encode( root );
+					
+				}else{
+					
+					reply_bytes = BEncoder.encode( reply );
+				}
+				
 				
 				String[] reply_lines = {
 						
 						"HTTP/1.1 200 OK",
-						"Content-Length: " + x.length,
+						"Content-Length: " + reply_bytes.length,
 						"Connection: close"
 				};
 				
@@ -407,7 +465,7 @@ TrackerProxy
 				
 				os.write( "\r\n" .getBytes( "ISO-8859-1" ));
 				
-				os.write( x );
+				os.write( reply_bytes );
 				
 			}else{
 				

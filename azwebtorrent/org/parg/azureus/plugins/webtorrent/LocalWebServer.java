@@ -321,9 +321,7 @@ LocalWebServer
 					}
 				}
 			}catch( Throwable e ){
-				
-				e.printStackTrace();
-				
+								
 			}finally{
 				
 				try{
