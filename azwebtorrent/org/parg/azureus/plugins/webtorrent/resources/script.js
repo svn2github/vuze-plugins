@@ -169,7 +169,9 @@ control_ws.onmessage =
 						}
 					}
 				};
-			
+				
+			createChannel( peer, offer_id, hash, x.type == 'offer' );
+
 			function setLocalAndSendMessage(sessionDescription) {
 				 
 				var message = {};
@@ -183,9 +185,7 @@ control_ws.onmessage =
 								
 				peer.setLocalDescription(sessionDescription); 
 			}
-			
-			createChannel( peer, offer_id, hash, x.type == 'offer' );
-				
+							
 			if ( x.type == 'create_offer' ){
 				
 				var offerOptions = {};
@@ -237,12 +237,29 @@ control_ws.onopen =
 
 function createChannel( peer, offer_id, hash, incoming )
 {
-	var channel = peer.createDataChannel( "vuzedc." + offer_id );
-	
+	if ( incoming ){
+		
+		peer.ondatachannel = 
+			function( event )
+			{
+				console.log( "ondatachannel" );
+				
+				setupChannel( peer, event.channel, offer_id, hash, incoming );
+			}
+	}else{
+
+		var channel = peer.createDataChannel( "vuzedc." + offer_id );
+		
+		setupChannel( peer, channel, offer_id, hash, incoming );
+	}
+}
+
+function setupChannel( peer, channel, offer_id, hash, incoming )
+{	
 	channel.binaryType = "arraybuffer";
 	
 	peer.vuzedc = channel;
-	
+
 	channel.onopen = function (){
 		console.log("datachannel open: pid=" + peer.peerIdentity );
 		
