@@ -125,7 +125,7 @@ TrackerProxy
 				hash_to_peer_id_map.put( info_hash, peer_id );
 			}
 			
-			Offer	offer = listener.getOffer( 60*1000 );
+			Offer	offer = listener.getOffer( info_hash, 60*1000 );
 			
 			if ( offer != null ){
 				
@@ -508,6 +508,7 @@ TrackerProxy
     {
     	public JavaScriptProxy.Offer
     	getOffer(
+    		byte[]		hash,
     		long		timeout );
     	
     	public void

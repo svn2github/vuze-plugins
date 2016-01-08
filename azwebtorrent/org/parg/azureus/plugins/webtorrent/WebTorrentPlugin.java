@@ -59,9 +59,10 @@ WebTorrentPlugin
 					{
 				    	public JavaScriptProxy.Offer
 				    	getOffer(
+				    		byte[]		hash,
 				    		long		timeout )
 				    	{
-				    		return( js_proxy.getOffer( timeout ));
+				    		return( js_proxy.getOffer( hash, timeout ));
 				    	}
 				    	
 				    	public void
@@ -84,7 +85,7 @@ WebTorrentPlugin
 				    		
 				    		throws Exception
 				    	{
-				    		js_proxy.gotOffer( offer_id, sdp, listener );
+				    		js_proxy.gotOffer( hash, offer_id, sdp, listener );
 				    	}
 					});
 			

@@ -30,7 +30,9 @@ import java.util.Map;
 
 
 
+
 import org.gudy.azureus2.core3.util.AESemaphore;
+import org.gudy.azureus2.core3.util.Base32;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.SimpleTimer;
@@ -50,7 +52,7 @@ JavaScriptProxyImpl
 	
 	private static volatile JavaScriptProxyImpl	current_proxy;
 	
-	
+	private static JavaScriptProxyPeerBridge	peer_bridge = new JavaScriptProxyPeerBridge();
 	
 	private final long	instance_id;	
 	
@@ -109,7 +111,7 @@ JavaScriptProxyImpl
 					    	peerCreated(
 					    		JavaScriptProxyInstance		inst )
 					    	{
-								addPeer( inst );
+								peer_bridge.addPeer( inst );
 					    	}
 					    	
 							@Override
@@ -118,7 +120,7 @@ JavaScriptProxyImpl
 					    		JavaScriptProxyInstance		inst,
 					    		ByteBuffer					message )
 					    	{
-								
+								peer_bridge.receive( inst, message );
 					    	}
 					    	
 							@Override
@@ -126,7 +128,7 @@ JavaScriptProxyImpl
 					    	peerDestroyed(
 					    		JavaScriptProxyInstance		inst )
 					    	{
-								
+								peer_bridge.removePeer( inst );
 					    	}
 						});
 				
@@ -235,6 +237,7 @@ JavaScriptProxyImpl
 	@Override
 	public Offer 
 	getOffer(
+		byte[]		info_hash,
 		long		timeout )
 	{
 		if ( current_instance_sem.reserve( timeout )){
@@ -272,6 +275,7 @@ JavaScriptProxyImpl
 				Map<String,Object>	message = new HashMap<>();
 					
 				message.put( "type", "create_offer" );
+				message.put( "info_hash", Base32.encode( info_hash ));
 				message.put( "offer_id", offer_id );
 					
 				inst.sendControlMessage( message );
@@ -337,6 +341,7 @@ JavaScriptProxyImpl
 	@Override
 	public void 
 	gotOffer(
+		byte[]							info_hash,
 		String 							external_offer_id, 
 		String 							sdp,
 		JavaScriptProxy.AnswerListener	listener )
@@ -377,6 +382,7 @@ JavaScriptProxyImpl
 				
 				to_send.put( "type", "offer" );
 				to_send.put( "offer_id", internal_offer_id );
+				to_send.put( "info_hash", Base32.encode( info_hash ));
 				to_send.put( "sdp", sdp );
 			
 				inst.sendControlMessage( to_send );

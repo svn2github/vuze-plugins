@@ -39,6 +39,7 @@ import javax.websocket.Session;
 import javax.websocket.server.ServerEndpoint;
 
 import org.glassfish.tyrus.server.Server;
+import org.gudy.azureus2.core3.util.Base32;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.RandomUtils;
 
@@ -110,6 +111,8 @@ JavaScriptProxyInstance
     private long		instance_id;
     private long		offer_id;
     private boolean		is_peer;
+    private boolean		is_incoming;
+    private byte[]		info_hash;
     
     private Session		session;
     private boolean		destroyed;
@@ -124,6 +127,18 @@ JavaScriptProxyInstance
 	getOfferID()
 	{
 		return( offer_id );
+	}
+	
+	protected boolean
+	isIncoming()
+	{
+		return( is_incoming );
+	}
+	
+	protected byte[]
+	getInfoHash()
+	{
+		return( info_hash );
 	}
 	
 	protected boolean
@@ -147,9 +162,11 @@ JavaScriptProxyInstance
 		
 		String[] args = query.split( "&" );
 		
-		String	type 		= null;
-		long	id			= -1;
-		long	oid			= 0;
+		String		type 		= null;
+		long		id			= -1;
+		long		oid			= 0;
+		boolean		inc			= false;
+		byte[]		hash	 	= null;
 		
 		for ( String arg: args ){
 			
@@ -169,6 +186,14 @@ JavaScriptProxyInstance
 			}else if ( lhs.equals( "offer_id" )){
 				
 				oid = Long.parseLong( rhs );
+				
+			}else if ( lhs.equals( "incoming" )){
+				
+				inc	= rhs.equals( "true" );		
+			
+			}else if ( lhs.equals( "hash" )){
+					
+				hash = Base32.decode( rhs );
 			}
 		}
 		
@@ -183,6 +208,8 @@ JavaScriptProxyInstance
 			instance_id	= id;
 			offer_id	= oid;
 			is_peer		= true;
+			is_incoming	= inc;
+			info_hash	= hash;
 			
 			listener.peerCreated( this );
 		}

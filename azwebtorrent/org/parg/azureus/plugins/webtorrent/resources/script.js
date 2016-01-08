@@ -121,8 +121,9 @@ control_ws.onmessage =
 		
 		console.log( x );
 
-		var	offer_id = x.offer_id;
-
+		var	offer_id	= x.offer_id;
+		var	hash		= x.info_hash;
+		
 		if ( x.type == 'create_offer' || x.type == 'offer' ){
 		  						
 			var peer = createPeer( offer_id );
@@ -183,7 +184,7 @@ control_ws.onmessage =
 				peer.setLocalDescription(sessionDescription); 
 			}
 			
-			createChannel( peer, offer_id );
+			createChannel( peer, offer_id, hash, x.type == 'offer' );
 				
 			if ( x.type == 'create_offer' ){
 				
@@ -234,27 +235,61 @@ control_ws.onopen =
 	{
 	}
 
-function createChannel( peer, offer_id )
+function createChannel( peer, offer_id, hash, incoming )
 {
-	var channel = peer.createDataChannel( "vuzedc" );
+	var channel = peer.createDataChannel( "vuzedc." + offer_id );
+	
+	channel.binaryType = "arraybuffer";
 	
 	peer.vuzedc = channel;
 	
 	channel.onopen = function (){
-		console.log("datachannel open");
+		console.log("datachannel open: pid=" + peer.peerIdentity );
 		
-		var peer_ws = new WebSocket( ws_url_prefix + "?type=peer" + "&id=" + ws_id + "&offer_id=" + offer_id  );
+		var peer_ws = new WebSocket( ws_url_prefix + "?type=peer" + "&id=" + ws_id + "&offer_id=" + offer_id + "&hash=" + hash + "&incoming=" + incoming );
 
+		peer_ws.binaryType = "arraybuffer";
+		
 		peer_ws.onmessage = 
 			function( event ) 
 			{
-				console.log( "got message from peer_ws" );
+				//console.log( "got message from peer_ws" );
+				
+				var array_buffer = event.data;
+				
+				console.log( "datachannel send: " + ab2str( array_buffer ));
+				
+				try{
+					channel.send( array_buffer );
+				
+				}catch( err ){
+					
+					peer_ws.close();
+					
+					channel.close();
+				
+					removePeer( peer );
+				}
+				/*
+				var fr = new FileReader();
+				
+				fr.onload = function(){
+					
+					var array_buffer = this.result;
+					
+					console.log( "datachannel send: " + ab2str( array_buffer ));
+					
+					channel.send( array_buffer );
+				};
+				
+				fr.readAsArrayBuffer( event.data );	// it's a Blob		
+				*/
 			};
 			
 		peer_ws.onerror = 
 			function( event )
 			{
-				console.log("peerws error");
+				// console.log("peerws error");
 				
 				peer_ws.close();
 				
@@ -266,7 +301,7 @@ function createChannel( peer, offer_id )
 		peer_ws.onclose = 
 			function( event )
 			{
-				console.log("peerws close");
+				// console.log("peerws close");
 				
 				channel.close();
 			
@@ -276,16 +311,26 @@ function createChannel( peer, offer_id )
 		channel.onmessage = 
 			function( event )
 			{
-				console.log( "datachannel message: " + ab2str( event.data ));
+				console.log( "datachannel recv: " + ab2str( event.data ));
 				
-				peer_ws.send( event.data );
+				try{
+					peer_ws.send( event.data );
+					
+				}catch( err ){
+					
+					peer_ws.close();
+					
+					channel.close();
+				
+					removePeer( peer );
+				}
 			};
 	};
 	
 	channel.onclose = 
 		function ()
 		{
-			console.log("datachannel close");
+			// console.log("datachannel close");
 		
 			removePeer( peer );
 		};
@@ -293,7 +338,7 @@ function createChannel( peer, offer_id )
 	channel.onerror = 
 		function () 
 		{
-			console.log("datachannel error");
+			// console.log("datachannel error");
 		
 			channel.close();
 			

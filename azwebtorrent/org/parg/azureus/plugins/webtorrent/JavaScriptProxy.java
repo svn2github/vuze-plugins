@@ -30,6 +30,7 @@ JavaScriptProxy
 	
 	public Offer
 	getOffer(
+		byte[]		info_hash,
 		long		timeout );
 	
 	public void
@@ -39,6 +40,7 @@ JavaScriptProxy
 	
 	public void
 	gotOffer(
+		byte[]			info_hash,
 		String			offer_id,
 		String			sdp,
 		AnswerListener	listener );
