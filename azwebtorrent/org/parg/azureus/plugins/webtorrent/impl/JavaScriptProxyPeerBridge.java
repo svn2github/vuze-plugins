@@ -180,6 +180,7 @@ JavaScriptProxyPeerBridge
 				Map<String,Object>	props = new HashMap<String, Object>();
 				
 				props.put( AEProxyAddressMapper.MAP_PROPERTY_DISABLE_AZ_MESSAGING, true );
+				props.put( AEProxyAddressMapper.MAP_PROPERTY_PROTOCOL_QUALIFIER, "WebSocket" );
 					
 				mapping = AEProxyFactory.getAddressMapper().registerPortMapping( local_port, remote_ip, props );
 				

@@ -19,6 +19,14 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
  */
 
+var trace_on = false;
+
+function trace( str ){
+	if ( trace_on ){
+		console.log( str );
+	}
+}
+
 function ab2str(buf) {
   return String.fromCharCode.apply(null, new Uint8Array(buf));
 }
@@ -92,7 +100,7 @@ function addPeer( peer )
 	
 	peers[ offer_id ] = peer;
 	
-	console.log( "addPeer: " + offer_id + " -> " + Object.keys(peers).length );
+	trace( "addPeer: " + offer_id + " -> " + Object.keys(peers).length );
 }
 
 function removePeer( peer )
@@ -105,7 +113,7 @@ function removePeer( peer )
 		
 		delete peers[ peer.offer_id ];
 		
-		console.log( "removePeer: " + offer_id + " -> " + Object.keys(peers).length );
+		trace( "removePeer: " + offer_id + " -> " + Object.keys(peers).length );
 	}
 }
 
@@ -119,7 +127,7 @@ control_ws.onmessage =
 			return;
 		}
 		
-		console.log( x );
+		trace( x );
 
 		var	offer_id	= x.offer_id;
 		var	hash		= x.info_hash;
@@ -157,13 +165,13 @@ control_ws.onmessage =
 				function (event) 
 				{ 
 					var state = peer.iceConnectionState;
-					console.log( "ice_state=" + state );
+					trace( "ice_state=" + state );
 					
 					if ( state == 'failed' || state == 'closed' ){
 						
 						if ( peers[ offer_id ] ){
 							
-							console.log( "icestate->" + state );
+							trace( "icestate->" + state );
 							
 							removePeer( peer );
 						}
@@ -198,7 +206,7 @@ control_ws.onmessage =
 				
 				var remoteSessionDescription = new browser_rtc.RTCSessionDescription( x );
 				
-				console.log( "offer: remote sdp: " + remoteSessionDescription );
+				trace( "offer: remote sdp: " + remoteSessionDescription );
 				
 				peer.setRemoteDescription( remoteSessionDescription );
 				
@@ -217,7 +225,7 @@ control_ws.onmessage =
 	
 				var remoteSessionDescription = new browser_rtc.RTCSessionDescription( x );
 			
-				console.log( "answer: remote sdp: " + remoteSessionDescription );
+				trace( "answer: remote sdp: " + remoteSessionDescription );
 			  
 				peer.setRemoteDescription( remoteSessionDescription );
 			}	
@@ -227,7 +235,7 @@ control_ws.onmessage =
 control_ws.onerror = 
 	function( event )
 	{
-	  console.log(event);
+	  trace(event);
 	}
 
 control_ws.onopen = 
@@ -242,7 +250,7 @@ function createChannel( peer, offer_id, hash, incoming )
 		peer.ondatachannel = 
 			function( event )
 			{
-				console.log( "ondatachannel" );
+				trace( "ondatachannel" );
 				
 				setupChannel( peer, event.channel, offer_id, hash, incoming );
 			}
@@ -261,7 +269,7 @@ function setupChannel( peer, channel, offer_id, hash, incoming )
 	peer.vuzedc = channel;
 
 	channel.onopen = function (){
-		console.log("datachannel open" );
+		trace("datachannel open" );
 		
 		peer.getStats(
 			function( stats )
@@ -288,7 +296,7 @@ function setupChannel( peer, channel, offer_id, hash, incoming )
 				
 				setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )	
 				
-				//console.log( items );
+				//trace( items );
 			}, null, 
 			function( stats )
 			{
@@ -299,7 +307,7 @@ function setupChannel( peer, channel, offer_id, hash, incoming )
 	channel.onclose = 
 		function ()
 		{
-			// console.log("datachannel close");
+			// trace("datachannel close");
 		
 			removePeer( peer );
 		};
@@ -307,7 +315,7 @@ function setupChannel( peer, channel, offer_id, hash, incoming )
 	channel.onerror = 
 		function () 
 		{
-			// console.log("datachannel error");
+			// trace("datachannel error");
 		
 			channel.close();
 			
@@ -324,11 +332,13 @@ function setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )
 	peer_ws.onmessage = 
 		function( event ) 
 		{
-			//console.log( "got message from peer_ws" );
+			//trace( "got message from peer_ws" );
 			
 			var array_buffer = event.data;
 			
-			console.log( "datachannel send: " + ab2str( array_buffer ));
+			if ( trace_on ){
+				trace( "datachannel send: " + ab2str( array_buffer ));
+			}
 			
 			try{
 				channel.send( array_buffer );
@@ -348,7 +358,7 @@ function setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )
 				
 				var array_buffer = this.result;
 				
-				console.log( "datachannel send: " + ab2str( array_buffer ));
+				trace( "datachannel send: " + ab2str( array_buffer ));
 				
 				channel.send( array_buffer );
 			};
@@ -360,7 +370,7 @@ function setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )
 	peer_ws.onerror = 
 		function( event )
 		{
-			// console.log("peerws error");
+			// trace("peerws error");
 			
 			peer_ws.close();
 			
@@ -372,7 +382,7 @@ function setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )
 	peer_ws.onclose = 
 		function( event )
 		{
-			// console.log("peerws close");
+			// trace("peerws close");
 			
 			channel.close();
 		
@@ -382,7 +392,9 @@ function setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )
 	channel.onmessage = 
 		function( event )
 		{
-			console.log( "datachannel recv: " + ab2str( event.data ));
+			if ( trace_on ){
+				trace( "datachannel recv: " + ab2str( event.data ));
+			}
 			
 			try{
 				peer_ws.send( event.data );
