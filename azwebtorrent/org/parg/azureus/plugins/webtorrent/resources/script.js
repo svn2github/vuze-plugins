@@ -80,6 +80,38 @@ var control_ws = new WebSocket( ws_url_prefix + "?type=control" + "&id=" + ws_id
 
 var peers = {};
 
+var timer = 
+	setInterval(
+		function()
+		{
+			var now = new Date().getTime();
+			
+			for ( var offer_id in peers ){
+				
+			    if( peers.hasOwnProperty(offer_id)){
+			    	
+			    	var peer = peers[offer_id];
+			    	
+			    	var age = now - peer.create_time;
+			    	
+			    	if ( age > 2*60*1000 ){
+			    	
+			    		var ice_state = peer.iceConnectionState;
+
+			    		if ( ice_state == 'connected' || ice_state == 'completed' || ice_state == 'disconnected' ){
+			    			
+			    			// looks ok
+			    			
+			    		}else{
+			    			
+			    			removePeer( peer );
+			    		}
+			    	}
+			    	
+			    	trace( offer_id + ": age=" + age + ", state=" + ice_state );
+			    } 
+			  }  
+		}, 15000 );
 
 function createPeer( offer_id )
 {
@@ -88,7 +120,7 @@ function createPeer( offer_id )
 	var peer = new browser_rtc.RTCPeerConnection( peer_config );
 		
 	peer.offer_id = offer_id;
-	
+		
 	addPeer( peer );
 	
 	return( peer );
@@ -98,9 +130,24 @@ function addPeer( peer )
 {	
 	var offer_id = peer.offer_id;
 	
+	peer.create_time = new Date().getTime();
+
 	peers[ offer_id ] = peer;
 	
 	trace( "addPeer: " + offer_id + " -> " + Object.keys(peers).length );
+}
+
+function havePeer( peer ){
+	var offer_id = peer.offer_id;
+	
+	if ( peers[ offer_id ] ){
+		
+		return( true );
+		
+	}else{
+		
+		return( false );
+	}
 }
 
 function removePeer( peer )
@@ -109,7 +156,35 @@ function removePeer( peer )
 	
 	if ( peers[ offer_id ] ){
 		
-		peer.close();
+		var channel = peer.vuzedc;
+		
+		if ( channel ){
+			
+			try{
+				channel.close();
+				
+			}catch( err ){				
+			}
+		}
+		
+		var ws = peer.vuzews;
+		
+		if ( ws ){
+			
+			if ( ws.readyState != WebSocket.CONNECTING ){
+				try{
+					ws.close();
+					
+				}catch( err ){	
+				}
+			}
+		}
+		
+		try{
+			peer.close();
+		
+		}catch( err ){
+		}
 		
 		delete peers[ peer.offer_id ];
 		
@@ -316,9 +391,7 @@ function setupChannel( peer, channel, offer_id, hash, incoming )
 		function () 
 		{
 			// trace("datachannel error");
-		
-			channel.close();
-			
+					
 			removePeer( peer );
 		};
 }
@@ -327,6 +400,8 @@ function setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )
 {
 	var peer_ws = new WebSocket( ws_url_prefix + "?type=peer" + "&id=" + ws_id + "&offer_id=" + offer_id + "&hash=" + hash + "&incoming=" + incoming + "&remote=" + remote_ip );
 
+	peer.vuzews = peer_ws;
+	
 	peer_ws.binaryType = "arraybuffer";
 	
 	peer_ws.onmessage = 
@@ -344,11 +419,7 @@ function setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )
 				channel.send( array_buffer );
 			
 			}catch( err ){
-				
-				peer_ws.close();
-				
-				channel.close();
-			
+								
 				removePeer( peer );
 			}
 			/*
@@ -371,11 +442,7 @@ function setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )
 		function( event )
 		{
 			// trace("peerws error");
-			
-			peer_ws.close();
-			
-			channel.close();
-		
+						
 			removePeer( peer );
 		}
 	
@@ -383,10 +450,21 @@ function setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )
 		function( event )
 		{
 			// trace("peerws close");
-			
-			channel.close();
-		
+						
 			removePeer( peer );
+		}
+	
+	peer_ws.onopen = 
+		function( event )
+		{
+			if ( !havePeer( peer )){
+				
+				try{
+					peer_ws.close();
+					
+				}catch( err ){
+				}
+			}
 		}
 	
 	channel.onmessage = 
@@ -397,14 +475,18 @@ function setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )
 			}
 			
 			try{
-				peer_ws.send( event.data );
+				var state = peer_ws.readyState;
 				
+				if ( state == WebSocket.CONNECTING || state == WebSocket.OPEN ){
+					
+					peer_ws.send( event.data );
+					
+				}else{
+					
+					removePeer( peer );
+				}
 			}catch( err ){
-				
-				peer_ws.close();
-				
-				channel.close();
-			
+							
 				removePeer( peer );
 			}
 		};

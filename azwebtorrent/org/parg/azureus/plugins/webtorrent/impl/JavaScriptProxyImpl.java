@@ -86,6 +86,8 @@ JavaScriptProxyImpl
 							controlCreated(
 								JavaScriptProxyInstance inst ) 
 							{
+								peer_bridge.reset();
+								
 								current_proxy.instanceCreated( inst );
 							}
 							

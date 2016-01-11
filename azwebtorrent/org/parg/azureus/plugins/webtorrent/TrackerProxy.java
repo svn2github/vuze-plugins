@@ -233,6 +233,8 @@ TrackerProxy
 			
 				if ( client_session != null ){
 					
+					//System.out.println( "announce: old connection to " + ws_url + ": " + announce);
+					
 					client_session.send( announce );
 					
 				}else{
@@ -260,7 +262,7 @@ TrackerProxy
 				                            onMessage(
 				                            	String message ) 
 				                            {
-				                                System.out.println("Received message: " + message);
+				                               // System.out.println("Received message: " + message);
 	
 				                            	Map map = JSONUtils.decodeJSON( message );
 				                            			                            	
@@ -326,7 +328,7 @@ TrackerProxy
 																				"\"info_hash\":\"" + encodeCrap( hash ) + "\"" + 
 																				"}";
 	
-																		// System.out.println( answer_str );
+																		//System.out.println( answer_str );
 																		
 																		try{
 																			session.getBasicRemote().sendText( answer_str );
@@ -367,7 +369,9 @@ TrackerProxy
 				                            	}                              
 				                            }
 				                        });
-				                      				                    	
+				                      		
+				                        // System.out.println( "announce: new connection to " + ws_url + announce );
+				                        
 				                        session.getBasicRemote().sendText( announce );
 				                        
 				                    }catch( IOException e ){
@@ -511,9 +515,12 @@ TrackerProxy
 
 		for ( byte b: bytes ){
 
-			if ( Character.isLetterOrDigit((char)b)){
+			char c = (char)b;
+			
+			if ( Character.isLetterOrDigit((char)b) || " {}:.=-\"".indexOf( c ) != -1){
 
-				str += (char)b;
+				str += c;
+				
 			}else{
 				int	code = b&0xff;
 
@@ -539,7 +546,7 @@ TrackerProxy
     	
     	for (char c: str_in.toCharArray()){
     		
-    		if ( Character.isLetterOrDigit(c)){
+    		if ( Character.isLetterOrDigit( c ) || " {}:.=-\"".indexOf( c ) != -1){
     		
     			str += c;
     			

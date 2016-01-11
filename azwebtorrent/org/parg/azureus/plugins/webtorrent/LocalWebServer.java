@@ -257,7 +257,7 @@ LocalWebServer
 				
 				String	get = lines_in[0];
 				
-				System.out.println( "Got request: " + get );
+				//System.out.println( "Got request: " + get );
 				
 				String resource 		= null;
 				String content_type 	= null;

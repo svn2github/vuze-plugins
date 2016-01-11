@@ -164,7 +164,7 @@ JavaScriptProxyInstance
     {
 		session = _session;
 		
-		System.out.println( "onOpen: " + session );
+		//System.out.println( "onOpen: " + session );
 		
 		String query = session.getRequestURI().getQuery();
 		

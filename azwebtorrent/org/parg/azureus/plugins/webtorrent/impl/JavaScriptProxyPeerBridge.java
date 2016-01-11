@@ -71,7 +71,7 @@ JavaScriptProxyPeerBridge
 		
 			peer_map.put( peer, connection );
 			
-			System.out.println( "addPeer: " + peer.getOfferID() + ", peers=" + peer_map.size());
+			//System.out.println( "addPeer: " + peer.getOfferID() + ", peers=" + peer_map.size());
 
 		}
 		
@@ -97,13 +97,37 @@ JavaScriptProxyPeerBridge
 			
 			if ( connection != null ){
 			
-				System.out.println( "removePeer: " + peer.getOfferID() + ", peers=" + peer_map.size());
+				//System.out.println( "removePeer: " + peer.getOfferID() + ", peers=" + peer_map.size());
 			}
 		}
 		
 		if ( connection != null ){
 			
 			connection.destroy();
+		}
+	}
+	
+	public void
+	reset()
+	{
+		List<Connection>	connections;
+	
+		synchronized( peer_map ){
+
+			connections = new ArrayList<>( peer_map.values());
+			
+			peer_map.clear();
+		}
+		
+		for ( Connection c: connections ){
+			
+			try{
+				
+				c.destroy();
+				
+			}catch( Throwable e ){
+				
+			}
 		}
 	}
 	
@@ -171,11 +195,12 @@ JavaScriptProxyPeerBridge
 				
 				String remote_ip = proxy.getRemoteIP();
 				
-				Debug.outNoStack( "remote-ip disabled for testing" );
-				//if ( remote_ip == null ){
+				//Debug.outNoStack( "remote-ip disabled for testing" );
+				
+				if ( remote_ip == null ){
 					
 					remote_ip = "websocket." + ( proxy.isIncoming()?1:0) + local_port;
-				//}
+				}
 				
 				Map<String,Object>	props = new HashMap<String, Object>();
 				
