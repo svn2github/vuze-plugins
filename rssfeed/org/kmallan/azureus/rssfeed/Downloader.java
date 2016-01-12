@@ -20,7 +20,10 @@
 
 package org.kmallan.azureus.rssfeed;
 
+import org.gudy.azureus2.core3.security.SESecurityManager;
 import org.gudy.azureus2.core3.util.Constants;
+import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.RandomUtils;
 
 import com.aelitis.azureus.core.proxy.AEProxyFactory;
 import com.aelitis.azureus.core.proxy.AEProxyFactory.PluginProxy;
@@ -158,7 +161,12 @@ public class Downloader extends InputStream {
 		  
 		  synchronized( listeners ){
 
-			  for (int i=0;i<2;i++){
+			  boolean	first_effort		= true;
+			  
+			  boolean	cert_hack 			= false;
+			  boolean	internal_error_hack	= false;
+			  
+			  while( true ){
 				  
 				  PluginProxy plugin_proxy = null;
 				  
@@ -192,10 +200,27 @@ public class Downloader extends InputStream {
 							  sslCon = (HttpsURLConnection)url.openConnection( proxy );
 						  }
 
-						  // allow for certs that contain IP addresses rather than dns names
-						  sslCon.setHostnameVerifier(new HostnameVerifier() {
-							  public boolean verify(String host, SSLSession session) {return true;}
-						  });
+						  if ( !first_effort ){
+							  
+							  TrustManager[] trustAllCerts = SESecurityManager.getAllTrustingTrustManager();
+
+							  try{
+								  SSLContext sc = SSLContext.getInstance("SSL");
+
+								  sc.init(null, trustAllCerts, RandomUtils.SECURE_RANDOM);
+
+								  SSLSocketFactory factory = sc.getSocketFactory();
+
+								  sslCon.setSSLSocketFactory( factory );
+
+							  }catch( Throwable e ){
+							  }
+						  }else{
+							  	// allow for certs that contain IP addresses rather than dns names
+							  sslCon.setHostnameVerifier(new HostnameVerifier() {
+								  public boolean verify(String host, SSLSession session) {return true;}
+							  });
+						  }
 						  con = sslCon;
 						  
 					  } else {
@@ -310,14 +335,31 @@ public class Downloader extends InputStream {
 					  break;
 				  }catch( SSLException e ){
 
-					  if ( i == 0 ){
+					  first_effort = false;
+					  
+					  String msg = Debug.getNestedExceptionMessage( e );
 
+					  if ( !cert_hack ){
+
+						  cert_hack = true;
+						  
 						  Plugin.getPluginInterface().getUtilities().getSecurityManager().installServerCertificate( url );
 
-					  }else{
-
-						  throw( e );
+						  continue;
 					  }
+					  
+					  if ( !internal_error_hack ){
+						  
+						  if ( msg.contains( "internal_error" )){
+							  
+							  internal_error_hack = true;
+						  
+							  continue;
+						  }
+					  }
+
+					  throw( e );
+					 
 				  }finally{
 				 
 					  if ( plugin_proxy != null ){
