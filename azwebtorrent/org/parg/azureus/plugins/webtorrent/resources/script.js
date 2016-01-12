@@ -80,6 +80,17 @@ var control_ws = new WebSocket( ws_url_prefix + "?type=control" + "&id=" + ws_id
 
 var peers = {};
 
+function debug(){}
+
+function now() {
+    return new Date().getTime()
+}
+
+var graph = window.graph = TorrentGraph('#svgWrap')
+
+graph.add({ id: 'You', me: true });
+
+
 var timer = 
 	setInterval(
 		function()
@@ -170,6 +181,10 @@ function removePeer( peer )
 		var ws = peer.vuzews;
 		
 		if ( ws ){
+			
+			graph.disconnect( 'You', offer_id );
+			
+			graph.remove( offer_id );
 			
 			if ( ws.readyState != WebSocket.CONNECTING ){
 				try{
@@ -343,6 +358,8 @@ function setupChannel( peer, channel, offer_id, hash, incoming )
 	
 	peer.vuzedc = channel;
 
+	peer.pending_messages = [];
+
 	channel.onopen = function (){
 		trace("datachannel open" );
 		
@@ -379,6 +396,16 @@ function setupChannel( peer, channel, offer_id, hash, incoming )
 			});
 		};
 		
+		// buffer any messages we receive while waiting for stats
+			
+	channel.onmessage = 
+		function( event )
+		{
+			trace( "pending message1" );
+		
+			peer.pending_messages.push( event.data );
+		};
+	
 	channel.onclose = 
 		function ()
 		{
@@ -401,7 +428,11 @@ function setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )
 	var peer_ws = new WebSocket( ws_url_prefix + "?type=peer" + "&id=" + ws_id + "&offer_id=" + offer_id + "&hash=" + hash + "&incoming=" + incoming + "&remote=" + remote_ip );
 
 	peer.vuzews = peer_ws;
+
+	graph.add({ id: peer.offer_id, ip: remote_ip });
 	
+	graph.connect('You', peer.offer_id)
+
 	peer_ws.binaryType = "arraybuffer";
 	
 	peer_ws.onmessage = 
@@ -464,6 +495,23 @@ function setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )
 					
 				}catch( err ){
 				}
+			}		
+			
+			if ( peer.pending_messages.length > 0 ){
+
+				try{
+					for	( i=0; i<peer.pending_messages.length; i++ ){
+	
+						trace( "Sending pending message" );
+						
+						peer_ws.send( peer.pending_messages[i] );
+					}
+				}catch( err ){
+					
+					removePeer( peer );
+				}
+				
+				peer.pending_messages = [];
 			}
 		}
 	
@@ -477,7 +525,13 @@ function setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )
 			try{
 				var state = peer_ws.readyState;
 				
-				if ( state == WebSocket.CONNECTING || state == WebSocket.OPEN ){
+				if ( state == WebSocket.CONNECTING  ){
+					
+					trace( "pending message2" );
+					
+					peer.pending_messages.push( event.data );
+					
+				}else if ( state == WebSocket.OPEN ){
 					
 					peer_ws.send( event.data );
 					

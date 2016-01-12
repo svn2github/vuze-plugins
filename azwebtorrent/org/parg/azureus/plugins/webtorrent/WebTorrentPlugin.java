@@ -23,15 +23,19 @@
 package org.parg.azureus.plugins.webtorrent;
 
 
+import java.io.File;
 import java.net.URL;
 
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.UrlUtils;
+import org.gudy.azureus2.platform.PlatformManagerFactory;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.ipc.IPCException;
 import org.gudy.azureus2.ui.swt.Utils;
+
+import com.aelitis.azureus.core.util.GeneralUtils;
 
 
 public class 
@@ -97,7 +101,15 @@ WebTorrentPlugin
 				run()
 				{
 					try{
-						Utils.launch( new URL( "http://127.0.0.1:" + web_server.getPort() + "/index.html?id=" + instance_id ));
+						String	url = "http://127.0.0.1:" + web_server.getPort() + "/index.html?id=" + instance_id;
+						
+						ProcessBuilder pb = GeneralUtils.createProcessBuilder( new File( "C:\\temp\\chrome-win32" ), new String[]{ "chrome.exe", url }, null );
+
+						pb.start();
+						
+						// PlatformManagerFactory.getPlatformManager().createProcess( "C:\\temp\\chrome-win32\\chrome.exe " + url, false );
+						
+						//Utils.launch( new URL( url ));
 						
 					}catch( Throwable e ){
 						

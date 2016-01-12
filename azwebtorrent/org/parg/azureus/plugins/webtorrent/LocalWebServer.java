@@ -262,17 +262,25 @@ LocalWebServer
 				String resource 		= null;
 				String content_type 	= null;
 				
-				if ( get.contains( "/index.html?id=" + instance_id )){
+				pos = get.indexOf( ' ' );
+				
+				String url = get.substring( pos+1 ).trim();
+				
+				pos = url.lastIndexOf( ' ' );
+				
+				url = url.substring( 0,  pos ).trim();
+
+				if ( url.startsWith( "/index.html?id=" + instance_id )){
 					
 					resource 		= "index.html";
 					content_type	= "text/html";
 					
-				}else if ( get.contains( "/script.js" )){
+				}else if ( url.equals( "/script.js" ) || url.equals( "/torrentgraph.js" ) || url.equals( "/d3.js" )){
 					
-					resource 		= "script.js";
+					resource 		= url.substring(1);
 					content_type	= "application/javascript;charset=UTF-8";
 					
-				}else if ( get.contains( "/favicon.ico" )){
+				}else if ( url.equals( "/favicon.ico" )){
 
 					resource 		= "favicon.ico";
 					content_type	= "image/x-icon";
@@ -304,15 +312,7 @@ LocalWebServer
 						res.close();
 					}
 				}else{
-					
-					pos = get.indexOf( ' ' );
-					
-					String url = get.substring( pos+1 ).trim();
-					
-					pos = url.lastIndexOf( ' ' );
-					
-					url = url.substring( 0,  pos ).trim();
-					
+										
 					if ( url.startsWith( "/?target" )){
 						
 						String original_url = UrlUtils.decode( url.substring( url.indexOf('=') + 1 ));
