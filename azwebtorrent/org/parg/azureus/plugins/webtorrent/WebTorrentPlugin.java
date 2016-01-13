@@ -30,34 +30,116 @@ import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.UrlUtils;
-import org.gudy.azureus2.platform.PlatformManagerFactory;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.ipc.IPCException;
-import org.gudy.azureus2.ui.swt.Utils;
+import org.gudy.azureus2.plugins.logging.LoggerChannel;
+import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
+import org.gudy.azureus2.plugins.ui.UIManager;
+import org.gudy.azureus2.plugins.ui.config.ActionParameter;
+import org.gudy.azureus2.plugins.ui.config.Parameter;
+import org.gudy.azureus2.plugins.ui.config.ParameterListener;
+import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
+import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
+import org.gudy.azureus2.plugins.utils.LocaleUtilities;
+
 
 import com.aelitis.azureus.core.util.GeneralUtils;
 
 
 public class 
 WebTorrentPlugin 
-	implements Plugin
+	implements UnloadablePlugin
 {
 	private static final long instance_id = RandomUtils.nextSecureAbsoluteLong();
 		
+	private PluginInterface	plugin_interface;
+	
+	private LoggerChannel 			log;
+	private BasicPluginConfigModel 	config_model;
+	private BasicPluginViewModel	view_model;
+	
+
 	private LocalWebServer	web_server;
+	private TrackerProxy	tracker_proxy;
 	private JavaScriptProxy	js_proxy;
 		
+	private Object			browser_lock = new Object();
+	
+	private Process			browser_process;
+	
+	private boolean			unloaded;
+	
 	@Override
 	public void 
 	initialize(
-		PluginInterface plugin_interface )
+		PluginInterface _plugin_interface )
 		
 		throws PluginException 
 	{
+		plugin_interface = _plugin_interface;
+		
+		final LocaleUtilities loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
+		
+		log	= plugin_interface.getLogger().getTimeStampedChannel( "WebTorrent");
+		
+		final UIManager	ui_manager = plugin_interface.getUIManager();
+
+		view_model = ui_manager.createBasicPluginViewModel( loc_utils.getLocalisedMessageText( "azwebtorrent.name" ));
+
+		view_model.getActivity().setVisible( false );
+		view_model.getProgress().setVisible( false );
+		
+		log.addListener(
+				new LoggerChannelListener()
+				{
+					public void
+					messageLogged(
+						int		type,
+						String	content )
+					{
+						view_model.getLogArea().appendText( content + "\n" );
+					}
+					
+					public void
+					messageLogged(
+						String		str,
+						Throwable	error )
+					{
+						view_model.getLogArea().appendText( str + "\n" );
+						view_model.getLogArea().appendText( error.toString() + "\n" );
+					}
+				});
+		
+		config_model = ui_manager.createBasicPluginConfigModel( "plugins", "azwebtorrent.name" );
+
+		view_model.setConfigSectionID( "azwebtorrent.name" );
+
+		final ActionParameter browser_launch_param = config_model.addActionParameter2( "azwebtorrent.browser.launch", "azwebtorrent.browser.launch.button" );
+		
+		browser_launch_param.addListener(
+			new ParameterListener()
+			{
+				public void 
+				parameterChanged(
+					Parameter param ) 
+				{
+					browser_launch_param.setEnabled( false );
+					
+					launchBrowser(
+						new Runnable()
+						{
+							@Override
+							public void run() {
+								browser_launch_param.setEnabled( true );
+							}
+						});
+				}
+			});
+					
 		try{
 			js_proxy = JavaScriptProxyManager.getProxy( instance_id );
 
-			TrackerProxy	tracker_proxy = 
+			tracker_proxy = 
 				new TrackerProxy(
 					new TrackerProxy.Listener()
 					{
@@ -95,28 +177,7 @@ WebTorrentPlugin
 			
 			web_server = new LocalWebServer( instance_id, js_proxy.getPort(), tracker_proxy );
 										
-			new AEThread2( "")
-			{
-				public void
-				run()
-				{
-					try{
-						String	url = "http://127.0.0.1:" + web_server.getPort() + "/index.html?id=" + instance_id;
-						
-						ProcessBuilder pb = GeneralUtils.createProcessBuilder( new File( "C:\\temp\\chrome-win32" ), new String[]{ "chrome.exe", url }, null );
-
-						pb.start();
-						
-						// PlatformManagerFactory.getPlatformManager().createProcess( "C:\\temp\\chrome-win32\\chrome.exe " + url, false );
-						
-						//Utils.launch( new URL( url ));
-						
-					}catch( Throwable e ){
-						
-						Debug.out( e );
-					}
-				}
-			}.start();
+			launchBrowser( null );
 		
 		}catch( Throwable e ){
 			
@@ -124,16 +185,82 @@ WebTorrentPlugin
 		}
 	}
 	
-
-
+	private void
+	launchBrowser(
+		final Runnable		callback )
+	{
+		new AEThread2( "")
+		{
+			public void
+			run()
+			{
+				synchronized( browser_lock ){
+					if ( browser_process != null ){
+						
+						try{
+							browser_process.destroy();
+							
+						}catch( Throwable e ){
+						}
+					}
+					
+					try{
+						File plugin_install_dir = new File( plugin_interface.getPluginDirectoryName());
 	
+						// Ideally we'd do what we used to:
+						//     config_file = pi.getPluginconfig().getPluginUserFile( "config.txt" );
+						// so we always get a writable location even if plugin installed into shared space. However,
+						// the way things currently work we have to have the executable in the same location so for 
+						// the moment I'm fixing by assuming we can write to wherever the plugin is installed.
+						// This issue came to light on Linux where the bundled plugins are installed into the
+						// shared plugin location...
+						
+						File config_file = new File( plugin_install_dir, "config.txt" );
+						
+						File plugin_dir 	= config_file.getParentFile();
+	
+						File data_dir 		= new File( plugin_dir, "data" );
+						File browser_dir 	= new File( plugin_dir, "browser" );
+	
+						data_dir.mkdirs();
+						browser_dir.mkdirs();
+						
+						String	url = "http://127.0.0.1:" + web_server.getPort() + "/index.html?id=" + instance_id;
+						
+						String[] args = {
+							"chrome.exe",
+							"--window-size=600,600",
+							"--no-default-browser-check",
+							"--no-first-run",
+							"--user-data-dir=\"" + data_dir.getAbsolutePath() + "\"",
+							url };
+						
+						ProcessBuilder pb = GeneralUtils.createProcessBuilder( browser_dir, args, null );
+	
+						browser_process = pb.start();
+												
+					}catch( Throwable e ){
+						
+						Debug.out( e );
+						
+					}finally{
+						
+						if ( callback != null ){
+							
+							callback.run();
+						}
+					}
+				}
+			}
+		}.start();
+	}
 	public URL
 	getProxyURL(
 		URL		url )
 		
 		throws IPCException
 	{
-		if ( web_server == null || js_proxy == null ){
+		if ( web_server == null || js_proxy == null || unloaded ){
 			
 			throw( new IPCException( "Proxy unavailable" ));
 		}
@@ -144,6 +271,47 @@ WebTorrentPlugin
 		}catch( Throwable e ){
 			
 			throw( new IPCException( e ));
+		}
+	}
+	
+	public void
+	unload()
+	{
+		unloaded	= true;
+		
+		if ( config_model != null ){
+			
+			config_model.destroy();
+			
+			config_model = null;
+		}
+		
+		if ( view_model != null ){
+			
+			view_model.destroy();
+			
+			view_model = null;
+		}
+		
+		if ( js_proxy != null ){
+			
+			js_proxy.destroy();
+			
+			js_proxy = null;
+		}
+	
+		if ( tracker_proxy != null ){
+			
+			tracker_proxy.destroy();
+			
+			tracker_proxy = null;
+		}
+		
+		if ( web_server != null ){
+			
+			web_server.destroy();
+			
+			web_server = null;
 		}
 	}
 }

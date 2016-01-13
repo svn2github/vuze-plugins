@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
@@ -71,7 +72,7 @@ JavaScriptProxyInstance
 	
 	private static Listener		listener;
 	
-    protected static int 
+    protected static ServerWrapper 
     startServer(
     	Listener		_listener ) 
     
@@ -93,11 +94,13 @@ JavaScriptProxyInstance
     	for ( int port: potential_ports ){
     	
     		try{
-    			Server server = new Server( "127.0.0.1", port, "/websockets", null, JavaScriptProxyInstance.class);
+    			Map<String,Object>	properties = new HashMap<>();
+    			
+    			Server server = new Server( "127.0.0.1", port, "/websockets", properties, JavaScriptProxyInstance.class);
         
     			server.start();
     	
-    			return( port );
+    			return( new ServerWrapper( server, port ));
     			
     		}catch( DeploymentException e ){
     			
@@ -361,6 +364,40 @@ JavaScriptProxyInstance
     	}catch( Throwable e ){
     		
     		Debug.out( e );
+    	}
+    }
+    
+    protected static class
+    ServerWrapper
+    {
+    	private final Server			server;
+    	private final int				port;
+    	
+    	private
+    	ServerWrapper(
+    		Server		_server,
+    		int			_port )
+    	{
+    		server		= _server;
+    		port		= _port;
+    	}
+    	
+    	public int
+    	getPort()
+    	{
+    		return( port );
+    	}
+    	
+    	public void
+    	destroy()
+    	{
+    		try{
+    			server.stop();
+    			
+    		}catch( Throwable e ){
+    			
+    			Debug.out( e );
+    		}
     	}
     }
     

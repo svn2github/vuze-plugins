@@ -65,6 +65,9 @@ LocalWebServer
 	private Listener	listener;
 	private int			filter_port;
 	
+	private ServerSocket server_socket;
+	
+	private volatile boolean	destroyed;
 	
 	public
 	LocalWebServer(
@@ -124,11 +127,11 @@ LocalWebServer
 		
 		thread_pool.setExecutionLimit( timeout );
 	
-		final ServerSocket ss = new ServerSocket( 0, 1024, InetAddress.getByName("127.0.0.1"));
+		server_socket = new ServerSocket( 0, 1024, InetAddress.getByName("127.0.0.1"));
 		
-		filter_port	= ss.getLocalPort();
+		filter_port	= server_socket.getLocalPort();
 		
-		ss.setReuseAddress(true);
+		server_socket.setReuseAddress(true);
 						
 		new AEThread2("WebSocketPlugin::filterloop")
 		{
@@ -137,10 +140,15 @@ LocalWebServer
 			{
 				long	failed_accepts		= 0;
 
-				while(true){
+				while( true ){
+					
+					if ( destroyed ){
+						
+						break;
+					}
 					
 					try{				
-						Socket socket = ss.accept();
+						Socket socket = server_socket.accept();
 								
 						failed_accepts = 0;
 						
@@ -165,6 +173,23 @@ LocalWebServer
 				}
 			}
 		}.start();
+	}
+	
+	public void
+	destroy()
+	{
+		destroyed = true;
+		
+		if ( server_socket != null ){
+			
+			try{
+				server_socket.close();
+				
+			}catch( Throwable e ){
+			}
+			
+			server_socket = null;
+		}
 	}
 	
 	private class

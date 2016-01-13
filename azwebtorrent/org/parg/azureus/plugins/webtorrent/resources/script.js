@@ -282,13 +282,18 @@ control_ws.onmessage =
 				control_ws.send( JSON.stringify( message ));
 								
 				peer.setLocalDescription(sessionDescription); 
-			}
-							
+			};
+				
+			function createFail( err )
+			{
+				removePeer( peer );
+			};
+			
 			if ( x.type == 'create_offer' ){
 				
 				var offerOptions = {};
 				
-				peer.createOffer(setLocalAndSendMessage, null, offerOptions );
+				peer.createOffer( setLocalAndSendMessage, createFail, offerOptions );
 				
 			}else{
 			
@@ -302,7 +307,8 @@ control_ws.onmessage =
 				
 				var answerOptions = {};
 				
-				peer.createAnswer(setLocalAndSendMessage, null, answerOptions );
+				peer.createAnswer(
+					setLocalAndSendMessage, createFail, answerOptions );
 			}
 
 		}else if ( x.type == 'answer' ){

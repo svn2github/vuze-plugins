@@ -56,28 +56,30 @@ JavaScriptProxyImpl
 	
 	private final long	instance_id;	
 	
-	private int	current_port;
+	private JavaScriptProxyInstance.ServerWrapper	current_server;
 	
 	private JavaScriptProxyInstance		current_instance;
 	private AESemaphore					current_instance_sem = new AESemaphore("");
 	
 	private Map<String,OfferAnswerImpl>		offer_answer_map = new HashMap<>();
 	
+	private boolean		destroyed;
+	
 	public
 	JavaScriptProxyImpl(
 		long		_instance_id )
 		
 		throws Exception
-	{
-		instance_id		= _instance_id;
-		
-		current_proxy	= this;
-		
+	{		
 		synchronized( lock ){
 			
+			instance_id		= _instance_id;
+			
+			current_proxy	= this;
+		
 			if ( !server_started ){
 								
-				current_port = 
+				current_server = 
 					JavaScriptProxyInstance.startServer(
 						new JavaScriptProxyInstance.Listener()
 						{
@@ -167,7 +169,15 @@ JavaScriptProxyImpl
 	public int
 	getPort()
 	{
-		return( current_port );
+		synchronized( lock ){
+		
+			if ( current_server == null ){
+				
+				return( 0 );
+			}
+			
+			return( current_server.getPort() );
+		}
 	}
 	
 	public void
@@ -397,6 +407,31 @@ JavaScriptProxyImpl
 					
 					offer_answer_map.remove( internal_offer_id );
 				}
+			}
+		}
+	}
+	
+	public void
+	destroy()
+	{
+		synchronized( lock ){
+		
+			server_started	= false;
+	
+			if ( current_instance != null ){
+				
+				current_instance.destroy();
+				
+				current_instance = null;
+			}
+			
+			current_instance_sem = new AESemaphore( "" );
+			
+			if ( current_server != null ){
+				
+				current_server.destroy();
+				
+				current_server = null;
 			}
 		}
 	}

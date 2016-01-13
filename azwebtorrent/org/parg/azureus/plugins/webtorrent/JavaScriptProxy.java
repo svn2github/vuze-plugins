@@ -45,6 +45,9 @@ JavaScriptProxy
 		String			sdp,
 		AnswerListener	listener );
 	
+	public void
+	destroy();
+	
 	public interface
 	Offer
 	{

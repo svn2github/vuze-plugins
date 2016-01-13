@@ -507,6 +507,24 @@ TrackerProxy
 		}
 	}
 	
+	public void
+	destroy()
+	{
+		synchronized( client_sessions ){
+		 
+			 for ( ClientSession s: client_sessions.values()){
+			 
+				 try{
+					 s.close();
+				 
+				 }catch( Throwable e ){
+				 }
+			 }
+			 
+			 client_sessions.clear();
+		 }
+	}
+	
 	private static String
 	encodeCrap(
 		byte[]	bytes )
