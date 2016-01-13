@@ -65,14 +65,26 @@ public class PromoPlugin
 
 	private static final String VIEWID = "SidebarPromo";
 
-	public static UISWTInstance swtInstance = null;
-	private BasicPluginConfigModel configModel;
+	private static PromoPlugin		pluginInstance;
+	
+	private UISWTInstance 			swtInstance;
+	private List<PromoView>			views	= new ArrayList<PromoView>();
+	
+	private BasicPluginConfigModel 	configModel;
 
-	private static LoggerChannel logger;
+	private LoggerChannel 	logger;
 
-	public static PluginInterface pluginInterface;
+	private PluginInterface 	pluginInterface;
 
-	public static String readStringFromUrl(String url) {
+	private volatile boolean	unloaded = false;
+	
+	public
+	PromoPlugin()
+	{
+		pluginInstance	= this;
+	}
+	
+	public String readStringFromUrl(String url) {
 		StringBuffer sb = new StringBuffer();
 		try {
 			URL _url = new URL(url);
@@ -111,6 +123,8 @@ public class PromoPlugin
 		
 		checkDumps();
 		
+		// COConfigurationManager.setParameter( "azpromo.dump.disable.plugin", false );
+		
 		if ( COConfigurationManager.getBooleanParameter( "azpromo.dump.disable.plugin", false )){
 			
 			PluginConfig pc = pluginInterface.getPluginconfig();
@@ -132,6 +146,16 @@ public class PromoPlugin
 			if ( pluginInterface.getPluginProperties().getProperty( "PubID", "" ) == "" ){
 			
 				return;
+			}
+		}
+		
+		if ( !COConfigurationManager.getBooleanParameter( "Plugin.azpromo.enabled", true )){
+			
+			PluginConfig pc = pluginInterface.getPluginconfig();
+			
+			if ( !pc.getPluginStringParameter( "plugin.info", "" ).equals( "d" )){
+				
+				pc.setPluginParameter( "plugin.info", "d" );
 			}
 		}
 		
@@ -174,7 +198,7 @@ public class PromoPlugin
 			// Get notified when the UI is attached
 			pluginInterface.getUIManager().addUIListener(new UIManagerListener() {
 				public void UIAttached(UIInstance instance) {
-					if (instance instanceof UISWTInstance) {
+					if (instance instanceof UISWTInstance && !unloaded ) {
 						swtInstance = ((UISWTInstance) instance);
 						swtInstance.addView(UISWTInstance.VIEW_SIDEBAR_AREA, VIEWID,
 								PromoView.class, null);
@@ -235,10 +259,37 @@ public class PromoPlugin
 
 	// @see org.gudy.azureus2.plugins.UnloadablePlugin#unload()
 	public void unload() throws PluginException {
+		
+		unloaded = true;
+		
 		if (swtInstance != null){
+			
 			swtInstance.removeViews(UISWTInstance.VIEW_SIDEBAR_AREA, VIEWID);
+			
+			swtInstance = null;
 		}
 		
+		// shouldn't need to track these views once bug in core that was preventing views from being
+		// closed on 'removeViews' is rolled out... (5701+)
+		
+		List<PromoView>	to_close = new ArrayList<PromoView>();
+		
+		synchronized( views ){
+			
+			to_close.addAll( views );
+			
+			views.clear();
+		}
+		
+		for ( PromoView view: to_close ){
+			
+			try{
+				view.destroy();
+				
+			}catch( Throwable e ){
+				
+			}
+		}
 		if (configModel != null ){
 			configModel.destroy();
 			configModel = null;
@@ -405,12 +456,47 @@ public class PromoPlugin
 		}
 	}
 	
+	protected PluginInterface
+	getPluginInterface()
+	{
+		return( pluginInterface );
+	}
 	
-
-	public static void log(String s) {
+	protected UISWTInstance
+	getSWTInstance()
+	{
+		return( swtInstance );
+	}
+	
+	protected void
+	viewAdded(
+		PromoView		view )
+	{
+		synchronized( views ){
+			
+			views.add( view );
+		}
+	}
+	
+	protected void
+	viewRemoved(
+		PromoView		view )
+	{
+		synchronized( views ){
+			
+			views.remove( view );
+		}
+	}
+	protected void log(String s) {
 		if (logger != null) {
 			logger.log(s);
 		}
 	}
 	
+	protected static PromoPlugin
+	getPlugin()
+	{
+		return( pluginInstance );
+	}
+
 }

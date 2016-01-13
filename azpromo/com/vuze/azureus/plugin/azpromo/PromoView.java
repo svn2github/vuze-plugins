@@ -43,6 +43,7 @@ import org.gudy.azureus2.core3.util.*;
 import org.gudy.azureus2.plugins.PluginConfig;
 import org.gudy.azureus2.ui.swt.BrowserWrapper;
 import org.gudy.azureus2.ui.swt.Utils;
+import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
 import org.gudy.azureus2.ui.swt.plugins.UISWTView;
 import org.gudy.azureus2.ui.swt.plugins.UISWTViewEvent;
 import org.gudy.azureus2.ui.swt.plugins.UISWTViewEventListener;
@@ -69,6 +70,8 @@ public class PromoView
 {
 	private static final String URL_JSON = "http://misc20150831.s3-website-us-east-1.amazonaws.com/test.json";
 
+	private PromoPlugin		plugin;
+	
 	private AdControlSWT adControl;
 
 	private Browser adBrowser;
@@ -80,6 +83,7 @@ public class PromoView
 	private Map mapJSON;
 
 	public PromoView() {
+		plugin	= PromoPlugin.getPlugin();
 	}
 
 	// @see org.gudy.azureus2.ui.swt.plugins.UISWTViewEventListener#eventOccurred(org.gudy.azureus2.ui.swt.plugins.UISWTViewEvent)
@@ -87,6 +91,7 @@ public class PromoView
 		switch (event.getType()) {
 			case UISWTViewEvent.TYPE_CREATE:
 				log("TYPE_CREATE Called");
+				plugin.viewAdded( this );
 				break;
 
 			case UISWTViewEvent.TYPE_INITIALIZE:
@@ -100,6 +105,7 @@ public class PromoView
 
 			case UISWTViewEvent.TYPE_DESTROY:
 				log("TYPE_DESTROY Called");
+				plugin.viewRemoved( this );
 				break;
 
 			case UISWTViewEvent.TYPE_DATASOURCE_CHANGED:
@@ -125,7 +131,7 @@ public class PromoView
 
 		this.view = view;
 		try {
-			PluginConfig config = PromoPlugin.pluginInterface.getPluginconfig();
+			PluginConfig config = plugin.getPluginInterface().getPluginconfig();
 			if (!config.getPluginBooleanParameter("resized.once")) {
 				config.setPluginParameter("resized.once", true);
 				boolean visible = SideBar.instance.isVisible();
@@ -173,11 +179,11 @@ public class PromoView
 		lblText.addMouseListener(new MouseListener() {
 
 			public void mouseUp(MouseEvent e) {
-				if (PromoPlugin.pluginInterface == null) {
+				if (plugin.getPluginInterface() == null) {
 					return;
 				}
 
-				PromoPlugin.pluginInterface.getUtilities().createThread("LoadPromo",
+				plugin.getPluginInterface().getUtilities().createThread("LoadPromo",
 						new Runnable() {
 
 					public void run() {
@@ -337,10 +343,10 @@ public class PromoView
 			}
 		});
 		
-		String pubID = PromoPlugin.pluginInterface.getPluginProperties().getProperty(
+		String pubID = plugin.getPluginInterface().getPluginProperties().getProperty(
 				"PubID", "mawra2ag1");
 
-		//int reloadTime = Integer.parseInt(PromoPlugin.pluginInterface.getPluginProperties().getProperty(
+		//int reloadTime = Integer.parseInt(plugin.getPluginInterface().getPluginProperties().getProperty(
 		//		"ReloadSecs", "86400"));
 		//log("pubID len=" + pubID.length() + ";reload in " + reloadTime);
 		log("pubID len=" + pubID.length());
@@ -355,7 +361,7 @@ public class PromoView
 
 		//options.setPublisherDefaultAdReloadTime(reloadTime);
 
-		PromoPlugin.pluginInterface.getUtilities().createThread("LoadPromo",
+		plugin.getPluginInterface().getUtilities().createThread("LoadPromo",
 				new Runnable() {
 
 					public void run() {
@@ -387,10 +393,10 @@ public class PromoView
 				});
 		adControl.getShell().layout(true, true);
 
-		PromoPlugin.pluginInterface.getUtilities().createThread("pv",
+		plugin.getPluginInterface().getUtilities().createThread("pv",
 				new Runnable() {
 					public void run() {
-						if (PromoPlugin.pluginInterface == null) {
+						if (plugin.getPluginInterface() == null) {
 							return;
 						}
 						boolean first = mapJSON == null;
@@ -460,7 +466,7 @@ public class PromoView
 	protected void flipTest(int delay) {
 		Utils.execSWTThreadLater(delay, new AERunnable() {
 			public void runSupport() {
-				if (PromoPlugin.pluginInterface == null) {
+				if (plugin.getPluginInterface() == null) {
 					return;
 				}
 
@@ -479,10 +485,11 @@ public class PromoView
 		}
 		view.closeView();
 		PromoPlugin.logEvent("clickx");
-		if (PromoPlugin.swtInstance == null) {
+		UISWTInstance swtInstance = plugin.getSWTInstance();
+		if (swtInstance == null) {
 			return;
 		}
-		int result = PromoPlugin.swtInstance.promptUser("Get Vuze Plus",
+		int result = swtInstance.promptUser("Get Vuze Plus",
 				"Upgrading to Vuze Plus will remove ads from the client.",
 				new String[] {
 					"Not Now",
@@ -499,7 +506,7 @@ public class PromoView
 
 	protected void log(String string) {
 
-		PromoPlugin.log(string);
+		plugin.log(string);
 	}
 
 	private void refresh(final UISWTView view) {
@@ -517,6 +524,22 @@ public class PromoView
 		if (tuxTest) {
 			adBrowser.setText(MapUtils.getMapString(mapJSON, "html", null));
 		}
+	}
+	
+	protected void
+	destroy()
+	{
+		Utils.execSWTThread(
+			new Runnable()
+			{
+				public void
+				run()
+				{
+					if ( view != null ){
+				}
+					view.closeView();
+				}
+			});
 	}
 
 	public static String readStringFromUrl(String url) {
