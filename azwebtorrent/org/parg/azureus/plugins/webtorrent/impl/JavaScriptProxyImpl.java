@@ -300,11 +300,6 @@ JavaScriptProxyImpl
 					}
 					
 					return( offer );
-					
-				}else{
-					
-					// TODO: pending offer, maybe it'll complete so use or delete?
-					
 				}
 			}catch( Throwable e ){
 				

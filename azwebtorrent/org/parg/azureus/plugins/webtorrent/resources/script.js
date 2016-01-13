@@ -386,8 +386,10 @@ function setupChannel( peer, channel, offer_id, hash, incoming )
 						item.type = result.type
 						item.timestamp = result.timestamp
 										
-						if ( item.type == 'remotecandidate' ){
-													
+						if ( item.type == 'remotecandidate' && item.candidateType != 'relayed' ){
+								
+							trace( item );
+							
 							remote_ip += (remote_ip==""?"":",") + item.ipAddress;
 						}
 					});

@@ -230,6 +230,7 @@ WebTorrentPlugin
 						String[] args = {
 							"chrome.exe",
 							"--window-size=600,600",
+							"--incognito",
 							"--no-default-browser-check",
 							"--no-first-run",
 							"--user-data-dir=\"" + data_dir.getAbsolutePath() + "\"",

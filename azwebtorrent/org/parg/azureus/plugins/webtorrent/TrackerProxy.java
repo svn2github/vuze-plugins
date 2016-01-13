@@ -127,6 +127,10 @@ TrackerProxy
 				throw( new Exception( "hash missing" ));
 			}
 			
+		  	String	read_timeout_str 	= System.getProperty("sun.net.client.defaultReadTimeout"); 
+
+		  	int	read_timeout	= Integer.parseInt( read_timeout_str );
+		  	
 			boolean	is_stop = event != null && event.equals( "stopped" );
 			
 			final boolean scrape = peer_id == null;
@@ -161,7 +165,12 @@ TrackerProxy
 					
 				}else{
 					
-					offer = listener.getOffer( info_hash, 60*1000 );
+					offer = listener.getOffer( info_hash, read_timeout - 5*1000 );
+					
+					if ( offer == null ){
+						
+						throw( new IOException( "WebTorrent proxy appears to be unavailable" ));
+					}
 				}
 			}
 			
@@ -428,7 +437,7 @@ TrackerProxy
 		            }
 				}   
 				
-				Map reply = client_session.waitForAnnounce( info_hash, 30*1000 );
+				Map reply = client_session.waitForAnnounce( info_hash, read_timeout - 5*1000 );
 				
 				if ( reply == null ){
 					
