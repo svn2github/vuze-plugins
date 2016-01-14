@@ -80,6 +80,106 @@ var control_ws = new WebSocket( ws_url_prefix + "?type=control" + "&id=" + ws_id
 
 var peers = {};
 
+var total_up 	= 0;
+var total_down	= 0;
+
+var RateAverage = function( periods )
+{
+	this.periods = periods;
+	this.buffer = [this.periods];
+	this.index = 0;
+	this.lastValue= 0;
+  
+	for ( var i=0;i<periods;i++){
+		this.buffer[i] = 0;
+	}
+}
+
+RateAverage.prototype.addValue = function( x ){
+  	this.buffer[this.index++%this.periods] = x-this.lastValue; 
+    this.lastValue=x;
+};
+  
+RateAverage.prototype.getAverage = function(){ 
+  	var total = 0;
+	for ( var i=0;i<this.periods;i++){
+		total += this.buffer[i];
+	}
+   
+	return( total/this.periods );
+};
+
+var up_average 		= new RateAverage(20);
+var down_average 	= new RateAverage(20);
+
+
+
+var total_up_element 	= document.getElementById("totalUp" );
+var total_down_element 	= document.getElementById("totalDown" );
+
+function 
+bytesToSize(bytes) 
+{
+	var sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+
+	if ( bytes == 0) return '0 ' + sizes[0];
+	
+	var i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+	
+	return Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
+};
+	
+function prettyNumber(pBytes, pUnits) {
+    // Handle some special cases
+    if(pBytes == 0) return '0 B';
+    if(pBytes == 1) return '1 B';
+    if(pBytes == -1) return '-1 B';
+
+    var bytes = Math.abs(pBytes)
+    if(pUnits && pUnits.toLowerCase() && pUnits.toLowerCase() == 'si') {
+        // SI units use the Metric representation based on 10^3 as a order of magnitude
+        var orderOfMagnitude = Math.pow(10, 3);
+        var abbreviations = ['B', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+    } else {
+        // IEC units use 2^10 as an order of magnitude
+        var orderOfMagnitude = Math.pow(2, 10);
+        //var abbreviations = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB'];
+        var abbreviations = ['B', 'KB', 'MB', 'iB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+    }
+    var i = Math.floor(Math.log(bytes) / Math.log(orderOfMagnitude));
+    var result = (bytes / Math.pow(orderOfMagnitude, i));
+
+    // This will get the sign right
+    if(pBytes < 0) {
+        result *= -1;
+    }
+
+    // This bit here is purely for show. it drops the percision on numbers greater than 100 before the units.
+    // it also always shows the full number of bytes if bytes is the unit.
+    if(result >= 99.995 || i==0) {
+        return result.toFixed(0) + ' ' + abbreviations[i];
+    } else {
+        return result.toFixed(2) + ' ' + abbreviations[i];
+    }
+}
+
+var page_timer = 
+	setInterval(
+		function()
+		{
+			up_average.addValue( total_up );
+			
+			var up_rate = up_average.getAverage();
+			
+			down_average.addValue( total_down );
+			
+			var down_rate = down_average.getAverage();
+
+			total_up_element.innerHTML = "<b>" + prettyNumber( total_up, "IEC" ) + " (" + prettyNumber( up_rate, "IEC" ) +"/sec)</b>";
+			
+			total_down_element.innerHTML = "<b>" + prettyNumber( total_down, "IEC" ) + " (" + prettyNumber( down_rate, "IEC" ) +"/sec)</b>";
+		}, 1000 );
+
 function debug(){}
 
 function now() {
@@ -457,6 +557,8 @@ function setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )
 			try{
 				channel.send( array_buffer );
 			
+				total_up += array_buffer.byteLength;
+					
 			}catch( err ){
 								
 				removePeer( peer );
@@ -512,7 +614,11 @@ function setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )
 	
 						trace( "Sending pending message" );
 						
-						peer_ws.send( peer.pending_messages[i] );
+						var array_buffer = peer.pending_messages[i];
+						
+						peer_ws.send( array_buffer );
+						
+						total_down += array_buffer.byteLength;
 					}
 				}catch( err ){
 					
@@ -527,6 +633,7 @@ function setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )
 		function( event )
 		{
 			if ( trace_on ){
+				
 				trace( "datachannel recv: " + ab2str( event.data ));
 			}
 			
@@ -541,7 +648,11 @@ function setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )
 					
 				}else if ( state == WebSocket.OPEN ){
 					
-					peer_ws.send( event.data );
+					var array_buffer = event.data;
+					
+					peer_ws.send( array_buffer );
+					
+					total_down += array_buffer.byteLength;
 					
 				}else{
 					

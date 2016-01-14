@@ -2,6 +2,10 @@
 <html>
 <head>
 <style type="text/css">
+.ib
+{
+    display: inline-block;
+}
 </style>
 </HEAD>
   <title>WebTorrent Protocol Proxy</title>
@@ -13,11 +17,16 @@
 This web page allows Vuze to talk the WebTorrent protocol for downloading and uploading.
 <br><br>
 Please leave this window open (minimize it or hide it) - otherwise WebTorrent clients will fail!
+<br>
+<hr />
+<div id="svgWrap" style="background: #154820"></div>
+<hr />
 
-<div id="svgWrap" style="background: #154820">
-</div>
+<div class="ib">Upload: <div class="ib" id="totalUp"><b>0 B (0 B/sec)</b></div></div><div class="ib">, Download: <div class="ib" id="totalDown"><b>0 B (0 B/sec)</b></div></div>
+
+</body>
 <script src="d3.js"></script>
 <script src="torrentgraph.js"></script>
 <script src="script.js"></script>
-</body>
+
 </html>

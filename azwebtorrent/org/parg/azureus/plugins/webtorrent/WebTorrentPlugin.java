@@ -23,12 +23,27 @@
 package org.parg.azureus.plugins.webtorrent;
 
 
+import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import org.gudy.azureus2.core3.util.AEThread2;
+import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.FileUtil;
 import org.gudy.azureus2.core3.util.RandomUtils;
+import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.core3.util.UrlUtils;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.ipc.IPCException;
@@ -36,11 +51,18 @@ import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
 import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.config.ActionParameter;
+import org.gudy.azureus2.plugins.ui.config.LabelParameter;
 import org.gudy.azureus2.plugins.ui.config.Parameter;
 import org.gudy.azureus2.plugins.ui.config.ParameterListener;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
+
+
+
+
+
+
 
 
 import com.aelitis.azureus.core.util.GeneralUtils;
@@ -55,8 +77,11 @@ WebTorrentPlugin
 	private PluginInterface	plugin_interface;
 	
 	private LoggerChannel 			log;
+	private LocaleUtilities 		loc_utils;
 	private BasicPluginConfigModel 	config_model;
 	private BasicPluginViewModel	view_model;
+	
+	private LabelParameter 			status_label;
 	
 
 	private LocalWebServer	web_server;
@@ -64,8 +89,11 @@ WebTorrentPlugin
 	private JavaScriptProxy	js_proxy;
 		
 	private Object			browser_lock = new Object();
-	
 	private Process			browser_process;
+	
+	private Object			active_lock	= new Object();
+	private boolean			active;
+	private long			last_activation_attempt;
 	
 	private boolean			unloaded;
 	
@@ -78,7 +106,7 @@ WebTorrentPlugin
 	{
 		plugin_interface = _plugin_interface;
 		
-		final LocaleUtilities loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
+		loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
 		
 		log	= plugin_interface.getLogger().getTimeStampedChannel( "WebTorrent");
 		
@@ -114,6 +142,8 @@ WebTorrentPlugin
 
 		view_model.setConfigSectionID( "azwebtorrent.name" );
 
+		status_label = config_model.addLabelParameter2( "azwebtorrent.status");
+
 		final ActionParameter browser_launch_param = config_model.addActionParameter2( "azwebtorrent.browser.launch", "azwebtorrent.browser.launch.button" );
 		
 		browser_launch_param.addListener(
@@ -129,62 +159,359 @@ WebTorrentPlugin
 						new Runnable()
 						{
 							@Override
-							public void run() {
+							public void run() 
+							{
 								browser_launch_param.setEnabled( true );
 							}
 						});
 				}
 			});
-					
+	}
+	
+	private File
+	checkBrowserInstall()
+	
+		throws PluginException
+	{
 		try{
-			js_proxy = JavaScriptProxyManager.getProxy( instance_id );
-
-			tracker_proxy = 
-				new TrackerProxy(
-					new TrackerProxy.Listener()
-					{
-				    	public JavaScriptProxy.Offer
-				    	getOffer(
-				    		byte[]		hash,
-				    		long		timeout )
-				    	{
-				    		return( js_proxy.getOffer( hash, timeout ));
-				    	}
-				    	
-				    	public void
-				    	gotAnswer(
-				    		byte[]		hash,
-				    		String		offer_id,
-				    		String		sdp )
-				    		
-				    		throws Exception
-				    	{
-				    		js_proxy.gotAnswer( offer_id, sdp );
-				    	}
-				    	
-				    	public void
-				    	gotOffer(
-				    		byte[]							hash,
-				    		String							offer_id,
-				    		String							sdp,
-				    		JavaScriptProxy.AnswerListener 	listener )
-				    		
-				    		throws Exception
-				    	{
-				    		js_proxy.gotOffer( hash, offer_id, sdp, listener );
-				    	}
-					});
+			File plugin_install_dir = new File( plugin_interface.getPluginDirectoryName());
+				
+			File plugin_data_dir	= plugin_interface.getPluginconfig().getPluginUserFile( "test" ).getParentFile();
 			
-			web_server = new LocalWebServer( instance_id, js_proxy.getPort(), tracker_proxy );
-										
-			launchBrowser( null );
-		
+			if ( !plugin_data_dir.exists()){
+				
+				plugin_data_dir.mkdirs();
+			}
+			
+			deleteOldStuff( plugin_install_dir );
+			deleteOldStuff( plugin_data_dir );
+			
+			File[]	install_files = plugin_install_dir.listFiles();
+			
+			List<File>	old_zip_files = new ArrayList<File>();
+			
+			String 	highest_version_zip			= "0";
+			File	highest_version_zip_file	= null;
+			
+			for ( File file: install_files ){
+				
+				String name = file.getName();
+				
+				if ( file.isFile() && name.startsWith( "browser-" ) && name.endsWith( ".zip" )){
+					
+					String version = name.substring( name.lastIndexOf( "-" ) + 1, name.length() - 4 );
+					
+					if ( Constants.compareVersions( version, highest_version_zip ) > 0 ){
+						
+						highest_version_zip = version;
+						
+						if ( highest_version_zip_file != null ){
+							
+							old_zip_files.add( highest_version_zip_file );
+						}
+						
+						highest_version_zip_file = file;
+					}
+				}
+			}
+			
+			File[]	data_files = plugin_data_dir.listFiles();
+			
+			String 	highest_version_data		= "0";
+			File	highest_version_data_file 	= null;
+			
+			for ( File file: data_files ){
+				
+				String name = file.getName();
+				
+				if ( file.isDirectory() && name.startsWith( "browser_" )){
+					
+					String version = name.substring( 8 );
+					
+					if ( Constants.compareVersions( version, highest_version_data ) > 0 ){
+						
+						highest_version_data = version;
+						
+						highest_version_data_file = file;
+					}
+				}
+			}
+						
+			if ( Constants.compareVersions( highest_version_zip, highest_version_data ) > 0 ){
+				
+				File temp_data = new File( plugin_data_dir, "tmp_" + highest_version_zip );
+				
+				if ( temp_data.exists()){
+					
+					if ( !FileUtil.recursiveDeleteNoCheck( temp_data )){
+						
+						throw( new Exception( "Failed to remove tmp directory: " + temp_data ));
+					}
+				}
+				
+				ZipInputStream zis = null;
+				
+				try{
+					zis = new ZipInputStream( new BufferedInputStream( new FileInputStream( highest_version_zip_file ) ));
+							
+					byte[] buffer = new byte[64*1024];
+					
+					while( true ){
+						
+						ZipEntry	entry = zis.getNextEntry();
+							
+						if ( entry == null ){
+							
+							break;
+						}
+					
+						String	name = entry.getName();
+					
+						if ( name.endsWith( "/" )){
+							
+							continue;
+						}
+						
+						if ( File.separatorChar != '/' ){
+							
+							name = name.replace( '/', File.separatorChar );
+						}
+						
+						File target_out = new File( temp_data, name );
+						
+						File parent_folder = target_out.getParentFile();
+						
+						if ( !parent_folder.exists()){
+							
+							parent_folder.mkdirs();
+						}
+						
+						OutputStream	entry_os = null;
+
+						try{
+							entry_os = new FileOutputStream( target_out );
+							
+							while( true ){
+								
+								int	len = zis.read( buffer );
+								
+								if ( len <= 0 ){
+									
+									break;
+								}
+																											
+								entry_os.write( buffer, 0, len );
+							}
+						}finally{
+							
+							if ( entry_os != null ){
+								
+								try{
+									entry_os.close();
+									
+								}catch( Throwable e ){
+									
+									Debug.out( e );
+								}
+							}
+						}
+					}
+				}finally{
+					
+					if ( zis != null ){
+						
+						try{
+							zis.close();
+							
+						}catch( Throwable e ){
+							
+							Debug.out( e );
+						}
+					}
+				}
+					
+				
+				File target_data = new File( plugin_data_dir, "browser_" + highest_version_zip );
+				
+				if ( target_data.exists()){
+					
+					throw( new Exception( "Target already exists: " + target_data ));
+				}
+				
+				if ( !temp_data.renameTo( target_data )){
+					
+					throw( new Exception( "Failed to rename " + temp_data + " to " + target_data ));
+				}
+				
+				for ( File old: old_zip_files ){
+					
+					old.delete();
+				}
+								
+				if ( Constants.isOSX || Constants.isLinux ){
+					
+					String chmod = findCommand( "chmod" );
+					
+					if ( chmod == null ){
+						
+						throw( new Exception( "Failed to find 'chmod' command" ));
+					}
+					
+					Runtime.getRuntime().exec(
+						new String[]{
+							chmod,
+							"-R",
+							"+x",
+							target_data.getAbsolutePath()
+						});
+				}
+				
+				return( target_data );
+
+			}else{
+				
+				File existing_data = new File( plugin_data_dir, "browser_" + highest_version_data );
+
+				if ( highest_version_data.equals( "0" ) || !existing_data.exists()){
+					
+					throw( new Exception( "No browser version installed" ));
+				}
+								
+				return( existing_data );
+			}
+					
 		}catch( Throwable e ){
 			
-			Debug.out( e );
+			String init_error = Debug.getNestedExceptionMessage( e );
+			
+			status_label.setLabelText( loc_utils.getLocalisedMessageText( "azwebtorrent.status.fail", new String[]{ init_error }) );
+			
+			log( "Browser setup failed: " + init_error );
+			
+			throw( new PluginException( "Browser setup failed: " + Debug.getNestedExceptionMessage( e )));
+		}
+	}
+		
+	private void
+	deleteOldStuff(
+		File		dir )
+	{
+		File[] files = dir.listFiles();
+		
+		if ( files == null || files.length == 0 ){
+			
+			return;
+		}
+		
+		Map<String,List<Object[]>>	map = new HashMap<String,List<Object[]>>();
+		
+		for ( File f: files ){
+			
+			String name = f.getName();
+			
+			int	pos = name.lastIndexOf( '_' );
+			
+			if ( pos == -1 ){
+				
+				continue;
+			}
+			
+			String root		= name.substring( 0, pos );
+			String ver_str 	= name.substring( pos+1 );
+			
+			if ( ver_str.endsWith( ".jar" ) || ver_str.endsWith( ".zip" )){
+				
+				root += ver_str.substring(  ver_str.length() - 4 );
+				
+				ver_str = ver_str.substring( 0, ver_str.length() - 4 );
+			}
+			
+			for ( char c: ver_str.toCharArray()){
+				
+				if ( c != '.' && !Character.isDigit( c )){
+					
+					ver_str = null;
+					
+					break;
+				}
+			}
+			
+			if ( ver_str != null && ver_str.length() > 0 ){
+				
+				List<Object[]> entry = map.get( root );
+				
+				if ( entry == null ){
+					
+					entry = new ArrayList<Object[]>();
+					
+					map.put( root, entry );
+				}
+				
+				entry.add( new Object[]{ ver_str, f });
+			}
+		}
+		
+		for ( Map.Entry<String,List<Object[]>> entry: map.entrySet()){
+			
+			String 			root 	= entry.getKey();
+			List<Object[]>	list	= entry.getValue();
+			
+			Collections.sort(
+				list,
+				new Comparator<Object[]>()
+				{
+					public int 
+					compare(
+						Object[] e1, 
+						Object[] e2) 
+					{
+						String ver1 = (String)e1[0];
+						String ver2 = (String)e2[0];
+						
+						return( Constants.compareVersions( ver1, ver2 ));
+					}
+				});
+			
+			/*
+			System.out.println( root );
+			
+			for ( Object[] o: list ){
+				
+				System.out.println( "    " + o[0] + " - " + o[1] );
+			}
+			*/
+			
+			int	ver_to_delete = list.size() - 3;
+							
+			for ( int i=0;i<ver_to_delete;i++ ){
+				
+				File f = (File)list.get(i)[1];
+				
+				delete( f );
+			}
 		}
 	}
 	
+	private void
+	delete(
+		File		f )
+	{
+		if ( f.isDirectory()){
+						
+			File[] files = f.listFiles();
+			
+			if ( files != null ){
+				
+				for ( File x: files ){
+					
+					delete( x );
+				}
+			}
+		}
+		
+		f.delete();
+	}
+		
 	private void
 	launchBrowser(
 		final Runnable		callback )
@@ -195,6 +522,7 @@ WebTorrentPlugin
 			run()
 			{
 				synchronized( browser_lock ){
+										
 					if ( browser_process != null ){
 						
 						try{
@@ -205,23 +533,12 @@ WebTorrentPlugin
 					}
 					
 					try{
-						File plugin_install_dir = new File( plugin_interface.getPluginDirectoryName());
-	
-						// Ideally we'd do what we used to:
-						//     config_file = pi.getPluginconfig().getPluginUserFile( "config.txt" );
-						// so we always get a writable location even if plugin installed into shared space. However,
-						// the way things currently work we have to have the executable in the same location so for 
-						// the moment I'm fixing by assuming we can write to wherever the plugin is installed.
-						// This issue came to light on Linux where the bundled plugins are installed into the
-						// shared plugin location...
+						File browser_dir = checkBrowserInstall();
 						
-						File config_file = new File( plugin_install_dir, "config.txt" );
+						File plugin_dir = plugin_interface.getPluginconfig().getPluginUserFile( "test" ).getParentFile();
 						
-						File plugin_dir 	= config_file.getParentFile();
-	
 						File data_dir 		= new File( plugin_dir, "data" );
-						File browser_dir 	= new File( plugin_dir, "browser" );
-	
+		
 						data_dir.mkdirs();
 						browser_dir.mkdirs();
 						
@@ -242,7 +559,7 @@ WebTorrentPlugin
 												
 					}catch( Throwable e ){
 						
-						Debug.out( e );
+						log( "Failed to launch browser", e );
 						
 					}finally{
 						
@@ -255,23 +572,178 @@ WebTorrentPlugin
 			}
 		}.start();
 	}
+	
+	private boolean
+	activate()
+	{
+		synchronized( active_lock ){
+			
+			if ( active ){
+				
+				return( true );
+			}
+			
+			long	now = SystemTime.getMonotonousTime();
+			
+			if ( last_activation_attempt != 0 && now - last_activation_attempt < 30*1000 ){
+				
+				return( false );
+			}
+			
+			last_activation_attempt = now;
+			
+			log( "Activating" );
+			
+			try{
+				js_proxy = JavaScriptProxyManager.getProxy( instance_id );
+	
+				tracker_proxy = 
+					new TrackerProxy(
+						new TrackerProxy.Listener()
+						{
+					    	public JavaScriptProxy.Offer
+					    	getOffer(
+					    		byte[]		hash,
+					    		long		timeout )
+					    	{
+					    		return( js_proxy.getOffer( hash, timeout ));
+					    	}
+					    	
+					    	public void
+					    	gotAnswer(
+					    		byte[]		hash,
+					    		String		offer_id,
+					    		String		sdp )
+					    		
+					    		throws Exception
+					    	{
+					    		js_proxy.gotAnswer( offer_id, sdp );
+					    	}
+					    	
+					    	public void
+					    	gotOffer(
+					    		byte[]							hash,
+					    		String							offer_id,
+					    		String							sdp,
+					    		JavaScriptProxy.AnswerListener 	listener )
+					    		
+					    		throws Exception
+					    	{
+					    		js_proxy.gotOffer( hash, offer_id, sdp, listener );
+					    	}
+						});
+				
+				web_server = new LocalWebServer( instance_id, js_proxy.getPort(), tracker_proxy );
+											
+				launchBrowser( null );
+			
+				active = true;
+				
+				return( true );
+				
+			}catch( Throwable e ){
+				
+				active = false;
+				
+				log( "Activation failed", e );
+				
+				deactivate();
+				
+				return( false );
+			}
+		}
+	}
+	
+	private void
+	deactivate()
+	{
+		synchronized( active_lock ){
+			
+			active = false;
+			
+			if ( web_server != null ){
+				
+				try{
+					
+					web_server.destroy();
+					
+				}catch( Throwable f ){
+					
+				}
+				
+				web_server = null;
+			}
+			
+			if ( tracker_proxy != null ){
+				
+				try{
+					
+					tracker_proxy.destroy();
+					
+				}catch( Throwable f ){
+					
+				}
+				
+				tracker_proxy = null;
+			}
+			
+			if ( js_proxy != null ){
+				
+				try{
+					
+					js_proxy.destroy();
+					
+				}catch( Throwable f ){
+					
+				}
+				
+				js_proxy = null;
+			}
+		}
+	}
+	
+	private String
+	findCommand(
+		String	name )
+	{
+		final String[]  locations = { "/bin", "/usr/bin" };
+
+		for ( String s: locations ){
+
+			File f = new File( s, name );
+
+			if ( f.exists() && f.canRead()){
+
+				return( f.getAbsolutePath());
+			}
+		}
+
+		return( name );
+	}
+	
 	public URL
 	getProxyURL(
 		URL		url )
 		
 		throws IPCException
 	{
-		if ( web_server == null || js_proxy == null || unloaded ){
+		if ( unloaded ){
 			
-			throw( new IPCException( "Proxy unavailable" ));
+			throw( new IPCException( "Proxy unavailable: plugin unloaded" ));
 		}
 		
-		try{
-			return( new URL( "http://127.0.0.1:" + web_server.getPort() + "/?target=" + UrlUtils.encode( url.toExternalForm())));
+		if ( activate()){
+				
+			try{
+				return( new URL( "http://127.0.0.1:" + web_server.getPort() + "/?target=" + UrlUtils.encode( url.toExternalForm())));
+				
+			}catch( Throwable e ){
+				
+				throw( new IPCException( e ));
+			}
+		}else{
 			
-		}catch( Throwable e ){
-			
-			throw( new IPCException( e ));
+			throw( new IPCException( "Proxy unavailable" ));
 		}
 	}
 	
@@ -294,25 +766,21 @@ WebTorrentPlugin
 			view_model = null;
 		}
 		
-		if ( js_proxy != null ){
-			
-			js_proxy.destroy();
-			
-			js_proxy = null;
-		}
+		deactivate();
+	}
 	
-		if ( tracker_proxy != null ){
-			
-			tracker_proxy.destroy();
-			
-			tracker_proxy = null;
-		}
-		
-		if ( web_server != null ){
-			
-			web_server.destroy();
-			
-			web_server = null;
-		}
+	private void
+	log(
+		String		str )
+	{
+		log.log( str );
+	}
+	
+	private void
+	log(
+		String		str,
+		Throwable	e )
+	{
+		log.log( str, e );
 	}
 }

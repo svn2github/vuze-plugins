@@ -53,7 +53,8 @@ public class
 TrackerProxy 
 	implements LocalWebServer.Listener
 {
-	private final Listener		listener;
+	private final WebTorrentPlugin		plugin;
+	private final Listener				listener;
 	
 	private Map<String,ClientSession>	client_sessions = new HashMap<String, ClientSession>();
 
@@ -62,8 +63,10 @@ TrackerProxy
 	
 	protected
 	TrackerProxy(
-		Listener		_listener )
+		WebTorrentPlugin	_plugin,
+		Listener			_listener )
 	{
+		plugin		= _plugin;
 		listener	= _listener;
 	}
 	
@@ -165,11 +168,19 @@ TrackerProxy
 					
 				}else{
 					
-					offer = listener.getOffer( info_hash, read_timeout - 5*1000 );
+					long	start = SystemTime.getMonotonousTime();
 					
+					offer = listener.getOffer( info_hash, read_timeout - 5*1000 );
+				
 					if ( offer == null ){
 						
 						throw( new IOException( "WebTorrent proxy appears to be unavailable" ));
+						
+					}else{
+						
+						long	elapsed = SystemTime.getMonotonousTime() - start;
+						
+						//System.out.println( "Offer generation took " + elapsed );
 					}
 				}
 			}
