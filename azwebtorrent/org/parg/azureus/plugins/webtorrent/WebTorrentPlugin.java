@@ -599,6 +599,7 @@ WebTorrentPlugin
 	
 				tracker_proxy = 
 					new TrackerProxy(
+						this,
 						new TrackerProxy.Listener()
 						{
 					    	public JavaScriptProxy.Offer
@@ -634,7 +635,9 @@ WebTorrentPlugin
 						});
 				
 				web_server = new LocalWebServer( instance_id, js_proxy.getPort(), tracker_proxy );
-											
+					
+				status_label.setLabelText( loc_utils.getLocalisedMessageText( "azwebtorrent.status.ok" ));
+
 				launchBrowser( null );
 			
 				active = true;
@@ -643,6 +646,8 @@ WebTorrentPlugin
 				
 			}catch( Throwable e ){
 				
+				status_label.setLabelText( loc_utils.getLocalisedMessageText( "azwebtorrent.status.fail", new String[]{ Debug.getNestedExceptionMessage(e) }));
+
 				active = false;
 				
 				log( "Activation failed", e );

@@ -78,37 +78,56 @@ JavaScriptProxyInstance
     
     	throws Exception
     {
-    	listener	= _listener;
-    	
-    	int[] potential_ports = new int[32];
-    	
-    	potential_ports[0] = 8025;		// default
-    	
-    	for ( int i=1;i<potential_ports.length;i++){
+    	ClassLoader old_loader = Thread.currentThread().getContextClassLoader();
+    
+    	try{
+    			// need to do this as the tyrus/grizzly stuff explicitly uses the context class
+    			// loader to instantiate things and this fails if it isn't the plugin one
     		
-    		potential_ports[i] = 2000 + (RandomUtils.nextAbsoluteInt()%60000);
-    	}
+    		Thread.currentThread().setContextClassLoader( JavaScriptProxyInstance.class.getClassLoader());
     	
-    	Exception last_error = null;
-    	
-    	for ( int port: potential_ports ){
-    	
+	    	listener	= _listener;
+	    	
+	    	int[] potential_ports = new int[32];
+	    	
+	    	potential_ports[0] = 8025;		// default
+	    	
+	    	for ( int i=1;i<potential_ports.length;i++){
+	    		
+	    		potential_ports[i] = 2000 + (RandomUtils.nextAbsoluteInt()%60000);
+	    	}
+	    	
+	    	Exception last_error = null;
+	    	
+	    	for ( int port: potential_ports ){
+	    	
+	    		try{
+	    			Map<String,Object>	properties = new HashMap<>();
+	    			
+	    			Server server = new Server( "127.0.0.1", port, "/websockets", properties, JavaScriptProxyInstance.class);
+	        
+	    			server.start();
+	    	
+	    			return( new ServerWrapper( server, port ));
+	    			
+	    		}catch( DeploymentException e ){
+	    			
+	    			last_error = e;
+	    		}
+	    	}
+	    	
+	    	throw( last_error );
+	    	
+    	}finally{
+    		
     		try{
-    			Map<String,Object>	properties = new HashMap<>();
+    			Thread.currentThread().setContextClassLoader( old_loader );
     			
-    			Server server = new Server( "127.0.0.1", port, "/websockets", properties, JavaScriptProxyInstance.class);
-        
-    			server.start();
-    	
-    			return( new ServerWrapper( server, port ));
+    		}catch( Throwable e ){
     			
-    		}catch( DeploymentException e ){
-    			
-    			last_error = e;
+    			Debug.out( e );
     		}
     	}
-    	
-    	throw( last_error );
     }
     
 

@@ -175,6 +175,12 @@ var page_timer =
 			
 			var down_rate = down_average.getAverage();
 
+			if ( !haveAnyPeers() ){
+				
+				up_rate 	= 0;
+				down_rate	= 0;
+			}
+			
 			total_up_element.innerHTML = "<b>" + prettyNumber( total_up, "IEC" ) + " (" + prettyNumber( up_rate, "IEC" ) +"/sec)</b>";
 			
 			total_down_element.innerHTML = "<b>" + prettyNumber( total_down, "IEC" ) + " (" + prettyNumber( down_rate, "IEC" ) +"/sec)</b>";
@@ -259,6 +265,19 @@ function havePeer( peer ){
 		
 		return( false );
 	}
+}
+
+function haveAnyPeers()
+{
+	for ( var offer_id in peers ){
+		
+	    if ( peers.hasOwnProperty(offer_id)){
+	    	
+	    	return( true );
+	    }
+	}
+	
+	return( false );
 }
 
 function removePeer( peer )
