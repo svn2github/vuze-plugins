@@ -88,6 +88,8 @@ TrackerProxy
 			int		numwant		= 0;
 			long	uploaded	= 0;
 			long	downloaded	= 0;
+			long	left		= 0;
+			
 			String	event		= null;
 			byte[]	info_hash	= null;
 			byte[]	peer_id		= null;
@@ -110,6 +112,10 @@ TrackerProxy
 				}else if ( lhs.equals( "downloaded" )){
 					
 					downloaded = Long.parseLong( rhs );
+					
+				}else if ( lhs.equals( "left" )){
+					
+					left = Long.parseLong( rhs );
 					
 				}else if ( lhs.equals( "event" )){
 					
@@ -230,6 +236,7 @@ TrackerProxy
 	        			"{\"numwant\":" + numwant + 
 	        			",\"uploaded\":" + uploaded + 
 	        			",\"downloaded\":" + downloaded + 
+	        			",\"left\":" + left + 
 	        			(event==null?"": ( ",\"event\":\"" + event + "\"" )) + 
 	        			",\"info_hash\":\"" + encodeCrap( info_hash ) + "\"" +
 	        			",\"peer_id\":\"" + encodeCrap( peer_id ) + "\"" +
