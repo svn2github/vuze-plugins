@@ -142,7 +142,21 @@ WebTorrentPlugin
 
 		view_model.setConfigSectionID( "azwebtorrent.name" );
 
+		
+		
+		config_model.addLabelParameter2( "azwebtorrent.info" );
+
+		config_model.addLabelParameter2( "azwebtorrent.blank" );
+
+		config_model.addHyperlinkParameter2( "azwebtorrent.link", loc_utils.getLocalisedMessageText( "azwebtorrent.link.url" ));
+		
+		config_model.addLabelParameter2( "azwebtorrent.blank" );
+
+		
+	
 		status_label = config_model.addLabelParameter2( "azwebtorrent.status");
+
+		config_model.addLabelParameter2( "azwebtorrent.browser.info" );
 
 		final ActionParameter browser_launch_param = config_model.addActionParameter2( "azwebtorrent.browser.launch", "azwebtorrent.browser.launch.button" );
 		

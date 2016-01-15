@@ -144,7 +144,7 @@ function prettyNumber(pBytes, pUnits) {
         // IEC units use 2^10 as an order of magnitude
         var orderOfMagnitude = Math.pow(2, 10);
         //var abbreviations = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB'];
-        var abbreviations = ['B', 'KB', 'MB', 'iB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+        var abbreviations = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
     }
     var i = Math.floor(Math.log(bytes) / Math.log(orderOfMagnitude));
     var result = (bytes / Math.pow(orderOfMagnitude, i));
