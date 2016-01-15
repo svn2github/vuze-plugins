@@ -65,6 +65,8 @@ import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 
 
 
+import org.gudy.azureus2.ui.swt.Utils;
+
 import com.aelitis.azureus.core.util.GeneralUtils;
 
 
@@ -169,15 +171,23 @@ WebTorrentPlugin
 				{
 					browser_launch_param.setEnabled( false );
 					
-					launchBrowser(
-						new Runnable()
+					Runnable cb = new Runnable()
+					{
+						@Override
+						public void run() 
 						{
-							@Override
-							public void run() 
-							{
-								browser_launch_param.setEnabled( true );
-							}
-						});
+							browser_launch_param.setEnabled( true );
+						}
+					};
+					
+					if ( active ){
+						
+						launchBrowser( cb );
+								
+					}else{
+						
+						activate( cb );
+					}
 				}
 			});
 	}
@@ -546,7 +556,16 @@ WebTorrentPlugin
 						}
 					}
 					
+					String	url = "http://127.0.0.1:" + web_server.getPort() + "/index.html?id=" + instance_id;
+
 					try{
+						if ( !Constants.isWindows ){
+							
+							Utils.launch( new URL( url ));
+							
+							return;
+						}
+						
 						File browser_dir = checkBrowserInstall();
 						
 						File plugin_dir = plugin_interface.getPluginconfig().getPluginUserFile( "test" ).getParentFile();
@@ -555,9 +574,7 @@ WebTorrentPlugin
 		
 						data_dir.mkdirs();
 						browser_dir.mkdirs();
-						
-						String	url = "http://127.0.0.1:" + web_server.getPort() + "/index.html?id=" + instance_id;
-						
+											
 						String[] args = {
 							"chrome.exe",
 							"--window-size=600,600",
@@ -588,87 +605,100 @@ WebTorrentPlugin
 	}
 	
 	private boolean
-	activate()
+	activate(
+		Runnable	callback )
 	{
-		synchronized( active_lock ){
-			
-			if ( active ){
+		boolean	async = false;
+		
+		try{
+			synchronized( active_lock ){
 				
-				return( true );
-			}
-			
-			long	now = SystemTime.getMonotonousTime();
-			
-			if ( last_activation_attempt != 0 && now - last_activation_attempt < 30*1000 ){
-				
-				return( false );
-			}
-			
-			last_activation_attempt = now;
-			
-			log( "Activating" );
-			
-			try{
-				js_proxy = JavaScriptProxyManager.getProxy( instance_id );
-	
-				tracker_proxy = 
-					new TrackerProxy(
-						this,
-						new TrackerProxy.Listener()
-						{
-					    	public JavaScriptProxy.Offer
-					    	getOffer(
-					    		byte[]		hash,
-					    		long		timeout )
-					    	{
-					    		return( js_proxy.getOffer( hash, timeout ));
-					    	}
-					    	
-					    	public void
-					    	gotAnswer(
-					    		byte[]		hash,
-					    		String		offer_id,
-					    		String		sdp )
-					    		
-					    		throws Exception
-					    	{
-					    		js_proxy.gotAnswer( offer_id, sdp );
-					    	}
-					    	
-					    	public void
-					    	gotOffer(
-					    		byte[]							hash,
-					    		String							offer_id,
-					    		String							sdp,
-					    		JavaScriptProxy.AnswerListener 	listener )
-					    		
-					    		throws Exception
-					    	{
-					    		js_proxy.gotOffer( hash, offer_id, sdp, listener );
-					    	}
-						});
-				
-				web_server = new LocalWebServer( instance_id, js_proxy.getPort(), tracker_proxy );
+				if ( active ){
 					
-				status_label.setLabelText( loc_utils.getLocalisedMessageText( "azwebtorrent.status.ok" ));
-
-				launchBrowser( null );
+					return( true );
+				}
+				
+				long	now = SystemTime.getMonotonousTime();
+				
+				if ( last_activation_attempt != 0 && now - last_activation_attempt < 30*1000 ){
+					
+					return( false );
+				}
+				
+				last_activation_attempt = now;
+				
+				log( "Activating" );
+				
+				try{
+					js_proxy = JavaScriptProxyManager.getProxy( instance_id );
+		
+					tracker_proxy = 
+						new TrackerProxy(
+							this,
+							new TrackerProxy.Listener()
+							{
+						    	public JavaScriptProxy.Offer
+						    	getOffer(
+						    		byte[]		hash,
+						    		long		timeout )
+						    	{
+						    		return( js_proxy.getOffer( hash, timeout ));
+						    	}
+						    	
+						    	public void
+						    	gotAnswer(
+						    		byte[]		hash,
+						    		String		offer_id,
+						    		String		sdp )
+						    		
+						    		throws Exception
+						    	{
+						    		js_proxy.gotAnswer( offer_id, sdp );
+						    	}
+						    	
+						    	public void
+						    	gotOffer(
+						    		byte[]							hash,
+						    		String							offer_id,
+						    		String							sdp,
+						    		JavaScriptProxy.AnswerListener 	listener )
+						    		
+						    		throws Exception
+						    	{
+						    		js_proxy.gotOffer( hash, offer_id, sdp, listener );
+						    	}
+							});
+					
+					web_server = new LocalWebServer( instance_id, js_proxy.getPort(), tracker_proxy );
+						
+					status_label.setLabelText( loc_utils.getLocalisedMessageText( "azwebtorrent.status.ok" ));
+	
+					launchBrowser( callback );
+				
+					async = true;
+					
+					active = true;
+					
+					return( true );
+					
+				}catch( Throwable e ){
+					
+					status_label.setLabelText( loc_utils.getLocalisedMessageText( "azwebtorrent.status.fail", new String[]{ Debug.getNestedExceptionMessage(e) }));
+	
+					active = false;
+					
+					log( "Activation failed", e );
+					
+					deactivate();
+					
+					return( false );
+				}
+			}
+		}finally{
 			
-				active = true;
+			if ( !async && callback != null ){
 				
-				return( true );
-				
-			}catch( Throwable e ){
-				
-				status_label.setLabelText( loc_utils.getLocalisedMessageText( "azwebtorrent.status.fail", new String[]{ Debug.getNestedExceptionMessage(e) }));
-
-				active = false;
-				
-				log( "Activation failed", e );
-				
-				deactivate();
-				
-				return( false );
+				callback.run();
 			}
 		}
 	}
@@ -751,7 +781,7 @@ WebTorrentPlugin
 			throw( new IPCException( "Proxy unavailable: plugin unloaded" ));
 		}
 		
-		if ( activate()){
+		if ( activate( null )){
 				
 			try{
 				return( new URL( "http://127.0.0.1:" + web_server.getPort() + "/?target=" + UrlUtils.encode( url.toExternalForm())));
