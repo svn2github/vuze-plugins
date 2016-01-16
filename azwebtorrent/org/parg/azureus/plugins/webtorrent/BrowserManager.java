@@ -465,7 +465,7 @@ BrowserManager
 							"--incognito",
 							"--no-default-browser-check",
 							"--no-first-run",
-							"--user-data-dir=\"" + data_dir.getAbsolutePath() + "\""
+							"--user-data-dir=" + (Constants.isOSX?data_dir.getAbsolutePath():("\"" + data_dir.getAbsolutePath() + "\""))
 						};
 							
 						
