@@ -67,7 +67,13 @@ BrowserManager
 	 * OSX - 64 bit only
 	 * Removed ...Version/<nnn>/Google Chrome Framework.framework/
 	 *     Default Apps
-	 *     Internet Plug-Ins
+	 *     Internet Plug-Ins 
+	 *     
+	 * Linux
+	 * Removed
+	 *     cron
+	 *     default_apps
+	 *     PepperFlash 
 	 */
 	private Object			browser_lock = new Object();
 	private Process			browser_process;
@@ -442,14 +448,7 @@ BrowserManager
 					}
 					
 
-					try{
-						if ( !( Constants.isWindows || Constants.isOSX )){
-							
-							Utils.launch( new URL( url ));
-							
-							return;
-						}
-						
+					try{						
 						File browser_dir = checkBrowserInstall( plugin );
 						
 						File plugin_dir = plugin.getPluginInterface().getPluginconfig().getPluginUserFile( "test" ).getParentFile();
@@ -480,7 +479,7 @@ BrowserManager
 							
 							args.add( url );
 							
-						}else{
+						}else if ( Constants.isOSX ){
 							
 							args.add( "open" );
 							args.add( "-a" );
@@ -491,7 +490,17 @@ BrowserManager
 							for ( String fa: fixed_args ){
 								args.add( fa );
 							}
+						}else{
+							
+							args.add( "./chrome" );
+							
+							for ( String fa: fixed_args ){
+								args.add( fa );
+							}
+							
+							args.add( url );
 						}
+						
 						ProcessBuilder pb = GeneralUtils.createProcessBuilder( browser_dir, args.toArray(new String[args.size()]), null );
 	
 						if ( Constants.isOSX ){
@@ -566,7 +575,7 @@ BrowserManager
 			
 		}else{
 			
-			return( getLinuxProcesses( "????", null ));
+			return( getLinuxProcesses( "chrome", null ));
 		}
 	}
 	
