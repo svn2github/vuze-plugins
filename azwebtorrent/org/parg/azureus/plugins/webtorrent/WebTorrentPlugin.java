@@ -206,7 +206,7 @@ WebTorrentPlugin
 				log( "Activating" );
 				
 				try{
-					js_proxy = JavaScriptProxyManager.getProxy( instance_id );
+					js_proxy = JavaScriptProxyManager.getProxy( this, instance_id );
 		
 					tracker_proxy = 
 						new TrackerProxy(
@@ -399,7 +399,7 @@ WebTorrentPlugin
 		log( init_error );	
 	}
 	
-	protected PluginInterface
+	public PluginInterface
 	getPluginInterface()
 	{
 		return( plugin_interface );

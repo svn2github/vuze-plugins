@@ -286,6 +286,8 @@ function removePeer( peer )
 	
 	if ( peers[ offer_id ] ){
 		
+		delete peers[ peer.offer_id ];
+
 		var channel = peer.vuzedc;
 		
 		if ( channel ){
@@ -318,9 +320,7 @@ function removePeer( peer )
 			peer.close();
 		
 		}catch( err ){
-		}
-		
-		delete peers[ peer.offer_id ];
+		}		
 		
 		trace( "removePeer: " + offer_id + " -> " + Object.keys(peers).length );
 	}
@@ -444,6 +444,58 @@ control_ws.onmessage =
 			  
 				peer.setRemoteDescription( remoteSessionDescription );
 			}	
+		}else if ( x.type == 'ping' ){
+			
+			var info = x.info;
+			
+			if ( info ){
+				
+				var peers_info = info.peers;
+				
+				var update = false;
+				
+				peers_info.forEach(
+					function( peer_info )
+					{
+						var offer_id = peer_info.offer_id;
+						
+						var peer = peers[offer_id];
+						  
+						if ( peer ){
+							
+							var ip 		= peer_info.ip;
+							var client	= peer_info.client;
+							var seeder	= peer_info.seed;
+							var percent	= peer_info.percent;
+							
+							var pct_str = (seeder||percent<0?"":(": " + percent + "%"));
+							
+							var node_text = ip + " (" + client + pct_str + ")";
+														
+							var node = graph.getNode( offer_id );
+							
+							if ( node ){
+							
+								if ( node.ip != node_text ){
+									
+									node.ip = node_text;
+									update 	= true;
+								}
+								
+								if ( node.seeder != seeder ){
+									
+									node.seeder = seeder;
+									update		= true;
+								}
+							}
+						}
+					});
+				
+				if ( update ){
+					
+					graph.update();
+				}
+			}
 		}
 	}
 
@@ -488,39 +540,66 @@ function setupChannel( peer, channel, offer_id, hash, incoming )
 	channel.onopen = function (){
 		trace("datachannel open" );
 		
-		peer.getStats(
-			function( stats )
-			{
-				var remote_ip = "";
-
-				stats.result().forEach(
-					function( result ){
-						var item = {}
-						result.names().forEach(
-							function (name) {
-								item[name] = result.stat(name)
-							});
-						
-						item.id = result.id
-						item.type = result.type
-						item.timestamp = result.timestamp
-										
-						if ( item.type == 'remotecandidate' && item.candidateType != 'relayed' ){
-								
+		if ( typeof window !== 'undefined' && !!window.mozRTCPeerConnection ){
+			
+		    peer.getStats(
+		    	null, 
+		    	function( res)
+		    	{	
+		    		var remote_ip = "";
+		    		
+		    		res.forEach(function (item) {
+		    			
+		    			if ( item.type == 'remotecandidate' && item.candidateType != 'relayed' ){
+							
 							trace( item );
 							
 							remote_ip += (remote_ip==""?"":",") + item.ipAddress;
 						}
-					});
-				
-				setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )	
-				
-				//trace( items );
-			}, null, 
-			function( stats )
-			{
-				setupChannelWS( peer, channel, offer_id, hash, incoming, "" )
-			});
+		    		});
+		    		
+		    		setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip );
+		    	}, 
+		    	function( stats )
+				{
+					setupChannelWS( peer, channel, offer_id, hash, incoming, "" )
+				});
+		}else{
+			
+			peer.getStats(
+				function( stats )
+				{
+					var remote_ip = "";
+	
+					stats.result().forEach(
+						function( result ){
+							var item = {}
+							result.names().forEach(
+								function (name) {
+									item[name] = result.stat(name)
+								});
+							
+							item.id = result.id
+							item.type = result.type
+							item.timestamp = result.timestamp
+											
+							if ( item.type == 'remotecandidate' && item.candidateType != 'relayed' ){
+									
+								trace( item );
+								
+								remote_ip += (remote_ip==""?"":",") + item.ipAddress;
+							}
+						});
+					
+					setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )	
+					
+					//trace( items );
+				}, null, 
+				function( stats )
+				{
+					setupChannelWS( peer, channel, offer_id, hash, incoming, "" )
+				});
+			}
 		};
 		
 		// buffer any messages we receive while waiting for stats

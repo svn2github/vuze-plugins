@@ -31,6 +31,7 @@ import java.util.Map;
 
 
 
+
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.Base32;
 import org.gudy.azureus2.core3.util.Debug;
@@ -39,6 +40,7 @@ import org.gudy.azureus2.core3.util.SimpleTimer;
 import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.parg.azureus.plugins.webtorrent.JavaScriptProxy;
+import org.parg.azureus.plugins.webtorrent.WebTorrentPlugin;
 
 
 public class 
@@ -52,7 +54,7 @@ JavaScriptProxyImpl
 	
 	private static volatile JavaScriptProxyImpl	current_proxy;
 	
-	private static JavaScriptProxyPeerBridge	peer_bridge = new JavaScriptProxyPeerBridge();
+	private static JavaScriptProxyPeerBridge	peer_bridge;
 	
 	private final long	instance_id;	
 	
@@ -67,11 +69,17 @@ JavaScriptProxyImpl
 	
 	public
 	JavaScriptProxyImpl(
-		long		_instance_id )
+		WebTorrentPlugin		_plugin,
+		long					_instance_id )
 		
 		throws Exception
 	{		
 		synchronized( lock ){
+			
+			if ( peer_bridge == null ){
+				
+				peer_bridge = new JavaScriptProxyPeerBridge( _plugin );
+			}
 			
 			instance_id		= _instance_id;
 			
@@ -153,6 +161,8 @@ JavaScriptProxyImpl
 
 										ping.put( "type", "ping" );
 
+										ping.put( "info", peer_bridge.getInfo());
+										
 										current_instance.sendControlMessage( ping );
 
 									}catch( Throwable e ){

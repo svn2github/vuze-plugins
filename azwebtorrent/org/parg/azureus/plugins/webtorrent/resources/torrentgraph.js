@@ -196,7 +196,6 @@ function TorrentGraph (root) {
 
     g.append('text')
       .attr('class', 'text')
-      .text(function (d) { return d.me ? 'You' : d.ip })
 
     node.select('text')
       .attr('font-size', function (d) {
@@ -206,6 +205,7 @@ function TorrentGraph (root) {
       .attr('dy', function (d) {
         return d.me ? -22 * scale() : -15 * scale()
       }).style( 'fill', 'white')
+      .text(function (d) { return d.me ? 'Vuze' : d.ip })
 
     node.exit()
       .remove()
@@ -352,7 +352,9 @@ function TorrentGraph (root) {
     connect: connect,
     disconnect: disconnect,
     unchoke: unchoke,
-    choke: choke
+    choke: choke,
+    getNode: getNode,
+    update: update
   }
 }
 

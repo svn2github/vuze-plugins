@@ -37,7 +37,9 @@ import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
-import org.gudy.azureus2.core3.util.RandomUtils;
+import org.gudy.azureus2.plugins.download.Download;
+import org.gudy.azureus2.plugins.peers.Peer;
+import org.parg.azureus.plugins.webtorrent.WebTorrentPlugin;
 
 import com.aelitis.azureus.core.networkmanager.admin.NetworkAdmin;
 import com.aelitis.azureus.core.peermanager.messaging.bittorrent.BTHandshake;
@@ -59,7 +61,16 @@ JavaScriptProxyPeerBridge
 		System.arraycopy( reserved,0,fake_header_and_reserved, 20, 8 );
 	}
 	
+	private WebTorrentPlugin	plugin;
+	
 	private Map<JavaScriptProxyInstance,Connection>		peer_map = new HashMap<>();
+	
+	public
+	JavaScriptProxyPeerBridge(
+		WebTorrentPlugin		_plugin )
+	{
+		plugin = _plugin;
+	}
 	
 	public void
 	addPeer(
@@ -105,6 +116,26 @@ JavaScriptProxyPeerBridge
 			
 			connection.destroy();
 		}
+	}
+	
+	public Map<String,Object>
+	getInfo()
+	{
+		Map<String,Object>	result = new HashMap<>();
+		
+		List<Map<String,Object>>	peers = new ArrayList<>();
+		
+		result.put( "peers", peers );
+		
+		synchronized( peer_map ){
+			
+			for ( Connection c: peer_map.values()){
+				
+				peers.add( c.getInfo());
+			}
+		}
+		
+		return( result );
 	}
 	
 	public void
@@ -162,6 +193,8 @@ JavaScriptProxyPeerBridge
 		private	JavaScriptProxyInstance				proxy;
 		private Socket								vuze_socket;
 		
+		private Peer								peer;
+		
 		private AEProxyAddressMapper.PortMapping	mapping;
 		
 		AESemaphore		wait_sem = new AESemaphore( "" );
@@ -177,6 +210,33 @@ JavaScriptProxyPeerBridge
 			proxy	= _proxy;
 		}
 		
+		private Peer
+		fixup()
+		{
+			synchronized( this ){
+				
+				if ( peer == null ){
+					
+					try{
+						Download download = plugin.getPluginInterface().getDownloadManager().getDownload( proxy.getInfoHash());
+						
+						if ( download != null ){
+							
+							Peer[] peers = download.getPeerManager().getPeers( proxy.getRemoteIP());
+							
+							if ( peers.length > 0 ){
+								
+								peer	= peers[0];
+							}
+						}
+					}catch( Throwable e ){
+						
+					}
+				}
+			}
+			
+			return( peer );
+		}
 		private void
 		start()
 		
@@ -227,13 +287,6 @@ JavaScriptProxyPeerBridge
 					os.write( fake_header_and_reserved );
 					
 					os.write( proxy.getInfoHash());
-					/*
-					byte[] peer_id = new byte[20];
-					
-					RandomUtils.nextBytes( peer_id );
-					
-					os.write( peer_id );
-					*/
 					
 					os.flush();
 					
@@ -260,16 +313,7 @@ JavaScriptProxyPeerBridge
 									break;
 								}
 								
-								if ( total_sent == 11111 && len >= 68 ){
-									
-									proxy.sendPeerMessage( ByteBuffer.wrap( buffer, 0, 68 ));
-									
-									proxy.sendPeerMessage( ByteBuffer.wrap( buffer, 68, len-68 ));
-									
-								}else{
-									
-									proxy.sendPeerMessage( ByteBuffer.wrap( buffer, 0, len ));
-								}
+								proxy.sendPeerMessage( ByteBuffer.wrap( buffer, 0, len ));
 								
 								total_sent += len;
 							}
@@ -337,6 +381,37 @@ JavaScriptProxyPeerBridge
 				
 				destroy();
 			}
+		}
+		
+		private Map<String,Object>
+		getInfo()
+		{
+			Map<String,Object>	result = new HashMap<>();
+			
+			result.put( "offer_id", String.valueOf( proxy.getOfferID()));
+			
+			result.put( "ip", proxy.getRemoteIP());
+			
+			Peer peer = fixup();
+			
+			if ( peer != null ){
+				
+				result.put( "client", peer.getClient());
+				
+				result.put( "seed", peer.isSeed());
+				
+				result.put( "percent", peer.getPercentDoneInThousandNotation()/10);
+				
+			}else{
+				
+				result.put( "client", "Unknown" );
+				
+				result.put( "seed", false );
+				
+				result.put( "percent", -1 );
+			}
+			
+			return( result );
 		}
 		
 		private void

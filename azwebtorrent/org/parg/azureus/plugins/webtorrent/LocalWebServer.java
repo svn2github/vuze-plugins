@@ -93,7 +93,13 @@ LocalWebServer
 		
 		peer_config.put( "iceServers", ice_servers);
 		
+			// apparently 'urls' is the new way of doing this - use both for the moment
+		
+		List<String>	urls = new ArrayList<>();
+
 		for ( String url: ice_urls ){
+			
+			urls.add( url );
 			
 			Map<String,Object> m = new HashMap<>();
 			
@@ -101,6 +107,12 @@ LocalWebServer
 			
 			m.put( "url", url );
 		}
+		
+		Map<String,Object>	urls_map = new HashMap<>();
+		
+		urls_map.put( "urls", urls );
+		
+		ice_servers.add( urls_map );
 		
 		ws_config = JSONUtils.encodeToJSON( config_map );
 		
