@@ -149,14 +149,15 @@ public class PromoPlugin
 			}
 		}
 		
-		if ( !COConfigurationManager.getBooleanParameter( "Plugin.azpromo.enabled", true )){
+		String plugin_state = COConfigurationManager.getBooleanParameter( "Plugin.azpromo.enabled", true )?"e":"d";
 			
-			PluginConfig pc = pluginInterface.getPluginconfig();
+		plugin_state += "-" + pi.getPluginVersion();
+		
+		PluginConfig pc = pluginInterface.getPluginconfig();
 			
-			if ( !pc.getPluginStringParameter( "plugin.info", "" ).equals( "d" )){
+		if ( !pc.getPluginStringParameter( "plugin.info", "" ).equals( plugin_state )){
 				
-				pc.setPluginParameter( "plugin.info", "d" );
-			}
+			pc.setPluginParameter( "plugin.info", plugin_state );
 		}
 		
 		UIManager uiManager = pluginInterface.getUIManager();
