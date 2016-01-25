@@ -30,7 +30,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.LineNumberReader;
 import java.io.OutputStream;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -50,7 +49,6 @@ import org.gudy.azureus2.core3.util.FileUtil;
 import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
-import org.gudy.azureus2.ui.swt.Utils;
 
 import com.aelitis.azureus.core.util.GeneralUtils;
 
@@ -75,6 +73,13 @@ BrowserManager
 	 *     default_apps
 	 *     PepperFlash 
 	 */
+	
+	private static final String BROWSER_SIZE = "600,625";
+	
+	private static final String WIN_APP_NAME	= "chrome.exe";
+	private static final String OSX_APP_NAME	= "Chromium.app";
+	private static final String LINUX_APP_NAME	= "chrome";
+	
 	private Object			browser_lock = new Object();
 	private Process			browser_process;
 
@@ -461,7 +466,7 @@ BrowserManager
 						List<String>	args = new ArrayList<>();
 						
 						String[] fixed_args = {
-							"--window-size=600,600",
+							"--window-size=" + BROWSER_SIZE,
 							"--incognito",
 							"--no-default-browser-check",
 							"--no-first-run",
@@ -471,7 +476,7 @@ BrowserManager
 						
 						if ( Constants.isWindows ){
 							
-							args.add( "chrome.exe" );
+							args.add( WIN_APP_NAME );
 							
 							for ( String fa: fixed_args ){
 								args.add( fa );
@@ -483,7 +488,7 @@ BrowserManager
 							
 							args.add( "open" );
 							args.add( "-a" );
-							args.add( new File( browser_dir, "Google Chrome.app" ).getAbsolutePath());
+							args.add( new File( browser_dir, OSX_APP_NAME ).getAbsolutePath());
 							args.add( url );
 							args.add( "--args" );
 							
@@ -492,7 +497,7 @@ BrowserManager
 							}
 						}else{
 							
-							args.add( "./chrome" );
+							args.add( "./" + LINUX_APP_NAME );
 							
 							for ( String fa: fixed_args ){
 								args.add( fa );
@@ -508,7 +513,7 @@ BrowserManager
 							
 							pb.environment().put(
 								"DYLD_LIBRARY_PATH",
-								browser_dir.getAbsolutePath() + slash + "Google Chrome.app" + slash + "Contents" + slash + "MacOS" );
+								browser_dir.getAbsolutePath() + slash + OSX_APP_NAME + slash + "Contents" + slash + "MacOS" );
 						}
 						
 						new BrowserInstance( pb );
@@ -567,15 +572,15 @@ BrowserManager
 	{
 		if ( Constants.isWindows ){
 			
-			return( getWindowsProcesses( "chrome.exe" ));
+			return( getWindowsProcesses( WIN_APP_NAME ));
 			
 		}else if(  Constants.isOSX ){
 			
-			return( getOSXProcesses( "Google Chrome.app" ));
+			return( getOSXProcesses( OSX_APP_NAME ));
 			
 		}else{
 			
-			return( getLinuxProcesses( "chrome", null ));
+			return( getLinuxProcesses( LINUX_APP_NAME, null ));
 		}
 	}
 	

@@ -154,7 +154,14 @@ JavaScriptProxyImpl
 							@Override
 							public void perform(TimerEvent event) {
 							
-								if ( current_instance != null ){
+								JavaScriptProxyInstance	inst;
+								
+								synchronized( lock ){
+									
+									inst = current_instance;
+								}
+								
+								if ( inst != null ){
 
 									try{
 										Map ping = new HashMap();
@@ -163,7 +170,7 @@ JavaScriptProxyImpl
 
 										ping.put( "info", peer_bridge.getInfo());
 										
-										current_instance.sendControlMessage( ping );
+										inst.sendControlMessage( ping );
 
 									}catch( Throwable e ){
 

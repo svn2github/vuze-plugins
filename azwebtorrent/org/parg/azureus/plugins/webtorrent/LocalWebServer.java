@@ -317,6 +317,11 @@ LocalWebServer
 					resource 		= url.substring(1);
 					content_type	= "application/javascript;charset=UTF-8";
 					
+				}else if ( url.endsWith( ".png" )){
+					
+					resource 		= url.substring(1);
+					content_type	= "image/png";
+					
 				}else if ( url.equals( "/favicon.ico" )){
 
 					resource 		= "favicon.ico";

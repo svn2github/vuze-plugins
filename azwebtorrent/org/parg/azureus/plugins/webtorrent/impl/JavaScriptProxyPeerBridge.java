@@ -193,6 +193,7 @@ JavaScriptProxyPeerBridge
 		private	JavaScriptProxyInstance				proxy;
 		private Socket								vuze_socket;
 		
+		private String								remote_ip;
 		private Peer								peer;
 		
 		private AEProxyAddressMapper.PortMapping	mapping;
@@ -222,7 +223,7 @@ JavaScriptProxyPeerBridge
 						
 						if ( download != null ){
 							
-							Peer[] peers = download.getPeerManager().getPeers( proxy.getRemoteIP());
+							Peer[] peers = download.getPeerManager().getPeers( remote_ip );
 							
 							if ( peers.length > 0 ){
 								
@@ -237,6 +238,7 @@ JavaScriptProxyPeerBridge
 			
 			return( peer );
 		}
+		
 		private void
 		start()
 		
@@ -253,10 +255,8 @@ JavaScriptProxyPeerBridge
 				
 					// we need to pass the peer_ip to the core so that it doesn't just see '127.0.0.1'
 				
-				String remote_ip = proxy.getRemoteIP();
-				
-				//Debug.outNoStack( "remote-ip disabled for testing" );
-				
+				remote_ip = proxy.getRemoteIP();
+								
 				if ( remote_ip == null ){
 					
 					remote_ip = "websocket." + ( proxy.isIncoming()?1:0) + local_port;

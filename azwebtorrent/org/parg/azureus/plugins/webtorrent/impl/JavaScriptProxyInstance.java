@@ -23,6 +23,7 @@
 package org.parg.azureus.plugins.webtorrent.impl;
 
 import java.io.IOException;
+import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -249,7 +250,7 @@ JavaScriptProxyInstance
 			if ( remote != null ){
 				
 				String[] ips = remote.split(",");
-				
+								
 				for ( String ip: ips ){
 					
 					try{
@@ -261,11 +262,25 @@ JavaScriptProxyInstance
 							
 						}else{
 							
-							remote_ip = ip;
+								// prefer ipv4 over ipv6 for display purposes
+							
+							if ( ia instanceof Inet4Address ){
+								
+								remote_ip = ip; 
+								
+							}else{
+								
+								if ( remote_ip == null ){
+									
+									remote_ip = ip; 
+								}
+							}
 						}
 					}catch( Throwable e ){
 					}
 				}
+				
+				
 			}
 			
 			listener.peerCreated( this );
