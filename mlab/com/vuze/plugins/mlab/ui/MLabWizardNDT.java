@@ -249,7 +249,8 @@ MLabWizardNDT
 	{
 		if ( Constants.isWindows || Constants.isOSX ){
 		
-			wizard.setNextEnabled( enabled );
+			wizard.setNextEnabled( false );	// no shaper probe any more
+			//wizard.setNextEnabled( enabled );
 			
 		}else{
 			
