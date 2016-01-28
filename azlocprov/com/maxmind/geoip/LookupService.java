@@ -119,7 +119,7 @@ public class LookupService {
     private final static int MAX_ORG_RECORD_LENGTH = 300;
     private final static int FULL_RECORD_LENGTH = 60;
 
-    private final Country UNKNOWN_COUNTRY = new Country("--", "N/A");
+    public static final Country UNKNOWN_COUNTRY = new Country("--", "N/A");		// PARG - changed this as causing conflicts with Country Locator when fixing up to 'wrong' LookupService class
 
     private static final String[] countryCode = { "--", "AP", "EU", "AD", "AE",
             "AF", "AG", "AI", "AL", "AM", "CW", "AO", "AQ", "AR", "AS", "AT",
