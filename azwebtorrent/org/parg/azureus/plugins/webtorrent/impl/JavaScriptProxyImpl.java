@@ -32,11 +32,13 @@ import java.util.Map;
 
 
 
+
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.Base32;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.SimpleTimer;
+import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.parg.azureus.plugins.webtorrent.JavaScriptProxy;
@@ -70,7 +72,8 @@ JavaScriptProxyImpl
 	public
 	JavaScriptProxyImpl(
 		WebTorrentPlugin		_plugin,
-		long					_instance_id )
+		long					_instance_id,
+		final Callback			_callback )
 		
 		throws Exception
 	{		
@@ -149,7 +152,11 @@ JavaScriptProxyImpl
 				SimpleTimer.addPeriodicEvent(
 						"WSTimer",
 						5*1000,
-						new TimerEventPerformer() {
+						new TimerEventPerformer()
+						{	
+							private long	first_failure;
+							
+							private int		consecutive_relaunch_requests;
 							
 							@Override
 							public void perform(TimerEvent event) {
@@ -160,6 +167,8 @@ JavaScriptProxyImpl
 									
 									inst = current_instance;
 								}
+								
+								boolean	ok = false;
 								
 								if ( inst != null ){
 
@@ -172,9 +181,55 @@ JavaScriptProxyImpl
 										
 										inst.sendControlMessage( ping );
 
+										ok = true;
+										
 									}catch( Throwable e ){
 
 										Debug.out( e );
+									}
+								}
+								
+								long	now = SystemTime.getMonotonousTime();
+								
+								if ( ok ){
+																		
+									first_failure					= 0;
+									consecutive_relaunch_requests	= 0;
+									
+								}else{
+									
+									if ( first_failure == 0 ){
+										
+										first_failure = now;
+										
+									}else{
+										
+										long	failed_ago = now - first_failure;
+																				
+										long	delay = 60*1000;
+																					
+										for ( int i=0;i<consecutive_relaunch_requests;i++){
+											
+											delay *= 2;
+											
+											if ( delay > 30*60*1000 ){
+												
+												delay = 30*60*1000;
+												
+												break;
+											}
+										}
+										
+										//System.out.println( "failed_ago=" + failed_ago + ", relaunches=" + consecutive_relaunch_requests );
+
+										if ( failed_ago > delay ){
+											
+											consecutive_relaunch_requests++;
+											
+											first_failure = 0;
+											
+											_callback.requestNewBrowser();
+										}
 									}
 								}
 							}
@@ -230,6 +285,13 @@ JavaScriptProxyImpl
     			
     			current_instance 		= null;
     			current_instance_sem	= new AESemaphore( "" );
+    			
+    			for ( OfferAnswerImpl oa: offer_answer_map.values()){
+    				
+    				oa.destroy();
+    			}
+    			
+    			offer_answer_map.clear();
     		}
     	}
 	}
@@ -485,12 +547,19 @@ JavaScriptProxyImpl
     	protected boolean
     	waitFor(
     		long		timeout )
+    		
+    		throws Exception
     	{
     		boolean done = offer_sem.reserve( timeout );
     		
     		if ( !done ){
     		
     			Debug.out( "Timeout waiting for offer" );
+    		}
+    		
+    		if ( destroyed ){
+    			
+    			throw( new Exception( "Offer destroyed" ));
     		}
     		
     		return( done );
@@ -573,6 +642,14 @@ JavaScriptProxyImpl
     	getOfferID()
     	{
     		return( external_offer_id );
+    	}
+    	
+    	private void
+    	destroy()
+    	{
+    		destroyed	= true;
+    		
+    		offer_sem.releaseForever();
     	}
     }	
 }

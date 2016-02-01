@@ -75,4 +75,11 @@ JavaScriptProxy
 		gotAnswer(
 			Answer		answer );
 	}
+	
+    public interface
+    Callback
+    {
+    	public void
+    	requestNewBrowser();
+    }
 }

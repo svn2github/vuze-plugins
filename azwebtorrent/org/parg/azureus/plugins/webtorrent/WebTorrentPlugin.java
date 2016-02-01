@@ -206,7 +206,19 @@ WebTorrentPlugin
 				log( "Activating" );
 				
 				try{
-					js_proxy = JavaScriptProxyManager.getProxy( this, instance_id );
+					js_proxy = 
+						JavaScriptProxyManager.getProxy( 
+							this, 
+							instance_id,
+							new JavaScriptProxy.Callback() {
+								
+								@Override
+								public void 
+								requestNewBrowser() 
+								{
+									launchBrowser( null );
+								}
+							});
 		
 					tracker_proxy = 
 						new TrackerProxy(

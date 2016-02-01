@@ -55,18 +55,12 @@ import com.aelitis.azureus.core.util.GeneralUtils;
 public class 
 BrowserManager 
 {
-	/* Windows
+	/* Windows (Chromium)
 	 * Removed <nnn>/
-	 *     default_apps
-	 *     Extensions
-	 *     Installer
-	 *     PepperFlash
-	 * 
-	 * OSX - 64 bit only
-	 * Removed ...Version/<nnn>/Google Chrome Framework.framework/
-	 *     Default Apps
-	 *     Internet Plug-Ins 
-	 *     
+	 *    	ui tester
+	 * OSX - 64 bit only (Chromium)
+	 * Removed 
+	 *		nothing  
 	 * Linux
 	 * Removed
 	 *     cron

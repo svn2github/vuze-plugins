@@ -29,11 +29,12 @@ JavaScriptProxyManager
 {
 	public static JavaScriptProxy
 	getProxy(
-		WebTorrentPlugin	plugin,
-		long				instance_id )
+		WebTorrentPlugin			plugin,
+		long						instance_id,
+		JavaScriptProxy.Callback	callback )
 		
 		throws Exception
 	{
-		return( new JavaScriptProxyImpl( plugin, instance_id ));
+		return( new JavaScriptProxyImpl( plugin, instance_id, callback ));
 	}
 }
