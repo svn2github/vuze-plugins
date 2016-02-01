@@ -7035,6 +7035,12 @@ XMWebUIPlugin
 			return( hash );
 		}
 		
+		public Torrent 
+		getTorrent() 
+		{
+			return( null );
+		}
+		
 		public long
 		getTorrentSize()
 		{
