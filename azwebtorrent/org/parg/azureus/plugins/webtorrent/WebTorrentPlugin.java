@@ -24,9 +24,17 @@ package org.parg.azureus.plugins.webtorrent;
 
 
 
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.URI;
 import java.net.URL;
 
 
+
+
+
+import java.util.HashMap;
+import java.util.Map;
 
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.RandomUtils;
@@ -69,6 +77,9 @@ WebTorrentPlugin
 		
 	private BrowserManager	browser_manager = new BrowserManager();
 	
+	private GenericWSClient	gws_client;
+	private GenericWSServer	gws_server;
+	
 	private Object			active_lock	= new Object();
 	private boolean			active;
 	private long			last_activation_attempt;
@@ -83,7 +94,7 @@ WebTorrentPlugin
 		throws PluginException 
 	{
 		plugin_interface = _plugin_interface;
-		
+				
 		loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
 		
 		log	= plugin_interface.getLogger().getTimeStampedChannel( "WebTorrent");
@@ -167,6 +178,19 @@ WebTorrentPlugin
 				}
 			});
 		
+		final ActionParameter test_param = config_model.addActionParameter2( "azwebtorrent.test", "azwebtorrent.test" );
+		
+		test_param.addListener(
+			new ParameterListener()
+			{
+				public void 
+				parameterChanged(
+					Parameter param ) 
+				{
+					runTest();
+				}
+			});
+		
 		plugin_interface.addListener(
 			new PluginAdapter()
 			{
@@ -176,9 +200,10 @@ WebTorrentPlugin
 					browser_manager.killBrowsers();
 				}
 			});
+		
+		gws_client = new GenericWSClient();
+		gws_server = new GenericWSServer();
 	}
-	
-
 	
 	private boolean
 	activate(
@@ -348,7 +373,15 @@ WebTorrentPlugin
 		}
 	}
 	
-
+		// IPC starts
+	
+	
+		/**
+		 * used by the ws(s) protocol handler to get TRACKER SPECIFIC connection
+		 * @param url
+		 * @return
+		 * @throws IPCException
+		 */
 	
 	public URL
 	getProxyURL(
@@ -375,6 +408,93 @@ WebTorrentPlugin
 			throw( new IPCException( "Proxy unavailable" ));
 		}
 	}
+	
+	public void
+	connect(
+		URL					ws_url,
+		Map<String,Object>	options,
+		Map<String,Object>	result )
+		
+		throws IPCException
+	{
+		try{
+			gws_client.connect( ws_url, options, result );
+			
+		}catch( Throwable e ){
+			
+			throw( new IPCException( e ));
+		}
+	}
+	
+		// IPC ends
+	
+	private void
+	runTest()
+	{
+		if ( false ){
+			try{
+				Map<String,Object>	options = new HashMap<>();
+				Map<String,Object>	result = new HashMap<>();
+				
+				connect( 
+					new URL( "ws://localhost:8025/websockets/vuze" ),
+					options,
+					result );
+				
+				OutputStream os = (OutputStream)result.get( "output_stream" );
+				
+				InputStream is = (InputStream)result.get( "input_stream" );
+				
+				os.write( "hello world".getBytes());
+				
+				os.flush();
+				
+				while( true ){
+					
+					byte[] buffer = new byte[1024];
+					
+					int len = is.read( buffer );
+					
+					if ( len == -1 ){
+						
+						break;
+					}
+					
+					System.out.println( new String( buffer, 0, len ));
+				}
+			}catch( Throwable e ){
+				
+				Debug.out( e );
+			}
+		}else{
+			
+			try{
+				gws_server.listen( "127.0.0.1", 7891, "/websockets", plugin_interface.getIPC());
+				
+			}catch( Throwable e ){
+				
+				Debug.out( e  );
+			}
+		}
+	}
+	
+	public void
+	sessionAdded(
+		URI			uri,
+		Object		session )
+	{
+		System.out.println( "sessionAdded: " + uri );
+	}
+	
+	public void
+	sessionRemoved(
+		Object		session )
+	{
+		System.out.println( "sessionRemoved" );
+	}
+	
+		// end of text
+	
 	
 	public void
 	unload()
