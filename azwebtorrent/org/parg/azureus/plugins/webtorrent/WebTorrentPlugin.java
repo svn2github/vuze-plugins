@@ -33,8 +33,11 @@ import java.net.URL;
 
 
 
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.RandomUtils;
@@ -42,6 +45,7 @@ import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.core3.util.UrlUtils;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.ipc.IPCException;
+import org.gudy.azureus2.plugins.ipc.IPCInterface;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
 import org.gudy.azureus2.plugins.ui.UIManager;
@@ -52,6 +56,7 @@ import org.gudy.azureus2.plugins.ui.config.ParameterListener;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
+import org.parg.azureus.plugins.webtorrent.GenericWSServer.ServerWrapper;
 
 
 
@@ -79,6 +84,8 @@ WebTorrentPlugin
 	
 	private GenericWSClient	gws_client;
 	private GenericWSServer	gws_server;
+	
+	private WebTorrentTracker	tracker;
 	
 	private Object			active_lock	= new Object();
 	private boolean			active;
@@ -203,6 +210,16 @@ WebTorrentPlugin
 		
 		gws_client = new GenericWSClient();
 		gws_server = new GenericWSServer();
+		
+		tracker	= new WebTorrentTracker( this, gws_server );
+		
+		try{
+			tracker.start();
+			
+		}catch( Throwable e ){
+			
+			Debug.out( e );
+		}
 	}
 	
 	private boolean
@@ -383,16 +400,24 @@ WebTorrentPlugin
 		 * @throws IPCException
 		 */
 	
+	private void
+	checkLoaded()
+	
+		throws IPCException
+	{
+		if ( unloaded ){
+			
+			throw( new IPCException( "IPC unavailable: plugin unloaded" ));
+		}
+	}
+	
 	public URL
 	getProxyURL(
 		URL		url )
 		
 		throws IPCException
 	{
-		if ( unloaded ){
-			
-			throw( new IPCException( "Proxy unavailable: plugin unloaded" ));
-		}
+		checkLoaded();
 		
 		if ( activate( null )){
 				
@@ -417,6 +442,8 @@ WebTorrentPlugin
 		
 		throws IPCException
 	{
+		checkLoaded();
+		
 		try{
 			gws_client.connect( ws_url, options, result );
 			
@@ -424,6 +451,88 @@ WebTorrentPlugin
 			
 			throw( new IPCException( e ));
 		}
+	}
+	
+	public Object
+	startServer(
+		String				host,
+		int					port,
+		String				context,
+		Map<String,Object>	options,
+		IPCInterface		callback )
+		
+		throws IPCException
+	{
+		checkLoaded();
+		
+		try{
+			return( gws_server.startServer( host, port, context, callback ));
+			
+		}catch( Throwable e ){
+			
+			throw( new IPCException( e ));
+		}
+	}
+	
+	public void
+	stopServer(
+		Object			server )
+		
+		throws IPCException
+	{
+		checkLoaded();
+		
+		gws_server.stopServer( (ServerWrapper)server );
+	}
+	
+	public void
+	sendMessage(
+		Object		server,
+		Object		session,
+		ByteBuffer	message )
+		
+		throws IPCException
+	{
+		checkLoaded();
+		
+		try{
+			gws_server.sendMessage( (ServerWrapper)server, (GenericWSServer)session, message );
+			
+		}catch( Throwable e ){
+			
+			throw( new IPCException( e ));
+		}
+	}
+	
+	public void
+	sendMessage(
+		Object		server,
+		Object		session,
+		String		message )
+		
+		throws IPCException
+	{
+		checkLoaded();
+		
+		try{
+			gws_server.sendMessage( (ServerWrapper)server, (GenericWSServer)session, message );
+			
+		}catch( Throwable e ){
+			
+			throw( new IPCException( e ));
+		}
+	}
+	
+	public void
+	closeSession(
+		Object		server,
+		Object		session )
+		
+		throws IPCException
+	{
+		checkLoaded();
+		
+		gws_server.closeSession( (ServerWrapper)server, (GenericWSServer)session );
 	}
 	
 		// IPC ends
@@ -469,7 +578,7 @@ WebTorrentPlugin
 		}else{
 			
 			try{
-				gws_server.listen( "127.0.0.1", 7891, "/websockets", plugin_interface.getIPC());
+				startServer( "127.0.0.1", 7891, "/websockets", null, plugin_interface.getIPC());
 				
 			}catch( Throwable e ){
 				
@@ -480,6 +589,7 @@ WebTorrentPlugin
 	
 	public void
 	sessionAdded(
+		Object		server,
 		URI			uri,
 		Object		session )
 	{
@@ -488,12 +598,30 @@ WebTorrentPlugin
 	
 	public void
 	sessionRemoved(
+		Object		server,
 		Object		session )
 	{
 		System.out.println( "sessionRemoved" );
 	}
 	
-		// end of text
+	public void
+	messageReceived(
+		Object		server,
+		Object		session,
+		ByteBuffer	message )
+	{
+		System.out.println( "messageReceived" );
+		
+		try{
+			sendMessage( server, session, ByteBuffer.wrap( "derp".getBytes() ));
+			
+		}catch( Throwable e ){
+			
+			Debug.out( e );
+		}
+	}
+	
+		// end of test
 	
 	
 	public void
@@ -518,6 +646,10 @@ WebTorrentPlugin
 		deactivate();
 		
 		browser_manager.killBrowsers();
+				
+		tracker.destroy();
+		
+		gws_server.unload();
 	}
 	
 	protected void
@@ -550,5 +682,106 @@ WebTorrentPlugin
 		Throwable	e )
 	{
 		log.log( str, e );
+	}
+	
+	public static String
+	encodeForJSON(
+		byte[]	bytes )
+	{
+		String str = "";
+
+		for ( byte b: bytes ){
+
+			char c = (char)b;
+			
+			if ( c <= 255 && ( Character.isLetterOrDigit(c) || " {}:.=-\"".indexOf( c ) != -1)){
+
+				str += c;
+				
+			}else{
+				int	code = b&0xff;
+
+				String s = Integer.toHexString( code );
+
+				while( s.length() < 4 ){
+
+					s = "0" + s;
+				}
+
+				str += "\\u" + s;
+			}
+		}
+
+		return( str );
+	}
+
+	public static String
+    encodeForJSON(
+    	String str_in )
+    {
+       	String str = "";
+    	
+    	for (char c: str_in.toCharArray()){
+    		
+			if ( c <= 255 && ( Character.isLetterOrDigit((char)c) || " {}:.=-\"".indexOf( c ) != -1)){
+    		
+    			str += c;
+    			
+    		}else{
+    			
+    			int	code = c&0xff;
+    			
+    			String s = Integer.toHexString( code );
+    			
+    			while( s.length() < 4 ){
+    				
+    				s = "0" + s;
+    			}
+    			
+    			str += "\\u" + s;
+    		}
+    	}
+    	
+    	return( str );
+    }
+    
+	public static String
+	decodeForJSON(
+		String		text )
+	{
+		try{
+				// decode escaped unicode chars
+			
+			Pattern p = Pattern.compile("(?i)\\\\u([\\dabcdef]{4})");
+	
+			Matcher m = p.matcher( text );
+	
+			boolean result = m.find();
+	
+			if ( result ){
+	
+				StringBuffer sb = new StringBuffer();
+	
+		    	while( result ){
+		    		
+		    		 String str = m.group(1);
+		    		 
+		    		 int unicode = Integer.parseInt( str, 16 );
+		    		 
+		    		 m.appendReplacement(sb, Matcher.quoteReplacement( String.valueOf((char)unicode)));
+		    		 
+		    		 result = m.find(); 
+		    	 }
+	
+				m.appendTail(sb);
+	
+				text = sb.toString();
+			}
+		}catch( Throwable e ){
+			
+			e.printStackTrace();
+		}
+		
+		return( text );
 	}
 }

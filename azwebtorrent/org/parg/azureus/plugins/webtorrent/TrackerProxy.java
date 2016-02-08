@@ -40,6 +40,7 @@ import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.BEncoder;
 import org.gudy.azureus2.core3.util.ByteArrayHashMap;
 import org.gudy.azureus2.core3.util.ByteEncodedKeyHashMap;
+import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.SystemTime;
@@ -230,7 +231,7 @@ TrackerProxy
 				
 					// roll it by hand, something in the above fucks up
 				
-				String offer_str = offer==null?"":"{\"offer\":{\"type\":\"offer\",\"sdp\":\"" + encodeCrap( offer.getSDP()) + "\"},\"offer_id\":\"" + offer.getOfferID() + "\"}";
+				String offer_str = offer==null?"":"{\"offer\":{\"type\":\"offer\",\"sdp\":\"" + WebTorrentPlugin.encodeForJSON( offer.getSDP()) + "\"},\"offer_id\":\"" + offer.getOfferID() + "\"}";
 				
 	        	final String announce = 
 	        			"{\"numwant\":" + numwant + 
@@ -238,11 +239,13 @@ TrackerProxy
 	        			",\"downloaded\":" + downloaded + 
 	        			",\"left\":" + left + 
 	        			(event==null?"": ( ",\"event\":\"" + event + "\"" )) + 
-	        			",\"info_hash\":\"" + encodeCrap( info_hash ) + "\"" +
-	        			",\"peer_id\":\"" + encodeCrap( peer_id ) + "\"" +
+	        			",\"info_hash\":\"" + WebTorrentPlugin.encodeForJSON( info_hash ) + "\"" +
+	        			",\"peer_id\":\"" + WebTorrentPlugin.encodeForJSON( peer_id ) + "\"" +
 	        			",\"offers\":[" + offer_str + "]}";
 				
-	        	//System.out.println( announce );
+	        	System.out.println( ByteFormatter.encodeString( info_hash ));
+	        			
+	        	System.out.println( "sending: " + announce );
 	        	
 	        	ClientSession	client_session = null;
 				
@@ -289,7 +292,7 @@ TrackerProxy
 				                            onMessage(
 				                            	String message ) 
 				                            {
-				                               // System.out.println("Received message: " + message);
+				                            	System.out.println("Received message: " + message);
 	
 				                            	Map map = JSONUtils.decodeJSON( message );
 				                            			                            	
@@ -348,11 +351,11 @@ TrackerProxy
 																		Answer answer ) 
 																	{
 																		String answer_str = "{\"answer\":{\"type\":\"answer\",\"sdp\":\"" + 
-																				encodeCrap( answer.getSDP()) + "\"}," + 
-																				"\"offer_id\":\"" + encodeCrap( answer.getOfferID()) + "\"," + 
-																				"\"peer_id\":\"" + encodeCrap( peer_id ) + "\"," + 
+																				WebTorrentPlugin.encodeForJSON( answer.getSDP()) + "\"}," + 
+																				"\"offer_id\":\"" + WebTorrentPlugin.encodeForJSON( answer.getOfferID()) + "\"," + 
+																				"\"peer_id\":\"" + WebTorrentPlugin.encodeForJSON( peer_id ) + "\"," + 
 																				"\"to_peer_id\":\"" + to_peer_id + "\"," + 
-																				"\"info_hash\":\"" + encodeCrap( hash ) + "\"" + 
+																				"\"info_hash\":\"" + WebTorrentPlugin.encodeForJSON( hash ) + "\"" + 
 																				"}";
 	
 																		//System.out.println( answer_str );
@@ -551,67 +554,6 @@ TrackerProxy
 			 client_sessions.clear();
 		 }
 	}
-	
-	private static String
-	encodeCrap(
-		byte[]	bytes )
-	{
-		String str = "";
-
-		for ( byte b: bytes ){
-
-			char c = (char)b;
-			
-			if ( Character.isLetterOrDigit((char)b) || " {}:.=-\"".indexOf( c ) != -1){
-
-				str += c;
-				
-			}else{
-				int	code = b&0xff;
-
-				String s = Integer.toHexString( code );
-
-				while( s.length() < 4 ){
-
-					s = "0" + s;
-				}
-
-				str += "\\u" + s;
-			}
-		}
-
-		return( str );
-	}
-
-    private static String
-    encodeCrap(
-    	String str_in )
-    {
-       	String str = "";
-    	
-    	for (char c: str_in.toCharArray()){
-    		
-    		if ( Character.isLetterOrDigit( c ) || " {}:.=-\"".indexOf( c ) != -1){
-    		
-    			str += c;
-    			
-    		}else{
-    			
-    			int	code = c&0xff;
-    			
-    			String s = Integer.toHexString( code );
-    			
-    			while( s.length() < 4 ){
-    				
-    				s = "0" + s;
-    			}
-    			
-    			str += "\\u" + s;
-    		}
-    	}
-    	
-    	return( str );
-    }
     
     public interface
     Listener

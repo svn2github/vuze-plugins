@@ -24,6 +24,7 @@ package org.parg.azureus.plugins.webtorrent;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URL;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -70,16 +71,18 @@ GenericWSServer
 	}
 	
 	private static Map<String,ServerWrapper>		server_map	= new HashMap<>();
-	
+	private static boolean							unloaded;
+
 	
 	private Session				session;
 	private ServerWrapper		server_wrapper;
 	private URI					uri;
 	
-	private boolean				destroyed;
+	private boolean				session_destroyed;
 	
-    protected ServerWrapper 
-    startServer(
+	
+    private ServerWrapper 
+    startServerInternal(
     	String 			host,
     	int				port,
     	String			context,
@@ -87,6 +90,11 @@ GenericWSServer
     
     	throws Exception
     {
+    	if ( unloaded ){
+    		
+    		throw( new Exception( "Destroyed" ));
+    	}
+    	
     	ClassLoader old_loader = Thread.currentThread().getContextClassLoader();
     
     	try{
@@ -144,7 +152,7 @@ GenericWSServer
     }
     
 	public ServerWrapper
-	listen(
+	startServer(
 		String				host,
 		int					port,
 		String				context,
@@ -166,11 +174,33 @@ GenericWSServer
 				throw( new Exception( "context already in use" ));
 			}
 		
-			ServerWrapper server = startServer( host, port, context, ipc );
+			ServerWrapper server = startServerInternal( host, port, context, ipc );
 			
 			server_map.put( context, server );
 			
 			return( server );
+		}
+	}
+	
+	public void
+	unload()
+	{
+		synchronized( server_map ){
+			
+			unloaded	= true;
+			
+			List<ServerWrapper> to_destroy = new ArrayList<>( server_map.values());
+			
+			for ( ServerWrapper sw: to_destroy ){
+				
+				try{
+					sw.destroy();
+					
+				}catch( Throwable e ){
+
+					Debug.out( e );
+				}
+			}
 		}
 	}
 	
@@ -201,7 +231,7 @@ GenericWSServer
 			
 			if ( server_wrapper == null ){
 				
-				destroy();
+				destroySession();
 				
 				throw( new IOException( "Server not found for '" + context + "'" ));
 			}
@@ -215,9 +245,17 @@ GenericWSServer
     onMessage(
     	ByteBuffer 	message ) 
     {
-    	System.out.println( server_wrapper + ": onMessage" );
+    	server_wrapper.receive( this, message );
     }
 	
+    @OnMessage
+    public void 
+    onMessage(
+    	String 	message ) 
+    {
+    	server_wrapper.receive( this, message );
+    }
+    
     @OnError
     public void 
     onError(
@@ -225,7 +263,7 @@ GenericWSServer
     {
     	Debug.out( e );
     	
-    	destroy();
+    	destroySession();
     }
 
     @OnClose
@@ -233,15 +271,52 @@ GenericWSServer
     onClose(
     	Session session) 
     {
-    	destroyed	= true;
+    	session_destroyed	= true;
     	
     	server_wrapper.removeSession( this );
     }
     
-    protected void
-    destroy()
+    public void
+    stopServer(
+    	ServerWrapper		server )
     {
-    	destroyed	= true;
+    	server.destroy();
+    }
+    
+    public void
+    sendMessage(
+    	ServerWrapper		server,
+    	GenericWSServer		g_session,
+    	ByteBuffer			buffer )
+    	
+    	throws Exception
+    {
+    	g_session.session.getBasicRemote().sendBinary( buffer );
+    }
+    
+    public void
+    sendMessage(
+    	ServerWrapper		server,
+    	GenericWSServer		g_session,
+    	String				buffer )
+    	
+    	throws Exception
+    {
+    	g_session.session.getBasicRemote().sendText( buffer );
+    }
+    
+    public void
+    closeSession(
+    	ServerWrapper		server,
+    	GenericWSServer		session )
+    {
+    	server.removeSession( session );
+    }
+    
+    protected void
+    destroySession()
+    {
+    	session_destroyed	= true;
     	
     	try{
     		session.close();
@@ -264,7 +339,11 @@ GenericWSServer
 		
 		private final IPCInterface		ipc;
 		
+		private final URL				url;
+		
 		private List<GenericWSServer>		sessions = new ArrayList<>();
+		
+		private boolean	server_destroyed;
 		
 		private
 		ServerWrapper(
@@ -279,6 +358,19 @@ GenericWSServer
 			context		= _context;
 			server		= _server;
 			
+			URL		_url;
+			
+			try{
+				
+				_url = new URL( "ws://127.0.0.1:" + port + context + "/vuze" );
+				
+			}catch( Throwable e ){
+				
+				_url = null;
+			}
+			
+			url			= _url;
+			
 			ipc			= _ipc;
 		}
 
@@ -288,17 +380,30 @@ GenericWSServer
 			return( port );
 		}
 
+		public URL
+		getTrackerURL()
+		{
+			return( url );
+		}
+		
 		private void
 		addSession(
 			GenericWSServer		session )
 		{
 			synchronized( sessions ){
 				
+				if ( server_destroyed ){
+					
+					session.destroySession();
+					
+					return;
+				}
+				
 				sessions.add( session );
 			}
 			
 			try{
-				ipc.invoke( "sessionAdded", new Object[]{ session.getURI(), session });
+				ipc.invoke( "sessionAdded", new Object[]{ this, session.getURI(), session });
 				
 			}catch( Throwable e ){
 				
@@ -310,13 +415,46 @@ GenericWSServer
 		removeSession(
 			GenericWSServer		session )
 		{
+			boolean	found;
+			
 			synchronized( sessions ){
 				
-				sessions.remove( session );
+				found = sessions.remove( session );
 			}
 			
+			if ( found ){
+				
+				try{
+					ipc.invoke( "sessionRemoved", new Object[]{ this, session });
+					
+				}catch( Throwable e ){
+					
+					Debug.out( e );
+				}
+			}
+		}
+		
+		private void
+		receive(
+			GenericWSServer	session,
+			ByteBuffer		buffer )
+		{
 			try{
-				ipc.invoke( "sessionRemoved", new Object[]{ session });
+				ipc.invoke( "messageReceived", new Object[]{ this, session, buffer });
+				
+			}catch( Throwable e ){
+				
+				Debug.out( e );
+			}
+		}
+		
+		private void
+		receive(
+			GenericWSServer	session,
+			String			buffer )
+		{
+			try{
+				ipc.invoke( "messageReceived", new Object[]{ this, session, buffer });
 				
 			}catch( Throwable e ){
 				
@@ -327,6 +465,28 @@ GenericWSServer
 		public void
 		destroy()
 		{
+			List<GenericWSServer>		to_close = new ArrayList<>();
+			
+			synchronized( sessions ){
+				
+				server_destroyed	= true;
+				
+				to_close.addAll( sessions );
+				
+				// don't clear sessions, this will be tidied as the sessions are closed below
+			}
+			
+			for ( GenericWSServer s: to_close ){
+				
+				try{
+					s.destroySession();
+					
+				}catch( Throwable e ){
+					
+					Debug.out( e );
+				}
+			}
+			
 			synchronized( server_map ){
 				
 				try{

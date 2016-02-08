@@ -39,6 +39,7 @@ import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.peers.Peer;
+import org.gudy.azureus2.plugins.peers.PeerManager;
 import org.parg.azureus.plugins.webtorrent.WebTorrentPlugin;
 
 import com.aelitis.azureus.core.networkmanager.admin.NetworkAdmin;
@@ -223,11 +224,16 @@ JavaScriptProxyPeerBridge
 						
 						if ( download != null ){
 							
-							Peer[] peers = download.getPeerManager().getPeers( remote_ip );
+							PeerManager pm = download.getPeerManager();
 							
-							if ( peers.length > 0 ){
+							if ( pm != null ){
 								
-								peer	= peers[0];
+								Peer[] peers = pm.getPeers( remote_ip );
+								
+								if ( peers.length > 0 ){
+									
+									peer	= peers[0];
+								}
 							}
 						}
 					}catch( Throwable e ){
