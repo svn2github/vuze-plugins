@@ -25,8 +25,10 @@ package org.parg.azureus.plugins.webtorrent.impl;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+
 
 
 
@@ -236,6 +238,43 @@ JavaScriptProxyImpl
 						});
 			}
 		}
+		SimpleTimer.addPeriodicEvent(
+			"WSTimer2",
+			5*1000,
+			new TimerEventPerformer()
+			{					
+				@Override
+				public void 
+				perform(
+					TimerEvent event ) 
+				{
+					long now = SystemTime.getMonotonousTime();
+					
+					List<OfferAnswerImpl>	expired = new ArrayList<>();
+					
+					synchronized( lock ){
+
+						Iterator<OfferAnswerImpl>	it = offer_answer_map.values().iterator();
+							
+						while( it.hasNext()){
+							
+							OfferAnswerImpl oa = it.next();
+							
+							if ( oa.getExpiry() < now ){
+								
+								expired.add( oa );
+								
+								it.remove();
+							}
+						}
+					}
+					
+					for ( OfferAnswerImpl oa: expired ){
+						
+						oa.destroy();
+					}
+				}
+			});
 	}
 	
 	public int
@@ -357,7 +396,7 @@ JavaScriptProxyImpl
 				
 				offer_id = String.valueOf( oid );
 				
-				offer = new OfferAnswerImpl( inst, offer_id );
+				offer = new OfferAnswerImpl( inst, offer_id, timeout, (OfferListener)null );
 				
 				offer_answer_map.put( offer_id, offer );
 			}
@@ -392,6 +431,68 @@ JavaScriptProxyImpl
 		return( null );
 	}
 	
+	@Override
+	public void 
+	getOffer(
+		byte[]			info_hash,
+		long			timeout,
+		OfferListener	listener )
+	{
+		if ( current_instance_sem.reserve( timeout )){
+			
+			JavaScriptProxyInstance	inst;
+			
+			String	offer_id;
+			
+			OfferAnswerImpl	offer;
+			
+			synchronized( lock ){
+			
+				inst = current_instance;
+				
+				if ( inst == null ){
+					
+					listener.failed();
+					
+					return;
+				}
+				
+				long oid = next_offer_id++;
+				
+				if ( oid == 0 ){
+					
+					oid = next_offer_id++;
+				}
+				
+				offer_id = String.valueOf( oid );
+				
+				offer = new OfferAnswerImpl( inst, offer_id, timeout, listener );
+				
+				offer_answer_map.put( offer_id, offer );
+			}
+				
+			try{
+				Map<String,Object>	message = new HashMap<>();
+					
+				message.put( "type", "create_offer" );
+				message.put( "info_hash", Base32.encode( info_hash ));
+				message.put( "offer_id", offer_id );
+					
+				inst.sendControlMessage( message );
+				
+				return;
+				
+			}catch( Throwable e ){
+				
+				synchronized( lock ){
+					
+					offer_answer_map.remove( offer_id );
+				}
+			}
+		}
+		
+		listener.failed();
+	}
 	
 	@Override
 	public void 
@@ -458,7 +559,7 @@ JavaScriptProxyImpl
 				
 				internal_offer_id = String.valueOf( oid );
 				
-				offer = new OfferAnswerImpl( inst, external_offer_id, listener );
+				offer = new OfferAnswerImpl( inst, external_offer_id, 2*60*1000, listener );
 				
 				offer_answer_map.put( internal_offer_id, offer );
 			}
@@ -516,7 +617,10 @@ JavaScriptProxyImpl
     {
     	private final JavaScriptProxyInstance		inst;
     	private final String						external_offer_id;
-    	private final AnswerListener				listener;
+    	private final long							expiry;
+    	
+    	private OfferListener					offer_listener;
+    	private AnswerListener					answer_listener;
     	
     	private String			sdp 			= null;
     	private List<String>	candidates 		= new ArrayList<>();
@@ -527,21 +631,30 @@ JavaScriptProxyImpl
     	
        	private
     	OfferAnswerImpl(
-    		JavaScriptProxyInstance		inst,
-    		String						external_offer_id )
+    		JavaScriptProxyInstance		_inst,
+    		String						_external_offer_id,
+    		long						_timeout,
+    		OfferListener				_listener )
     	{
-       		this( inst, external_offer_id, null );
+    		inst					= _inst;
+    		external_offer_id		= _external_offer_id;
+    		offer_listener			= _listener;
+    		
+    		expiry = SystemTime.getMonotonousTime() + _timeout;
     	}
        	
     	private
     	OfferAnswerImpl(
     		JavaScriptProxyInstance		_inst,
     		String						_external_offer_id,
+    		long						_timeout,
     		AnswerListener				_listener )
     	{
     		inst					= _inst;
     		external_offer_id		= _external_offer_id;
-    		listener				= _listener;
+    		answer_listener			= _listener;
+    		
+    		expiry = SystemTime.getMonotonousTime() + _timeout;
     	}
     	
     	protected boolean
@@ -563,6 +676,12 @@ JavaScriptProxyImpl
     		}
     		
     		return( done );
+    	}
+    	
+    	protected long
+    	getExpiry()
+    	{
+    		return( expiry );
     	}
     	
     	public void
@@ -587,9 +706,13 @@ JavaScriptProxyImpl
     				
     				offer_sem.releaseForever();
     				
-    				if ( listener != null ){
+    				if ( answer_listener != null ){
     					
-    					listener.gotAnswer( this );
+    					answer_listener.gotAnswer( this );
+    					
+    				}else if ( offer_listener != null ){
+    					
+    					offer_listener.gotOffer( this );
     				}
     			}
     		}
@@ -650,6 +773,15 @@ JavaScriptProxyImpl
     		destroyed	= true;
     		
     		offer_sem.releaseForever();
+    		
+    		if ( answer_listener != null ){
+				
+				answer_listener.failed();
+				
+			}else if ( offer_listener != null ){
+				
+				offer_listener.failed();
+			}
     	}
     }	
 }

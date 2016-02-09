@@ -211,7 +211,7 @@ WebTorrentPlugin
 		gws_client = new GenericWSClient();
 		gws_server = new GenericWSServer();
 		
-		tracker	= new WebTorrentTracker( this, gws_server );
+		tracker	= new WebTorrentTracker( this, gws_server, true, "0.0.0.0", 8000 );
 		
 		try{
 			tracker.start();
@@ -267,6 +267,7 @@ WebTorrentPlugin
 							this,
 							new TrackerProxy.Listener()
 							{
+								@Override
 						    	public JavaScriptProxy.Offer
 						    	getOffer(
 						    		byte[]		hash,
@@ -275,6 +276,17 @@ WebTorrentPlugin
 						    		return( js_proxy.getOffer( hash, timeout ));
 						    	}
 						    	
+						    	@Override
+						    	public void 
+						    	getOffer(
+						    		byte[] 							hash, 
+						    		long 							timeout,
+						    		JavaScriptProxy.OfferListener	offer_listener) 
+						    	{
+						    		js_proxy.getOffer( hash, timeout, offer_listener );
+						    	}
+						    	
+						    	@Override
 						    	public void
 						    	gotAnswer(
 						    		byte[]		hash,
@@ -286,6 +298,7 @@ WebTorrentPlugin
 						    		js_proxy.gotAnswer( offer_id, sdp );
 						    	}
 						    	
+						    	@Override
 						    	public void
 						    	gotOffer(
 						    		byte[]							hash,
@@ -455,6 +468,7 @@ WebTorrentPlugin
 	
 	public Object
 	startServer(
+		boolean				ssl,
 		String				host,
 		int					port,
 		String				context,
@@ -466,7 +480,7 @@ WebTorrentPlugin
 		checkLoaded();
 		
 		try{
-			return( gws_server.startServer( host, port, context, callback ));
+			return( gws_server.startServer( ssl, host, port, context, callback ));
 			
 		}catch( Throwable e ){
 			
@@ -578,7 +592,7 @@ WebTorrentPlugin
 		}else{
 			
 			try{
-				startServer( "127.0.0.1", 7891, "/websockets", null, plugin_interface.getIPC());
+				startServer( true, "127.0.0.1", 7891, "/websockets", null, plugin_interface.getIPC());
 				
 			}catch( Throwable e ){
 				

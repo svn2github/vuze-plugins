@@ -41,15 +41,26 @@ WebTorrentTracker
 	
 	private final GenericWSServer		gs_server;
 	
+	private final boolean				is_ssl;
+	private final String				bind_ip;
+	private final int					port;
+	
+	
 	private ServerWrapper		server;
 	
 	protected
 	WebTorrentTracker(
 		WebTorrentPlugin	_plugin,
-		GenericWSServer		_server )
+		GenericWSServer		_server,
+		boolean				_is_ssl,
+		String				_bind_ip,
+		int					_port )
 	{
 		plugin		= _plugin;
 		gs_server	= _server;
+		is_ssl		= _is_ssl;
+		bind_ip		= _bind_ip;
+		port		= _port;
 	}
 	
 	public void
@@ -57,7 +68,7 @@ WebTorrentTracker
 	
 		throws Exception
 	{
-		server = gs_server.startServer( "0.0.0.0", 8000, "/wstracker", new IPCInterfaceImpl( this ));
+		server = gs_server.startServer( is_ssl, bind_ip, port, "/wstracker", new IPCInterfaceImpl( this ));
 		
 		System.out.println( "tracker url=" + server.getTrackerURL());
 	}
@@ -74,7 +85,7 @@ WebTorrentTracker
 		URI			uri,
 		Object		session )
 	{
-		System.out.println( "sessionAdded: " + uri );
+		//System.out.println( "sessionAdded: " + uri );
 	}
 	
 	public void
@@ -82,7 +93,7 @@ WebTorrentTracker
 		Object		server,
 		Object		session )
 	{
-		System.out.println( "sessionRemoved" );
+		//System.out.println( "sessionRemoved" );
 	}
 	
 	public void

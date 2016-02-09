@@ -26,16 +26,26 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URLDecoder;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
 import javax.websocket.ClientEndpointConfig;
 import javax.websocket.Endpoint;
 import javax.websocket.EndpointConfig;
 import javax.websocket.MessageHandler;
 import javax.websocket.Session;
 
+import org.glassfish.grizzly.ssl.SSLContextConfigurator;
+import org.glassfish.grizzly.ssl.SSLEngineConfigurator;
 import org.glassfish.tyrus.client.ClientManager;
+import org.glassfish.tyrus.client.ClientProperties;
+import org.glassfish.tyrus.client.ThreadPoolConfig;
+import org.gudy.azureus2.core3.security.SESecurityManager;
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.BEncoder;
 import org.gudy.azureus2.core3.util.ByteArrayHashMap;
@@ -43,6 +53,7 @@ import org.gudy.azureus2.core3.util.ByteEncodedKeyHashMap;
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.pluginsimpl.local.clientid.ClientIDManagerImpl;
 import org.parg.azureus.plugins.webtorrent.JavaScriptProxy.Answer;
@@ -145,11 +156,13 @@ TrackerProxy
 			
 			final boolean scrape = peer_id == null;
 			
-			Offer	offer;
+			final List<Offer>	offers;
 			
 			if ( scrape ){
 				
-				offer = null;
+				offers = null;
+				
+				numwant	= 0;
 				
 				synchronized( hash_to_scrape_peer_id_map ){
 					
@@ -171,15 +184,57 @@ TrackerProxy
 				
 				if ( is_stop ){
 				
-					offer = null;
+					offers = null;
 					
 				}else{
 					
 					long	start = SystemTime.getMonotonousTime();
 					
-					offer = listener.getOffer( info_hash, read_timeout - 5*1000 );
-				
-					if ( offer == null ){
+					int	offers_to_generate = left==0?Math.min( numwant, 4 ):Math.min( numwant,  8 );
+						
+					final AESemaphore	sem = new AESemaphore( "" );
+					
+					offers = new ArrayList<>();
+					
+					for ( int i=0;i<offers_to_generate;i++){
+
+						listener.getOffer( 
+							info_hash, read_timeout - 5*1000,
+							new JavaScriptProxy.OfferListener() {
+								
+								boolean done = false;
+								
+								@Override
+								public void gotOffer(Offer offer) {
+									synchronized( sem ){
+										if ( done ){
+											return;
+										}
+										done = true;
+										offers.add( offer );
+									}
+									sem.release();
+								}
+								
+								@Override
+								public void failed() {
+									synchronized( sem ){
+										if ( done ){
+											return;
+										}
+										done = true;
+									}
+									sem.release();
+								}
+							});
+					}
+					
+					for ( int i=0;i<offers_to_generate;i++){
+						
+						sem.reserve();
+					}
+					
+					if ( offers_to_generate > 0 && offers.size() == 0 ){
 						
 						throw( new IOException( "WebTorrent proxy appears to be unavailable" ));
 						
@@ -192,7 +247,7 @@ TrackerProxy
 				}
 			}
 			
-			if ( offer != null || scrape || is_stop ){
+			if ( offers != null || scrape || is_stop ){
 				
 												
 				/*
@@ -231,7 +286,17 @@ TrackerProxy
 				
 					// roll it by hand, something in the above fucks up
 				
-				String offer_str = offer==null?"":"{\"offer\":{\"type\":\"offer\",\"sdp\":\"" + WebTorrentPlugin.encodeForJSON( offer.getSDP()) + "\"},\"offer_id\":\"" + offer.getOfferID() + "\"}";
+				String offer_str = "";
+				
+				if ( offers != null ){
+					
+					for ( Offer offer: offers ){
+						
+						offer_str += 
+							(offer_str.length()==0?"":",") + 
+							"{\"offer\":{\"type\":\"offer\",\"sdp\":\"" + WebTorrentPlugin.encodeForJSON( offer.getSDP()) + "\"},\"offer_id\":\"" + offer.getOfferID() + "\"}";
+					}
+				}
 				
 	        	final String announce = 
 	        			"{\"numwant\":" + numwant + 
@@ -243,9 +308,9 @@ TrackerProxy
 	        			",\"peer_id\":\"" + WebTorrentPlugin.encodeForJSON( peer_id ) + "\"" +
 	        			",\"offers\":[" + offer_str + "]}";
 				
-	        	System.out.println( ByteFormatter.encodeString( info_hash ));
+	        	//System.out.println( ByteFormatter.encodeString( info_hash ));
 	        			
-	        	System.out.println( "sending: " + announce );
+	        	//System.out.println( "sending: " + announce );
 	        	
 	        	ClientSession	client_session = null;
 				
@@ -269,10 +334,23 @@ TrackerProxy
 					
 				}else{
 					
+		            ClientManager client = ClientManager.createClient();
+		            
+		            if ( ws_url.toLowerCase( Locale.US ).startsWith( "wss")){
+		            	
+			            TrustManager[] trustAllCerts = SESecurityManager.getAllTrustingTrustManager();				
+						
+						SSLContext sc = SSLContext.getInstance("SSL");
+							
+						sc.init( null, trustAllCerts, RandomUtils.SECURE_RANDOM );
+			         
+				        SSLEngineConfigurator sslEngineConfigurator = new SSLEngineConfigurator(sc );
+				        
+			            client.getProperties().put( ClientProperties.SSL_ENGINE_CONFIGURATOR, sslEngineConfigurator);
+		            }
+		            
 		            ClientEndpointConfig cec = ClientEndpointConfig.Builder.create().build();
 		            
-		            ClientManager client = ClientManager.createClient();
-		            						            
 		            Session session = 
 		            	client.connectToServer(
 		            		new Endpoint() 
@@ -292,7 +370,7 @@ TrackerProxy
 				                            onMessage(
 				                            	String message ) 
 				                            {
-				                            	System.out.println("Received message: " + message);
+				                               // System.out.println("Received message: " + message);
 	
 				                            	Map map = JSONUtils.decodeJSON( message );
 				                            			                            	
@@ -367,6 +445,11 @@ TrackerProxy
 										                            			
 											                            	//	Debug.out( e );
 																		 }
+																	}
+																	
+																	@Override
+																	public void failed()
+																	{
 																	}
 																});
 				                            			}
@@ -562,6 +645,12 @@ TrackerProxy
     	getOffer(
     		byte[]		hash,
     		long		timeout );
+    	
+    	public void
+    	getOffer(
+    		byte[]							hash,
+    		long							timeout,
+    		JavaScriptProxy.OfferListener	offer_listener );
     	
     	public void
     	gotAnswer(

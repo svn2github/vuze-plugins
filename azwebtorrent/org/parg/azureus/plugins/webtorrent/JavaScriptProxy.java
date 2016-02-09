@@ -34,6 +34,12 @@ JavaScriptProxy
 		long		timeout );
 	
 	public void
+	getOffer(
+		byte[]			info_hash,
+		long			timeout,
+		OfferListener	offer_listener );
+	
+	public void
 	gotAnswer(
 		String		offer_id,
 		String		sdp );
@@ -74,6 +80,20 @@ JavaScriptProxy
 		public void
 		gotAnswer(
 			Answer		answer );
+		
+		public void
+		failed();
+	}
+	
+	public interface
+	OfferListener
+	{
+		public void
+		gotOffer(
+			Offer		offer );
+		
+		public void
+		failed();
 	}
 	
     public interface

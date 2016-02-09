@@ -22,7 +22,9 @@
 
 package org.parg.azureus.plugins.webtorrent;
 
-import java.io.IOException;
+import java.io.*;
+import java.net.InetAddress;
+import java.net.Socket;
 import java.net.URI;
 import java.net.URL;
 import java.nio.ByteBuffer;
@@ -33,6 +35,8 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLServerSocketFactory;
 import javax.websocket.DeploymentException;
 import javax.websocket.OnClose;
 import javax.websocket.OnError;
@@ -42,6 +46,8 @@ import javax.websocket.Session;
 import javax.websocket.server.ServerEndpoint;
 
 import org.glassfish.tyrus.server.Server;
+import org.gudy.azureus2.core3.security.SESecurityManager;
+import org.gudy.azureus2.core3.util.AEThread2;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.plugins.ipc.IPCInterface;
@@ -83,10 +89,11 @@ GenericWSServer
 	
     private ServerWrapper 
     startServerInternal(
-    	String 			host,
-    	int				port,
-    	String			context,
-    	IPCInterface	ipc )
+    	final boolean		is_ssl,
+    	final String 		bind_ip,
+    	int					port,
+    	String				context,
+    	IPCInterface		ipc )
     
     	throws Exception
     {
@@ -120,17 +127,147 @@ GenericWSServer
 	    	
 	    	Exception last_error = null;
 	    	
-	    	for ( int p: potential_ports ){
+	    	for ( int server_port: potential_ports ){
 	    	
 	    		try{
 	    			Map<String,Object>	properties = new HashMap<>();
+	    		
+	    			if ( is_ssl ){
+	    				
+	    				boolean	ssl_done = false;
+	    				
+	    				SSLServerSocketFactory factory = SESecurityManager.getSSLServerSocketFactory();
+	    				
+	    				final SSLServerSocket ssl_server_socket = (SSLServerSocket)factory.createServerSocket( server_port, 128, InetAddress.getByName( bind_ip ));
+
+	    				if ( ssl_server_socket == null ){
+	    					
+	    					throw( new Exception( "Failed to create SSL server" ));
+	    				}
+	    				
+	    				try{
+							String cipherSuites[] = ssl_server_socket.getSupportedCipherSuites();
+							  
+							ssl_server_socket.setEnabledCipherSuites(cipherSuites);
+			 
+							ssl_server_socket.setNeedClientAuth(false);
+							
+							ssl_server_socket.setReuseAddress(true);
+								    		    	
+					    	for ( int i=0;i<32;i++){
+					    		
+					    		final int internal_port = 2000 + (RandomUtils.nextAbsoluteInt()%60000);
+					    				    	
+					    		try{
+								
+					    			Server server = new Server( "127.0.0.1", internal_port, context, properties, GenericWSServer.class);
+						        
+					    			server.start();
+					    			
+					    			ssl_done = true;
+					    			
+					    			final ServerWrapper sw = new ServerWrapper( is_ssl, bind_ip, server_port, context, server, ipc );
+					    			
+					    			sw.setSSLSocket( ssl_server_socket );
+
+					    			new AEThread2( "" )
+					    			{
+					    				public void
+					    				run()
+					    				{
+					    					try{
+						    					while( true ){
+						    						
+						    						final Socket ssl_socket = ssl_server_socket.accept();
+						    												    						
+						    						try{
+						    							final Socket internal_socket = new Socket( "127.0.0.1", internal_port );
+
+							    						Runnable	closer = new
+							    							Runnable()
+							    							{
+							    								private int	count;
+							    								
+							    								public void
+							    								run()
+							    								{
+							    									synchronized( this ){
+							    										
+							    										count++;
+							    										
+							    										if ( count < 2 ){
+							    											
+							    											return;
+							    										}
+							    									}
+							    									
+							    									try{
+							    										ssl_socket.close();
+							    										
+							    									}catch( Throwable e ){
+							    										
+							    									}
+							    									try{
+							    										internal_socket.close();
+							    										
+							    									}catch( Throwable e ){
+							    										
+							    									}
+							    								}
+							    							};
+							    							
+							    						runPipe( internal_socket.getInputStream(), ssl_socket.getOutputStream(), closer );
+							    						
+							    						runPipe( ssl_socket.getInputStream(), internal_socket.getOutputStream(), closer );
+							    						
+						    						}catch( Throwable e ){
+						    							
+						    							try{
+						    								ssl_socket.close();
+						    								
+						    							}catch( Throwable f ){
+						    							}
+						    						}
+						    					}
+					    					}catch( Throwable e ){
+					    						
+					    						if ( !sw.isDestroyed()){
+					    							
+					    							Debug.out( e );
+					    						}
+					    					}
+					    				}
+					    			}.start();
+					    								    			
+					    			return( sw );
+					    			
+					    		}catch( DeploymentException e ){
+					    			
+					    			last_error = e;
+					    		}
+							}
+	    				}finally{
+	    					
+	    					if ( !ssl_done ){
+	    						
+	    						try{
+	    							
+	    							ssl_server_socket.close();
+	    							
+	    						}catch( Throwable e ){
+	    							
+	    							Debug.out( e);
+	    						}
+	    					}
+	    				}
+	    			}else{    			
 	    			
-	    			Server server = new Server( host, p, context, properties, GenericWSServer.class);
-	        
-	    			server.start();
-	    	
-	    			return( new ServerWrapper( host, p, context, server, ipc ));
-	    			
+		    			Server server = new Server( bind_ip, server_port, context, properties, GenericWSServer.class);
+		        
+		    			server.start();
+		    	
+		    			return( new ServerWrapper( is_ssl, bind_ip, server_port, context, server, ipc ));
+	    			}
 	    		}catch( DeploymentException e ){
 	    			
 	    			last_error = e;
@@ -151,8 +288,44 @@ GenericWSServer
     	}
     }
     
+    private void
+    runPipe(
+    	final InputStream	is,
+    	final OutputStream	os,
+    	final Runnable		closer )
+   	{
+    	new AEThread2( "WSS:pipe" ){
+    		
+    		public void
+    		run()
+    		{
+    			try{
+    				byte[]	buffer = new byte[16*1024];
+    				
+    				while( true ){
+    		
+    					int	len = is.read( buffer );
+    					
+    					if ( len <= 0 ){
+    						
+    						break;
+    					}
+    					
+    					os.write( buffer, 0, len );
+    				}
+    			}catch( Throwable e ){
+    				
+    			}finally{
+    				
+    				closer.run();
+    			}
+    		}
+    	}.start();
+   	}
+    
 	public ServerWrapper
 	startServer(
+		boolean				ssl,
 		String				host,
 		int					port,
 		String				context,
@@ -174,7 +347,7 @@ GenericWSServer
 				throw( new Exception( "context already in use" ));
 			}
 		
-			ServerWrapper server = startServerInternal( host, port, context, ipc );
+			ServerWrapper server = startServerInternal( ssl, host, port, context, ipc );
 			
 			server_map.put( context, server );
 			
@@ -333,6 +506,7 @@ GenericWSServer
 	ServerWrapper
 	{
 		private final Server			server;
+		private final boolean			is_ssl;
 		private final String			host;
 		private final int				port;
 		private final String			context;
@@ -341,18 +515,22 @@ GenericWSServer
 		
 		private final URL				url;
 		
+		private SSLServerSocket			ssl_socket;
+		
 		private List<GenericWSServer>		sessions = new ArrayList<>();
 		
 		private boolean	server_destroyed;
 		
 		private
 		ServerWrapper(
+			boolean			_is_ssl,
 			String			_host,
 			int				_port,
 			String			_context,
 			Server			_server,
 			IPCInterface	_ipc )
 		{
+			is_ssl		= _is_ssl;
 			host		= _host;
 			port		= _port;
 			context		= _context;
@@ -362,7 +540,7 @@ GenericWSServer
 			
 			try{
 				
-				_url = new URL( "ws://127.0.0.1:" + port + context + "/vuze" );
+				_url = new URL( (is_ssl?"wss":"ws") + "://127.0.0.1:" + port + context + "/vuze" );
 				
 			}catch( Throwable e ){
 				
@@ -372,6 +550,13 @@ GenericWSServer
 			url			= _url;
 			
 			ipc			= _ipc;
+		}
+
+		private void
+		setSSLSocket(
+			SSLServerSocket		socket )
+		{
+			ssl_socket = socket;
 		}
 
 		public int
@@ -462,10 +647,25 @@ GenericWSServer
 			}
 		}
 		
+		private boolean
+		isDestroyed()
+		{
+			return( server_destroyed );
+		}
+		
 		public void
 		destroy()
 		{
 			List<GenericWSServer>		to_close = new ArrayList<>();
+			
+			if ( ssl_socket != null ){
+				
+				try{
+					ssl_socket.close();
+					
+				}catch( Throwable e ){
+				}
+			}
 			
 			synchronized( sessions ){
 				
