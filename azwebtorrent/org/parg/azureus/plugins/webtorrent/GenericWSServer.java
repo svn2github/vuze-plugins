@@ -90,7 +90,7 @@ GenericWSServer
     private ServerWrapper 
     startServerInternal(
     	final boolean		is_ssl,
-    	final String 		bind_ip,
+    	String 				_bind_ip,
     	int					port,
     	String				context,
     	IPCInterface		ipc )
@@ -101,6 +101,8 @@ GenericWSServer
     		
     		throw( new Exception( "Destroyed" ));
     	}
+    	
+    	final String bind_ip = _bind_ip.equals( "" )?"0.0.0.0":_bind_ip;
     	
     	ClassLoader old_loader = Thread.currentThread().getContextClassLoader();
     
@@ -326,7 +328,7 @@ GenericWSServer
 	public ServerWrapper
 	startServer(
 		boolean				ssl,
-		String				host,
+		String				bind_ip,
 		int					port,
 		String				context,
 		IPCInterface		ipc )
@@ -347,7 +349,7 @@ GenericWSServer
 				throw( new Exception( "context already in use" ));
 			}
 		
-			ServerWrapper server = startServerInternal( ssl, host, port, context, ipc );
+			ServerWrapper server = startServerInternal( ssl, bind_ip, port, context, ipc );
 			
 			server_map.put( context, server );
 			

@@ -45,6 +45,7 @@ WebTorrentTracker
 	private final String				bind_ip;
 	private final int					port;
 	
+	private final String				host;
 	
 	private ServerWrapper		server;
 	
@@ -54,13 +55,39 @@ WebTorrentTracker
 		GenericWSServer		_server,
 		boolean				_is_ssl,
 		String				_bind_ip,
-		int					_port )
+		int					_port,
+		String				_host )
 	{
 		plugin		= _plugin;
 		gs_server	= _server;
 		is_ssl		= _is_ssl;
 		bind_ip		= _bind_ip;
 		port		= _port;
+		host		= _host;
+	}
+	
+	public boolean
+	isSSL()
+	{
+		return( is_ssl );
+	}
+	
+	public int
+	getPort()
+	{
+		return( port );
+	}
+	
+	public String
+	getBindIP()
+	{
+		return( bind_ip );
+	}
+
+	public String
+	getHost()
+	{
+		return( host );
 	}
 	
 	public void
@@ -77,6 +104,12 @@ WebTorrentTracker
 	stop()
 	{
 		server.destroy();
+	}
+	
+	public String
+	getURL()
+	{
+		return( ( is_ssl?"wss":"ws" ) + "://" + host + ":" + port + "/wstracker/vuze" );
 	}
 	
 	public void

@@ -50,9 +50,13 @@ import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
 import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.config.ActionParameter;
+import org.gudy.azureus2.plugins.ui.config.BooleanParameter;
+import org.gudy.azureus2.plugins.ui.config.InfoParameter;
+import org.gudy.azureus2.plugins.ui.config.IntParameter;
 import org.gudy.azureus2.plugins.ui.config.LabelParameter;
 import org.gudy.azureus2.plugins.ui.config.Parameter;
 import org.gudy.azureus2.plugins.ui.config.ParameterListener;
+import org.gudy.azureus2.plugins.ui.config.StringParameter;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
@@ -75,7 +79,14 @@ WebTorrentPlugin
 	
 	private LabelParameter 			status_label;
 	
+	private BooleanParameter		tracker_enable;
+	private BooleanParameter		tracker_ssl;
+	private IntParameter			tracker_port;
+	private StringParameter			tracker_bind;
+	private StringParameter			tracker_host;
+	private InfoParameter			tracker_url;
 
+	
 	private LocalWebServer	web_server;
 	private TrackerProxy	tracker_proxy;
 	private JavaScriptProxy	js_proxy;
@@ -185,6 +196,44 @@ WebTorrentPlugin
 				}
 			});
 		
+			// tracker
+		
+		tracker_enable 	= config_model.addBooleanParameter2( "azwebtorrent.tracker.enable", "azwebtorrent.tracker.enable", false );
+		tracker_ssl 	= config_model.addBooleanParameter2( "azwebtorrent.tracker.ssl", "azwebtorrent.tracker.ssl", false );
+		tracker_port 	= config_model.addIntParameter2( "azwebtorrent.tracker.port", "azwebtorrent.tracker.port", 8000, 1, 65535 );
+		tracker_bind 	= config_model.addStringParameter2( "azwebtorrent.tracker.bindip", "azwebtorrent.tracker.bindip", "" );
+		tracker_host 	= config_model.addStringParameter2( "azwebtorrent.tracker.public.address", "azwebtorrent.tracker.public.address", "127.0.0.1" );
+		tracker_url		= config_model.addInfoParameter2( "azwebtorrent.tracker.url", "" );
+				
+		Parameter[] tracker_params = { 
+				tracker_enable, tracker_ssl, tracker_port, tracker_bind,
+				tracker_host, tracker_url
+		};
+		
+		ParameterListener	tracker_listener = new
+			ParameterListener() {
+				
+				@Override
+				public void parameterChanged(Parameter param) {
+					setupTracker();
+				}
+			};
+			
+		for ( Parameter p : tracker_params ){
+			
+			p.setGenerateIntermediateEvents( false );
+
+			p.addListener( tracker_listener );
+			
+			if ( p != tracker_enable ){
+			
+				tracker_enable.addEnabledOnSelection( p );
+			}
+		}
+		
+		config_model.createGroup( "azwebtorrent.tracker", tracker_params );
+		
+		
 		final ActionParameter test_param = config_model.addActionParameter2( "azwebtorrent.test", "azwebtorrent.test" );
 		
 		test_param.addListener(
@@ -211,14 +260,62 @@ WebTorrentPlugin
 		gws_client = new GenericWSClient();
 		gws_server = new GenericWSServer();
 		
-		tracker	= new WebTorrentTracker( this, gws_server, true, "0.0.0.0", 8000 );
-		
-		try{
-			tracker.start();
-			
-		}catch( Throwable e ){
-			
-			Debug.out( e );
+		setupTracker();
+	}
+	
+	private void
+	setupTracker()
+	{
+		synchronized( this ){
+						
+			WebTorrentTracker	existing_tracker = tracker;
+
+			if ( tracker_enable.getValue()){
+								
+				boolean	ssl		= tracker_ssl.getValue();
+				int		port	= tracker_port.getValue();
+				String	bind_ip	= tracker_bind.getValue().trim();
+				String 	host	= tracker_host.getValue().trim();
+				
+				if ( existing_tracker != null ){
+					
+					if ( 	existing_tracker.isSSL() == ssl &&
+							existing_tracker.getPort() == port &&
+							existing_tracker.getBindIP().equals( bind_ip ) &&
+							existing_tracker.getHost().equals( host )){
+						
+						return;
+					}
+					
+					existing_tracker.destroy();
+				}
+				
+				tracker	= new WebTorrentTracker( this, gws_server, ssl, bind_ip, port, host );
+
+				tracker_url.setValue( tracker.getURL());
+				
+				try{
+					tracker.start();
+					
+				}catch( Throwable e ){
+					
+					Debug.out( e );
+					
+					tracker.destroy();
+					
+					tracker = null;
+				}
+			}else{
+				
+				tracker_url.setValue( "" );
+				
+				if ( existing_tracker != null ){
+					
+					existing_tracker.destroy();
+					
+					tracker = null;
+				}
+			}
 		}
 	}
 	
@@ -469,7 +566,7 @@ WebTorrentPlugin
 	public Object
 	startServer(
 		boolean				ssl,
-		String				host,
+		String				bind_ip,
 		int					port,
 		String				context,
 		Map<String,Object>	options,
@@ -480,7 +577,7 @@ WebTorrentPlugin
 		checkLoaded();
 		
 		try{
-			return( gws_server.startServer( ssl, host, port, context, callback ));
+			return( gws_server.startServer( ssl, bind_ip, port, context, callback ));
 			
 		}catch( Throwable e ){
 			
@@ -660,8 +757,13 @@ WebTorrentPlugin
 		deactivate();
 		
 		browser_manager.killBrowsers();
-				
-		tracker.destroy();
+			
+		if ( tracker != null ){
+		
+			tracker.destroy();
+		
+			tracker= null;
+		}
 		
 		gws_server.unload();
 	}
