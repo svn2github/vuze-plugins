@@ -52,6 +52,8 @@ import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.plugins.ipc.IPCInterface;
 
+import com.aelitis.azureus.core.networkmanager.admin.NetworkAdmin;
+
 
 @ServerEndpoint("/vuze")
 public class 
@@ -102,7 +104,26 @@ GenericWSServer
     		throw( new Exception( "Destroyed" ));
     	}
     	
-    	final String bind_ip = _bind_ip.equals( "" )?"0.0.0.0":_bind_ip;
+    	final String bind_ip;
+    	
+    	if ( _bind_ip.equals( "" )){
+    		
+    		String temp = "0.0.0.0";
+    		
+    		try{
+    			InetAddress ia = NetworkAdmin.getSingleton().getSingleHomedServiceBindAddress();
+    			
+    			temp = ia.getHostAddress();
+    			
+    		}catch( Throwable e ){
+    		}
+    		
+    		bind_ip = temp;
+    		
+    	}else{
+    		
+    		bind_ip = _bind_ip;
+    	}
     	
     	ClassLoader old_loader = Thread.currentThread().getContextClassLoader();
     
@@ -168,7 +189,7 @@ GenericWSServer
 					    			
 					    			ssl_done = true;
 					    			
-					    			final ServerWrapper sw = new ServerWrapper( is_ssl, bind_ip, server_port, context, server, ipc );
+					    			final ServerWrapper sw = new ServerWrapper( server_port, context, server, ipc );
 					    			
 					    			sw.setSSLSocket( ssl_server_socket );
 
@@ -268,7 +289,7 @@ GenericWSServer
 		        
 		    			server.start();
 		    	
-		    			return( new ServerWrapper( is_ssl, bind_ip, server_port, context, server, ipc ));
+		    			return( new ServerWrapper( server_port, context, server, ipc ));
 	    			}
 	    		}catch( DeploymentException e ){
 	    			
@@ -508,15 +529,11 @@ GenericWSServer
 	ServerWrapper
 	{
 		private final Server			server;
-		private final boolean			is_ssl;
-		private final String			host;
 		private final int				port;
 		private final String			context;
 		
 		private final IPCInterface		ipc;
-		
-		private final URL				url;
-		
+				
 		private SSLServerSocket			ssl_socket;
 		
 		private List<GenericWSServer>		sessions = new ArrayList<>();
@@ -525,31 +542,14 @@ GenericWSServer
 		
 		private
 		ServerWrapper(
-			boolean			_is_ssl,
-			String			_host,
 			int				_port,
 			String			_context,
 			Server			_server,
 			IPCInterface	_ipc )
 		{
-			is_ssl		= _is_ssl;
-			host		= _host;
 			port		= _port;
 			context		= _context;
 			server		= _server;
-			
-			URL		_url;
-			
-			try{
-				
-				_url = new URL( (is_ssl?"wss":"ws") + "://127.0.0.1:" + port + context + "/vuze" );
-				
-			}catch( Throwable e ){
-				
-				_url = null;
-			}
-			
-			url			= _url;
 			
 			ipc			= _ipc;
 		}
@@ -567,12 +567,6 @@ GenericWSServer
 			return( port );
 		}
 
-		public URL
-		getTrackerURL()
-		{
-			return( url );
-		}
-		
 		private void
 		addSession(
 			GenericWSServer		session )

@@ -810,7 +810,7 @@ WebTorrentPlugin
 
 			char c = (char)b;
 			
-			if ( c <= 255 && ( Character.isLetterOrDigit(c) || " {}:.=-\"".indexOf( c ) != -1)){
+			if ( c <= 255 && ( Character.isLetterOrDigit(c) || " {}:.=-".indexOf( c ) != -1)){
 
 				str += c;
 				
@@ -839,7 +839,7 @@ WebTorrentPlugin
     	
     	for (char c: str_in.toCharArray()){
     		
-			if ( c <= 255 && ( Character.isLetterOrDigit((char)c) || " {}:.=-\"".indexOf( c ) != -1)){
+			if ( c <= 255 && ( Character.isLetterOrDigit((char)c) || " {}:.=-".indexOf( c ) != -1)){
     		
     			str += c;
     			
