@@ -65,6 +65,8 @@ public class PromoView
 {
 	private static final String URL_JSON = "http://client.vuze.com/donation/sidebar_promo.php";
 
+	private static final String DEFAULT_INHOUSE_HTML = "<html><body style=\"overflow:hidden; margin:100px 10px;\"><p>Please <a target=\"_BLANK\" href=\"http://www.vuze.com/donation/donate.php?sourceRef=sidebarpromo\">Donate</a></BODY></html>";
+
 	private PromoPlugin		plugin;
 	
 	private Browser adBrowser;
@@ -182,8 +184,6 @@ public class PromoView
 						}
 					}
 				});
-
-				setInHouse(true);
 			}
 
 			public void mouseDown(MouseEvent e) {
@@ -257,7 +257,6 @@ public class PromoView
 		
 		
 		adBrowser = new Browser(ourParent, SWT.NO_SCROLL);
-		adBrowser.setVisible(false);
 		adBrowser.addOpenWindowListener(new OpenWindowListener() {
 			public void open(WindowEvent event) {
 				final BrowserWrapper subBrowser = Utils.createSafeBrowser(ourParent,
@@ -317,24 +316,21 @@ public class PromoView
 		String json = readStringFromUrl(URL_JSON).trim();
 
 		log("Inhouse load");
-		
-		if ( json.startsWith( "{" )){
-			mapJSON = JSONUtils.decodeJSON(json);
+	
+		mapJSON = JSONUtils.decodeJSON(json);
 
-			if (first){
-				
-				int firstShowInMS = MapUtils.getMapInt(mapJSON, "first-show-ms",
-						1000 * 60 * ((Math.random() > 0.8) ? 0 : 2));
-				flipTest(firstShowInMS);
-				
-			} else {
-				
-				flipTest(0);
-			}
+		if (first){
 			
-			 showEvery = mapJSON == null ? 1000 * 60 * 15
-					: MapUtils.getMapInt(mapJSON, "show-every-ms", 1000 * 60 * 5);
+			int firstShowInMS = MapUtils.getMapInt(mapJSON, "first-show-ms", 0);
+			flipTest(firstShowInMS);
+			
+		} else {
+			
+			flipTest(0);
 		}
+		
+		 showEvery = mapJSON == null ? 1000 * 60 * 15
+				: MapUtils.getMapInt(mapJSON, "show-every-ms", 1000 * 60 * 5);
 		
 		if (timeEvent_inHouse != null) {
 			timeEvent_inHouse.cancel();
@@ -431,11 +427,9 @@ public class PromoView
 		} else {
 			showingInHouse = on;
 		}
-		adBrowser.setVisible(showingInHouse);
-		if (showingInHouse) {
-			adBrowser.setUrl("about:blank");
-			adBrowser.setText(MapUtils.getMapString(mapJSON, "html", null));
-		}
+		adBrowser.setText("");
+		String html = showingInHouse ? MapUtils.getMapString(mapJSON, "html", DEFAULT_INHOUSE_HTML) : DEFAULT_INHOUSE_HTML;  
+		adBrowser.setText(html);
 	}
 	
 	protected void
