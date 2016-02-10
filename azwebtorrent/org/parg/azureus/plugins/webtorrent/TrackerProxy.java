@@ -300,6 +300,7 @@ TrackerProxy
 	        			",\"uploaded\":" + uploaded + 
 	        			",\"downloaded\":" + downloaded + 
 	        			",\"left\":" + left + 
+	        			",\"action\":" + (scrape?2:1) + // added so our tracker can discriminate announce/scrape
 	        			(event==null?"": ( ",\"event\":\"" + event + "\"" )) + 
 	        			",\"info_hash\":\"" + WebTorrentPlugin.encodeForJSON( info_hash ) + "\"" +
 	        			",\"peer_id\":\"" + WebTorrentPlugin.encodeForJSON( peer_id ) + "\"" +

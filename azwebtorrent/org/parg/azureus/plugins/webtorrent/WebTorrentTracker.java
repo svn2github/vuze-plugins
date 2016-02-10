@@ -264,6 +264,28 @@ WebTorrentTracker
 		}
 	}
 	
+	private int
+	getOptionalInt(
+		Map<String,Object>		map,
+		String					key,
+		int						def )
+	{
+		Number number = (Number)map.get( key );
+		
+		return( number==null?def:number.intValue());
+	}
+	
+	private long
+	getOptionalLong(
+		Map<String,Object>		map,
+		String					key,
+		long					def )
+	{
+		Number number = (Number)map.get( key );
+		
+		return( number==null?def:number.longValue());
+	}
+	
 	public void
 	messageReceived(
 		Object		server,
@@ -316,16 +338,19 @@ WebTorrentTracker
 							target_session.getSessionWrapper().sendMessage( message );
 						}
 					}else{
-						int		numwant 	= ((Number)map_in.get("numwant")).intValue();
-						long	uploaded 	= ((Number)map_in.get("uploaded")).longValue();
-						long	downloaded 	= ((Number)map_in.get("downloaded")).longValue();
+						int		numwant 	= getOptionalInt( map_in, "numwant", 0 );
+						long	uploaded 	= getOptionalLong( map_in, "uploaded", 0 );
+						long	downloaded 	= getOptionalLong( map_in, "downloaded", 0 );
 						
 							// meh, not present for webtorrent
 						
-						Number	l_left		= (Number)map_in.get("left");
-						long	left 		= l_left==null?Long.MAX_VALUE:l_left.longValue();
+						long	left 		= getOptionalLong( map_in, "left", Long.MAX_VALUE );
+						
+						int		action 		= getOptionalInt( map_in, "action", 0 );
 												
-						if ( left == 0 ){
+						boolean	is_scrape = action == 2;
+						
+						if ( left == 0 && !is_scrape ){
 														
 							session_torrent.setComplete();
 						}
@@ -373,10 +398,26 @@ WebTorrentTracker
 						
 						map_out.put( "info_hash", WebTorrentPlugin.encodeForJSON( info_hash ));
 						
-						map_out.put( "complete", 23 );
-						map_out.put( "incomplete", 42 );
+						int complete 	= tracked_torrent.getComplete();
+						int incomplete 	= tracked_torrent.getIncomplete();
 						
-						map_out.put( "action", 1 );
+						if ( is_scrape ){
+							// adjust!
+							
+							if ( session_torrent.isComplete()){
+								
+								complete--;
+								
+							}else{
+								
+								incomplete--;
+							}
+						}
+						map_out.put( "complete", Math.max(complete,0));
+						map_out.put( "incomplete", Math.max(incomplete,0));
+						
+						map_out.put( "action", is_scrape?2:1 );
+						
 						map_out.put( "interval", 120 );
 						
 						reply = JSONUtils.encodeToJSON( map_out );
@@ -574,7 +615,12 @@ WebTorrentTracker
 		private void
 		setComplete()
 		{
-			complete = true;
+			if ( !complete){
+			
+				complete = true;
+				
+				tracked_torrent.setComplete( this );
+			}
 		}
 		
 		private boolean
@@ -666,6 +712,10 @@ WebTorrentTracker
 				
 		private int	st_offer_alloc_index;
 
+		
+		private int	total_incomplete;
+		private int	total_complete;
+		
 		private
 		TrackedTorrent(
 			HashWrapper		_hw )
@@ -789,7 +839,37 @@ WebTorrentTracker
 			synchronized( lock ){
 				
 				session_torrents.add( st );
+				
+				if ( st.isComplete()){
+					
+					total_complete++;
+					
+				}else{
+					
+					total_incomplete++;
+				}
 			}
+		}
+		
+		private void
+		setComplete(
+			SessionTorrent		st )
+		{
+			total_complete++;
+			
+			total_incomplete--;
+		}
+		
+		private int
+		getComplete()
+		{
+			return( total_complete );
+		}
+		
+		private int
+		getIncomplete()
+		{
+			return( total_incomplete );
 		}
 		
 		private void
@@ -798,11 +878,21 @@ WebTorrentTracker
 		{
 			synchronized( lock ){
 			
-				session_torrents.remove( st );
+				if ( session_torrents.remove( st )){
 				
-				if ( session_torrents.size() == 0 ){
+					if ( st.isComplete()){
+						
+						total_complete--;
+						
+					}else{
+						
+						total_incomplete--;
+					}
 					
-					destroy();
+					if ( session_torrents.size() == 0 ){
+						
+						destroy();
+					}
 				}
 			}
 		}
