@@ -23,7 +23,6 @@ package com.vuze.azureus.plugin.azpromo;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.Locale;
 import java.util.Map;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
@@ -56,10 +55,6 @@ import com.aelitis.azureus.ui.swt.views.skin.SBC_PlusFTUX;
 import com.aelitis.azureus.ui.swt.views.skin.sidebar.SideBar;
 import com.aelitis.azureus.util.JSONUtils;
 import com.aelitis.azureus.util.MapUtils;
-import com.appadx.adcontrol.AdControlEventListener;
-import com.appadx.adcontrol.AdControlException;
-import com.appadx.adcontrol.AdControlSWT;
-import com.appadx.adcontrol.IAdControlOptions;
 
 /**
  * @created Sep 29, 2014
@@ -68,19 +63,19 @@ import com.appadx.adcontrol.IAdControlOptions;
 public class PromoView
 	implements UISWTViewEventListener
 {
-	private static final String URL_JSON = "http://misc20150831.s3-website-us-east-1.amazonaws.com/test.json";
+	private static final String URL_JSON = "http://client.vuze.com/donation/sidebar_promo.php";
 
 	private PromoPlugin		plugin;
 	
-	private AdControlSWT adControl;
-
 	private Browser adBrowser;
 
 	private UISWTView view;
 
-	private boolean tuxTest = false;
+	private boolean showingInHouse = false;
 
 	private Map mapJSON;
+
+	private TimerEvent timeEvent_inHouse;
 
 	public PromoView() {
 		plugin	= PromoPlugin.getPlugin();
@@ -90,12 +85,10 @@ public class PromoView
 	public boolean eventOccurred(UISWTViewEvent event) {
 		switch (event.getType()) {
 			case UISWTViewEvent.TYPE_CREATE:
-				log("TYPE_CREATE Called");
 				plugin.viewAdded( this );
 				break;
 
 			case UISWTViewEvent.TYPE_INITIALIZE:
-				log("TYPE_INITIALIZE Called");
 				initialize((Composite) event.getData(), event.getView());
 				break;
 
@@ -104,24 +97,19 @@ public class PromoView
 				break;
 
 			case UISWTViewEvent.TYPE_DESTROY:
-				log("TYPE_DESTROY Called");
 				plugin.viewRemoved( this );
 				break;
 
 			case UISWTViewEvent.TYPE_DATASOURCE_CHANGED:
-				log("TYPE_DATASOURCE_CHANGED Called");
 				break;
 
 			case UISWTViewEvent.TYPE_FOCUSGAINED:
-				log("TYPE_FOCUSGAINED Called");
 				break;
 
 			case UISWTViewEvent.TYPE_FOCUSLOST:
-				log("TYPE_FOCUSLOST Called");
 				break;
 
 			case UISWTViewEvent.TYPE_LANGUAGEUPDATE:
-				log("TYPE_LANGUAGEUPDATE Called " + Locale.getDefault().toString());
 				break;
 		}
 		return true;
@@ -189,13 +177,13 @@ public class PromoView
 					public void run() {
 						try {
 							log("loadclick");
-							adControl.loadAd();
+							loadInHouse();
 						} catch (Throwable t) {
 						}
 					}
 				});
 
-				setTuxText(false);
+				setInHouse(true);
 			}
 
 			public void mouseDown(MouseEvent e) {
@@ -205,8 +193,6 @@ public class PromoView
 			}
 		});
 
-		adControl = new AdControlSWT(ourParent, SWT.NO_SCROLL);
-		
 		
 		Logger logger = Logger.getLogger( "com.appadx.adcontrol" );
 		
@@ -243,12 +229,6 @@ public class PromoView
 					
 				}
 			});
-
-		
-		fd = Utils.getFilledFormData();
-		fd.height = 254;
-		fd.top = new FormAttachment(lblClose, 2);
-		adControl.setLayoutData(fd);
 
 		Browser theirBrowser = findBrowser( ourParent );
 		
@@ -309,132 +289,64 @@ public class PromoView
 		adBrowser.setLayoutData(fd);
 
 		fd = Utils.getFilledFormData();
-		fd.bottom = new FormAttachment(adControl, -1);
+		fd.bottom = new FormAttachment(adBrowser, -1);
 		fd.top = null;
 		fd.right = null;
 		fd.left.offset = 3;
 		lblText.setLayoutData(fd);
 
-		adControl.addAdControlEventListener(new AdControlEventListener() {
-
-			public void onAdClicked() {
-				log("clicked");
-				super.onAdClicked();
-			}
-
-			public void onAdCompleted() {
-				log("complete");
-				super.onAdCompleted();
-			}
-
-			public void onAdError(String arg0, int arg1, int arg2) {
-				log("" + arg1 + "/" + arg2 + ": " + arg0);
-				super.onAdError(arg0, arg1, arg2);
-			}
-
-			public void onAdLogMessage(String mesg) {
-				log(mesg);
-				super.onAdLogMessage(mesg);
-			}
-
-			public void onAdStarted() {
-				log("started");
-				super.onAdStarted();
-			}
-		});
-		
-		String pubID = plugin.getPluginInterface().getPluginProperties().getProperty(
-				"PubID", "mawra2ag1");
-
-		//int reloadTime = Integer.parseInt(plugin.getPluginInterface().getPluginProperties().getProperty(
-		//		"ReloadSecs", "86400"));
-		//log("pubID len=" + pubID.length() + ";reload in " + reloadTime);
-		log("pubID len=" + pubID.length());
-
-		IAdControlOptions options = adControl.getOptions();
-		options.setPlayerOption(IAdControlOptions.Player.AUTO_MUTE, true);
-		options.setPubID(pubID);
-		options.setPageName("vuze");
-		options.setPubConfigURL(
-				"http://vuze-pubcfg.desktopadx.com/service/pubcfg/get.php?id=");
-		options.setRequestDomain("btpr.vuze.com");
-
-		//options.setPublisherDefaultAdReloadTime(reloadTime);
-
-		plugin.getPluginInterface().getUtilities().createThread("LoadPromo",
-				new Runnable() {
-
-					public void run() {
-						try {
-							log("load");
-							adControl.loadAd();
-							Utils.execSWTThread(new Runnable() {
-								public void run() {
-									log("show");
-									if (ourParent.isDisposed()) {
-										return;
-									}
-									ourParent.setVisible(true);
-								}
-							});
-
-							PromoPlugin.logEvent("shown");
-						} catch (AdControlException e1) {
-							//  Bad or missing Publisher Configuration - Connection timed out: connect
-							e1.printStackTrace();
-							Utils.execSWTThread(new Runnable() {
-								public void run() {
-									log("closeErr");
-									view.closeView();
-								}
-							});
-						}
-					}
-				});
-		adControl.getShell().layout(true, true);
+		ourParent.getShell().layout(true, true);
 
 		plugin.getPluginInterface().getUtilities().createThread("pv",
 				new Runnable() {
 					public void run() {
-						if (plugin.getPluginInterface() == null) {
-							return;
-						}
-						boolean first = mapJSON == null;
-						
-						int showEvery = 1000 * 60 * 15;
-								
-						String json = readStringFromUrl(URL_JSON).trim();
-						
-						if ( json.startsWith( "{" )){
-							mapJSON = JSONUtils.decodeJSON(json);
-	
-							if (first){
-								
-								int firstShowInMS = MapUtils.getMapInt(mapJSON, "first-show-ms",
-										1000 * 60 * ((Math.random() > 0.8) ? 0 : 2));
-								flipTest(firstShowInMS);
-								
-							} else {
-								
-								flipTest(0);
-							}
-							
-							 showEvery = mapJSON == null ? 1000 * 60 * 15
-									: MapUtils.getMapInt(mapJSON, "show-every-ms", 1000 * 60 * 5);
-						}
-						
-						
-						SimpleTimer.addEvent("pv", SystemTime.getOffsetTime(showEvery),
-								new TimerEventPerformer() {
-						
-							public void perform(TimerEvent event) {
-								run();
-							}
-						});
-
+						loadInHouse();
 					}
 				});
 
+	}
+
+	protected void loadInHouse() {
+		if (plugin.getPluginInterface() == null) {
+			return;
+		}
+		boolean first = mapJSON == null;
+		
+		int showEvery = 1000 * 60 * 15;
+				
+		String json = readStringFromUrl(URL_JSON).trim();
+
+		log("Inhouse load");
+		
+		if ( json.startsWith( "{" )){
+			mapJSON = JSONUtils.decodeJSON(json);
+
+			if (first){
+				
+				int firstShowInMS = MapUtils.getMapInt(mapJSON, "first-show-ms",
+						1000 * 60 * ((Math.random() > 0.8) ? 0 : 2));
+				flipTest(firstShowInMS);
+				
+			} else {
+				
+				flipTest(0);
+			}
+			
+			 showEvery = mapJSON == null ? 1000 * 60 * 15
+					: MapUtils.getMapInt(mapJSON, "show-every-ms", 1000 * 60 * 5);
+		}
+		
+		if (timeEvent_inHouse != null) {
+			timeEvent_inHouse.cancel();
+		}
+		
+		timeEvent_inHouse = SimpleTimer.addEvent("pv", SystemTime.getOffsetTime(showEvery),
+				new TimerEventPerformer() {
+		
+			public void perform(TimerEvent event) {
+				loadInHouse();
+			}
+		});
 	}
 
 	private Browser
@@ -474,7 +386,7 @@ public class PromoView
 					return;
 				}
 
-				setTuxText(!tuxTest);
+				setInHouse(true);
 			}
 		});
 	}
@@ -512,16 +424,16 @@ public class PromoView
 	private void refresh(final UISWTView view) {
 	}
 
-	private void setTuxText(boolean on) {
+	private void setInHouse(boolean on) {
 		long showUntil = MapUtils.getMapLong(mapJSON, "show-until", 0);
 		if (showUntil > 0 && System.currentTimeMillis() > showUntil) {
-			tuxTest = false;
+			showingInHouse = false;
 		} else {
-			tuxTest = on;
+			showingInHouse = on;
 		}
-		adBrowser.setVisible(tuxTest);
-		adControl.setVisible(!tuxTest);
-		if (tuxTest) {
+		adBrowser.setVisible(showingInHouse);
+		if (showingInHouse) {
+			adBrowser.setUrl("about:blank");
 			adBrowser.setText(MapUtils.getMapString(mapJSON, "html", null));
 		}
 	}
