@@ -24,14 +24,21 @@ package org.parg.azureus.plugins.webtorrent;
 
 import java.net.URI;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.azureus2.core3.util.HashWrapper;
+import org.gudy.azureus2.core3.util.SimpleTimer;
 import org.gudy.azureus2.core3.util.SystemTime;
+import org.gudy.azureus2.core3.util.TimerEvent;
+import org.gudy.azureus2.core3.util.TimerEventPerformer;
+import org.gudy.azureus2.core3.util.TimerEventPeriodic;
 import org.gudy.azureus2.pluginsimpl.local.ipc.IPCInterfaceImpl;
 import org.json.simple.JSONObject;
 import org.parg.azureus.plugins.webtorrent.GenericWSServer.ServerWrapper;
@@ -41,6 +48,8 @@ import com.aelitis.azureus.util.JSONUtils;
 public class 
 WebTorrentTracker 
 {
+	private static boolean	TRACE = false;
+	
 	private final WebTorrentPlugin		plugin;
 	
 	private final GenericWSServer		gs_server;
@@ -51,9 +60,15 @@ WebTorrentTracker
 	
 	private final String				host;
 	
+	private final Object		lock = new Object();
+	
 	private ServerWrapper		server;
 	
-	private Map<Object,SessionWrapper>		session_map = new HashMap<>();
+	private Map<Object,SessionWrapper>		session_map 	= new HashMap<>();
+	
+	private Map<HashWrapper,TrackedTorrent>	active_torrents	= new HashMap<>();
+	
+	private final TimerEventPeriodic	timer;
 	
 	private boolean		destroyed;
 	
@@ -72,6 +87,32 @@ WebTorrentTracker
 		bind_ip		= _bind_ip;
 		port		= _port;
 		host		= _host;
+		
+		timer = 
+			SimpleTimer.addPeriodicEvent(
+				"WTT:timer",
+				20*1000,
+				new TimerEventPerformer() {
+					
+					@Override
+					public void 
+					perform(
+						TimerEvent event ) 
+					{
+						synchronized( lock ){
+							
+							for ( TrackedTorrent tt: active_torrents.values()){
+								
+								tt.checkTimeouts();
+							}
+						}
+						
+						if ( TRACE ){
+							
+							print();
+						}
+					}
+				});
 	}
 	
 	public boolean
@@ -110,12 +151,46 @@ WebTorrentTracker
 	stop()
 	{
 		server.destroy();
+		
+		timer.cancel();
 	}
 	
 	public String
 	getURL()
 	{
 		return( ( is_ssl?"wss":"ws" ) + "://" + host + ":" + port + "/wstracker/vuze" );
+	}
+	
+	private void
+	trace(
+		String		str )
+	{
+		if ( TRACE ){
+			System.out.println( str );
+		}
+	}
+	
+	private void
+	print()
+	{
+		synchronized( lock ){
+			
+			System.out.println( "WebTorrentTracker: sessions=" + session_map.size() + ", torrents=" + active_torrents.size());
+			
+			System.out.println( "Sessions" );
+			
+			for ( SessionWrapper sw: session_map.values()){
+				
+				sw.print();
+			}
+			
+			System.out.println( "Torrents" );
+			
+			for (TrackedTorrent tt: active_torrents.values()){
+				
+				tt.print();
+			}
+		}
 	}
 	
 	public void
@@ -126,7 +201,7 @@ WebTorrentTracker
 	{
 		boolean	close_it = false;
 		
-		synchronized( session_map ){
+		synchronized( lock ){
 			
 			if ( destroyed ){
 				
@@ -156,7 +231,7 @@ WebTorrentTracker
 	{
 		SessionWrapper	wrapper;
 		
-		synchronized( session_map ){
+		synchronized( lock ){
 			
 			wrapper = session_map.remove( session );
 		}
@@ -167,19 +242,41 @@ WebTorrentTracker
 		}
 	}
 	
+	private SessionTorrent
+	getSessionTorrent(
+		SessionWrapper	sw,
+		byte[]			hash )
+	{
+		synchronized( lock ){
+		
+			HashWrapper	hw = new HashWrapper( hash );
+			
+			TrackedTorrent tt = active_torrents.get( hw );
+			
+			if ( tt == null ){
+				
+				tt = new TrackedTorrent( hw );
+				
+				active_torrents.put( hw, tt );
+			}
+			
+			return( sw.getTorrent( tt ));
+		}
+	}
+	
 	public void
 	messageReceived(
 		Object		server,
 		Object		session,
 		String		message )
 	{
-		System.out.println( "messageReceived: " + message );
+		trace( "messageReceived: " + message );
 		
 		boolean	close_it	= false;
 		
 		String	reply 		= null;
 		
-		synchronized( session_map ){
+		synchronized( lock ){
 			
 			SessionWrapper wrapper = session_map.get( session );
 		
@@ -198,20 +295,25 @@ WebTorrentTracker
 								
 					byte[] info_hash = hash_str.getBytes( "ISO-8859-1" );
 					
-					System.out.println( "hash=" + ByteFormatter.encodeString( info_hash ));
+					SessionTorrent	session_torrent = getSessionTorrent( wrapper, info_hash );			
 					
+					TrackedTorrent tracked_torrent = session_torrent.getTrackedTorrent();
+
 					String peer_id_str = (String)map_in.get( "peer_id" );
 					
 					byte[] peer_id = peer_id_str.getBytes( "ISO-8859-1" );
 
 					if ( map_in.containsKey( "answer" )){
 						
-						for ( SessionWrapper w2: session_map.values()){
-							
-							if ( w2 != wrapper ){
+						String 	offer_id_str	= (String)map_in.get( "offer_id" );
+												
+						byte[] offer_id = offer_id_str.getBytes( "ISO-8859-1" );
+						
+						SessionTorrent target_session = tracked_torrent.lookupSessionForOffer( offer_id );
+						
+						if ( target_session != null ){
 								
-								plugin.sendMessage( w2.server, w2.session, message );
-							}
+							target_session.getSessionWrapper().sendMessage( message );
 						}
 					}else{
 						int		numwant 	= ((Number)map_in.get("numwant")).intValue();
@@ -225,14 +327,17 @@ WebTorrentTracker
 												
 						if ( left == 0 ){
 														
-							wrapper.setComplete();
+							session_torrent.setComplete();
 						}
 						
 						String event = (String)map_in.get( "event" );
 						
-						if ( event != null && event.equals( "completed" )){
+						if ( event != null ){
+							
+							if ( event.equals( "completed" )){
 														
-							wrapper.setComplete();
+								session_torrent.setComplete();	
+							}
 						}
 						
 						List<Map>	offers = (List<Map>)map_in.get( "offers" );
@@ -248,38 +353,44 @@ WebTorrentTracker
 								
 								byte[] offer_id = offer_id_str.getBytes( "ISO-8859-1" );
 								
-								for ( SessionWrapper w2: session_map.values()){
-									
-									if ( w2 != wrapper ){
+								String offer_message = "{\"offer\":{\"type\":\"offer\",\"sdp\":\"" + 
+										WebTorrentPlugin.encodeForJSON( offer_sdp  ) + "\"}," + 
+										"\"offer_id\":\"" + WebTorrentPlugin.encodeForJSON( offer_id ) + "\"," + 
+										"\"peer_id\":\"" + WebTorrentPlugin.encodeForJSON( peer_id ) + "\"," + 
+										"\"info_hash\":\"" + WebTorrentPlugin.encodeForJSON( info_hash ) + "\"" + 
+										"}";
+								
+								SessionTorrent target_session = tracked_torrent.allocateSessionForOffer( session_torrent, offer_id, offer_message );
+								
+								if ( target_session != null ){
 										
-										String offer_str = "{\"offer\":{\"type\":\"offer\",\"sdp\":\"" + 
-												WebTorrentPlugin.encodeForJSON( offer_sdp  ) + "\"}," + 
-												"\"offer_id\":\"" + WebTorrentPlugin.encodeForJSON( offer_id ) + "\"," + 
-												"\"peer_id\":\"" + WebTorrentPlugin.encodeForJSON( peer_id ) + "\"," + 
-												"\"info_hash\":\"" + WebTorrentPlugin.encodeForJSON( info_hash ) + "\"" + 
-												"}";
-	
-										plugin.sendMessage( w2.server, w2.session, offer_str );
-									}
+									target_session.getSessionWrapper().sendMessage( offer_message );	
 								}
 							}
 						}
+					
+						Map<String, Object> map_out = new JSONObject();
+						
+						map_out.put( "info_hash", WebTorrentPlugin.encodeForJSON( info_hash ));
+						
+						map_out.put( "complete", 23 );
+						map_out.put( "incomplete", 42 );
+						
+						map_out.put( "action", 1 );
+						map_out.put( "interval", 120 );
+						
+						reply = JSONUtils.encodeToJSON( map_out );
+						
+						reply = reply.replaceAll( "\\\\u00", "\\u00" );
+						
+						if ( event != null ){
+							
+							if ( event.equals( "stopped" )){
+								
+								session_torrent.destroy();
+							}
+						}
 					}
-					
-					Map<String, Object> map_out = new JSONObject();
-					
-					map_out.put( "info_hash", WebTorrentPlugin.encodeForJSON( info_hash ));
-					
-					map_out.put( "complete", 23 );
-					map_out.put( "incomplete", 42 );
-					
-					map_out.put( "action", 1 );
-					map_out.put( "interval", 120 );
-					
-					reply = JSONUtils.encodeToJSON( map_out );
-					
-					reply = reply.replaceAll( "\\\\u00", "\\u00" );
-					
 				}catch( Throwable e ){
 					
 					close_it = true;
@@ -329,14 +440,18 @@ WebTorrentTracker
 		
 		Collection<SessionWrapper>	to_destroy;
 		
-		synchronized( session_map ){
+		synchronized( lock ){
 			
 			destroyed	= true;
 			
 			to_destroy = session_map.values();
 			
 			session_map.clear();
+		}
 		
+		for ( SessionWrapper sw: to_destroy ){
+			
+			sw.destroy();
 		}
 	}
 	
@@ -348,8 +463,8 @@ WebTorrentTracker
 		private final URI			uri;
 		
 		private long	last_heard_from;
-		
-		private boolean	complete;
+				
+		private Map<HashWrapper, SessionTorrent>	session_torrents = new HashMap<>();
 		
 		private
 		SessionWrapper(
@@ -364,22 +479,414 @@ WebTorrentTracker
 			setAlive();
 		}
 		
+		private String
+		getName()
+		{
+			return( "SW: " + String.valueOf( session ));
+		}
+		
 		private void
 		setAlive()
 		{
 			last_heard_from = SystemTime.getMonotonousTime();
 		}
 		
-		private void
-		setComplete()
+		private SessionTorrent
+		getTorrent(
+			TrackedTorrent		tt )
 		{
-			complete	= true;
+			synchronized( lock ){
+				
+				HashWrapper	hw = tt.getHash();
+				
+				SessionTorrent st = session_torrents.get( hw );
+				
+				if ( st == null ){
+					
+					st = new SessionTorrent( this, tt );
+					
+					session_torrents.put( hw, st );
+				}
+				
+				return( st );
+			}
+		}
+		
+		private void
+		sendMessage(
+			String			message )
+			
+			throws Exception
+		{
+			plugin.sendMessage( server, session, message );	
 		}
 		
 		private void
 		destroy()
 		{
+			synchronized( lock ){
+				
+				for ( SessionTorrent st: session_torrents.values()){
+					
+					st.destroy();
+				}
+				
+				session_torrents.clear();
+			}
+		}
+		
+		private void
+		print()
+		{
+			System.out.println( "    " + getName() + ", STs=" + session_torrents.size());
 			
+			for (SessionTorrent st: session_torrents.values()){
+				
+				st.print();
+			}
+		}
+	}
+	
+	private class
+	SessionTorrent
+	{
+		private final SessionWrapper	session_wrapper;
+		private final TrackedTorrent	tracked_torrent;
+		
+		private Map<SessionTorrent,OutstandingOffer>	oo_map = new HashMap<>();
+		
+		private boolean	complete;
+		private boolean	destroyed;
+		
+		private
+		SessionTorrent(
+			SessionWrapper		_sw,
+			TrackedTorrent		_tt )
+		{
+			session_wrapper	= _sw;
+			tracked_torrent	= _tt;
+			
+			tracked_torrent.addSessionTorrent( this );
+			
+			trace( "ST added: " + getName());
+		}
+		
+		private void
+		setComplete()
+		{
+			complete = true;
+		}
+		
+		private boolean
+		isComplete()
+		{
+			return( complete );
+		}
+		
+		private TrackedTorrent
+		getTrackedTorrent()
+		{
+			return( tracked_torrent );
+		}
+		
+		private SessionWrapper
+		getSessionWrapper()
+		{
+			return( session_wrapper );
+		}
+		
+		private void
+		addOutstandingOffer(
+			OutstandingOffer		oo )
+		{
+			synchronized( lock ){
+				
+				oo_map.put( oo.getFromST(), oo );
+			}
+		}
+		
+		private void
+		removeOutstandingOffer(
+			OutstandingOffer		oo )
+		{
+			synchronized( lock ){
+				
+				oo_map.remove( oo.getFromST());
+			}
+		}
+		
+		private boolean
+		hasOutstandingOffer(
+			SessionTorrent		from_session )
+		{
+			synchronized( lock ){
+				
+				return( oo_map.containsKey( from_session ));
+			}
+		}
+		
+		private boolean
+		isDestroyed()
+		{
+			return( destroyed );
+		}
+		
+		private String
+		getName()
+		{
+			return( tracked_torrent.getName() + "/" + session_wrapper.getName());
+		}
+		
+		private void
+		destroy()
+		{
+			destroyed = true;
+			
+			tracked_torrent.removeSessionTorrent( this );
+			
+			trace( "ST removed: " + getName());
+
+		}
+		
+		private void
+		print()
+		{
+			System.out.println( "        " + getName() + ": oos=" + oo_map.size());
+		}
+	}
+	
+	private class
+	TrackedTorrent
+	{
+		private final HashWrapper		hash;
+		
+		private final List<SessionTorrent>	session_torrents = new ArrayList<>();
+				
+		private final Map<HashWrapper,OutstandingOffer>	outstanding_offer_map = new HashMap<>();
+				
+		private int	st_offer_alloc_index;
+
+		private
+		TrackedTorrent(
+			HashWrapper		_hw )
+		{
+			hash	= _hw;
+			
+			trace( "TT added: " + getName());
+		}
+		
+		private HashWrapper
+		getHash()
+		{
+			return( hash );
+		}
+		
+		private String
+		getName()
+		{
+			return( ByteFormatter.encodeString( hash.getBytes()));
+		}
+		
+		private SessionTorrent
+		allocateSessionForOffer(
+			SessionTorrent	source,
+			byte[]			offer_id,
+			String			offer_message )
+		{			
+			boolean	source_complete = source.isComplete();
+			
+			synchronized( lock ){
+			
+				int num_st = session_torrents.size();
+				
+				for ( int i=st_offer_alloc_index;i<st_offer_alloc_index+num_st;i++){
+					
+					int	index = i%num_st;
+					
+					SessionTorrent	target = session_torrents.get( index );
+					
+					if ( source != target ){
+						
+						if ( !( source_complete && target.isComplete())){
+							
+							if ( !target.hasOutstandingOffer( source )){
+								
+								OutstandingOffer oo = new OutstandingOffer( source, target );
+																
+									// not great but at least moves things around
+								
+								st_offer_alloc_index = index+1;
+																
+								outstanding_offer_map.put( new HashWrapper( offer_id), oo );
+							
+								trace( "allocateSFO" );
+
+								trace( "    -> " +  target.getName());
+
+								return( target );
+							}
+						}
+					}
+				}
+			}
+			
+				// TODO: could keep a pending pool of unused offers
+			
+			return( null );
+		}
+		
+		private SessionTorrent
+		lookupSessionForOffer(
+			byte[]		offer_id )
+		{
+			trace( "lookupSFO" );
+			
+			synchronized( lock ){
+				
+				OutstandingOffer oo = outstanding_offer_map.remove( new HashWrapper( offer_id ));
+				
+				if ( oo != null ){
+					
+					SessionTorrent st = oo.getFromST();
+					
+					if ( !st.isDestroyed()){
+						
+						oo.destroy();
+						
+						trace( "    -> " +  st.getName());
+						
+						return( st );
+					}
+					
+				}
+			}
+			
+			return( null );
+		}
+		
+		private void
+		checkTimeouts()
+		{
+			for ( Iterator<Map.Entry<HashWrapper,OutstandingOffer>> it = outstanding_offer_map.entrySet().iterator();it.hasNext();){
+				
+				Map.Entry<HashWrapper,OutstandingOffer> entry = it.next();
+				
+				OutstandingOffer oo = entry.getValue();
+				
+				if ( oo.isExpired()){
+					
+					oo.destroy();
+					
+					it.remove();
+				}
+			}
+		}
+		
+		private void
+		addSessionTorrent(
+			SessionTorrent		st )
+		{
+			synchronized( lock ){
+				
+				session_torrents.add( st );
+			}
+		}
+		
+		private void
+		removeSessionTorrent(
+			SessionTorrent		st )
+		{
+			synchronized( lock ){
+			
+				session_torrents.remove( st );
+				
+				if ( session_torrents.size() == 0 ){
+					
+					destroy();
+				}
+			}
+		}
+		
+		private void
+		destroy()
+		{
+			synchronized( lock ){
+				
+				active_torrents.remove( hash );
+				
+				trace( "TT removed: " + getName());
+			}
+		}
+		
+		private void
+		print()
+		{
+			System.out.println( "    TT: " + getName());
+			
+			System.out.println( "    STs: " + session_torrents.size());
+			
+			for ( SessionTorrent st: session_torrents ){
+				
+				st.print();
+			}
+			
+			System.out.println( "    OOs: " + outstanding_offer_map.size());
+
+			for ( OutstandingOffer oo: outstanding_offer_map.values()){
+				
+				oo.print();
+			}
+		}
+	}
+	
+	private class
+	OutstandingOffer
+	{
+		private final SessionTorrent		from_st;
+		private final SessionTorrent		to_st;
+		
+		private final long					create_time = SystemTime.getMonotonousTime();
+		
+		private
+		OutstandingOffer(
+			SessionTorrent		_from,
+			SessionTorrent		_to )
+		{
+			from_st		= _from;
+			to_st		= _to;
+			
+			to_st.addOutstandingOffer( this );
+
+		}
+		
+		private SessionTorrent
+		getFromST()
+		{
+			return( from_st );
+		}
+		
+		private SessionTorrent
+		getToST()
+		{
+			return( to_st );
+		}
+		
+		public boolean
+		isExpired()
+		{
+			return( SystemTime.getMonotonousTime() - create_time > 60*1000 );
+		}
+		
+		private void
+		destroy()
+		{
+			to_st.removeOutstandingOffer( this );
+		}
+		
+		private void
+		print()
+		{
+			System.out.println( "    " + from_st.getName() + " -> " + to_st.getName());
 		}
 	}
 }
