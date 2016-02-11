@@ -85,6 +85,7 @@ WebTorrentPlugin
 	private StringParameter			tracker_bind;
 	private StringParameter			tracker_host;
 	private InfoParameter			tracker_url;
+	private InfoParameter			tracker_stats;
 
 	
 	private LocalWebServer	web_server;
@@ -204,10 +205,11 @@ WebTorrentPlugin
 		tracker_bind 	= config_model.addStringParameter2( "azwebtorrent.tracker.bindip", "azwebtorrent.tracker.bindip", "" );
 		tracker_host 	= config_model.addStringParameter2( "azwebtorrent.tracker.public.address", "azwebtorrent.tracker.public.address", "127.0.0.1" );
 		tracker_url		= config_model.addInfoParameter2( "azwebtorrent.tracker.url", "" );
-				
+		tracker_stats	= config_model.addInfoParameter2( "azwebtorrent.tracker.status", "" );
+			
 		Parameter[] tracker_params = { 
 				tracker_enable, tracker_ssl, tracker_port, tracker_bind,
-				tracker_host, tracker_url
+				tracker_host, tracker_url, tracker_stats
 		};
 		
 		ParameterListener	tracker_listener = new
@@ -233,7 +235,7 @@ WebTorrentPlugin
 		
 		config_model.createGroup( "azwebtorrent.tracker", tracker_params );
 		
-		
+		/*
 		final ActionParameter test_param = config_model.addActionParameter2( "azwebtorrent.test", "azwebtorrent.test" );
 		
 		test_param.addListener(
@@ -246,6 +248,7 @@ WebTorrentPlugin
 					runTest();
 				}
 			});
+		*/
 		
 		plugin_interface.addListener(
 			new PluginAdapter()
@@ -316,6 +319,23 @@ WebTorrentPlugin
 					tracker = null;
 				}
 			}
+		}
+	}
+	
+	public void
+	updateTrackerStatus(
+		int		sessions,
+		int		torrents )
+	{
+		if ( tracker_stats != null ){
+			
+			tracker_stats.setValue( 
+				loc_utils.getLocalisedMessageText(
+					"azwebtorrent.tracker.status.detail",
+					new String[]{
+						String.valueOf( sessions ),
+						String.valueOf( torrents )
+					}));
 		}
 	}
 	

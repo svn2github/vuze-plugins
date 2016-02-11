@@ -105,6 +105,8 @@ WebTorrentTracker
 								
 								tt.checkTimeouts();
 							}
+							
+							plugin.updateTrackerStatus( session_map.size(), active_torrents.size());
 						}
 						
 						if ( TRACE ){
