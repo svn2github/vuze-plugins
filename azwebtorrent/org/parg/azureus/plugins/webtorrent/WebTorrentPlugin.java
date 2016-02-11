@@ -34,20 +34,28 @@ import java.net.URL;
 
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.gudy.azureus2.core3.torrent.TOTorrent;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.RandomUtils;
 import org.gudy.azureus2.core3.util.SystemTime;
+import org.gudy.azureus2.core3.util.TorrentUtils;
 import org.gudy.azureus2.core3.util.UrlUtils;
 import org.gudy.azureus2.plugins.*;
+import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.ipc.IPCException;
 import org.gudy.azureus2.plugins.ipc.IPCInterface;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
+import org.gudy.azureus2.plugins.torrent.Torrent;
 import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.config.ActionParameter;
 import org.gudy.azureus2.plugins.ui.config.BooleanParameter;
@@ -57,9 +65,16 @@ import org.gudy.azureus2.plugins.ui.config.LabelParameter;
 import org.gudy.azureus2.plugins.ui.config.Parameter;
 import org.gudy.azureus2.plugins.ui.config.ParameterListener;
 import org.gudy.azureus2.plugins.ui.config.StringParameter;
+import org.gudy.azureus2.plugins.ui.menus.MenuItem;
+import org.gudy.azureus2.plugins.ui.menus.MenuItemFillListener;
+import org.gudy.azureus2.plugins.ui.menus.MenuItemListener;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginConfigModel;
 import org.gudy.azureus2.plugins.ui.model.BasicPluginViewModel;
+import org.gudy.azureus2.plugins.ui.tables.TableContextMenuItem;
+import org.gudy.azureus2.plugins.ui.tables.TableManager;
+import org.gudy.azureus2.plugins.ui.tables.TableRow;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
+import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.parg.azureus.plugins.webtorrent.GenericWSServer.ServerWrapper;
 
 
@@ -70,6 +85,8 @@ WebTorrentPlugin
 {
 	private static final long instance_id = RandomUtils.nextSecureAbsoluteLong();
 		
+	private static final String DEFAULT_EXTERNAL_TRACKERS	= "wss://tracker.openwebtorrent.com/";
+	
 	private PluginInterface	plugin_interface;
 	
 	private LoggerChannel 			log;
@@ -80,6 +97,7 @@ WebTorrentPlugin
 	private LabelParameter 			status_label;
 	
 	private BooleanParameter		tracker_enable;
+	private StringParameter			tracker_external;
 	private BooleanParameter		tracker_ssl;
 	private IntParameter			tracker_port;
 	private StringParameter			tracker_bind;
@@ -87,6 +105,7 @@ WebTorrentPlugin
 	private InfoParameter			tracker_url;
 	private InfoParameter			tracker_stats;
 
+	private List<TableContextMenuItem>		menus = new ArrayList<>();
 	
 	private LocalWebServer	web_server;
 	private TrackerProxy	tracker_proxy;
@@ -199,7 +218,8 @@ WebTorrentPlugin
 		
 			// tracker
 		
-		tracker_enable 	= config_model.addBooleanParameter2( "azwebtorrent.tracker.enable", "azwebtorrent.tracker.enable", false );
+		tracker_enable 		= config_model.addBooleanParameter2( "azwebtorrent.tracker.enable", "azwebtorrent.tracker.enable", false );
+		tracker_external 	= config_model.addStringParameter2( "azwebtorrent.tracker.external", "azwebtorrent.tracker.external", DEFAULT_EXTERNAL_TRACKERS );
 		tracker_ssl 	= config_model.addBooleanParameter2( "azwebtorrent.tracker.ssl", "azwebtorrent.tracker.ssl", false );
 		tracker_port 	= config_model.addIntParameter2( "azwebtorrent.tracker.port", "azwebtorrent.tracker.port", 8000, 1, 65535 );
 		tracker_bind 	= config_model.addStringParameter2( "azwebtorrent.tracker.bindip", "azwebtorrent.tracker.bindip", "" );
@@ -208,7 +228,7 @@ WebTorrentPlugin
 		tracker_stats	= config_model.addInfoParameter2( "azwebtorrent.tracker.status", "" );
 			
 		Parameter[] tracker_params = { 
-				tracker_enable, tracker_ssl, tracker_port, tracker_bind,
+				tracker_enable, tracker_external, tracker_ssl, tracker_port, tracker_bind,
 				tracker_host, tracker_url, tracker_stats
 		};
 		
@@ -220,16 +240,23 @@ WebTorrentPlugin
 					setupTracker();
 				}
 			};
-			
+						
 		for ( Parameter p : tracker_params ){
 			
 			p.setGenerateIntermediateEvents( false );
 
-			p.addListener( tracker_listener );
-			
-			if ( p != tracker_enable ){
-			
-				tracker_enable.addEnabledOnSelection( p );
+			if ( p == tracker_external ){
+				
+				tracker_enable.addDisabledOnSelection( p );
+
+			}else{
+				
+				p.addListener( tracker_listener );
+				
+				if ( p != tracker_enable ){
+				
+					tracker_enable.addEnabledOnSelection( p );
+				}
 			}
 		}
 		
@@ -250,6 +277,177 @@ WebTorrentPlugin
 			});
 		*/
 		
+		MenuItemFillListener	menu_fill_listener = 
+				new MenuItemFillListener()
+				{
+					public void
+					menuWillBeShown(
+						MenuItem	menu,
+						Object		_target )
+					{
+						List<Download>	downloads = new ArrayList<>();
+						
+						if ( _target instanceof TableRow ){
+							
+							Object obj = ((TableRow)_target).getDataSource();
+		
+							if ( obj instanceof Download ){
+								
+								downloads.add((Download)obj);
+							}
+						}else{
+							
+							TableRow[] rows = (TableRow[])_target;
+						     
+							for ( TableRow row: rows ){
+							
+								Object obj = row.getDataSource();
+								
+								if ( obj instanceof Download ){
+									
+									downloads.add((Download)obj);
+								}
+							}
+						}
+						
+						boolean	found = false;
+						
+						Set<String>	trackers = getTrackersForHosting();
+							
+						if ( trackers.size() > 0 ){
+							
+							for ( Download download: downloads ){
+								
+								Torrent torrent = download.getTorrent();
+								
+								if ( torrent != null ){
+									
+									TOTorrent to_torrent = PluginCoreUtils.unwrap( torrent );
+									
+									if ( !TorrentUtils.isReallyPrivate( to_torrent )){
+										
+										List<List<String>> existing_urls = TorrentUtils.announceGroupsToList( to_torrent );
+										
+										Set<String> temp = new HashSet<String>();
+										
+										for ( List<String> l: existing_urls ){
+											
+											temp.addAll(l);
+										}
+										
+										if ( !temp.containsAll( trackers )){
+											
+											found = true;
+											
+											break;
+										}
+									}
+								}
+							}
+						}
+						
+						menu.setEnabled( found );
+					}
+				};
+			
+			
+			MenuItemListener	menu_listener = 
+					new MenuItemListener()
+					{
+						public void
+						selected(
+							MenuItem		_menu,
+							Object			_target )
+						{
+							List<Download>	downloads = new ArrayList<>();
+							
+							if ( _target instanceof TableRow ){
+								
+								Object obj = ((TableRow)_target).getDataSource();
+			
+								if ( obj instanceof Download ){
+									
+									downloads.add((Download)obj);
+								}
+							}else{
+								
+								TableRow[] rows = (TableRow[])_target;
+							     
+								for ( TableRow row: rows ){
+								
+									Object obj = row.getDataSource();
+									
+									if ( obj instanceof Download ){
+										
+										downloads.add((Download)obj);
+									}
+								}
+							}
+														
+							Set<String>	trackers = getTrackersForHosting();
+							
+							for ( Download download: downloads ){
+								
+								Torrent torrent = download.getTorrent();
+								
+								if ( torrent != null ){
+									
+									TOTorrent to_torrent = PluginCoreUtils.unwrap( torrent );
+									
+									if ( !TorrentUtils.isReallyPrivate( to_torrent )){
+										
+										List<List<String>> existing_urls = TorrentUtils.announceGroupsToList( to_torrent );
+												
+										Set<String> trackers_copy = new HashSet<>( trackers );
+	
+										for ( List<String> l: existing_urls ){
+											
+											trackers_copy.removeAll( l );
+										}
+										
+										if ( trackers_copy.size() > 0 ){
+											
+											List<List<String>> updated_urls = new ArrayList<List<String>>( existing_urls );
+											
+											for ( String str: trackers_copy ){
+												
+												List<String> l = new ArrayList<String>();
+												
+												l.add( str );
+												
+												updated_urls.add( l );
+											}
+											
+											TorrentUtils.listToAnnounceGroups( updated_urls, to_torrent );
+										}
+									}
+								}
+							}
+						}
+					};
+					
+		String[] tables = {
+				TableManager.TABLE_MYTORRENTS_COMPLETE,	
+				TableManager.TABLE_MYTORRENTS_INCOMPLETE,	
+				TableManager.TABLE_MYTORRENTS_COMPLETE_BIG,	
+				TableManager.TABLE_MYTORRENTS_INCOMPLETE_BIG,	
+				TableManager.TABLE_MYTORRENTS_ALL_BIG,
+		};
+			
+		for ( String table: tables ){
+			
+			TableContextMenuItem menu_item 	= 
+				plugin_interface.getUIManager().getTableManager().addContextMenuItem(
+					table, 
+					"azwebtorrent.menu.addtracker");
+
+			menu_item.addFillListener( menu_fill_listener );
+			
+			menu_item.addListener( menu_listener );
+			
+			menus.add( menu_item );
+		}
+		
 		plugin_interface.addListener(
 			new PluginAdapter()
 			{
@@ -264,6 +462,39 @@ WebTorrentPlugin
 		gws_server = new GenericWSServer();
 		
 		setupTracker();
+	}
+	
+	private Set<String>
+	getTrackersForHosting()
+	{
+		Set<String>	trackers = new HashSet<>();
+		
+		if ( tracker != null ){
+			
+			trackers.add(tracker.getURL());
+			
+		}else{
+			
+			String[] bits = tracker_external.getValue().replace( ';', ',' ).split( "," );
+			
+			for (String bit: bits ){
+				
+				bit = bit.trim();
+				
+				if ( bit.length() > 0 ){
+					
+					try{
+						trackers.add( new URL( bit ).toExternalForm());
+						
+					}catch( Throwable e ){
+						
+						Debug.out( e );
+					}
+				}
+			}
+		}
+		
+		return( trackers );
 	}
 	
 	private void
@@ -773,6 +1004,13 @@ WebTorrentPlugin
 			
 			view_model = null;
 		}
+		
+		for (TableContextMenuItem menu_item: menus ){
+			
+			menu_item.remove();
+		}
+		
+		menus.clear();
 		
 		deactivate();
 		
