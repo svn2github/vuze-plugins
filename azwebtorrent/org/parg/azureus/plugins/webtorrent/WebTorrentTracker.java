@@ -23,7 +23,6 @@
 package org.parg.azureus.plugins.webtorrent;
 
 import java.net.URI;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -32,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.gudy.azureus2.core3.util.ByteFormatter;
-import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.HashWrapper;
 import org.gudy.azureus2.core3.util.SimpleTimer;
 import org.gudy.azureus2.core3.util.SystemTime;
@@ -262,7 +260,7 @@ WebTorrentTracker
 				active_torrents.put( hw, tt );
 			}
 			
-			return( sw.getTorrent( tt ));
+			return( sw.getSessionTorrent( tt ));
 		}
 	}
 	
@@ -430,7 +428,7 @@ WebTorrentTracker
 							
 							if ( event.equals( "stopped" )){
 								
-								session_torrent.destroy();
+								wrapper.removeSessionTorrent( session_torrent );
 							}
 						}
 					}
@@ -535,7 +533,7 @@ WebTorrentTracker
 		}
 		
 		private SessionTorrent
-		getTorrent(
+		getSessionTorrent(
 			TrackedTorrent		tt )
 		{
 			synchronized( lock ){
@@ -552,6 +550,19 @@ WebTorrentTracker
 				}
 				
 				return( st );
+			}
+		}
+		
+		private void
+		removeSessionTorrent(
+			SessionTorrent		st )
+		{
+			synchronized( lock ){
+				
+				if ( session_torrents.remove( st.getTrackedTorrent().getHash()) != null ){
+				
+					st.destroy();
+				}
 			}
 		}
 		
