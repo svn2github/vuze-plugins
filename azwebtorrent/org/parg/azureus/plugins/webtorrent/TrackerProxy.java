@@ -48,6 +48,7 @@ import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.BEncoder;
 import org.gudy.azureus2.core3.util.ByteArrayHashMap;
 import org.gudy.azureus2.core3.util.ByteEncodedKeyHashMap;
+import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.RandomUtils;
@@ -62,6 +63,8 @@ public class
 TrackerProxy 
 	implements LocalWebServer.Listener
 {
+	private static final boolean TRACE = false;
+	
 	private final WebTorrentPlugin		plugin;
 	private final Listener				listener;
 	
@@ -306,9 +309,9 @@ TrackerProxy
 	        			",\"peer_id\":\"" + WebTorrentPlugin.encodeForJSON( peer_id ) + "\"" +
 	        			",\"offers\":[" + offer_str + "]}";
 				
-	        	//System.out.println( ByteFormatter.encodeString( info_hash ));
+	        	trace( ByteFormatter.encodeString( info_hash ));
 	        			
-	        	//System.out.println( "sending: " + announce );
+	        	trace( "sending: " + announce );
 	        	
 	        	ClientSession	client_session = null;
 				
@@ -326,7 +329,7 @@ TrackerProxy
 			
 				if ( client_session != null ){
 					
-					//System.out.println( "announce: old connection to " + ws_url + ": " + announce);
+					trace( "announce: old connection to " + ws_url + ": " + announce);
 					
 					client_session.send( announce );
 					
@@ -368,7 +371,7 @@ TrackerProxy
 				                            onMessage(
 				                            	String message ) 
 				                            {
-				                               // System.out.println("Received message: " + message);
+				                            	trace("Received message: " + message);
 	
 				                            	Map map = JSONUtils.decodeJSON( message );
 				                            			                            	
@@ -434,7 +437,7 @@ TrackerProxy
 																				"\"info_hash\":\"" + WebTorrentPlugin.encodeForJSON( hash ) + "\"" + 
 																				"}";
 	
-																		//System.out.println( answer_str );
+																		trace( answer_str );
 																		
 																		try{
 																			session.getBasicRemote().sendText( answer_str );
@@ -481,7 +484,7 @@ TrackerProxy
 				                            }
 				                        });
 				                      		
-				                        // System.out.println( "announce: new connection to " + ws_url + announce );
+				                        trace( "announce: new connection to " + ws_url + announce );
 				                        
 				                        session.getBasicRemote().sendText( announce );
 				                        
@@ -787,5 +790,14 @@ TrackerProxy
     	private long		last_announce_time;
     	private AESemaphore	announce_sem;
 
+    }
+    
+    private void
+    trace(
+    	String		str )
+    {
+    	if ( TRACE ){
+    		System.out.println( str );
+    	}
     }
 }
