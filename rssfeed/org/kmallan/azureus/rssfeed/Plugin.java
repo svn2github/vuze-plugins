@@ -20,11 +20,12 @@
 package org.kmallan.azureus.rssfeed;
 
 import java.io.File;
-import java.io.FileOutputStream;
+import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Iterator;
+import java.util.List;
 
+import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.ui.UIInstance;
@@ -41,7 +42,6 @@ import org.gudy.azureus2.ui.swt.plugins.UISWTViewEventListener;
 import org.eclipse.swt.program.Program;
 import org.eclipse.swt.widgets.Composite;
 
-import com.cedarsoftware.util.io.JsonWriter;
 
 public class Plugin implements org.gudy.azureus2.plugins.Plugin {
 
@@ -56,6 +56,8 @@ public class Plugin implements org.gudy.azureus2.plugins.Plugin {
   private static Config rssfeedConfig;
   private static View view = null;
 
+  private List<BooleanParameter>	net_params;
+  
   public void initialize(PluginInterface pluginIf) {
     pluginInterface = pluginIf;
     rssfeedConfig = new Config();
@@ -171,6 +173,24 @@ public class Plugin implements org.gudy.azureus2.plugins.Plugin {
 		
 		auto_reload.addEnabledOnSelection( auto_reload_delay );
 		
+		net_params = new ArrayList<BooleanParameter>();
+		
+		final BooleanParameter net_force = config.addBooleanParameter2("RSSFeed.Config.netforce", "RSSFeed.Config.netforce", false);
+
+		net_params.add( net_force );
+		
+		for ( String net: AENetworkClassifier.AT_NETWORKS ){
+			
+			BooleanParameter net_param = config.addBooleanParameter2("RSSFeed.Config.netforce." + net, "ConfigView.section.connection.networks." + net, false);
+
+			net_force.addEnabledOnSelection( net_param );
+			
+			net_params.add( net_param );
+		}
+		
+		config.createGroup( "RSSFeed.Config.netgroup", net_params.toArray( new Parameter[net_params.size()]));
+				 
+		
 		/*
 		pluginInterface.addConfigUIParameters(getParameters(), );
 		
@@ -201,7 +221,7 @@ public class Plugin implements org.gudy.azureus2.plugins.Plugin {
 					UIInstance		instance )
 				{
 					if ( instance instanceof UISWTInstance ){
-						view = new View(pluginInterface, rssfeedConfig);
+						view = new View(Plugin.this, pluginInterface, rssfeedConfig);
 						
 						swtInstance = ((UISWTInstance) instance);
 
@@ -318,6 +338,34 @@ public class Plugin implements org.gudy.azureus2.plugins.Plugin {
 			  return( PROXY_DEFAULT );
 		  }
 	  }
+  }
+  
+  public String[]
+  getForcedNetworks()
+  {
+	  if ( net_params == null ){
+		  
+		  return( null );
+	  }
+	  
+	  Iterator<BooleanParameter> it = net_params.iterator();
+	  
+	  if ( !it.next().getValue()){
+		  
+		  return( null );
+	  }
+	  
+	  List<String>	result = new ArrayList<String>();
+	  
+	  for ( String net: AENetworkClassifier.AT_NETWORKS ){
+
+		  if (it.next().getValue()){
+			  
+			  result.add( net );
+		  }
+	  }
+	  
+	  return( result.toArray( new String[ result.size()]));
   }
   
   public static PluginInterface

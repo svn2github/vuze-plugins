@@ -271,42 +271,45 @@ public class TorrentDownloader {
     return (download != null);
   }
 
-  private Download addTorrent(final Torrent curTorrent, File torrentLocation, File dataLocation, final DownloadWillBeAddedListener _dwba) throws Exception {
+  private Download addTorrent(final Torrent curTorrent, File torrentLocation, File dataLocation, final DownloadWillBeAddedListener external_dwba) throws Exception {
     Download download = null;
     if(torrentLocation != null && dataLocation != null) {
     	
-		DownloadWillBeAddedListener dwba = null;
-
-    	try{
-    		if ( _dwba != null ){
-    			
-    			dwba = 
-    				new DownloadWillBeAddedListener() 
-	    			{	
-						public void 
-						initialised(
-							Download download) 
-						{
-							if ( Arrays.equals( download.getTorrent().getHash(), curTorrent.getHash())){
-								
-								_dwba.initialised( download );
-							}
+		DownloadWillBeAddedListener dwba = 
+			new DownloadWillBeAddedListener() 
+			{	
+				public void 
+				initialised(
+					Download download) 
+				{
+					if ( Arrays.equals( download.getTorrent().getHash(), curTorrent.getHash())){
+						
+						String[] networks = view.getPlugin().getForcedNetworks();
+						
+						if ( networks != null ){
+						
+							PluginCoreUtils.unwrap( download ).getDownloadState().setNetworks( networks );
 						}
-					};
-     		    			
-    			downloadManager.addDownloadWillBeAddedListener(dwba);
-    		}
+						
+						if ( external_dwba != null ){
+							
+							external_dwba.initialised( download );
+						}
+					}
+				}
+			};
+     		    	
+		try{
+    		downloadManager.addDownloadWillBeAddedListener(dwba);
     		
     		download = downloadManager.addDownload(curTorrent, torrentLocation, dataLocation);
     		
     	}finally{
-    		
-    		if ( dwba != null ){
-    			
-    			downloadManager.removeDownloadWillBeAddedListener(dwba);
-    		}
+    		    			
+    		downloadManager.removeDownloadWillBeAddedListener(dwba);
     	}
     }
+    
     return download;
   }
 

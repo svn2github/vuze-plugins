@@ -41,6 +41,7 @@ import java.util.Timer;
 public class View implements MouseListener, SelectionListener, MenuListener, ModifyListener,
     Listener, ParameterListener {
 
+  private Plugin plugin;
   private PluginInterface pluginInterface;
   public Config rssfeedConfig;
   private Scheduler scheduler;
@@ -103,7 +104,8 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
 
   private final View thisView;
 
-  public View(PluginInterface pluginInterface, Config rssfeedConfig) {
+  public View(Plugin plugin,PluginInterface pluginInterface, Config rssfeedConfig) {
+	this.plugin = plugin;
     this.pluginInterface = pluginInterface;
     this.rssfeedConfig = rssfeedConfig;
     this.treeViewManager = new TreeViewManager(this);
@@ -117,6 +119,12 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
     thisView = this;
   }
 
+  public Plugin
+  getPlugin()
+  {
+	  return( plugin );
+  }
+  
   public void finalize() {
     Plugin.debugOut("Killing RSSFeed");
     timer.cancel();
