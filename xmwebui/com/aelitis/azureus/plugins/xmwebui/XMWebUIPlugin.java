@@ -115,7 +115,7 @@ XMWebUIPlugin
 	
 	private static final boolean IS_5101_PLUS = Constants.isCurrentVersionGE( "5.1.0.1" );
 	
-	private static final int VUZE_RPC_VERSION = 3;
+	private static final int VUZE_RPC_VERSION = 4;
 	
 	private static Download
 	destubbify(
@@ -198,6 +198,8 @@ XMWebUIPlugin
     private transient Map<String,Object>	json_server_methods 		= new HashMap<String, Object>();		// Object during transition to core support
 
 		private BooleanParameter logtofile_param;
+
+		private LoggerChannel log;
     
     public
     XMWebUIPlugin()
@@ -250,9 +252,13 @@ XMWebUIPlugin
 	
 		throws PluginException
 	{	
-		super.initialize( _plugin_interface );
 		
 		plugin_interface	= _plugin_interface;
+
+		log = plugin_interface.getLogger().getChannel( "xmwebui" );
+		defaults.put(PR_LOG, log);
+		
+		super.initialize( _plugin_interface );
 		
 		plugin_interface.getUtilities().getLocaleUtilities().integrateLocalisedMessageBundle( 
 				"com.aelitis.azureus.plugins.xmwebui.internat.Messages" );
@@ -274,7 +280,7 @@ XMWebUIPlugin
 		trace_param = config.addBooleanParameter2( "xmwebui.trace", "xmwebui.trace", false );
 		
 		logtofile_param = config.addBooleanParameter2( "xmwebui.logtofile", "xmwebui.logtofile", false );
-		
+
 		changeLogToFile(logtofile_param.getValue());
 		logtofile_param.addConfigParameterListener(new ConfigParameterListener() {
 			public void configParameterChanged(ConfigParameter param) {
@@ -494,15 +500,11 @@ XMWebUIPlugin
 	}
 	
 	protected void changeLogToFile(boolean logToFile) {
-		org.gudy.azureus2.plugins.logging.Logger logger = plugin_interface.getLogger();
-		if (logger != null) {
-			LoggerChannel channel = logger.getChannel("WebPlugin");
-			if (channel != null) {
-				if (logToFile) {
-					channel.setDiagnostic(1024l * 1024l, true);
-				} else {
-					// no way of turning off :(
-				}
+		if (log != null) {
+			if (logToFile) {
+				log.setDiagnostic(1024l * 1024l, true);
+			} else {
+				// no way of turning off :(
 			}
 		}
 	}
@@ -772,7 +774,7 @@ XMWebUIPlugin
 			response.setHeader("X-Transmission-Session-Id", session_id );
 
 			if (!isSessionValid(request)) {
-				log(request.getHeader());
+				log("Header:\n" + request.getHeader());
 				LineNumberReader lnr;
 				if ("gzip".equals(request.getHeaders().get("content-encoding"))) {
 					GZIPInputStream gzipIS = new GZIPInputStream(request.getInputStream());
@@ -1724,6 +1726,7 @@ XMWebUIPlugin
 				map.put("canBePublic", tag.canBePublic());
 				map.put("public", tag.isPublic());
 				map.put("visible", tag.isVisible());
+				map.put("group", tag.getGroup());
 				map.put("auto", tag.isTagAuto());
 				listTags.add(map);
 			}
@@ -1763,6 +1766,8 @@ XMWebUIPlugin
 			file = file.getParentFile();
 		}
 		if (file == null) {
+			result.put("path", oPath);
+			result.put("size-bytes", 0);
 			return;
 		}
 		long space = FileUtil.getUsableSpace(file);
@@ -1952,7 +1957,9 @@ XMWebUIPlugin
     result.put(TransmissionVars.TR_PREFS_KEY_UPLOAD_SLOTS_PER_TORRENT, 14 ); //TODO
     //result.put(TransmissionVars.TR_PREFS_KEY_BIND_ADDRESS_IPV4, TR_DEFAULT_BIND_ADDRESS_IPV4 ); //TODO
     //result.put(TransmissionVars.TR_PREFS_KEY_BIND_ADDRESS_IPV6, TR_DEFAULT_BIND_ADDRESS_IPV6 ); //TODO
-    
+
+    result.put("config-dir", "" ); //TODO
+
     boolean startStopped = COConfigurationManager.getBooleanParameter("Default Start Torrents Stopped");
     result.put(TransmissionVars.TR_PREFS_KEY_START, !startStopped ); //TODO
     
@@ -2659,6 +2666,16 @@ XMWebUIPlugin
 								if (tag != null) {
 									tag.removeTaggable(PluginCoreUtils.unwrap(download));
 								}
+							} else if (oTagToAdd instanceof Number) {
+								int uid = ((Number) oTagToAdd).intValue();
+								Tag tag = ttManual.getTag(uid);
+								if (tag != null) {
+									tag.removeTaggable(PluginCoreUtils.unwrap(download));
+								}
+								tag = ttCategory.getTag(uid);
+								if (tag != null) {
+									tag.removeTaggable(PluginCoreUtils.unwrap(download));
+								}
 							}
 
 						}
@@ -3097,7 +3114,7 @@ XMWebUIPlugin
 			
 				if ( metainfoString != null ){
 			
-					metainfoBytes = Base64.decode( metainfoString );
+					metainfoBytes = Base64.decode( metainfoString.replaceAll("[\r\n]+", "") );
 							
 					vf = vfh.loadVuzeFile( metainfoBytes );
 				
@@ -3216,7 +3233,8 @@ XMWebUIPlugin
 		
 		if ( metainfoString != null ){
 		
-			metainfoBytes = Base64.decode( metainfoString );
+			metainfoBytes = Base64.decode( metainfoString.replaceAll("[\r\n]+", "") );
+			//metainfoBytes = Base64.decode( metainfoString );
 		
 			VuzeFileHandler vfh = VuzeFileHandler.getSingleton();
 	
@@ -3382,6 +3400,8 @@ XMWebUIPlugin
 			} catch (Throwable e) {
 
 				e.printStackTrace();
+				
+				//System.err.println("decode of " + new String(Base64.encode(metainfoBytes), "UTF8"));
 
 				throw (new IOException("torrent download failed: "
 						+ Debug.getNestedExceptionMessage(e)));
@@ -3655,8 +3675,8 @@ XMWebUIPlugin
 				
 		Map<Long,Map>	torrent_info = new LinkedHashMap<Long, Map>();
 		
+		
 		for ( DownloadStub download_stub: downloads ){
-			
 			if (download_stub.isStub()) {
 				method_Torrent_Get_Stub(request, args, fields, torrent_info,
 						download_stub, file_fields);
@@ -3930,6 +3950,11 @@ XMWebUIPlugin
 				String host = (String)request.getHeaders().get( "host" );
 
 				value = torrentGet_files(host, download, download_id, file_fields, args);
+				
+				// One hash for all files.  This won't work when our file list is a partial
+				//if (value instanceof Collection) {
+				//	torrent.put("files-hc", longHashSimpleList((Collection<?>) value));
+				//}
 
 			} else if (field.equals("fileStats")) {
 				// RPC v5
@@ -4157,7 +4182,9 @@ XMWebUIPlugin
 
 			} else if (field.equals("trackers")) {
 
-				value = torrentGet_trackers(core_download);
+				String agent = MapUtils.getMapString(request.getHeaders(), "User-Agent", "");
+				boolean hack = agent.contains("httpok"); // Torrnado
+				value = torrentGet_trackers(core_download, hack);
 
 			} else if (field.equals("trackerStats")) {
 				// RPC v7
@@ -4958,7 +4985,7 @@ XMWebUIPlugin
 		return value;
 	}
 	
-	private Object torrentGet_trackers(DownloadManager core_download) {
+	private Object torrentGet_trackers(DownloadManager core_download, boolean hack) {
 		List	trackers = new ArrayList();
 
 		List<TrackerPeerSource> trackerPeerSources = core_download.getTrackerPeerSources();
@@ -4985,8 +5012,14 @@ XMWebUIPlugin
 	    try {
 		    name = tps.getName();
 	    } catch (Exception e) {
+	    	name = tps.getClass().getSimpleName();
 	    	// NPE at com.aelitis.azureus.plugins.extseed.ExternalSeedPlugin$5.getName(ExternalSeedPlugin.java:561
 	    }
+	    
+	    if (hack && !name.contains("://")) {
+	    	name = "://" + name;
+	    }
+	    
 	    map.put("id", tps.hashCode());
 	    /* the full announce URL */
 	    map.put("announce", name); // TODO

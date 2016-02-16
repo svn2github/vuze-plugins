@@ -888,3 +888,14 @@ VZ.3 Vuze Lifecycle
 
    key                  | value type & description
    ---------------------+-------------------------------------------------
+
+ VZ.4 Tags
+ 
+ We support tag RPCs.
+ TODO: Document
+ 
+ VZ.5 Hash Codes
+ 
+ We use hascodes for lists and maps to reduce network traffic
+ TODO: Document
+ 
