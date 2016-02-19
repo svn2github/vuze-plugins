@@ -3762,8 +3762,7 @@ XMWebUIPlugin
 		Torrent t = download.getTorrent();
 
 		if (t == null) {
-
-			return;
+			t = new TorrentBlank(download);
 		}
 
 		long download_id = getID(download, true);
