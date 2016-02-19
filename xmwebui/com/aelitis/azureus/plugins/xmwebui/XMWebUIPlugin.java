@@ -3762,7 +3762,10 @@ XMWebUIPlugin
 		Torrent t = download.getTorrent();
 
 		if (t == null) {
-			t = new TorrentBlank(download);
+			// Can't do this.. download is a nullstate, which doesn't store
+			// Attributes, and getID relies on that
+			//t = new TorrentBlank(download);
+			return;
 		}
 
 		long download_id = getID(download, true);
