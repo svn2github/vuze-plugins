@@ -655,8 +655,12 @@ function setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )
 			try{
 				channel.send( array_buffer );
 			
-				total_up += array_buffer.byteLength;
+				var bytes = array_buffer.byteLength;
+				
+				if ( Number.isInteger( bytes )){
 					
+					total_up += bytes;
+				}	
 			}catch( err ){
 								
 				removePeer( peer );
@@ -716,7 +720,12 @@ function setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )
 						
 						peer_ws.send( array_buffer );
 						
-						total_down += array_buffer.byteLength;
+						var bytes = array_buffer.byteLength;
+						
+						if ( Number.isInteger( bytes )){
+							
+							total_down += bytes;
+						}
 					}
 				}catch( err ){
 					
@@ -750,8 +759,12 @@ function setupChannelWS( peer, channel, offer_id, hash, incoming, remote_ip )
 					
 					peer_ws.send( array_buffer );
 					
-					total_down += array_buffer.byteLength;
+					var bytes = array_buffer.byteLength;
 					
+					if ( Number.isInteger( bytes )){
+						
+						total_down += bytes;
+					}
 				}else{
 					
 					removePeer( peer );
