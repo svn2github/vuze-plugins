@@ -224,6 +224,8 @@ public class AzExecPlugin implements Plugin, DownloadCompletionListener, MenuIte
 			command_k = "multi";
 		}
 		
+		String command_m = d.getTorrentFileName();
+		
 		String command = command_template;
 		command = command.replace("%F", command_f);
 		command = command.replace("%D", command_d);
@@ -232,6 +234,7 @@ public class AzExecPlugin implements Plugin, DownloadCompletionListener, MenuIte
 		command = command.replace("%T", command_t);
 		command = command.replace("%I", command_i);
 		command = command.replace("%K", command_k);
+		command = command.replace("%M", command_m);
 
 		final String command_to_run = command;
 		plugin_interface.getUtilities().createThread(d.getName() + " exec", new Runnable() {
