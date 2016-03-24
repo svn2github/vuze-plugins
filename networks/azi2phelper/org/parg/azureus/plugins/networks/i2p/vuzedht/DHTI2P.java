@@ -914,6 +914,8 @@ DHTI2P
 						}else{
 										
 							refresh_find_node_fail++;
+							
+							router.contactDead( node.getNID().getData(), false );
 						}
         			}
         		}
@@ -1011,6 +1013,8 @@ DHTI2P
 						}else{
 							
 							refresh_find_node_fail++;
+							
+							router.contactDead(  rc.getID(), false );
 						}
             		}else{
             			
@@ -1022,7 +1026,7 @@ DHTI2P
 							
 						}else{
 							
-            				router.contactDead( rc.getID(), false);
+            				router.contactDead( rc.getID(), false );
 
 							refresh_ping_fail++;
 						}
@@ -1063,6 +1067,18 @@ DHTI2P
             			bad_sent++;
             		}
             	}
+        	}
+        	
+        	if ( live_node_count < 5 ){
+        		
+	        		// alt contacts are cheap, throw in a ping if we can
+	        	
+	        	List<NodeInfo> alts = adapter.getAlternativeContacts( 5 - live_node_count );
+	        	
+	        	for ( NodeInfo alt: alts ){
+	        		
+	        		heardAbout( alt );
+	        	}
         	}
         }finally{
         					

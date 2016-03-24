@@ -2244,6 +2244,10 @@ DHTTransportI2P
 	        }else if ( to_port == reply_port) {
 	
 	        	receiveMessage( null, from_port, raw_payload_length, payload );
+	        	
+	        }else{
+	        	
+	        	if ( TRACE ) trace( "unmatched port: " + to_port + " (" + query_port + "/" + reply_port + ")");
 	        }
     	}catch( Throwable e ){
     		
@@ -2356,6 +2360,9 @@ DHTTransportI2P
 	        		
 	        		if ( TRACE ) trace( "Got reply to timed-out request" );
 	        	}
+	        }else{
+	        	
+	        	if ( TRACE ) trace( "Unhandled message type: " + type  );
 	        }
     	}catch( Throwable e ){
     		

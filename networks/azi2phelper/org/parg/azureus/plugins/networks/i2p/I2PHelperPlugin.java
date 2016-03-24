@@ -2772,6 +2772,40 @@ I2PHelperPlugin
 		}	
 	}
 		
+	public List<NodeInfo>
+	getAlternativeContacts(
+		int				max )
+	{
+		I2PHelperAltNetHandler anh = alt_network_handler;
+		
+		List<NodeInfo> result = new ArrayList<NodeInfo>();
+		
+		if ( anh != null ){
+			
+			List<DHTTransportAlternativeContact> contacts = DHTUDPUtils.getAlternativeContacts( DHTTransportAlternativeNetwork.AT_I2P, max );
+
+			if ( contacts.size() > 0 ){
+										
+				for ( DHTTransportAlternativeContact c: contacts ){
+				
+					NodeInfo ni = anh.decodeContact( c );
+					
+					if ( ni != null ){	
+						
+						result.add( ni );
+						
+						if ( result.size()  >= max ){
+							
+							break;
+						}
+					}
+				}
+			}
+		}
+		
+		return( result );
+	}
+	
 	public void
 	tryExternalBootstrap(
 		I2PHelperDHT	dht,
@@ -4916,6 +4950,13 @@ I2PHelperPlugin
 				stateChanged(
 					I2PHelperRouterDHT dht ) 
 				{
+				}
+				
+				@Override
+				public List<NodeInfo> 
+				getAlternativeContacts(int max) 
+				{
+					return( new ArrayList<NodeInfo>());
 				}
 				
 				public void

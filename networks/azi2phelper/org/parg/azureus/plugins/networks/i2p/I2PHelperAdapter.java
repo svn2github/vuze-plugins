@@ -21,8 +21,11 @@
 
 package org.parg.azureus.plugins.networks.i2p;
 
+import java.util.List;
+
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouterDHT;
+import org.parg.azureus.plugins.networks.i2p.snarkdht.NodeInfo;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTTransportContactI2P;
 
 import net.i2p.client.streaming.I2PSocket;
@@ -50,6 +53,10 @@ I2PHelperAdapter
 	tryExternalBootstrap(
 		I2PHelperDHT	dht,
 		boolean			force );
+	
+	public List<NodeInfo>
+	getAlternativeContacts(
+		int				max );
 	
 	public void
 	stateChanged(
