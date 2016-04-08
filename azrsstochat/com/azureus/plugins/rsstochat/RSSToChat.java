@@ -911,6 +911,33 @@ RSSToChat
 				
 				String history_key = magnet;
 				
+					// unfortunately if the magnet link is generated from a download with a lot of webseeds then a limited and randomized subset of
+					// these are returned by Vuze - this results in the same download generating multiple distinct magnets which, without processing, 
+					// causes repeat entries in the feed. Solution is to remove &ws= entries if there are more than 4 (for some backward compatability)
+				
+				String history_key_no_ws = "";
+				
+				String[] bits = history_key.split( "&" );
+				
+				int	num_ws = 0;
+				
+				for ( String bit: bits ){
+				
+					if ( bit.toLowerCase( Locale.US ).startsWith( "ws=" )){
+						
+						num_ws++;
+						
+					}else{
+						
+						history_key_no_ws += (history_key_no_ws.length()==0?"":"&") + bit;
+					}
+				}
+				
+				if ( num_ws > 4 ){
+					
+					history_key = history_key_no_ws;
+				}
+				
 				if ( history != null && history.hasPublished( history_key )){
 					
 					continue;
@@ -2091,12 +2118,12 @@ RSSToChat
 									
 					retry_outstanding = false;
 					
-					log( "Refreshing " + getSourceName());
+					History history = new History( this );
+
+					log( "Refreshing " + getSourceName() + " (" + history.getHistoryKey() + ")");
 					
 					ChatInstance chat_instance;
-					
-					History history = new History( this );
-					
+										
 					synchronized( this ){
 						
 						if ( destroyed ){
