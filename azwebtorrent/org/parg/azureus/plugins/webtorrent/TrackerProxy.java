@@ -297,17 +297,22 @@ TrackerProxy
 							"{\"offer\":{\"type\":\"offer\",\"sdp\":\"" + WebTorrentPlugin.encodeForJSON( offer.getSDP()) + "\"},\"offer_id\":\"" + offer.getOfferID() + "\"}";
 					}
 				}
+								
+					// on 2016/04/08 I discovered that the tracker protocol had been rewritten to pass "announce" and "scrape" as the action rather than just 
+					// the number 1 (and we added 2 for scrape). 
+					// Server code also updated to handle multiple info-hashes (and a single one too so we're good for the moment mebe)
 				
 	        	final String announce = 
 	        			"{\"numwant\":" + numwant + 
 	        			",\"uploaded\":" + uploaded + 
 	        			",\"downloaded\":" + downloaded + 
 	        			",\"left\":" + left + 
-	        			",\"action\":" + (scrape?2:1) + // added so our tracker can discriminate announce/scrape
+	        			",\"action\":" + (scrape?"\"scrape\"":"\"announce\"") +
 	        			(event==null?"": ( ",\"event\":\"" + event + "\"" )) + 
 	        			",\"info_hash\":\"" + WebTorrentPlugin.encodeForJSON( info_hash ) + "\"" +
 	        			",\"peer_id\":\"" + WebTorrentPlugin.encodeForJSON( peer_id ) + "\"" +
-	        			",\"offers\":[" + offer_str + "]}";
+	        			(scrape?"":( ",\"offers\":[" + offer_str + "]" )) +
+	        			"}";
 				
 	        	trace( ByteFormatter.encodeString( info_hash ));
 	        			
@@ -480,7 +485,34 @@ TrackerProxy
 							                            	}
 								                		 }
 								                	 }
-				                            	}                              
+				                            	}else if ( map.containsKey( "files" )){
+				                            		
+				                            			// scrape response
+				                            		
+				                            		Map<String,Map> files = (Map<String,Map>)map.get( "files" );
+				                            		
+				                            		synchronized( client_sessions ){
+							                    		 
+							                    		 ClientSession s = client_sessions.get( ws_url );
+								                		 
+								                		 if ( s.getSession() == session ){
+
+								                			 for ( String info_hash: files.keySet()){
+
+								                				 try{
+								                					 
+								                					 byte[] hash = info_hash.getBytes( "ISO-8859-1" );
+								                					 
+								                					 s.announceReceived( hash, map );
+								                					 
+								                				 }catch( Throwable e ){
+
+								                					 Debug.out( e );
+								                				 }
+								                			 }
+								                		 }
+				                            		}
+				                            	}
 				                            }
 				                        });
 				                      		
@@ -553,15 +585,33 @@ TrackerProxy
 				
 				if ( scrape ){
 					
-					Map<String,Object>	root = new HashMap<>();
-					
-					ByteEncodedKeyHashMap<String, Object>	files = new ByteEncodedKeyHashMap<>();
-					
-					root.put( "files", files );
-					
-					files.put( new String( info_hash,Constants.BYTE_ENCODING ), reply );
-					
-					reply_bytes = BEncoder.encode( root );
+					if ( reply.containsKey( "files" )){
+						
+						Map<String,Object>	root = new HashMap<>();
+						
+						root.putAll( reply );
+						
+						ByteEncodedKeyHashMap<String, Object>	files = new ByteEncodedKeyHashMap<>();
+						
+						files.putAll((Map)reply.get( "files" ));
+						
+						root.put( "files", files);
+												
+						reply_bytes = BEncoder.encode( root );
+						
+					}else{
+							// old style before tracker protocol supported scrape
+						
+						Map<String,Object>	root = new HashMap<>();
+						
+						ByteEncodedKeyHashMap<String, Object>	files = new ByteEncodedKeyHashMap<>();
+						
+						root.put( "files", files );
+						
+						files.put( new String( info_hash,Constants.BYTE_ENCODING ), reply );
+						
+						reply_bytes = BEncoder.encode( root );
+					}
 					
 				}else{
 					

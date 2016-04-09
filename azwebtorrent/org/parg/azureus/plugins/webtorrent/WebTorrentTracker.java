@@ -346,9 +346,27 @@ WebTorrentTracker
 						
 						long	left 		= getOptionalLong( map_in, "left", Long.MAX_VALUE );
 						
-						int		action 		= getOptionalInt( map_in, "action", 0 );
+							// meh, they changed to use "announce" and "scrape"
+						
+						boolean	is_scrape;
+						boolean	is_new_action;
+						
+						String action_str = (String)map_in.get( "action" );
+						
+						if ( action_str != null ){
+							
+							is_new_action	= true;
+							
+							is_scrape 		= action_str.equals( "scrape" );
+							
+						}else{
+						
+							int		action 		= getOptionalInt( map_in, "action", 0 );
 												
-						boolean	is_scrape = action == 2;
+							is_scrape = action == 2;
+							
+							is_new_action = false;
+						}
 						
 						if ( left == 0 && !is_scrape ){
 														
@@ -395,9 +413,7 @@ WebTorrentTracker
 						}
 					
 						Map<String, Object> map_out = new JSONObject();
-						
-						map_out.put( "info_hash", WebTorrentPlugin.encodeForJSON( info_hash ));
-						
+												
 						int complete 	= tracked_torrent.getComplete();
 						int incomplete 	= tracked_torrent.getIncomplete();
 						
@@ -413,12 +429,52 @@ WebTorrentTracker
 								incomplete--;
 							}
 						}
-						map_out.put( "complete", Math.max(complete,0));
-						map_out.put( "incomplete", Math.max(incomplete,0));
 						
-						map_out.put( "action", is_scrape?2:1 );
-						
-						map_out.put( "interval", 120 );
+						if ( is_new_action ){
+							
+							map_out.put( "action", is_scrape?"scrape":"announce" );
+
+							if ( is_scrape ){
+								
+								JSONObject files = new JSONObject();
+								
+								map_out.put( "files", files );
+								
+								JSONObject file = new JSONObject();
+								
+								files.put( WebTorrentPlugin.encodeForJSON( info_hash ), file );
+								
+								file.put( "complete", Math.max(complete,0));
+								file.put( "incomplete", Math.max(incomplete,0));
+								file.put( "downloaded", Math.max(complete,0));	// TODO!
+
+								JSONObject flags = new JSONObject();
+								
+								map_out.put( "flags", flags );
+								
+								flags.put( "min_request_interval", 600 );
+								
+							}else{
+								
+								map_out.put( "info_hash", WebTorrentPlugin.encodeForJSON( info_hash ));
+
+								map_out.put( "complete", Math.max(complete,0));
+								map_out.put( "incomplete", Math.max(incomplete,0));
+								
+								
+								map_out.put( "interval", 120 );
+							}
+						}else{
+							
+							map_out.put( "info_hash", WebTorrentPlugin.encodeForJSON( info_hash ));
+
+							map_out.put( "complete", Math.max(complete,0));
+							map_out.put( "incomplete", Math.max(incomplete,0));
+							
+							map_out.put( "action", is_scrape?2:1 );
+							
+							map_out.put( "interval", 120 );
+						}
 						
 						reply = JSONUtils.encodeToJSON( map_out );
 						
