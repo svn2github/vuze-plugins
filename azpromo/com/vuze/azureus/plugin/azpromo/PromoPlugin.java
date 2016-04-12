@@ -192,69 +192,74 @@ public class PromoPlugin
 			}
 		});
 
-		boolean enabled = pluginInterface.getPluginconfig().getPluginBooleanParameter(
-				"enabled");
-		if (enabled) {
+		// Get notified when the UI is attached
+		pluginInterface.getUIManager().addUIListener(new UIManagerListener() {
+			public void UIAttached(UIInstance instance) {
+				
+				checkLicence();
+				
+				boolean enabled = pluginInterface.getPluginconfig().getPluginBooleanParameter("enabled");
 
-			// Get notified when the UI is attached
-			pluginInterface.getUIManager().addUIListener(new UIManagerListener() {
-				public void UIAttached(UIInstance instance) {
+				if ( enabled ){
 					if (instance instanceof UISWTInstance && !unloaded ) {
 						swtInstance = ((UISWTInstance) instance);
 						swtInstance.addView(UISWTInstance.VIEW_SIDEBAR_AREA, VIEWID,
 								PromoView.class, null);
 					}
 				}
+			}
 
-				public void UIDetached(UIInstance instance) {
-					swtInstance = null;
+			public void UIDetached(UIInstance instance) {
+				swtInstance = null;
+			}
+		});
+
+		pluginInterface.addListener(new PluginListener() {
+			public void initializationComplete() {
+				if (pluginInterface == null) {
+					return;
 				}
-			});
 
-			pluginInterface.addListener(new PluginListener() {
-				public void initializationComplete() {
-					if (pluginInterface == null) {
-						return;
+				FeatureManager fm = pluginInterface.getUtilities().getFeatureManager();
+
+				FeatureManager.FeatureManagerListener fml = new FeatureManager.FeatureManagerListener() {
+
+					public void licenceRemoved(Licence licence) {
+						checkLicence();
 					}
 
-					FeatureManager fm = pluginInterface.getUtilities().getFeatureManager();
+					public void licenceChanged(Licence licence) {
+						checkLicence();
+					}
 
-					FeatureManager.FeatureManagerListener fml = new FeatureManager.FeatureManagerListener() {
+					public void licenceAdded(Licence licence) {
+						checkLicence();
+					}
+				};
 
-						public void licenceRemoved(Licence licence) {
-							checkLicence();
-						}
+				fm.addListener(fml);
 
-						public void licenceChanged(Licence licence) {
-							checkLicence();
-						}
+				checkLicence();
+			}
 
-						public void licenceAdded(Licence licence) {
-							checkLicence();
-						}
-					};
+			public void closedownInitiated() {
+			}
 
-					fm.addListener(fml);
-
-					checkLicence();
-				}
-
-				public void closedownInitiated() {
-				}
-
-				public void closedownComplete() {
-				}
-			});
-
-		}
-
+			public void closedownComplete() {
+			}
+		});
 	}
 
 	protected void checkLicence() {
-		boolean hasFullLicence = FeatureUtils.hasFullLicence();
+		boolean hasLicence = FeatureUtils.hasPlusLicence() || FeatureUtils.hasNoAdLicence();
 
-		if (hasFullLicence) {
+		if ( hasLicence ){
+			
 			pluginInterface.getPluginconfig().setPluginParameter("enabled", false);
+			
+		}else{
+			
+			pluginInterface.getPluginconfig().setPluginParameter("enabled", true);
 		}
 	}
 
