@@ -28,6 +28,7 @@ import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Scale;
+import org.gudy.azureus2.ui.swt.Utils;
 
 /* TODO (overview)
  * 1. the ScrolledComposite should resize according to window size
@@ -151,17 +152,33 @@ public class ZoomedScrolledMap extends Composite {
 	public void setImage(Image argImg) {
 		mapImage = argImg;
 		
-		/* initialize map size */
-		float ratio = (float)mapImage.getBounds().height/mapImage.getBounds().width;
-		//System.out.println("scroll size:"+scroll.getSize()); // 819x419
+			// defer this as otherwise the client are can be invalid and this causes the map to never
+			// be drawn
 		
-		/* Initially the image should fill the entire scrolledComposite */
-		/* Note: clientArea = The area without trimmings (scrollbars etc) */
-		imgWidth = scroll.getClientArea().width;
-		imgHeight = (int)(ratio*imgWidth);
-		canvas.setLocation(0,0);
-		canvas.setSize(imgWidth, imgHeight);		
-		GeoUtils.setMapSize(imgWidth, imgHeight);
+		Utils.execSWTThreadLater(
+			1,
+			new Runnable()
+			{
+				public void
+				run()
+				{
+					/* initialize map size */
+					float ratio = (float)mapImage.getBounds().height/mapImage.getBounds().width;
+					//System.out.println("scroll size:"+scroll.getSize()); // 819x419
+					
+					/* Initially the image should fill the entire scrolledComposite */
+					/* Note: clientArea = The area without trimmings (scrollbars etc) */
+					imgWidth = scroll.getClientArea().width;
+					imgHeight = (int)(ratio*imgWidth);
+					canvas.setLocation(0,0);
+					canvas.setSize(imgWidth, imgHeight);		
+					GeoUtils.setMapSize(imgWidth, imgHeight);
+				}
+			});
+		
+		
+		
+		
 		canvas.addPaintListener(new PaintListener() {
 			public void paintControl(PaintEvent e) {
 				redrawMap(e.gc);

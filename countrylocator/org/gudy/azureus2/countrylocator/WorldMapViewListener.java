@@ -57,7 +57,9 @@ public class WorldMapViewListener implements UISWTViewEventListener {
 		case UISWTViewEvent.TYPE_REFRESH:
 			/* Periodical refresh: Update the stats values */
 			mapView = (MapView)mapViews.get(event.getView());
-			mapView.refresh();
+			if ( mapView != null ){
+				mapView.refresh();
+			}
 			break;
 
 		case UISWTViewEvent.TYPE_DESTROY:
