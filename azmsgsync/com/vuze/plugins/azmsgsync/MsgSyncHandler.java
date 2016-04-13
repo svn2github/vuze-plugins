@@ -41,11 +41,6 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import org.bouncycastle.crypto.engines.AESFastEngine;
-import org.bouncycastle.crypto.modes.CBCBlockCipher;
-import org.bouncycastle.crypto.paddings.PaddedBufferedBlockCipher;
-import org.bouncycastle.crypto.params.KeyParameter;
-import org.bouncycastle.crypto.params.ParametersWithIV;
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.AERunnable;
@@ -69,6 +64,11 @@ import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.gudy.azureus2.core3.util.TimerEventPeriodic;
 import org.gudy.azureus2.plugins.ipc.IPCException;
+import org.gudy.bouncycastle.crypto.engines.AESFastEngine;
+import org.gudy.bouncycastle.crypto.modes.CBCBlockCipher;
+import org.gudy.bouncycastle.crypto.paddings.PaddedBufferedBlockCipher;
+import org.gudy.bouncycastle.crypto.params.KeyParameter;
+import org.gudy.bouncycastle.crypto.params.ParametersWithIV;
 
 import com.aelitis.azureus.core.AzureusCoreFactory;
 import com.aelitis.azureus.core.dht.DHT;
