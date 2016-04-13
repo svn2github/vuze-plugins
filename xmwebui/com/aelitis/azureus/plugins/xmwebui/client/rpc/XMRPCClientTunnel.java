@@ -33,13 +33,13 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import org.bouncycastle.crypto.agreement.srp.SRP6Client;
-import org.bouncycastle.crypto.digests.SHA256Digest;
-import org.bouncycastle.util.encoders.Hex;
 import org.gudy.azureus2.core3.util.Base32;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.core3.util.TimeFormatter;
+import org.gudy.bouncycastle.crypto.agreement.srp.SRP6Client;
+import org.gudy.bouncycastle.crypto.digests.SHA256Digest;
+import org.gudy.bouncycastle.util.encoders.Hex;
 import org.json.simple.JSONObject;
 
 import com.aelitis.azureus.util.JSONUtils;

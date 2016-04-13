@@ -30,8 +30,8 @@ import java.net.URL;
 import java.util.List;
 import java.util.Map;
 
-import org.bouncycastle.util.encoders.Base64;
 import org.gudy.azureus2.core3.util.Debug;
+import org.gudy.bouncycastle.util.encoders.Base64;
 
 import com.aelitis.azureus.plugins.xmwebui.client.rpc.XMRPCClient.HTTPResponse;
 

@@ -30,7 +30,6 @@ import java.text.ParseException;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
 
-import org.bouncycastle.util.encoders.Base64;
 import org.gudy.azureus2.core3.category.Category;
 import org.gudy.azureus2.core3.category.CategoryManager;
 import org.gudy.azureus2.core3.config.COConfigurationManager;
@@ -75,6 +74,7 @@ import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloaderAdap
 import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.gudy.azureus2.pluginsimpl.local.utils.resourcedownloader.ResourceDownloaderFactoryImpl;
 import org.gudy.azureus2.ui.webplugin.WebPlugin;
+import org.gudy.bouncycastle.util.encoders.Base64;
 import org.json.simple.JSONObject;
 
 import com.aelitis.azureus.core.AzureusCore;
