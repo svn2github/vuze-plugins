@@ -73,7 +73,7 @@ public class RCM_SearchProvider
 						public byte[]
 						getData()
 						{
-							InputStream is = getClass().getClassLoader().getResourceAsStream( "org/gudy/azureus2/ui/icons/rcm.png" );
+							InputStream is = getClass().getClassLoader().getResourceAsStream( "com/aelitis/plugins/rcmplugin/resources/rcm.png" ); // org/gudy/azureus2/ui/icons/rcm.png" );
 							
 							if ( is == null ){
 								
