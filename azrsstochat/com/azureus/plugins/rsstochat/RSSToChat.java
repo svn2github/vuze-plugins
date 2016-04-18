@@ -1711,6 +1711,10 @@ RSSToChat
 			PlatformTorrentUtils.setContentTitle( torrent, torrent_title );
 			PlatformTorrentUtils.setContentPrimaryFileIndex( torrent, primary_file_index );
 			
+			String chat_url = inst.getURL();
+			
+			torrent.setComment( "See " + chat_url + " for updates");
+			
 			File torrent_file = new File( site_folder.getParent(), site_folder.getName() + ".torrent" );
 			
 			torrent.serialiseToBEncodedFile( torrent_file );
