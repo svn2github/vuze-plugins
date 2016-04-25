@@ -82,6 +82,8 @@ RelatedContentUISWT
 {		
 	public static final String SIDEBAR_SECTION_RELATED_CONTENT = "RelatedContent";
 	
+	public static final String POPULARITY_SEARCH_EXPR	= "(.)";
+	
 	public static final String SPINNER_IMAGE_ID 	= "image.sidebar.vitality.dots";
 
 	private static RelatedContentUISWT		singleton;
@@ -1418,6 +1420,19 @@ RelatedContentUISWT
 						}
 					});
 			
+			menu_item = menu_manager.addMenuItem( parent_id, "rcm.menu.findbypop" );
+			
+			menu_item.addListener( 
+					new MenuItemListener() 
+					{
+						public void 
+						selected(
+							MenuItem menu, Object target ) 
+						{
+							addSearch( POPULARITY_SEARCH_EXPR, new String[]{ AENetworkClassifier.AT_PUBLIC });
+						}
+					});
+			
 			menu_item = menu_manager.addMenuItem( parent_id, "sep1" );
 
 			menu_item.setStyle( MenuItem.STYLE_SEPARATOR );
@@ -1755,7 +1770,9 @@ RelatedContentUISWT
 		final String 		expression,
 		final String[]		networks )
 	{
-		final String name = "'" + expression + "'";
+		final boolean	is_popularity = expression==POPULARITY_SEARCH_EXPR;
+		
+		final String name = is_popularity?MessageText.getString("rcm.pop" ):("'" + expression + "'" );
 		
 		try{
 			synchronized( this ){
@@ -1768,7 +1785,12 @@ RelatedContentUISWT
 				
 				if (  existing_si == null ){
 		
-					final RCMItem new_si = new RCMItemContent( dummy_hash, networks, new String[] { expression });
+					final RCMItemContent new_si = new RCMItemContent( dummy_hash, networks, new String[] { expression });
+					
+					if ( is_popularity ){
+						
+						new_si.setMinVersion( RelatedContent.VERSION_BETTER_SCRAPE );
+					}
 					
 					rcm_item_map.put( dummy_hash, new_si );
 					
@@ -2125,8 +2147,9 @@ RelatedContentUISWT
 	{	
 		private byte[]				hash;
 		private long				file_size;
-		private String[]				expressions;
-		private int expressions_searching;
+		private String[]			expressions;
+		private int					min_version = -1;
+		private int 				expressions_searching;
 		
 		private String[]			networks;
 		
@@ -2174,11 +2197,24 @@ RelatedContentUISWT
 		RCMItemContent(
 			byte[]		_hash,
 			String[]	_networks,
-			String[]		_expressions )
+			String[]	_expressions )
 		{
 			hash		= _hash;
 			networks	= _networks;
 			expressions	= _expressions;
+		}
+		
+		private void
+		setMinVersion(
+			int		ver )
+		{
+			min_version	= ver;
+		}
+		
+		protected int
+		getMinVersion()
+		{
+			return( min_version );
 		}
 		
 		public void
@@ -2228,20 +2264,23 @@ RelatedContentUISWT
 								
 								for ( RelatedContent c: content ){
 									
-									if ( !content_list.contains( c )){
-																			
-										byte[] hash = c.getHash();
+									if ( c.getVersion() >= min_version ){
 										
-										if ( hash == null ){
+										if ( !content_list.contains( c )){
+																				
+											byte[] hash = c.getHash();
 											
-											hash = c.getTitle().getBytes();
-										}
-																					
-										if ( uniques.put( hash, "" ) == null ){
-
-											content_new.add( c );
-											
-											content_list.add( c );
+											if ( hash == null ){
+												
+												hash = c.getTitle().getBytes();
+											}
+																						
+											if ( uniques.put( hash, "" ) == null ){
+	
+												content_new.add( c );
+												
+												content_list.add( c );
+											}
 										}
 									}
 								}
@@ -3362,6 +3401,7 @@ RelatedContentUISWT
 			SearchResult	sr )
 		{
 			super( 
+				sr.getProperty(SearchResult.PR_VERSION )instanceof Long?((Long)sr.getProperty(SearchResult.PR_VERSION )).intValue():0,
 				(String)sr.getProperty( SearchResult.PR_NAME ),
 				(byte[])sr.getProperty( SearchResult.PR_HASH ),
 				null,	// tracker

@@ -115,7 +115,7 @@ SBC_RCMView
 	private int minSize;
 	
 	private boolean showIndirect = true;
-
+	
 	private Object ds;
 
 	private ParameterListener paramSourceListener;
@@ -158,8 +158,10 @@ SBC_RCMView
 				
 			}else if ( ds instanceof RCMItemContent ){
 				
-				mdi_entry = ((RCMItemContent) ds).getSideBarEntry();
+				RCMItemContent	ic = (RCMItemContent)ds;
 				
+				mdi_entry = ic.getSideBarEntry();
+								
 				manager.reserveTemporarySpace();
 				
 				space_reserved = true;
@@ -351,12 +353,16 @@ SBC_RCMView
 		return null;
 	}
 	
-	private boolean isOurContent(RelatedContent c) {
-		boolean show = ((c.getSeeds() >= minSeeds) || (showUnknownSeeds && c.getSeeds() < 0)) 
-			&& (createdMsAgo == 0 || (SystemTime.getCurrentTime() - c.getPublishDate() < createdMsAgo))
-			&& ((c.getRank() >= minRank))
-			&& (c.getSize()==-1||(c.getSize() >= 1024L*1024*minSize))
-			&& (showIndirect || c.getHash() != null);
+	private boolean 
+	isOurContent(
+		RelatedContent c) 
+	{
+		boolean show = 
+			((c.getSeeds() >= minSeeds) || (showUnknownSeeds && c.getSeeds() < 0)) && 
+			(createdMsAgo == 0 || (SystemTime.getCurrentTime() - c.getPublishDate() < createdMsAgo)) &&
+			((c.getRank() >= minRank)) &&
+			(c.getSize()==-1||(c.getSize() >= 1024L*1024*minSize)) &&
+			(showIndirect || c.getHash() != null);
 		
 		if ( show ){
 			
