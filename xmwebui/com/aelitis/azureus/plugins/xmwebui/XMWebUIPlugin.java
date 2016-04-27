@@ -3215,6 +3215,7 @@ XMWebUIPlugin
 			
 			 "vuze_category"	| string (optional category name)
 			 "vuze_tags"		| array  (optional list of tags)
+			 "name"	        | string (optional friendly name to use instead of url/hash)
 			 
 		   The format of the "cookies" should be NAME=CONTENTS, where NAME is the
 		   cookie name and CONTENTS is what the cookie should contain.
@@ -3455,6 +3456,7 @@ XMWebUIPlugin
 					try{
 						final AESemaphore sem = new AESemaphore( "magnetsem" );
 						final URL f_torrent_url = torrent_url;
+						final String f_name = (String) args.get("name");
 						magnet_event = SimpleTimer.addEvent(
 							"magnetcheck",
 							SystemTime.getOffsetTime( 10*1000 ),
@@ -3471,7 +3473,7 @@ XMWebUIPlugin
 											return;
 										}
 										
-										MagnetDownload magnet_download = new MagnetDownload( f_torrent_url );
+										MagnetDownload magnet_download = new MagnetDownload( f_torrent_url, f_name );
 										
 										byte[]	hash = magnet_download.getTorrentHash();
 										
@@ -6945,7 +6947,8 @@ XMWebUIPlugin
 		
 		private
 		MagnetDownload(
-			URL		_magnet )
+			URL		_magnet,
+			String friendlyName )
 		{
 			create_time	= SystemTime.getCurrentTime();
 			
@@ -7017,7 +7020,11 @@ XMWebUIPlugin
 			
 			if ( name == null ){
 				
-				if ( hash == null ){
+				if ( friendlyName != null ){
+
+					name = friendlyName;
+
+				} else if ( hash == null ){
 					
 					name = magnet_url.toExternalForm();
 					
