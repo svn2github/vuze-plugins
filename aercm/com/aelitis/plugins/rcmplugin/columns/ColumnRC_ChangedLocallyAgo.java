@@ -62,10 +62,16 @@ ColumnRC_ChangedLocallyAgo
 
 		long date = rc.getChangedLocallyOn();
 
-		if ( cell.setSortValue( date )){
-
-			cell.setToolTip(date <= 0?"--":DisplayFormatters.formatCustomDateOnly( date ));
-			cell.setText( date <= 0?"--":TimeFormatter.format( (SystemTime.getCurrentTime() - date) / 1000 ));
+		long display_secs = (SystemTime.getCurrentTime() - date) / 1000;
+		
+		int	round_secs = 10;
+		
+		long sort_value = display_secs/round_secs;
+		
+		if ( cell.setSortValue( sort_value )){
+		
+			cell.setToolTip(date <= 0?"--":DisplayFormatters.formatCustomDateOnly( date ) + ", v=" + rc.getVersion());
+			cell.setText( date <= 0?"--":TimeFormatter.format( sort_value * round_secs ));
 		}
 	}
 }

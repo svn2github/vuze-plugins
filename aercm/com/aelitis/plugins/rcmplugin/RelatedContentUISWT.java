@@ -1789,6 +1789,8 @@ RelatedContentUISWT
 					
 					if ( is_popularity ){
 						
+						new_si.setPopularity( true );
+						
 						new_si.setMinVersion( RelatedContent.VERSION_BETTER_SCRAPE );
 					}
 					
@@ -2149,6 +2151,7 @@ RelatedContentUISWT
 		private long				file_size;
 		private String[]			expressions;
 		private int					min_version = -1;
+		private boolean				popularity	= false;
 		private int 				expressions_searching;
 		
 		private String[]			networks;
@@ -2166,7 +2169,7 @@ RelatedContentUISWT
 		
 		private CopyOnWriteList<RelatedContentEnumeratorListener>	listeners = new CopyOnWriteList<RelatedContentEnumeratorListener>();
 		
-		private ByteArrayHashMap<String>	uniques = new ByteArrayHashMap<String>();
+		private ByteArrayHashMap<RelatedContent>	uniques = new ByteArrayHashMap<RelatedContent>();
 		
 		private int		lookup_starts;
 		
@@ -2217,6 +2220,19 @@ RelatedContentUISWT
 			return( min_version );
 		}
 		
+		private void
+		setPopularity(
+			boolean		b )
+		{
+			popularity = b;
+		}
+		
+		protected boolean
+		isPopularity()
+		{
+			return( popularity );
+		}
+		
 		public void
 		setMdiEntry(
 			MdiEntry _sb_entry )
@@ -2244,6 +2260,9 @@ RelatedContentUISWT
 				final RelatedContentLookupListener listener =
 					new RelatedContentLookupListener()
 					{
+						private int	total_results		= 0;
+						private int ignored_version 	= 0;
+						
 						public void
 						lookupStart()
 						{
@@ -2261,6 +2280,8 @@ RelatedContentUISWT
 								
 									return;
 								}
+																
+								total_results += content.length;
 								
 								for ( RelatedContent c: content ){
 									
@@ -2275,15 +2296,29 @@ RelatedContentUISWT
 												hash = c.getTitle().getBytes();
 											}
 																						
-											if ( uniques.put( hash, "" ) == null ){
+											RelatedContent existing = uniques.get( hash );
 	
+											if ( existing == null ){
+												
+												uniques.put( hash, c );
+												
 												content_new.add( c );
 												
 												content_list.add( c );
+												
+											}else{
+												
+												if ( existing instanceof SearchRelatedContent ){
+												
+													((SearchRelatedContent)existing).updateFrom( c );
+												}
 											}
 										}
+									}else{
+										
+										ignored_version++;
 									}
-								}
+								}							
 							}
 							
 							int	num_new = content_new.size();
@@ -2315,6 +2350,8 @@ RelatedContentUISWT
 						public void
 						lookupComplete()
 						{	
+							//System.out.println( "Total results=" + total_results + ", ignored=" + ignored_version );
+
 							lookupEnds();
 						}
 						
@@ -2340,7 +2377,7 @@ RelatedContentUISWT
   					
   					if ( networks != null && networks.length > 0 ){
   						
-  						parameters.put( "n", networks );	// update to SearchProvider.SP_NETWORKS sometime
+  						parameters.put( SearchProvider.SP_NETWORKS, networks );
   					}
   					
   					manager.searchRCM(
@@ -2387,7 +2424,12 @@ RelatedContentUISWT
   							getProperty(
   								int property ) 
   							{
-  								return null;
+  								if ( property == 2 ){	// Update sometime SearchObserver.PR_SUPPORTS_DUPLICATES
+  									
+  									return( true );
+  								}
+  								
+  								return( null );
   							}
   							
   							public void 
@@ -2396,7 +2438,7 @@ RelatedContentUISWT
   								synchronized (expressions) {
   									expressions_searching--;
   									if (expressions_searching == 0) {
-  	  								listener.lookupComplete();
+  										listener.lookupComplete();
   									}
   								}
   							}
@@ -2407,7 +2449,7 @@ RelatedContentUISWT
   								synchronized (expressions) {
   									expressions_searching--;
   									if (expressions_searching == 0) {
-  	  								listener.lookupComplete();
+  										listener.lookupComplete();
   									}
   								}
   							}
@@ -3419,6 +3461,34 @@ RelatedContentUISWT
 			if ( l_rank != null ){
 				
 				rank = l_rank.intValue();
+			}
+		}
+		
+		private void
+		updateFrom(
+			RelatedContent		other )
+		{
+			String[] old_tags 	= getTags();
+			String[] new_tags	= other.getTags();
+			
+			if ( old_tags.length == 0 && new_tags.length == 0 ){
+				
+			}else if ( old_tags.length > 0 && new_tags.length == 0 ){
+				
+			}else if ( old_tags.length == 0 && new_tags.length > 0 ){
+				
+				setTags( new_tags );
+				
+			}else{
+				
+				Set<String>	tags = new HashSet<String>( Arrays.asList( old_tags ));
+				
+				tags.addAll( Arrays.asList( new_tags ));
+				
+				if ( tags.size() > old_tags.length ){
+					
+					setTags( tags.toArray( new String[ tags.size()]));
+				}
 			}
 		}
 		

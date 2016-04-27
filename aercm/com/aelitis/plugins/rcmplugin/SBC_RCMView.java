@@ -689,6 +689,8 @@ SBC_RCMView
 	initTable(
 		Composite control ) 
 	{
+		TableColumnManager tcManager = TableColumnManager.getInstance();
+
 		tv_related_content = TableViewFactory.createTableViewSWT(
 				RelatedContent.class, 
 				TABLE_RCM,
@@ -696,10 +698,13 @@ SBC_RCMView
 				new TableColumnCore[0], 
 				ColumnRC_Rank.COLUMN_ID, 
 				SWT.MULTI | SWT.FULL_SELECTION | SWT.VIRTUAL );
+		
 		if (txtFilter != null) {
 			tv_related_content.enableFilterCheck(txtFilter, this);
 		}
+		
 		tv_related_content.setRowDefaultHeight(16);
+		
 		SWTSkinObject soSizeSlider = getSkinObject("table-size-slider");
 		if (soSizeSlider instanceof SWTSkinObjectContainer) {
 			SWTSkinObjectContainer so = (SWTSkinObjectContainer) soSizeSlider;
@@ -708,7 +713,7 @@ SBC_RCMView
 			}
 		}
 		
-		TableColumnManager.getInstance().setDefaultColumnNames(TABLE_RCM, new String[] {
+		tcManager.setDefaultColumnNames(TABLE_RCM, new String[] {
 					ColumnRC_New.COLUMN_ID,
 					ColumnRC_Rank.COLUMN_ID,
 					ColumnRC_Title.COLUMN_ID,
@@ -720,6 +725,23 @@ SBC_RCMView
 					ColumnRC_Tags.COLUMN_ID,
 					ColumnRC_Rating.COLUMN_ID,
 		});
+		
+		if ( ds instanceof RCMItemContent ){
+			
+			if (((RCMItemContent)ds).isPopularity()){
+		
+					// force view to be sorted by peers, descending
+						
+				tcManager.setDefaultSortColumnName(TABLE_RCM, ColumnRC_Peers.COLUMN_ID);
+				
+				TableColumnCore tcc = tcManager.getTableColumnCore( TABLE_RCM, ColumnRC_Peers.COLUMN_ID );
+				
+				if ( tcc != null ){
+					
+					tcc.setSortAscending( false);
+				}
+			}
+		}
 		
 		table_parent = new Composite(control, SWT.NONE);
 		table_parent.setLayoutData(Utils.getFilledFormData());
