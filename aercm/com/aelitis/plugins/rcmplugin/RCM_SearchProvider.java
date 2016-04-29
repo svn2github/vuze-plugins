@@ -129,7 +129,7 @@ public class RCM_SearchProvider
 		try{
 			RelatedContentManager manager = RelatedContentManager.getSingleton();
 			
-			return( manager.searchRCM( search_parameters, new SearchObserverFilter( manager, observer )));
+			return( manager.searchRCM( search_parameters, new SearchObserverFilter( manager, search_parameters, observer )));
 			
 		}catch( Throwable e ){
 			
@@ -159,6 +159,8 @@ public class RCM_SearchProvider
 		private RelatedContentManager				manager;
 		private ByteArrayHashMap<RelatedContent>	hash_map;
 		
+		final boolean						is_popularity;
+		
 		private SearchObserver				observer;
 		
 		private int	min_rank = plugin.getMinuumSearchRank();
@@ -166,10 +168,15 @@ public class RCM_SearchProvider
 		private
 		SearchObserverFilter(
 			RelatedContentManager	_manager,
+			Map<String,Object>		_search_parameters,
 			SearchObserver			_observer )
 		{
 			manager		= _manager;
 			observer 	= _observer;
+			
+			String expression = (String)_search_parameters.get( SearchProvider.SP_SEARCH_TERM );
+			
+			is_popularity = expression.equals( RCMPlugin.POPULARITY_SEARCH_EXPR );
 			
 			if ( min_rank > 0 ){
 				
@@ -194,6 +201,16 @@ public class RCM_SearchProvider
 			SearchInstance		search,
 			SearchResult		result )
 		{
+			if ( is_popularity ){
+				
+				Long version = (Long)result.getProperty( SearchResult.PR_VERSION );
+				
+				if ( version != null && version < RelatedContent.VERSION_BETTER_SCRAPE ){
+					
+					return;
+				}
+			}
+			
 			if ( hash_map == null){
 				
 				long	cnet = (Long)result.getProperty( 50000 );

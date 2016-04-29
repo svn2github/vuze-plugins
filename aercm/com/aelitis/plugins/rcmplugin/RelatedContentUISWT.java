@@ -28,7 +28,6 @@ import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.widgets.*;
-
 import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.*;
@@ -81,9 +80,7 @@ RelatedContentUISWT
 	implements RelatedContentUI
 {		
 	public static final String SIDEBAR_SECTION_RELATED_CONTENT = "RelatedContent";
-	
-	public static final String POPULARITY_SEARCH_EXPR	= "(.)";
-	
+		
 	public static final String SPINNER_IMAGE_ID 	= "image.sidebar.vitality.dots";
 
 	private static RelatedContentUISWT		singleton;
@@ -139,6 +136,7 @@ RelatedContentUISWT
 	
 	private HashMap<UISWTView,RCM_SubViewHolder> rcm_subviews = new HashMap<UISWTView,RCM_SubViewHolder>();
 
+	private String	last_search_expr = "";
 	
 	private volatile boolean	destroyed = false;
 
@@ -1383,6 +1381,13 @@ RelatedContentUISWT
 							SimpleTextEntryWindow entryWindow = new SimpleTextEntryWindow(
 									"rcm.menu.findbyexpr.title", "rcm.menu.findbyexpr.msg" );
 							
+							if ( last_search_expr != null && last_search_expr.trim().length() > 0 ){
+								
+								entryWindow.setPreenteredText( last_search_expr, false );
+								
+								entryWindow.selectPreenteredText(true);
+							}
+							
 							entryWindow.prompt(new UIInputReceiverListener() {
 								public void UIInputReceiverClosed(UIInputReceiver entryWindow) {
 									if (!entryWindow.hasSubmittedInput()) {
@@ -1429,7 +1434,7 @@ RelatedContentUISWT
 						selected(
 							MenuItem menu, Object target ) 
 						{
-							addSearch( POPULARITY_SEARCH_EXPR, new String[]{ AENetworkClassifier.AT_PUBLIC });
+							addSearch( RCMPlugin.POPULARITY_SEARCH_EXPR, new String[]{ AENetworkClassifier.AT_PUBLIC });
 						}
 					});
 			
@@ -1587,6 +1592,24 @@ RelatedContentUISWT
 								if (entry instanceof SideBarEntrySWT) {
 									new_si.setTreeItem( ((SideBarEntrySWT)entry).getTreeItem() );
 								}
+								
+								UIManager			ui_manager = plugin_interface.getUIManager();
+								
+								MenuManager menu_manager = ui_manager.getMenuManager();
+
+								MenuItem menu_item = menu_manager.addMenuItem( "sidebar." + key, "rcm.menu.searchmore" );
+
+								menu_item.addListener(
+									new MenuItemListener() 
+									{
+										public void
+										selected(
+											MenuItem			menu,
+											Object 				target )
+										{
+											addSearch( hash, networks, name );
+										}
+									});
 								
 								new_si.activate();
 							}
@@ -1770,7 +1793,9 @@ RelatedContentUISWT
 		final String 		expression,
 		final String[]		networks )
 	{
-		final boolean	is_popularity = expression==POPULARITY_SEARCH_EXPR;
+		last_search_expr	= expression;
+		
+		final boolean	is_popularity = expression.equals( RCMPlugin.POPULARITY_SEARCH_EXPR );
 		
 		final String name = is_popularity?MessageText.getString("rcm.pop" ):("'" + expression + "'" );
 		
@@ -1859,6 +1884,41 @@ RelatedContentUISWT
 												addSearch( expression, networks );
 											}
 										});
+									
+									final SearchProvider sp = plugin.getSearchProvider();
+									
+									if ( sp != null ){
+										
+										menu_item = menu_manager.addMenuItem( "sidebar." + key, "rcm.menu.create.subs" );
+	
+										menu_item.addListener(
+											new MenuItemListener() 
+											{
+												public void
+												selected(
+													MenuItem			menu,
+													Object 				target )
+												{
+													Map<String,Object>	properties = new HashMap<String, Object>();
+													
+													String search_name = MessageText.getString( "rcm.search.provider" ) + ": " + name + net_str;
+													
+													properties.put( SearchProvider.SP_SEARCH_NAME, search_name );
+													properties.put( SearchProvider.SP_SEARCH_TERM, expression );
+													properties.put( SearchProvider.SP_NETWORKS, networks );
+													
+													try{
+														plugin.getPluginInterface().getUtilities().getSubscriptionManager().requestSubscription(
+															sp,
+															properties );
+														
+													}catch( Throwable e ){
+														
+														Debug.out( e );
+													}
+												}
+											});
+									}
 									
 									new_si.activate();
 								}
@@ -2171,6 +2231,8 @@ RelatedContentUISWT
 		
 		private ByteArrayHashMap<RelatedContent>	uniques = new ByteArrayHashMap<RelatedContent>();
 		
+		private Map<String,SubsRelatedContent>	s_map = new HashMap<String,SubsRelatedContent>();
+
 		private int		lookup_starts;
 		
 		private AsyncDispatcher	async_dispatcher = new AsyncDispatcher();
@@ -2470,8 +2532,6 @@ RelatedContentUISWT
 						hash,
 						new SubscriptionLookupListener()
 						{
-							private Map<String,SubsRelatedContent>	s_map = new HashMap<String,SubsRelatedContent>();
-
 							public void
 							found(
 								byte[]					hash,

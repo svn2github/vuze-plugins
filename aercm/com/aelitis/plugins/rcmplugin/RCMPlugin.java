@@ -57,6 +57,8 @@ RCMPlugin
 
 	public static final String PARAM_FTUX_SHOWN = "rcm.ftux.shown2";
 
+	public static final String POPULARITY_SEARCH_EXPR	= "(.)";
+
 	static{
 		COConfigurationManager.setParameter( "rcm.persist", true );
 		
@@ -411,6 +413,18 @@ RCMPlugin
 		return( plugin_interface.getPluginconfig().getPluginIntParameter( "rcm.search.min_rank", MIN_SEARCH_RANK_DEFAULT ));
 	}
 	
+	public SearchProvider
+	getSearchProvider()
+	{
+		return( search_provider );
+	}
+	
+	public PluginInterface
+	getPluginInterface()
+	{
+		return( plugin_interface );
+	}
+	
 	protected void
 	hookSearch()
 	{		
@@ -418,19 +432,21 @@ RCMPlugin
 		
 		try{
 				
+			Utilities utilities = plugin_interface.getUtilities();
+			
 			if ( enable ){
 			
 				if ( search_provider == null ){
 					
 					search_provider = new RCM_SearchProvider( this );
 						
-					plugin_interface.getUtilities().registerSearchProvider( search_provider );
+					utilities.registerSearchProvider( search_provider );
 				}
 			}else{
 				
 				if ( search_provider != null ) {
 					
-					plugin_interface.getUtilities().unregisterSearchProvider( search_provider );
+					utilities.unregisterSearchProvider( search_provider );
 					
 					search_provider = null;
 				}
