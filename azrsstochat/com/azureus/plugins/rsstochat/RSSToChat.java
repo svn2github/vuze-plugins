@@ -329,6 +329,7 @@ RSSToChat
 				
 				Pattern	desc_link_pattern 	= null;
 				String	link_type			= "magnet";
+				boolean	ignore_dates		= false;
 				
 				String	presentation 			= "link";
 				String	website_name			= null;
@@ -392,6 +393,15 @@ RSSToChat
 						
 							throw( new Exception( "<link_type> value '" + link_type + "' is invalid" ));
 						}
+					}
+					
+					SimpleXMLParserDocumentNode ignore_dates_node = subs_node.getChild( "ignore_dates" );
+
+					if ( ignore_dates_node != null ){
+						
+						String id_value = ignore_dates_node.getValue().trim();
+
+						ignore_dates = id_value.equalsIgnoreCase( "true" );
 					}
 					
 					source 	= name;
@@ -551,7 +561,7 @@ RSSToChat
 				
 				for ( String network: networks ){
 					
-					Mapping mapping = new Mapping( source, is_rss, desc_link_pattern, link_type, network, key, type, presentation, website_name, website_retain_sites, website_retain_items, refresh_mins );
+					Mapping mapping = new Mapping( source, is_rss, desc_link_pattern, link_type, ignore_dates, network, key, type, presentation, website_name, website_retain_sites, website_retain_items, refresh_mins );
 					
 					log( "    Mapping: " + mapping.getOverallName());
 					
@@ -1100,9 +1110,12 @@ RSSToChat
 
 					long	result_time = pub_date==null?0:pub_date.getTime();
 					
-					if ( result_time > 0 && result_time < history.getLatestPublish()){
+					if ( !mapping.ignore_dates ){
 						
-						continue;
+						if ( result_time > 0 && result_time < history.getLatestPublish()){
+							
+							continue;
+						}
 					}
 					
 					byte[] 	b_hash 		= (byte[])props.get( SearchResult.PR_HASH );
@@ -2051,6 +2064,7 @@ RSSToChat
 		private final boolean		is_rss;
 		private final Pattern		desc_link_pattern;
 		private final String		link_type;
+		private final boolean		ignore_dates;
 		private final int			type;
 		private final String		network;
 		private final String		key;
@@ -2074,6 +2088,7 @@ RSSToChat
 			boolean			_is_rss,
 			Pattern			_desc_link_pattern,
 			String			_link_type,
+			boolean			_ignore_dates,
 			String			_network,
 			String			_key,
 			int				_type,
@@ -2087,6 +2102,7 @@ RSSToChat
 			is_rss				= _is_rss;
 			desc_link_pattern	= _desc_link_pattern;
 			link_type			= _link_type;
+			ignore_dates		= _ignore_dates;
 			network				= _network;
 			key					= _key;
 			type				= _type;
