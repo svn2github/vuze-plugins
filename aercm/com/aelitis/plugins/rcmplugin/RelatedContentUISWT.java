@@ -22,6 +22,7 @@ package com.aelitis.plugins.rcmplugin;
 
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.SelectionAdapter;
@@ -2212,7 +2213,6 @@ RelatedContentUISWT
 		private String[]			expressions;
 		private int					min_version = -1;
 		private boolean				popularity	= false;
-		private int 				expressions_searching;
 		
 		private String[]			networks;
 		
@@ -2430,92 +2430,85 @@ RelatedContentUISWT
 					
 				if ( expressions != null ){
 					
-					expressions_searching = expressions.length;
+					final AtomicInteger expressions_searching = new AtomicInteger( expressions.length );
+					
 					for (String expression : expressions) {
 						
-  					Map<String,Object>	parameters = new HashMap<String, Object>();
+	  					Map<String,Object>	parameters = new HashMap<String, Object>();
+	  					
+	  					parameters.put( SearchProvider.SP_SEARCH_TERM, expression );
+	  					
+	  					if ( networks != null && networks.length > 0 ){
+	  						
+	  						parameters.put( SearchProvider.SP_NETWORKS, networks );
+	  					}
   					
-  					parameters.put( SearchProvider.SP_SEARCH_TERM, expression );
-  					
-  					if ( networks != null && networks.length > 0 ){
-  						
-  						parameters.put( SearchProvider.SP_NETWORKS, networks );
-  					}
-  					
-  					manager.searchRCM(
-  						parameters, 
-  						new SearchObserver() {
-  							
-  							public void 
-  							resultReceived(
-  								SearchInstance 		search, 
-  								SearchResult 		search_result ) 
-  							{
-  								SearchRelatedContent result = new SearchRelatedContent( search_result );
-  								
-  								// logical and -- should probably be done in searchRCM as a parameter
-  								if (expressions.length > 1) {
-  									
-  									String[] tags = result.getTags();
-  									String name = result.getTitle();
-  									for (String expr : expressions) {
-  										boolean found = false;
-  										
-  										if (expr.startsWith("tag:")) {
-  											expr = expr.substring(4);
-    										for (String tag : tags) {
-  												if (tag.toLowerCase().contains(expr.toLowerCase())) {
-  													found = true;
-  													break;
-  												}
-  											}
-  										} else {
-  											found = name.toLowerCase().contains(expr.toLowerCase());
-  										}
-  										if (!found) {
-  											return;
-  										}
-										}
-  									
-  								}
-  								
-  								listener.contentFound( new RelatedContent[]{ result });
-  							}
-  							
-  							public Object 
-  							getProperty(
-  								int property ) 
-  							{
-  								if ( property == 2 ){	// Update sometime SearchObserver.PR_SUPPORTS_DUPLICATES
-  									
-  									return( true );
-  								}
-  								
-  								return( null );
-  							}
-  							
-  							public void 
-  							complete() 
-  							{
-  								synchronized (expressions) {
-  									expressions_searching--;
-  									if (expressions_searching == 0) {
-  										listener.lookupComplete();
-  									}
-  								}
-  							}
-  							
-  							public void 
-  							cancelled() 
-  							{
-  								synchronized (expressions) {
-  									expressions_searching--;
-  									if (expressions_searching == 0) {
-  										listener.lookupComplete();
-  									}
-  								}
-  							}
-  						});
+	  					manager.searchRCM(
+	  						parameters, 
+	  						new SearchObserver() {
+	  							
+	  							public void 
+	  							resultReceived(
+	  								SearchInstance 		search, 
+	  								SearchResult 		search_result ) 
+	  							{
+	  								SearchRelatedContent result = new SearchRelatedContent( search_result );
+	  								
+	  								// logical and -- should probably be done in searchRCM as a parameter
+	  								if (expressions.length > 1) {
+	  									
+	  									String[] tags = result.getTags();
+	  									String name = result.getTitle();
+	  									for (String expr : expressions) {
+	  										boolean found = false;
+	  										
+	  										if (expr.startsWith("tag:")) {
+	  											expr = expr.substring(4);
+	    										for (String tag : tags) {
+	  												if (tag.toLowerCase().contains(expr.toLowerCase())) {
+	  													found = true;
+	  													break;
+	  												}
+	  											}
+	  										} else {
+	  											found = name.toLowerCase().contains(expr.toLowerCase());
+	  										}
+	  										if (!found) {
+	  											return;
+	  										}
+											}
+	  									
+	  								}
+	  								
+	  								listener.contentFound( new RelatedContent[]{ result });
+	  							}
+	  							
+	  							public Object 
+	  							getProperty(
+	  								int property ) 
+	  							{
+	  								if ( property == 2 ){	// Update sometime SearchObserver.PR_SUPPORTS_DUPLICATES
+	  									
+	  									return( true );
+	  								}
+	  								
+	  								return( null );
+	  							}
+	  							
+	  							public void 
+	  							complete() 
+	  							{
+	  								if ( expressions_searching.decrementAndGet() == 0 ){
+	  									listener.lookupComplete();
+	  								}
+	  							}
+	  							
+	  							public void 
+	  							cancelled() 
+	  							{
+	  								complete();
+	  							}
+	  						});
 					}
 					
 				}else if ( file_size != 0 ){
