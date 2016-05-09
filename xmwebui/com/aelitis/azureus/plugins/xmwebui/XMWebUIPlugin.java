@@ -79,9 +79,6 @@ import org.json.simple.JSONObject;
 
 import com.aelitis.azureus.core.AzureusCore;
 import com.aelitis.azureus.core.AzureusCoreFactory;
-import com.aelitis.azureus.core.content.ContentException;
-import com.aelitis.azureus.core.content.RelatedAttributeLookupListener;
-import com.aelitis.azureus.core.content.RelatedContentManager;
 import com.aelitis.azureus.core.metasearch.*;
 import com.aelitis.azureus.core.pairing.PairingManager;
 import com.aelitis.azureus.core.pairing.PairingManagerFactory;
@@ -115,7 +112,10 @@ XMWebUIPlugin
 	
 	private static final boolean IS_5101_PLUS = Constants.isCurrentVersionGE( "5.1.0.1" );
 	
-	private static final int VUZE_RPC_VERSION = 4;
+	/**
+	 * 5: No longer xml escapes strings when user agent does not start with "Mozilla/"
+	 */
+	private static final int VUZE_RPC_VERSION = 5;
 	
 	private static Download
 	destubbify(
@@ -1361,8 +1361,10 @@ XMWebUIPlugin
 				method_Session_Stats(args, result);
 				
 			}else if ( method.equals( "torrent-add" )){
-				
-				method_Torrent_Add(args, result);
+				String agent = MapUtils.getMapString(request.getHeaders(), "User-Agent", "");
+				boolean xmlEscape = agent.startsWith("Mozilla/");
+
+				method_Torrent_Add(args, result, xmlEscape);
 				
 				// this is handled within the torrent-add method: save_core_state = true;
 				
@@ -3186,7 +3188,8 @@ XMWebUIPlugin
 	private void 
 	method_Torrent_Add(
 		final Map args, 
-		Map result) 
+		Map result,
+		boolean xmlEscape) 
 				
 		throws IOException, DownloadException, TextualException
  {
@@ -3623,7 +3626,7 @@ XMWebUIPlugin
 		Map<String, Object> torrent_details = new HashMap<String, Object>();
 
 		torrent_details.put("id", new Long(getID(download, true)));
-		torrent_details.put("name", escapeXML(download.getName()));
+		torrent_details.put("name", xmlEscape ? escapeXML(download.getName()) : download.getName());
 		torrent_details.put(TransmissionVars.FIELD_TORRENT_HASH,
 				ByteFormatter.encodeString(download.getTorrentHash()));
 
@@ -3677,14 +3680,16 @@ XMWebUIPlugin
 				
 		Map<Long,Map>	torrent_info = new LinkedHashMap<Long, Map>();
 		
-		
+		String agent = MapUtils.getMapString(request.getHeaders(), "User-Agent", "");
+		boolean xmlEscape = agent.startsWith("Mozilla/");
+
 		for ( DownloadStub download_stub: downloads ){
 			if (download_stub.isStub()) {
 				method_Torrent_Get_Stub(request, args, fields, torrent_info,
-						download_stub, file_fields);
+						download_stub, file_fields, xmlEscape);
 			} else {
 				method_Torrent_Get_NonStub(request, args, fields, torrent_info,
-						(Download) download_stub, file_fields);
+						(Download) download_stub, file_fields, xmlEscape);
 			}
 		} // for downloads
 		
@@ -3758,7 +3763,8 @@ XMWebUIPlugin
 			List<String> fields,
 			Map<Long, Map> torrent_info,
 			Download download,
-			List<String> file_fields)
+			List<String> file_fields,
+			boolean xmlEscape)
 	{
 
 		Torrent t = download.getTorrent();
@@ -4401,7 +4407,7 @@ XMWebUIPlugin
 
 			if (value != null) {
 
-				if (value instanceof String) {
+				if (xmlEscape && (value instanceof String)) {
 
 					value = escapeXML((String) value);
 				}
@@ -4416,7 +4422,8 @@ XMWebUIPlugin
 			List<String> fields,
 			Map<Long, Map> torrent_info,
 			DownloadStub download_stub,
-			List<String> file_fields) 
+			List<String> file_fields,
+			boolean xmlEscape) 
 	{
 		
 		Map torrent = new HashMap();
@@ -4709,7 +4716,7 @@ XMWebUIPlugin
 			
 			if ( value != null ){
 			
-				if ( value instanceof String ){
+				if (xmlEscape && (value instanceof String)) {
 				
 					value = escapeXML((String)value);
 				}
@@ -6746,23 +6753,6 @@ XMWebUIPlugin
 		str = str.replaceAll( "<", "&lt;" );
 		str = str.replaceAll( "\"", "&quot;" );
 		str = str.replaceAll( "--", "&#45;&#45;" );
-		
-		return( str );
-	}
-	
-	protected String
-	escapeXSS(
-		String	str )
-	{
-		if ( str == null ){
-			
-			return( "" );
-			
-		}
-		str = str.replaceAll( "#", "&#35" );
-		str = escapeXML(str);
-		str = str.replaceAll( "\\(", "&#40;" );
-		str = str.replaceAll( "\\)", "&#41;" );
 		
 		return( str );
 	}
