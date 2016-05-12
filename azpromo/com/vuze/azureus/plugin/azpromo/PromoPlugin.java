@@ -67,7 +67,10 @@ public class PromoPlugin
 
 	private static PromoPlugin		pluginInstance;
 	
+	private Object					viewLock	= new Object();
 	private UISWTInstance 			swtInstance;
+	private boolean					viewAdded;
+	
 	private List<PromoView>			views	= new ArrayList<PromoView>();
 	
 	private BasicPluginConfigModel 	configModel;
@@ -180,13 +183,27 @@ public class PromoPlugin
 				if (swtInstance != null) {
 					boolean enabled = pluginInterface.getPluginconfig().getPluginBooleanParameter(
 							"enabled");
-					if (enabled) {
-						swtInstance.addView(UISWTInstance.VIEW_SIDEBAR_AREA, VIEWID,
-								PromoView.class, null);
-					} else {
-						swtInstance.removeViews(UISWTInstance.VIEW_SIDEBAR_AREA, VIEWID);
-
-						PromoPlugin.logEvent("goaway");
+					
+					synchronized( viewLock ){
+						
+						if ( enabled ){
+							
+							if ( !viewAdded ){
+								
+								swtInstance.addView(UISWTInstance.VIEW_SIDEBAR_AREA, VIEWID, PromoView.class, null);
+								
+								viewAdded = true;
+							}
+						}else{
+							if ( viewAdded ){
+								
+								swtInstance.removeViews( UISWTInstance.VIEW_SIDEBAR_AREA, VIEWID );
+	
+								viewAdded = false;
+								
+								PromoPlugin.logEvent("goaway");
+							}
+						}
 					}
 				}
 			}
@@ -203,8 +220,16 @@ public class PromoPlugin
 				if ( enabled ){
 					if (instance instanceof UISWTInstance && !unloaded ) {
 						swtInstance = ((UISWTInstance) instance);
-						swtInstance.addView(UISWTInstance.VIEW_SIDEBAR_AREA, VIEWID,
-								PromoView.class, null);
+						
+						synchronized( viewLock ){
+							
+							if ( !viewAdded ){
+						
+								swtInstance.addView(UISWTInstance.VIEW_SIDEBAR_AREA, VIEWID, PromoView.class, null);
+								
+								viewAdded = true;
+							}
+						}
 					}
 				}
 			}
@@ -268,9 +293,17 @@ public class PromoPlugin
 		
 		unloaded = true;
 		
-		if (swtInstance != null){
+		if ( swtInstance != null ){
 			
-			swtInstance.removeViews(UISWTInstance.VIEW_SIDEBAR_AREA, VIEWID);
+			synchronized( viewLock ){
+				
+				if ( viewAdded ){
+			
+					swtInstance.removeViews(UISWTInstance.VIEW_SIDEBAR_AREA, VIEWID);
+					
+					viewAdded = false;
+				}
+			}
 			
 			swtInstance = null;
 		}
@@ -303,7 +336,7 @@ public class PromoPlugin
 		
 		logger = null;
 		
-		pluginInterface = null;
+		pluginInterface = null; 
 	}
 
 	public static void logEvent(String event) {
