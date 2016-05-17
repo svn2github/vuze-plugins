@@ -23,6 +23,8 @@ package org.parg.azureus.plugins.networks.i2p.swt;
 
 
 
+import java.util.List;
+
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.CTabFolder;
 import org.eclipse.swt.custom.CTabItem;
@@ -58,8 +60,10 @@ import org.gudy.azureus2.ui.swt.views.stats.DHTView;
 import org.gudy.azureus2.ui.swt.views.stats.StatsView;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperDHT;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperPlugin;
+import org.parg.azureus.plugins.networks.i2p.plugindht.I2PHelperDHTPluginInterface;
 import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouter;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTI2P;
+import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT;
 
 import com.aelitis.azureus.core.dht.DHT;
 import com.aelitis.azureus.ui.UIFunctions;
@@ -70,8 +74,6 @@ I2PHelperView
 	implements UISWTViewEventListener
 {
 	private static final String	resource_path = "org/parg/azureus/plugins/networks/i2p/swt/";
-
-	private static final boolean	SHOW_AZ_DHTS = true;
 	
 	private I2PHelperPlugin		plugin;
 	private UISWTInstance		ui;
@@ -82,6 +84,11 @@ I2PHelperView
 
 	private Composite	composite;
 
+	private int					normal_dht_count;
+	private int					proxy_dht_count;
+	
+	private List<I2PHelperDHTPluginInterface> proxy_dhts;
+	
 	private DHTView[] 			dht_views;
 	private DHTOpsView[]		ops_views;
 	
@@ -106,17 +113,7 @@ I2PHelperView
 		plugin	= _plugin;
 		ui 		= (UISWTInstance)_ui;
 		view_id	= _view_id;
-		
-		int	view_count = plugin.getDHTCount();
-		
-		if ( SHOW_AZ_DHTS ){
-			
-			view_count *= 2;
-		}
-		
-		dht_views	= new DHTView[ view_count ];
-		ops_views	= new DHTOpsView[ view_count ];
-		
+				
 		ui.addView( UISWTInstance.VIEW_MAIN, view_id, this );
 		
 		Utils.execSWTThread(
@@ -315,9 +312,22 @@ I2PHelperView
 		
 		CTabItem first_stats_item = null;
 		
-		int dht_count = plugin.getDHTCount();
+		normal_dht_count = plugin.getDHTCount();
+		
+		proxy_dhts = plugin.getProxyDHTs();
+		
+		proxy_dht_count = proxy_dhts.size();
+		
+		int	total_dhts	= normal_dht_count+proxy_dht_count;
+		
+		int	total_views = total_dhts*2;		// basic + AZ views
+		
+		dht_views	= new DHTView[ total_views ];
+		ops_views	= new DHTOpsView[ total_views ];
 
-		for ( int i=0;i<dht_views.length;i++){
+			// views are basic1 basic2 (proxy1,proxy2...) az1 az2 (proxyaz1, proxyaz2...)
+		
+		for ( int i=0;i<total_views;i++){
 				
 				// DHT stats view
 			
@@ -328,10 +338,26 @@ I2PHelperView
 				first_stats_item = stats_item;
 			}
 			
-			String stats_text = plugin.getMessageText("azi2phelper.ui.dht_stats" + (i%dht_count));
-			String graph_text = plugin.getMessageText("azi2phelper.ui.dht_graph" + (i%dht_count));
+			int	dht_index;
 			
-			if ( i >= dht_count ){
+			if ( i < total_dhts ){
+				dht_index = i;
+			}else{
+				dht_index = i - total_dhts;
+			}
+			
+			String stats_text;
+			String graph_text;
+			
+			if ( dht_index < normal_dht_count ){
+				stats_text = plugin.getMessageText("azi2phelper.ui.dht_stats" + dht_index);
+				graph_text = plugin.getMessageText("azi2phelper.ui.dht_graph" + dht_index);
+			}else{
+				String name = proxy_dhts.get(dht_index - normal_dht_count).getName();
+				stats_text = name + " " + plugin.getMessageText("azi2phelper.ui.dht_stats3");
+				graph_text = name + " " + plugin.getMessageText("azi2phelper.ui.dht_graph3");
+			}
+			if ( i >= total_dhts ){
 				
 				stats_text = stats_text + " (AZ)";
 				graph_text = graph_text + " (AZ)";
@@ -422,7 +448,7 @@ I2PHelperView
 						perform(
 							TimerEvent event ) 
 						{
-							if ( dht_views[0] != null ){
+							if ( dht_views != null ){
 								
 								Utils.execSWTThread(
 									new Runnable()
@@ -463,40 +489,83 @@ I2PHelperView
 			}
 			case UISWTViewEvent.TYPE_REFRESH:{
 				
-				for ( int i=0;i<dht_views.length;i++){
-					
-					DHTView 	dht_view = dht_views[i];
-					DHTOpsView 	ops_view = ops_views[i];
-					
-					if ( dht_view != null && ops_view != null ){
-						
-						I2PHelperRouter router = plugin.getRouter();
-						
-						if ( router != null ){
-							
-							int	view_count = plugin.getDHTCount();
+				if ( dht_views != null ){
+				
+					int	total_dhts	= normal_dht_count+proxy_dht_count;
 
-							I2PHelperDHT dht_helper = router.getAllDHTs()[i%view_count].getDHT();
-							
-							if ( dht_helper instanceof DHTI2P ){
-								
-								DHT dht;
-								
-								if ( i < view_count ){
-									
-									dht = ((DHTI2P)dht_helper).getDHT();
-								}else{
-									
-									dht = ((DHTI2P)dht_helper).getAZDHT().getDHT();
-								}
-								
-								dht_view.setDHT( dht );
-								ops_view.setDHT( dht );
-							}
-						}
+					for ( int i=0;i<dht_views.length;i++){
 						
-						dht_view.eventOccurred(event);
-						ops_view.eventOccurred(event);
+						DHTView 	dht_view = dht_views[i];
+						DHTOpsView 	ops_view = ops_views[i];
+						
+						if ( dht_view != null && ops_view != null ){
+							
+							int	dht_index;
+							
+							if ( i < total_dhts ){
+								
+								dht_index = i;
+								
+							}else{
+								
+								dht_index = i - total_dhts;
+							}
+							
+							if ( dht_index < normal_dht_count ){
+								
+								I2PHelperRouter router = plugin.getRouter();
+								
+								if ( router != null ){
+										
+									I2PHelperDHT dht_helper = router.getAllDHTs()[dht_index].getDHT();
+									
+									if ( dht_helper instanceof DHTI2P ){
+										
+										DHT dht;
+										
+										if ( i < normal_dht_count ){
+											
+											dht = ((DHTI2P)dht_helper).getDHT();
+										}else{
+											
+											dht = ((DHTI2P)dht_helper).getAZDHT().getDHT();
+										}
+										
+										dht_view.setDHT( dht );
+										ops_view.setDHT( dht );
+									}
+								}
+							}else{
+								
+								I2PHelperDHTPluginInterface proxy_dht = proxy_dhts.get( dht_index - normal_dht_count);
+								
+								I2PHelperAZDHT dht_helper = proxy_dht.getDHT( 1 );
+								
+								if ( dht_helper != null ){
+									
+									DHT dht;
+									
+									try{
+										if ( i < normal_dht_count + proxy_dht_count ){
+											
+											dht = dht_helper.getBaseDHT();
+										}else{
+											
+											dht = dht_helper.getDHT();
+										}
+										
+										dht_view.setDHT( dht );
+										ops_view.setDHT( dht );
+										
+									}catch( Throwable e ){
+										
+									}
+								}
+							}
+							
+							dht_view.eventOccurred(event);
+							ops_view.eventOccurred(event);
+						}
 					}
 				}
 				
@@ -515,24 +584,27 @@ I2PHelperView
 						view_timer = null;
 					}
 					
-					for ( int i=0;i<dht_views.length;i++){
+					if ( dht_views != null ){
 						
-						DHTView 	dht_view = dht_views[i];
-						
-						if ( dht_view != null ){
+						for ( int i=0;i<dht_views.length;i++){
 							
-							dht_view.delete();
+							DHTView 	dht_view = dht_views[i];
 							
-							dht_views[i] = null;
-						}
-						
-						DHTOpsView 	ops_view = ops_views[i];
-						
-						if ( ops_view != null ){
+							if ( dht_view != null ){
+								
+								dht_view.delete();
+								
+								dht_views[i] = null;
+							}
 							
-							ops_view.delete();
+							DHTOpsView 	ops_view = ops_views[i];
 							
-							ops_views[i] = null;
+							if ( ops_view != null ){
+								
+								ops_view.delete();
+								
+								ops_views[i] = null;
+							}
 						}
 					}
 				}finally{

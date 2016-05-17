@@ -142,6 +142,7 @@ import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTTransportContactI2P;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT.DHTContact;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT.DHTValue;
+import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperDHTBridge;
 
 import com.aelitis.azureus.core.AzureusCoreFactory;
 import com.aelitis.azureus.core.dht.transport.DHTTransportAlternativeContact;
@@ -401,6 +402,8 @@ I2PHelperPlugin
 	private LinkedList<NodeInfo>	bootstrap_nodes_from_peers = new LinkedList<NodeInfo>();
 	
 	private static DDBTestXFer	test_xfer = new DDBTestXFer();
+	
+	private I2PHelperDHTBridge	dht_bridge	= new I2PHelperDHTBridge( this );
 	
 	private I2PHelperHostnameService	hostname_service;
 	
@@ -1636,23 +1639,74 @@ I2PHelperPlugin
 	
 	public void
 	stateChanged(
-		I2PHelperRouterDHT	dht )
+		I2PHelperRouterDHT	dht,
+		boolean				init_done )
 	{
-		String address = dht.getB32Address();
-		
-		if ( address.length() > 0 ){
+		if ( init_done ){
 			
-			int	 index = dht.getDHTIndex();
-			
-			dht_addresses[ index ] = address;
-			
-			String str = "";
-			
-			for ( int i=0;i<dht_addresses.length;i++){
+			if ( dht.getDHTIndex() == I2PHelperRouter.DHT_MIX ){
+						
+				new AEThread2( "I2P:async" )
+				{
+					public void
+					run()
+					{
+						String[] nets = new String[]{ AENetworkClassifier.AT_PUBLIC, AENetworkClassifier.AT_I2P };
+						
+						Map<String,Object> server_options = new HashMap<String, Object>();
+						
+						server_options.put( "networks", nets );
+						
+						try{
+							DHTPluginInterface expected_dht_pi = getProxyDHT( "DHT bridge setup", server_options );
+							
+							if ( expected_dht_pi != null ){
+								
+								List<DistributedDatabase> ddbs = getPluginInterface().getUtilities().getDistributedDatabases( nets );
 				
-				str += ( str.length()==0?"":", " ) + (dht_addresses[i]==null?"<pending>":dht_addresses[i]);
+								for ( DistributedDatabase ddb: ddbs ){
+									
+									if ( ddb.getNetwork() == AENetworkClassifier.AT_I2P ){
+											
+										DHTPluginInterface dht_pi = ddb.getDHTPlugin();
+										
+										if ( dht_pi == expected_dht_pi ){
+										
+											while( dht_pi.isInitialising()){
+												
+												Thread.sleep( 5000 );
+											}
+											
+											dht_bridge.setDDB( ddb );
+										}
+									}
+								}
+							}
+						}catch( Throwable e ){
+							
+							Debug.out( e );
+						}
+					}
+				}.start();
 			}
-			i2p_address_param.setValue( str );
+		}else{
+			
+			String address = dht.getB32Address();
+			
+			if ( address.length() > 0 ){
+				
+				int	 index = dht.getDHTIndex();
+				
+				dht_addresses[ index ] = address;
+				
+				String str = "";
+				
+				for ( int i=0;i<dht_addresses.length;i++){
+					
+					str += ( str.length()==0?"":", " ) + (dht_addresses[i]==null?"<pending>":dht_addresses[i]);
+				}
+				i2p_address_param.setValue( str );
+			}
 		}
 	}
 	
@@ -2383,6 +2437,7 @@ I2PHelperPlugin
 						router.createServer( 
 							"chat_" + nick,
 							false,
+							I2PHelperRouter.SM_TYPE_OTHER,
 							new I2PHelperRouter.ServerAdapter()
 							{							
 								@Override
@@ -2440,6 +2495,7 @@ I2PHelperPlugin
 							router.createServer( 
 								"chat_" + my_nick,
 								false,
+								I2PHelperRouter.SM_TYPE_OTHER,
 								new I2PHelperRouter.ServerAdapter()
 								{							
 									@Override
@@ -4119,6 +4175,7 @@ I2PHelperPlugin
 						current_router.createServer(
 							server_id, 
 							false,
+							I2PHelperRouter.SM_TYPE_OTHER,
 							new I2PHelperRouter.ServerAdapter() 
 							{			
 								@Override
@@ -4155,6 +4212,15 @@ I2PHelperPlugin
 	private Map<Integer,I2PHelperDHTPluginInterface>	dht_pi_map 		= new HashMap<Integer, I2PHelperDHTPluginInterface>();
 	private Map<String,I2PHelperDHTPluginInterface>		dht_client_map 	= new HashMap<String, I2PHelperDHTPluginInterface>();
 	
+	public List<I2PHelperDHTPluginInterface>
+	getProxyDHTs()
+	{
+		synchronized( dht_client_map ){
+
+			return( new ArrayList<I2PHelperDHTPluginInterface>( dht_client_map.values()));
+		}
+	}
+	
 	public DHTPluginInterface
 	getProxyDHT(
 		String				reason,
@@ -4173,7 +4239,7 @@ I2PHelperPlugin
 		setUnloadable( false );
 		
 		try{		
-			int		dht_index;
+			int		dht_index = -1;
 			
 			Download download = (Download)server_options.get( "download" );
 			
@@ -4185,104 +4251,126 @@ I2PHelperPlugin
 					
 					dht_index = I2PHelperRouter.selectDHTIndex( networks );
 					
-				}else{
+				}
 				
-					String server_id = (String)server_options.get( "server_id");
+				String server_id = (String)server_options.get( "server_id");
 					
-					if ( server_id != null ){
+				if ( server_id != null ){
 						
-						Boolean b_is_transient = (Boolean)server_options.get( "server_id_transient" );
-						
-						boolean is_transient = b_is_transient != null && b_is_transient;
-						
-						long	start = SystemTime.getMonotonousTime();
+					Boolean b_is_transient = (Boolean)server_options.get( "server_id_transient" );
+					
+					boolean is_transient = b_is_transient != null && b_is_transient;
+					
+					long	start = SystemTime.getMonotonousTime();
 
-						while( true ){
+					while( true ){
+						
+						if ( unloaded ){
 							
-							if ( unloaded ){
+							return( null );
+						}
+						
+						if ( SystemTime.getMonotonousTime() - start > 2*60*1000 ){
+							
+							throw( new IPCException( "Timeout waiting for router startup" ));
+						}
+						
+						I2PHelperRouter current_router = router;
+						
+						if ( current_router == null ){
+							
+							try{
+								Thread.sleep(1000);									
+								
+							}catch( Throwable e ){
+							
+								Debug.out( e );
 								
 								return( null );
 							}
+						}else{
 							
-							if ( SystemTime.getMonotonousTime() - start > 2*60*1000 ){
+							int sm_type = I2PHelperRouter.SM_TYPE_OTHER;
+							
+							Number i_sm_type = (Number)server_options.get( "server_sm_type");
+							
+							if ( i_sm_type != null ){
 								
-								throw( new IPCException( "Timeout waiting for router startup" ));
+								sm_type = i_sm_type.intValue();
 							}
 							
-							I2PHelperRouter current_router = router;
+							I2PHelperRouter.ServerInstance server = 
+								current_router.createServer(
+									server_id, 
+									is_transient,
+									sm_type,
+									new I2PHelperRouter.ServerAdapter() 
+									{			
+										@Override
+										public void 
+										incomingConnection(
+											I2PHelperRouter.ServerInstance		server,
+											I2PSocket 							i2p_socket )
+													
+											throws Exception 
+										{	
+											i2p_socket.close();
+										}
+									});
 							
-							if ( current_router == null ){
-								
-								try{
-									Thread.sleep(1000);									
-									
-								}catch( Throwable e ){
-								
-									Debug.out( e );
-									
-									return( null );
-								}
-							}else{
-								
-								I2PHelperRouter.ServerInstance server = 
-									current_router.createServer(
-										server_id, 
-										is_transient,
-										new I2PHelperRouter.ServerAdapter() 
-										{			
-											@Override
-											public void 
-											incomingConnection(
-												I2PHelperRouter.ServerInstance		server,
-												I2PSocket 							i2p_socket )
-														
-												throws Exception 
-											{	
-												i2p_socket.close();
-											}
-										});
+							if ( dht_index == -1 ){
 								
 								dht_index = I2PHelperRouter.DHT_NON_MIX;
+							}
+							
+							I2PHelperDHTPluginInterface pi;
+							
+							synchronized( dht_pi_map ){
 								
-								I2PHelperDHTPluginInterface pi;
+								pi = dht_pi_map.get( dht_index );
 								
-								synchronized( dht_pi_map ){
+								if ( pi == null ){
 									
-									pi = dht_pi_map.get( dht_index );
+									pi = new I2PHelperDHTPluginInterface( this, dht_index );
 									
-									if ( pi == null ){
-										
-										pi = new I2PHelperDHTPluginInterface( this, dht_index );
-										
-										dht_pi_map.put( dht_index, pi );
-									}
+									dht_pi_map.put( dht_index, pi );
 								}
+							}
+							
+							I2PHelperAZDHT dht = pi.getDHT( 2*60*1000 );
+							
+							if ( dht == null ){
 								
-								I2PHelperAZDHT dht = pi.getDHT( 2*60*1000 );
+								throw( new IPCException( "Timeout waiting for DHT initialisation" ));
+							}
+							
+							synchronized( dht_client_map ){
 								
-								if ( dht == null ){
-									
-									throw( new IPCException( "Timeout waiting for DHT initialisation" ));
-								}
+								String client_key = server_id + "/" + dht_index;
 								
-								synchronized( dht_client_map ){
+								I2PHelperDHTPluginInterface client_pi = dht_client_map.get( client_key );
+								
+								if ( client_pi == null ){
 									
-									I2PHelperDHTPluginInterface client_pi = dht_client_map.get( server_id );
+									DHTAZClient client = new DHTAZClient( server, dht, I2PHelperPlugin.this );
 									
-									if ( client_pi == null ){
-										
-										DHTAZClient client = new DHTAZClient( server, dht, I2PHelperPlugin.this );
-										
-										client_pi = new I2PHelperDHTPluginInterface( this, client );
+									String server_name = (String)server_options.get( "server_name");
 
-										dht_client_map.put( server_id, client_pi );
+									if ( server_name == null ){
+										
+										server_name = client_key;
 									}
 									
-									return( client_pi );
+									client_pi = new I2PHelperDHTPluginInterface( this, client, server_name );
+
+									dht_client_map.put( client_key, client_pi );
 								}
+								
+								return( client_pi );
 							}
 						}
 					}
+				}else{
 					
 					dht_index =	I2PHelperRouter.DHT_MIX;
 				}
@@ -4948,7 +5036,8 @@ I2PHelperPlugin
 				@Override
 				public void 
 				stateChanged(
-					I2PHelperRouterDHT dht ) 
+					I2PHelperRouterDHT 	dht,
+					boolean				init_done )
 				{
 				}
 				
@@ -5091,6 +5180,7 @@ I2PHelperPlugin
 							router.createServer( 
 								"test", 
 								false,
+								I2PHelperRouter.SM_TYPE_OTHER,
 								new I2PHelperRouter.ServerAdapter() 
 								{
 								

@@ -28,7 +28,6 @@ import java.util.List;
 import com.aelitis.azureus.core.dht.DHT;
 import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
 import com.aelitis.azureus.plugins.dht.DHTPluginContact;
-import com.aelitis.azureus.plugins.dht.impl.DHTPluginContactImpl;
 
 public class 
 DHTAZFull

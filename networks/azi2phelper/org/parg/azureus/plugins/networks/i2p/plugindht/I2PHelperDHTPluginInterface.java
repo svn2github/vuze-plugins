@@ -72,7 +72,8 @@ public class
 I2PHelperDHTPluginInterface
 	implements DHTPluginInterface
 {
-	private I2PHelperPlugin		plugin;
+	final private I2PHelperPlugin		plugin;
+	final private String				name;
 	
 	private volatile I2PHelperAZDHT		dht;
 	
@@ -87,10 +88,12 @@ I2PHelperDHTPluginInterface
 	public 
 	I2PHelperDHTPluginInterface(
 		I2PHelperPlugin		_plugin,
-		I2PHelperAZDHT		_dht )
+		I2PHelperAZDHT		_dht,
+		String				_name )
 	{
 		plugin	= _plugin;
 		dht		= _dht;
+		name	= _name;
 		
 		init_event = SimpleTimer.addPeriodicEvent(
 				"I2PHelperDHTPluginInterface",
@@ -125,6 +128,7 @@ I2PHelperDHTPluginInterface
 		int					_dht_index )
 	{
 		plugin			= _plugin;
+		name			= "<internal>";
 		
 		final int dht_index = _dht_index;
 		
@@ -184,6 +188,12 @@ I2PHelperDHTPluginInterface
 			});
 	}
 	
+	public String
+	getName()
+	{
+		return( name );
+	}
+	
 	public boolean
 	isEnabled()
 	{
@@ -200,7 +210,22 @@ I2PHelperDHTPluginInterface
 	public boolean 
 	isInitialising() 
 	{
-		return( !init_sem.isReleasedForever());
+		if ( init_sem.isReleasedForever()){
+			
+			I2PHelperAZDHT azdht = dht;
+			
+			if ( azdht != null ){
+				
+				return( !azdht.waitForInitialisation(1));
+				
+			}else{
+				
+				return( false );
+			}
+		}else{
+		
+			return( true );
+		}
 	}
 	
 	public I2PHelperAZDHT

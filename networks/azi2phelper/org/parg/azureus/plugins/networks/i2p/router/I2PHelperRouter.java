@@ -1055,6 +1055,7 @@ I2PHelperRouter
 	createServer(
 		final String			server_id,
 		boolean					is_transient,
+		int						sm_type,
 		ServerAdapter			server_adapter )
 		
 		throws Exception
@@ -1075,7 +1076,7 @@ I2PHelperRouter
 				return( existing_server );
 			}
 			
-			server = new ServerInstance( server_id, is_transient, server_adapter );
+			server = new ServerInstance( server_id, is_transient, sm_type, server_adapter );
 			
 			servers.put( server_id, server );
 		}
@@ -1316,6 +1317,7 @@ I2PHelperRouter
 	ServerInstance
 	{
 		private final String			server_id;
+		private final int				sm_type;
 		private final ServerAdapter		server_adapter;
 		
 		private I2PSession 			session;
@@ -1332,6 +1334,7 @@ I2PHelperRouter
 		ServerInstance(
 			String				_server_id,
 			boolean				_is_transient,
+			int					_sm_type,
 			ServerAdapter		_adapter )
 			
 			throws Exception
@@ -1342,6 +1345,7 @@ I2PHelperRouter
 			}
 			
 			server_id			= _server_id;
+			sm_type				= _sm_type;
 			server_adapter		= _adapter;
 			
 			File dest_key_file 	= new File( config_dir,  server_id + "_dest_key.dat" );
@@ -1417,7 +1421,7 @@ I2PHelperRouter
 			    		
 			    		sm_props.putAll( sm_properties );
 			    		
-			    		setupSMExplicitOpts( sm_props, "Vuze: " + server_id, SM_TYPE_OTHER );
+			    		setupSMExplicitOpts( sm_props, "Vuze: " + server_id, sm_type );
 			    		
 			    		sm = I2PSocketManagerFactory.createManager( is, i2p_host, i2p_port, sm_props );
 			    	

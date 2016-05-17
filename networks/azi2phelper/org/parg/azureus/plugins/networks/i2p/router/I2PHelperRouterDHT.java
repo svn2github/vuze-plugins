@@ -255,7 +255,7 @@ I2PHelperRouterDHT
 								
 					b32_dest	= Base32.encode( my_dest.calculateHash().getData()) + ".b32.i2p";
 					
-					adapter.stateChanged( this );
+					adapter.stateChanged( this, false );
 		
 						// some older trackers require ip to be explicitly set to the full destination name :(
 					
@@ -452,7 +452,7 @@ I2PHelperRouterDHT
 					}
 					
 					initialized = true;
-					
+										
 				}catch( Throwable e ){
 					
 					e.printStackTrace();
@@ -465,6 +465,11 @@ I2PHelperRouterDHT
 		}finally{
 			
 			init_sem.releaseForever();
+		}
+		
+		if ( initialized ){
+			
+			adapter.stateChanged( this, true );
 		}
 	}
 	

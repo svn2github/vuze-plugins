@@ -60,7 +60,8 @@ I2PHelperAdapter
 	
 	public void
 	stateChanged(
-		I2PHelperRouterDHT		dht );
+		I2PHelperRouterDHT		dht,
+		boolean					initialisation_complete );
 	
 	public void
 	contactAlive(
