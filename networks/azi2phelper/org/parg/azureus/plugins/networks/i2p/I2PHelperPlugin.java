@@ -157,6 +157,7 @@ import com.aelitis.azureus.core.tracker.TrackerPeerSource;
 import com.aelitis.azureus.core.util.bloom.BloomFilter;
 import com.aelitis.azureus.core.util.bloom.BloomFilterFactory;
 import com.aelitis.azureus.plugins.dht.DHTPluginInterface;
+import com.aelitis.azureus.plugins.dht.DHTPluginOperationListener;
 import com.aelitis.azureus.plugins.dht.DHTPluginValue;
 import com.aelitis.azureus.plugins.dht.DHTPluginContact;
 import com.aelitis.azureus.plugins.upnp.UPnPMapping;
@@ -2820,6 +2821,19 @@ I2PHelperPlugin
 						
 						System.out.println( "    " + c.getProperties() + " -> " + plugin_maybe_null.alt_network_handler.decodeContact( c ));
 					}
+				}else if ( cmd.equals( "bridge_put" )){
+
+					if ( bits.length != 3 ){
+						
+						throw( new Exception( "usage: bridge_put key value"));
+					}
+					
+					byte[] key = bits[1].getBytes( "UTF-8" );
+							
+					byte[] value = bits[2].getBytes( "UTF-8" );
+
+					plugin_maybe_null.bridgePut( "Bridge Test", key, value, null );
+					
 				}else{
 			
 					adapter.log( "Usage: print|info..." );
@@ -3891,6 +3905,23 @@ I2PHelperPlugin
 		}
 	}
 	
+	public void
+	log(
+		String		str,
+		Throwable	e )
+	{
+		if ( log != null ){
+			
+			log.log( str, e );
+			
+		}else{
+			
+			System.err.println( str );
+			
+			e.printStackTrace();
+		}
+	}
+	
 	private static byte[]
 	decodeHash(
 		String	hash_str )
@@ -3931,6 +3962,39 @@ I2PHelperPlugin
 			
 			pi.getPluginProperties().put( "plugin.unload.disabled", String.valueOf( !b ));
 		}
+	}
+	
+	public void
+	handleBridgePut(
+		I2PHelperDHTPluginInterface		dht,
+		byte[]							key,
+		String							description,
+		byte[]							value,
+		byte							flags,
+		DHTPluginOperationListener		listener )
+	{
+		if ( dht.getDHTIndex() != I2PHelperRouter.DHT_NON_MIX ){
+			
+			Debug.out( "Bridged operations must be performed on non-mix DHT" );
+			
+			listener.starts( key );
+			
+			listener.complete( key, false );
+			
+		}else{
+			
+			bridgePut( description, key, value, listener );
+		}
+	}
+	
+	private void
+	bridgePut(
+		String						desc,
+		byte[]						key,
+		byte[]						value,
+		DHTPluginOperationListener	listener )
+	{
+		dht_bridge.writeToBridge( desc, key, value, listener );
 	}
 
 		// IPC methods
@@ -4249,14 +4313,20 @@ I2PHelperPlugin
 				
 				if ( networks != null ){
 					
-					dht_index = I2PHelperRouter.selectDHTIndex( networks );
-					
+					dht_index = I2PHelperRouter.selectDHTIndex( networks );				
 				}
 				
 				String server_id = (String)server_options.get( "server_id");
 					
 				if ( server_id != null ){
 						
+					if ( dht_index == -1 ){
+						
+							// server default is non-mix
+						
+						dht_index = I2PHelperRouter.DHT_NON_MIX;
+					}
+
 					Boolean b_is_transient = (Boolean)server_options.get( "server_id_transient" );
 					
 					boolean is_transient = b_is_transient != null && b_is_transient;
@@ -4318,10 +4388,6 @@ I2PHelperPlugin
 										}
 									});
 							
-							if ( dht_index == -1 ){
-								
-								dht_index = I2PHelperRouter.DHT_NON_MIX;
-							}
 							
 							I2PHelperDHTPluginInterface pi;
 							
@@ -4361,7 +4427,7 @@ I2PHelperPlugin
 										server_name = client_key;
 									}
 									
-									client_pi = new I2PHelperDHTPluginInterface( this, client, server_name );
+									client_pi = new I2PHelperDHTPluginInterface( this, dht_index, client, server_name );
 
 									dht_client_map.put( client_key, client_pi );
 								}
@@ -4371,8 +4437,12 @@ I2PHelperPlugin
 						}
 					}
 				}else{
+					if ( dht_index == -1 ){
 					
-					dht_index =	I2PHelperRouter.DHT_MIX;
+							// general default is mix
+						
+						dht_index = I2PHelperRouter.DHT_MIX;
+					}
 				}
 			}else{
 			

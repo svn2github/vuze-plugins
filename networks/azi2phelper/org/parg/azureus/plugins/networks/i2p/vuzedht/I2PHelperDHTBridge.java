@@ -32,7 +32,10 @@ import org.gudy.azureus2.core3.util.BDecoder;
 import org.gudy.azureus2.core3.util.BEncoder;
 import org.gudy.azureus2.core3.util.ByteFormatter;
 import org.gudy.azureus2.core3.util.Debug;
-import org.gudy.azureus2.core3.util.RandomUtils;
+import org.gudy.azureus2.core3.util.SimpleTimer;
+import org.gudy.azureus2.core3.util.SystemTime;
+import org.gudy.azureus2.core3.util.TimerEvent;
+import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabase;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabaseContact;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabaseEvent;
@@ -47,12 +50,13 @@ import org.parg.azureus.plugins.networks.i2p.I2PHelperPlugin;
 import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouter;
 
 import com.aelitis.azureus.core.dht.control.DHTControl;
+import com.aelitis.azureus.plugins.dht.DHTPluginOperationListener;
 
 public class 
 I2PHelperDHTBridge 
 	implements DistributedDatabaseTransferType, DistributedDatabaseTransferHandler
 {
-	private static boolean TEST_LOOPBACK	= true;
+	private static boolean TEST_LOOPBACK	= false;
 	
 	static{
 		if ( TEST_LOOPBACK ){
@@ -71,29 +75,18 @@ I2PHelperDHTBridge
 	
 	private AsyncDispatcher		bridge_dispatcher = new AsyncDispatcher();
 	
+	private List<BridgeWrite>	bridge_writes = new LinkedList<BridgeWrite>();
+	
 	public
 	I2PHelperDHTBridge(
 		I2PHelperPlugin		_plugin )
 	{
 		plugin	= _plugin;
-		
-		if ( TEST_LOOPBACK ){
-			
-			byte[] key 		= new byte[10];
-			byte[] value 	= new byte[10];
-			
-			value[0] = 45;
-			
-			RandomUtils.nextBytes( key );
-
-			writeToBridge( "BLORP", key, value );
-		}
 	}
 	
 	public void
 	setDDB(
 		DistributedDatabase _read_ddb )
-		
 	{
 		try{
 
@@ -113,14 +106,66 @@ I2PHelperDHTBridge
 	
 	public void
 	writeToBridge(
-		final String		desc,
-		final byte[]		key,
-		final byte[]		value )
+		String						desc,
+		byte[]						key,
+		byte[]						value,
+		DHTPluginOperationListener	listener )
 	{
-			// TODO: periodic republish every
-			// DHTControl.ORIGINAL_REPUBLISH_INTERVAL_DEFAULT
+		log( "Bridge Write starts for '" + desc + "': " + ByteFormatter.encodeString( key ));
 		
+		BridgeWrite	bw = new BridgeWrite( desc, key, value, listener );
+
+		synchronized( bridge_writes ){
+						
+			bridge_writes.add( bw );
+			
+			if ( bridge_writes.size() == 1 ){
+				
+				SimpleTimer.addPeriodicEvent(
+					"I2PBridge:repub",
+					5*60*1000,
+					new TimerEventPerformer() {
+						
+						@Override
+						public void 
+						perform(
+							TimerEvent event) 
+						{
+							long	now = SystemTime.getMonotonousTime();
+							
+							synchronized( bridge_writes ){
+								
+								for ( BridgeWrite bw: bridge_writes ){
+									
+									if ( now - bw.getLastWrite() >= DHTControl.ORIGINAL_REPUBLISH_INTERVAL_DEFAULT ){
+										
+										bw.setLastWrite( now );
+										
+										writeToBridge( bw, false );
+									}
+								}
+							}
+						}
+					});
+			}
+		}
+		
+		writeToBridge( bw, true );
+	}
+	
+	public void
+	writeToBridge(
+		final BridgeWrite		bridge_write,
+		final boolean			first_time )
+	{
 		if ( bridge_dispatcher.getQueueSize() > 256 ){
+			
+			if ( first_time ){
+				
+				bridge_write.started();
+				
+				bridge_write.completed();
+			}
 			
 			return;
 		}
@@ -130,18 +175,21 @@ I2PHelperDHTBridge
 				public void 
 				runSupport()
 				{
-					writeToBridgeAsync( desc, key, value );
+					writeToBridgeAsync( bridge_write, first_time );
 				}
 			});
 	}
 	
 	private void
 	writeToBridgeAsync(
-		String		desc,
-		byte[]		key,
-		byte[]		value )
+		BridgeWrite		bridge_write,
+		boolean			first_time )
 	{
 		init_sem.reserve();
+		
+		if ( first_time ){
+			bridge_write.started();
+		}
 		
 		try{		
 			synchronized( this ){
@@ -177,24 +225,36 @@ I2PHelperDHTBridge
 							}
 						}
 					}
+					
+					log( "Bridge init complete" );
+
 				}
 			}
 			
-			writeToBridgeSupport( desc, key, value );
+			writeToBridgeSupport( bridge_write );
 			
 		}catch( Throwable e ){
 		
+			log( "Bridge init failed", e );
+			
 			Debug.out( e );
+			
+		}finally{
+			
+			if ( first_time ){
+				bridge_write.completed();
+			}
 		}
-
 	}
 	
 	private void
 	writeToBridgeSupport(
-		final String		desc,
-		final byte[]		key,
-		final byte[]		value )
+		BridgeWrite	bridge_write )
 	{
+		final String		desc 	= bridge_write.getDesc();
+		final byte[]		key		= bridge_write.getKey();
+		final byte[]		value	= bridge_write.getValue();
+		
 		if ( TEST_LOOPBACK ){
 			
 				// have to store it in ddb_read as the actual write will go elsewhere in the mix DHT
@@ -231,6 +291,8 @@ I2PHelperDHTBridge
 				DistributedDatabaseKey 		pure_k = pure_dht.createKey( key, desc );
 				DistributedDatabaseValue 	pure_v = pure_dht.createValue( value );
 		
+				pure_k.setFlags( DistributedDatabaseKey.FL_ANON );
+			
 				pure_dht.write(
 						new DistributedDatabaseListener()
 						{
@@ -257,6 +319,8 @@ I2PHelperDHTBridge
 				DistributedDatabaseKey 		mix_k = mix_dht.createKey( key, desc );
 				DistributedDatabaseValue 	mix_v = mix_dht.createValue( value );
 		
+				mix_k.setFlags( DistributedDatabaseKey.FL_ANON );
+
 				mix_dht.write(
 						new DistributedDatabaseListener()
 						{
@@ -275,12 +339,14 @@ I2PHelperDHTBridge
 									}
 								}else if ( type == DistributedDatabaseEvent.ET_OPERATION_COMPLETE ){
 									
+									log( "Bridge write complete for '" + desc + "'" );
+									
 									bridge_dispatcher.dispatch(
 										new AERunnable(){
 											public void 
 											runSupport()
 											{
-												sendBridgeRequest( mix_dht, key, value,  write_contacts );
+												sendBridgeRequest( mix_dht, desc, key, value,  write_contacts );
 											}
 										});
 								}
@@ -290,6 +356,8 @@ I2PHelperDHTBridge
 				
 			}catch( Throwable e ){
 				
+				log( "Bridge write failed for '" + desc + "'", e );
+				
 				Debug.out( e );
 			}
 		}
@@ -298,6 +366,7 @@ I2PHelperDHTBridge
 	private void
 	sendBridgeRequest(
 		DistributedDatabase					ddb,
+		String								desc,
 		byte[]								key,
 		byte[]								value,
 		List<DistributedDatabaseContact>	contacts )
@@ -315,6 +384,7 @@ I2PHelperDHTBridge
 		try{
 			DistributedDatabaseKey read_key = ddb.createKey( BEncoder.encode( request ));
 	
+			boolean	done = false;
 			
 			for ( DistributedDatabaseContact contact: contacts ){
 				
@@ -349,7 +419,9 @@ I2PHelperDHTBridge
 						
 						if ( r != null && r == 1 ){
 						
-								// job done
+							done = true;
+							
+							log( "Bridge replication complete for '" + desc + "'" );
 							
 							break;
 						}
@@ -359,7 +431,14 @@ I2PHelperDHTBridge
 					Debug.out( e );
 				}
 			}
+			
+			if ( !done ){
+				
+				log( "Bridge replication failed for '" + desc + "', no relay" );
+			}
 		}catch( Throwable e ){
+			
+			log( "Bridge replication failed for '" + desc + "'", e );
 			
 			Debug.out( e );
 		}
@@ -420,7 +499,7 @@ I2PHelperDHTBridge
 					
 					DistributedDatabaseKey dd_key = public_ddb.createKey( request_key, "Bridge mapping" );
 					
-					dd_key.setFlags( DistributedDatabaseKey.FL_ANON );
+					dd_key.setFlags( DistributedDatabaseKey.FL_ANON | DistributedDatabaseKey.FL_BRIDGED );
 					
 					DistributedDatabaseValue dd_value = public_ddb.createValue( request_value );
 					
@@ -445,6 +524,111 @@ I2PHelperDHTBridge
 		}catch( Throwable e ){
 			
 			return( null );
+		}
+	}
+	
+	private void
+	log(
+		String	str )
+	{
+		if ( TEST_LOOPBACK ){
+			System.out.println( str );
+		}
+		
+		plugin.log( str );
+	}
+	
+	private void
+	log(
+		String		str,
+		Throwable 	e )
+	{
+		if ( TEST_LOOPBACK ){
+			System.out.println( str );
+			e.printStackTrace();
+		}
+		
+		plugin.log( str, e );
+	}
+	
+	private static class
+	BridgeWrite
+	{
+		private final String						desc;
+		private final byte[]						key;
+		private final byte[]						value;
+		private final DHTPluginOperationListener	listener;
+		
+		private long		last_write;
+		
+		private
+		BridgeWrite(
+			String						_desc,
+			byte[]						_key,
+			byte[]						_value,
+			DHTPluginOperationListener	_listener )
+		{
+			desc		= _desc;
+			key			= _key;
+			value		= _value;
+			listener	= _listener;
+			
+			last_write = SystemTime.getMonotonousTime();
+		}
+		
+		private String
+		getDesc()
+		{
+			return( desc );
+		}
+		
+		private byte[]
+		getKey()
+		{
+			return( key );
+		}
+		
+		private byte[]
+		getValue()
+		{
+			return( value );
+		}
+		
+		private long
+		getLastWrite()
+		{
+			return( last_write );
+		}
+		
+		private void
+		setLastWrite(
+			long		t )
+		{
+			last_write	= t;
+		}
+		
+		private void
+		started()
+		{
+			try{
+				if ( listener != null ){
+					listener.starts(key);
+				}
+			}catch( Throwable e ){
+				Debug.out(e);
+			}
+		}
+		
+		private void
+		completed()
+		{
+			try{
+				if ( listener != null ){
+					listener.complete( key, false );
+				}
+			}catch( Throwable e ){
+				Debug.out(e);
+			}
 		}
 	}
 }

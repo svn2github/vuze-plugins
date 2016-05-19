@@ -54,6 +54,8 @@ import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT;
 
 
 
+
+
 import com.aelitis.azureus.core.dht.db.DHTDB;
 import com.aelitis.azureus.core.dht.db.DHTDBValue;
 import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
@@ -76,6 +78,8 @@ I2PHelperDHTPluginInterface
 	final private I2PHelperPlugin		plugin;
 	final private String				name;
 	
+	private final int					dht_index;
+	
 	private volatile I2PHelperAZDHT		dht;
 	
 	private AsyncDispatcher		dispatcher = new AsyncDispatcher( "I2PHelperDHTPluginInterface" );
@@ -89,12 +93,14 @@ I2PHelperDHTPluginInterface
 	public 
 	I2PHelperDHTPluginInterface(
 		I2PHelperPlugin		_plugin,
+		int					_dht_index,
 		I2PHelperAZDHT		_dht,
 		String				_name )
 	{
-		plugin	= _plugin;
-		dht		= _dht;
-		name	= _name;
+		plugin		= _plugin;
+		dht_index	= _dht_index;
+		dht			= _dht;
+		name		= _name;
 		
 		init_event = SimpleTimer.addPeriodicEvent(
 				"I2PHelperDHTPluginInterface",
@@ -129,6 +135,8 @@ I2PHelperDHTPluginInterface
 		int					_dht_index )
 	{
 		plugin			= _plugin;
+		dht_index		= _dht_index;
+		
 		name			= "<internal>";
 		
 		final int dht_index = _dht_index;
@@ -227,6 +235,12 @@ I2PHelperDHTPluginInterface
 		
 			return( true );
 		}
+	}
+	
+	public int
+	getDHTIndex()
+	{
+		return( dht_index );
 	}
 	
 	public I2PHelperAZDHT
@@ -466,47 +480,54 @@ I2PHelperDHTPluginInterface
 		final byte[]						value,
 		final byte							flags,
 		final DHTPluginOperationListener	listener)
-	{		
-		if ( dht != null && dispatcher.getQueueSize() == 0 ){
+	{	
+		if ((flags & DHTPluginInterface.FLAG_BRIDGED )!= 0 ){
 			
-			dht.put( key, description, value, (short)(flags&0x00ff), true, listener );
-		
+			plugin.handleBridgePut( this, key, description, value, flags, listener );
+			
 		}else{
 			
-			if ( dispatcher.getQueueSize() > 100 ){
+			if ( dht != null && dispatcher.getQueueSize() == 0 ){
 				
-				Debug.out( "Dispatch queue too large" );
-				
-				listener.complete( key, false );
-			}
+				dht.put( key, description, value, (short)(flags&0x00ff), true, listener );
 			
-			dispatcher.dispatch(
-				new AERunnable() {
+			}else{
+				
+				if ( dispatcher.getQueueSize() > 100 ){
 					
-					@Override
-					public void 
-					runSupport() 
-					{
-						I2PHelperAZDHT	dht_to_use = dht;
+					Debug.out( "Dispatch queue too large" );
+					
+					listener.complete( key, false );
+				}
+				
+				dispatcher.dispatch(
+					new AERunnable() {
 						
-						if ( dht_to_use == null ){
+						@Override
+						public void 
+						runSupport() 
+						{
+							I2PHelperAZDHT	dht_to_use = dht;
 							
-							init_sem.reserve();
+							if ( dht_to_use == null ){
+								
+								init_sem.reserve();
+								
+								dht_to_use = dht;
+							}
 							
-							dht_to_use = dht;
+							if ( dht_to_use == null ){
+								
+								listener.complete( key, false );
+								
+							}else{
+								
+								dht.put( key, description, value, (short)(flags&0x00ff), true, listener );
+							}
 						}
-						
-						if ( dht_to_use == null ){
-							
-							listener.complete( key, false );
-							
-						}else{
-							
-							dht.put( key, description, value, (short)(flags&0x00ff), true, listener );
-						}
-					}
-				});
-		};
+					});
+			};
+		}
 	}
 	
 	public void
