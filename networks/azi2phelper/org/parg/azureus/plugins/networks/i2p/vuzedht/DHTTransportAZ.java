@@ -279,7 +279,7 @@ DHTTransportAZ
 		}
 	}
 	
-	public DHTTransportStats
+	public DHTTransportStatsI2P
 	getStats()
 	{
 		return( stats );

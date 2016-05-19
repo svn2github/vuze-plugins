@@ -1750,7 +1750,7 @@ I2PHelperPlugin
 			
 			if ( client == null ){
 				
-				client = new DHTAZClient( inst, dht.getHelperAZDHT(), adapter );
+				client = new DHTAZClient( inst, dht.getHelperAZDHT(), 10000, adapter );
 				
 				az_dht_client_map.put( inst, client );
 			}
@@ -4352,7 +4352,7 @@ I2PHelperPlugin
 								
 								if ( client_pi == null ){
 									
-									DHTAZClient client = new DHTAZClient( server, dht, I2PHelperPlugin.this );
+									DHTAZClient client = new DHTAZClient( server, dht, 10000 + (dht_index*100), I2PHelperPlugin.this );
 									
 									String server_name = (String)server_options.get( "server_name");
 

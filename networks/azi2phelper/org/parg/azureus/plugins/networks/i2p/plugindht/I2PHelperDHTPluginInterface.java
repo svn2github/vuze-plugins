@@ -53,6 +53,7 @@ import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT;
 
 
 
+
 import com.aelitis.azureus.core.dht.db.DHTDB;
 import com.aelitis.azureus.core.dht.db.DHTDBValue;
 import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
@@ -615,6 +616,33 @@ I2PHelperDHTPluginInterface
 		return( vals );
 	}
 	
+	@Override
+	public List<DHTPluginValue> 
+	getValues(byte[] key)
+	{
+		List<DHTPluginValue>	vals = new ArrayList<DHTPluginValue>();
+
+		if ( dht != null ){
+							
+			try{
+				List<DHTTransportValue> values = dht.getDHT().getStoredValues( key );
+							
+				for ( DHTTransportValue v: values ){
+					
+					vals.add( mapValue( v ));
+				}
+				
+				return( vals );
+				
+			}catch( Throwable e ){
+				
+				Debug.out( e );
+			}
+		}
+		
+		return( vals );
+	}
+
 	protected DHTPluginValue
 	mapValue(
 		final DHTTransportValue	value )
@@ -800,25 +828,94 @@ I2PHelperDHTPluginInterface
 		
 		public byte[]
 		read(
-			DHTPluginProgressListener	listener,
-			byte[]						handler_key,
-			byte[]						key,
-			long						timeout )
+			final DHTPluginProgressListener		listener,
+			byte[]								handler_key,
+			byte[]								key,
+			long								timeout )
 		{
-			Debug.out( "not imp" );
-
-			return( null );
+			DHTTransportContact contact = fixup();
+			
+			try{
+				return( contact.getTransport().readTransfer(
+						new DHTTransportProgressListener()
+						{
+							public void
+							reportSize(
+								long	size )
+							{
+								listener.reportSize( size );
+							}
+							
+							public void
+							reportActivity(
+								String	str )
+							{
+								listener.reportActivity( str );
+							}
+							
+							public void
+							reportCompleteness(
+								int		percent )
+							{
+								listener.reportCompleteness( percent );
+							}
+						},
+						contact, 
+						handler_key, 
+						key, 
+						timeout ));
+				
+			}catch( Throwable e ){
+				
+				throw( new RuntimeException( e ));
+			}
 		}
 		
 		public void
 		write(
-			DHTPluginProgressListener	listener,
-			byte[]						handler_key,
-			byte[]						key,
-			byte[]						data,
-			long						timeout )
+			final DHTPluginProgressListener		listener,
+			byte[]								handler_key,
+			byte[]								key,
+			byte[]								data,
+			long								timeout )
 		{
-			Debug.out( "not imp" );
+			DHTTransportContact contact = fixup();
+			
+			try{
+				contact.getTransport().writeTransfer(
+						new DHTTransportProgressListener()
+						{
+							public void
+							reportSize(
+								long	size )
+							{
+								listener.reportSize( size );
+							}
+							
+							public void
+							reportActivity(
+								String	str )
+							{
+								listener.reportActivity( str );
+							}
+							
+							public void
+							reportCompleteness(
+								int		percent )
+							{
+								listener.reportCompleteness( percent );
+							}
+						},
+						contact, 
+						handler_key, 
+						key, 
+						data,
+						timeout );
+				
+			}catch( Throwable e ){
+				
+				throw( new RuntimeException( e ));
+			}
 		}
 		
 		public byte[]

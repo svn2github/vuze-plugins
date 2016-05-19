@@ -82,6 +82,7 @@ DHTAZClient
 	DHTAZClient(
 		final I2PHelperRouter.ServerInstance	inst,
 		final I2PHelperAZDHT					az_dht,
+		final int								dht_port,
 		final I2PHelperAdapter					_adapter )
 	
 	{	adapter = _adapter;
@@ -107,14 +108,7 @@ DHTAZClient
 							
 							continue;
 						}
-						
-						// actually we don't want to randomise the port as we want a destination to be valid for
-						// as long as its .i2p address is, not change every startup
-						
-						int dht_port = 10000;
-						
-						// int dht_port = 10000 + RandomUtils.nextInt( 65535 - 10000 );
-						
+												
 						Destination my_dest = session.getMyDestination();
 						
 						NID dht_nid = NodeInfo.generateNID( my_dest.calculateHash(), dht_port, I2PAppContext.getGlobalContext().random());
@@ -136,8 +130,11 @@ DHTAZClient
 								DHTUtilsI2P.REQUEST_TIMEOUT );
 							
 						//base_transport.setTraceOn( true );
+						base_transport.getStats();
 						
-						base_transport.setRequestHandler( new BogusRequestHandler());
+						BogusRequestHandler base_request_handler = new BogusRequestHandler();
+						
+						base_transport.setRequestHandler( base_request_handler );
 						
 						DHTTransportAZ transport = 
 							new DHTTransportAZ( 
@@ -158,7 +155,9 @@ DHTAZClient
 		
 						//transport.setTraceOn( true );
 						
-						transport.setRequestHandler( new BogusRequestHandler());
+						BogusRequestHandler request_handler = new BogusRequestHandler();
+						
+						transport.setRequestHandler( request_handler );
 						
 						transport.setGenericFlag( DHTTransport.GF_DHT_SLEEPING, true );
 						
@@ -185,6 +184,9 @@ DHTAZClient
 									base_props,
 									storage_adapter,
 									DHTAZClient.this );
+						
+						base_request_handler.setStats( base_dht.getControl().getStats());
+						
 						dht = 
 							DHTFactory.create( 
 								transport, 
@@ -194,6 +196,8 @@ DHTAZClient
 								storage_adapter,
 								DHTAZClient.this );
 						
+						request_handler.setStats( dht.getControl().getStats());
+
 						break;
 					}
 				}catch( Throwable e ){
@@ -653,6 +657,15 @@ DHTAZClient
 	BogusRequestHandler
 		implements DHTTransportRequestHandler
 	{
+		private DHTTransportFullStats		full_stats;
+		
+		private void
+		setStats(
+			DHTTransportFullStats	_stats )
+		{
+			full_stats = _stats;
+		}
+		
 		public void
 		pingRequest(
 			DHTTransportContact contact )
@@ -673,7 +686,7 @@ DHTAZClient
 		statsRequest(	
 			DHTTransportContact contact )
 		{
-			return( null );
+			return( full_stats );
 		}
 		
 		public DHTTransportStoreReply

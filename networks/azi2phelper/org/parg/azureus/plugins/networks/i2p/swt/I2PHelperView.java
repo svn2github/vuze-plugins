@@ -23,6 +23,7 @@ package org.parg.azureus.plugins.networks.i2p.swt;
 
 
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.eclipse.swt.SWT;
@@ -36,6 +37,7 @@ import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Listener;
+import org.gudy.azureus2.core3.util.Constants;
 import org.gudy.azureus2.core3.util.SimpleTimer;
 import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
@@ -314,7 +316,14 @@ I2PHelperView
 		
 		normal_dht_count = plugin.getDHTCount();
 		
-		proxy_dhts = plugin.getProxyDHTs();
+		if ( Constants.isCVSVersion()){
+			
+			proxy_dhts = plugin.getProxyDHTs();
+			
+		}else{
+			
+			proxy_dhts = new ArrayList<I2PHelperDHTPluginInterface>();
+		}
 		
 		proxy_dht_count = proxy_dhts.size();
 		

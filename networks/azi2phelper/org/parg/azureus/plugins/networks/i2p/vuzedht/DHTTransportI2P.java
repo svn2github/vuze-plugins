@@ -606,7 +606,7 @@ DHTTransportI2P
 		az_request_handler = _azrh;
 	}
 	
-	public DHTTransportStats
+	public DHTTransportStatsI2P
 	getStats()
 	{
 		return( stats );
@@ -2747,7 +2747,7 @@ DHTTransportI2P
     	}
 	}
 	
-	private class
+	public class
 	DHTTransportStatsI2P
 		extends DHTTransportStatsImpl
 	{
