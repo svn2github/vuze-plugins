@@ -22,6 +22,8 @@
 
 package org.parg.azureus.plugins.networks.i2p.plugindht;
 
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -56,11 +58,15 @@ import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT;
 
 
 
+
+
+import com.aelitis.azureus.core.dht.DHTStorageKeyStats;
 import com.aelitis.azureus.core.dht.db.DHTDB;
 import com.aelitis.azureus.core.dht.db.DHTDBValue;
 import com.aelitis.azureus.core.dht.transport.DHTTransportContact;
 import com.aelitis.azureus.core.dht.transport.DHTTransportProgressListener;
 import com.aelitis.azureus.core.dht.transport.DHTTransportValue;
+import com.aelitis.azureus.plugins.dht.DHTPlugin;
 import com.aelitis.azureus.plugins.dht.DHTPluginContact;
 import com.aelitis.azureus.plugins.dht.DHTPluginInterface;
 import com.aelitis.azureus.plugins.dht.DHTPluginKeyStats;
@@ -69,6 +75,7 @@ import com.aelitis.azureus.plugins.dht.DHTPluginOperationListener;
 import com.aelitis.azureus.plugins.dht.DHTPluginProgressListener;
 import com.aelitis.azureus.plugins.dht.DHTPluginTransferHandler;
 import com.aelitis.azureus.plugins.dht.DHTPluginValue;
+import com.aelitis.azureus.plugins.dht.impl.DHTPluginStorageManager;
 
 
 public class 
@@ -275,9 +282,50 @@ I2PHelperDHTPluginInterface
 	decodeStats(
 		DHTPluginValue		value )
 	{
-		Debug.out( "not imp" );
+		if (( value.getFlags() & DHTPlugin.FLAG_STATS) == 0 ){
+			
+			return( null );
+		}
 		
-		return( null );
+		try{
+			DataInputStream	dis = new DataInputStream( new ByteArrayInputStream( value.getValue()));
+			
+			final DHTStorageKeyStats stats = DHTPluginStorageManager.decodeStats( dis );
+			
+			return( 
+				new DHTPluginKeyStats()
+				{
+					public int
+					getEntryCount()
+					{
+						return( stats.getEntryCount());
+					}
+					
+					public int
+					getSize()
+					{
+						return( stats.getSize());
+					}
+					
+					public int
+					getReadsPerMinute()
+					{
+						return( stats.getReadsPerMinute());
+					}
+					
+					public byte
+					getDiversification()
+					{
+						return( stats.getDiversification());
+					}
+				});
+			
+		}catch( Throwable e ){
+			
+			Debug.printStackTrace(e);
+			
+			return( null );
+		}
 	}
 
 	public void

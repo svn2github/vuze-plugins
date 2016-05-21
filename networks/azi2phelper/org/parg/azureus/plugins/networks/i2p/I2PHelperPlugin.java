@@ -110,6 +110,7 @@ import org.gudy.azureus2.plugins.ipc.IPCInterface;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.logging.LoggerChannelListener;
 import org.gudy.azureus2.plugins.torrent.Torrent;
+import org.gudy.azureus2.plugins.torrent.TorrentAttribute;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManager;
 import org.gudy.azureus2.plugins.ui.UIManagerEvent;
@@ -262,6 +263,7 @@ I2PHelperPlugin
 	private static final String	BOOTSTRAP_SERVER = "http://i2pboot.vuze.com:60000/?getNodes=true";
 	
 	private PluginInterface			plugin_interface;
+	private TorrentAttribute		ta_networks;
 	private PluginConfig			plugin_config;
 	private LoggerChannel 			log;
 	private BasicPluginConfigModel 	config_model;
@@ -423,6 +425,8 @@ I2PHelperPlugin
 		try{
 			plugin_interface	= pi;
 			
+			ta_networks 	= plugin_interface.getTorrentManager().getAttribute( TorrentAttribute.TA_NETWORKS );
+
 			setUnloadable( true );
 			
 			final File plugin_dir = pi.getPluginconfig().getPluginUserFile( "tmp.tmp" ).getParentFile();
@@ -3029,6 +3033,13 @@ I2PHelperPlugin
 		}
 	}
 	
+	public String[]
+	getNetworks(
+		Download	download )
+	{
+		return( download.getListAttribute( ta_networks ));
+	}
+	
 	public int
 	selectDHTIndex()
 	{
@@ -3060,8 +3071,8 @@ I2PHelperPlugin
 			return( selectDHTIndex());
 			
 		}else{
-			
-			return( selectDHTIndex( PluginCoreUtils.unwrap( download ).getDownloadState().getNetworks()));
+						
+			return( selectDHTIndex( getNetworks( download )));
 		}
 	}
 	
@@ -3077,19 +3088,7 @@ I2PHelperPlugin
 	public int
 	selectDHTIndex(
 		String[]		peer_networks )
-	{
-		/*
-		String str = "";
-		
-		if ( peer_networks != null ){
-			
-			for ( String net: peer_networks ){
-			
-				str += (str.length()==0?"":", ") + net;
-			}
-		}
-		*/
-		
+	{		
 		if ( dht_count < 2 ){
 			
 			return( I2PHelperRouter.DHT_MIX );
@@ -3110,7 +3109,7 @@ I2PHelperPlugin
 	
 		return( I2PHelperRouter.DHT_NON_MIX );
 	}
-	
+		
 	public I2PHelperDHT
 	selectDHT(
 		byte[]		torrent_hash )
@@ -4313,7 +4312,7 @@ I2PHelperPlugin
 				
 				if ( networks != null ){
 					
-					dht_index = I2PHelperRouter.selectDHTIndex( networks );				
+					dht_index = selectDHTIndex( networks );				
 				}
 				
 				String server_id = (String)server_options.get( "server_id");
@@ -4446,7 +4445,7 @@ I2PHelperPlugin
 				}
 			}else{
 			
-				dht_index = I2PHelperRouter.selectDHTIndex( download );
+				dht_index = selectDHTIndex( download );
 			}
 			
 			synchronized( dht_pi_map ){
@@ -4686,6 +4685,90 @@ I2PHelperPlugin
 					}
 				}
 			});
+	}
+	
+	private AsyncDispatcher		manual_tracker_dispatcher = new AsyncDispatcher();
+	
+	public Map<String,Object>
+	addDownloadToTracker(
+		final Download				download,
+		final Map<String,Object>	options )
+		
+		throws IPCException
+	{
+		setUnloadable( false );
+		
+		if ( manual_tracker_dispatcher.getQueueSize() > 1024 ){
+			 throw( new IPCException( "Queue to long" ));
+		}
+		
+		manual_tracker_dispatcher.dispatch(
+			new AERunnable() {
+				
+				@Override
+				public void 
+				runSupport() 
+				{
+					handleManualTrackerAction( download, options, true );
+				}
+			});
+		
+		return( null );
+	}
+	
+	public Map<String,Object>
+	removeDownloadFromTracker(
+		final Download				download,
+		final Map<String,Object>	options )
+		
+		throws IPCException
+	{
+		if ( manual_tracker_dispatcher.getQueueSize() > 1024 ){
+			 throw( new IPCException( "Queue to long" ));
+		}
+		
+		manual_tracker_dispatcher.dispatch(
+				new AERunnable() {
+					
+					@Override
+					public void 
+					runSupport() 
+					{
+						handleManualTrackerAction( download, options, false );
+					}
+				});	
+		
+		return( null );
+	}
+	
+	private void
+	handleManualTrackerAction(
+		Download			download,
+		Map<String,Object>	options,
+		boolean				is_add )
+	{
+		I2PDHTTrackerPlugin	tracker_plugin = null;
+	
+		while( true ){
+			
+			I2PHelperTracker t = tracker;
+			
+			if ( t != null ){
+				
+				tracker_plugin = t.getTrackerPlugin();
+				
+				if ( tracker_plugin != null ){
+					
+					break;
+				}
+			}
+		}
+		
+		if ( is_add ){
+			tracker_plugin.downloadAdded(download);
+		}else{
+			tracker_plugin.downloadRemoved(download);
+		}
 	}
 	
 	private void

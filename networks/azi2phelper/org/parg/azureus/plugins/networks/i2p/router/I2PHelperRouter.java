@@ -896,7 +896,7 @@ I2PHelperRouter
 			
 		}else{
 			
-			return( selectDHT( PluginCoreUtils.unwrap( download ).getDownloadState().getNetworks()));
+			return( selectDHT( plugin.getNetworks(download)));
 		}
 	}
 	
@@ -984,50 +984,6 @@ I2PHelperRouter
 		}
 		
 		return( dht );
-	}
-	
-	public static int
-	selectDHTIndex(
-		Download	download )
-			
-	{ 
-		if ( download == null ){
-		
-			return(selectDHTIndex((String[])null));
-			
-		}else{
-			
-			return( selectDHTIndex( PluginCoreUtils.unwrap( download ).getDownloadState().getNetworks()));
-		}
-	}
-	
-	public static int
-	selectDHTIndex(
-		Map<String,Object>		options )
-	{
-		String[] peer_networks = options==null?null:(String[])options.get( "peer_networks" );
-		
-		return( selectDHTIndex( peer_networks ));
-	}
-	
-	public static int
-	selectDHTIndex(
-		String[]		peer_networks )
-	{
-		if ( peer_networks == null || peer_networks.length == 0 ){
-			
-			return( DHT_MIX );
-		}
-		
-		for ( String net: peer_networks ){
-			
-			if ( net == AENetworkClassifier.AT_PUBLIC ){
-				
-				return( DHT_MIX );
-			}
-		}
-	
-		return( DHT_NON_MIX );
 	}
 	
 	public I2PHelperRouterDHT[]

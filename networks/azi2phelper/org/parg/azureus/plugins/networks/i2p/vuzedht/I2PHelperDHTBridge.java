@@ -386,9 +386,13 @@ I2PHelperDHTBridge
 	
 			boolean	done = false;
 			
+			int	bad_version = 0;
+			
 			for ( DistributedDatabaseContact contact: contacts ){
 				
 				if ( contact.getVersion() < DHTUtilsI2P.PROTOCOL_VERSION_BRIDGE ){
+					
+					bad_version++;
 					
 					continue;
 				}
@@ -434,7 +438,7 @@ I2PHelperDHTBridge
 			
 			if ( !done ){
 				
-				log( "Bridge replication failed for '" + desc + "', no relay" );
+				log( "Bridge replication failed for '" + desc + "', no relay: contacts=" + contacts.size() + ", bv=" + bad_version );
 			}
 		}catch( Throwable e ){
 			
