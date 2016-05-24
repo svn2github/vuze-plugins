@@ -1835,7 +1835,7 @@ RelatedContentUISWT
 										return;
 									}
 									
-									RCMView view = new RCMView( SIDEBAR_SECTION_RELATED_CONTENT, name + RCMPlugin.getNetworkString( networks ) );
+									final RCMView view = new RCMView( SIDEBAR_SECTION_RELATED_CONTENT, name + RCMPlugin.getNetworkString( networks ) );
 									
 									new_si.setView( view );
 									
@@ -1868,6 +1868,8 @@ RelatedContentUISWT
 										new_si.setTreeItem( ((SideBarEntrySWT)entry).getTreeItem() );
 									}
 									
+										// search more
+									
 									UIManager			ui_manager = plugin_interface.getUIManager();
 									
 									MenuManager menu_manager = ui_manager.getMenuManager();
@@ -1885,13 +1887,21 @@ RelatedContentUISWT
 												addSearch( expression, networks );
 											}
 										});
+																		
+										// create subscription
 									
+									final String[]	subscription_name = { MessageText.getString( "rcm.search.provider" ) + ": " + name + net_str };
+
 									final SearchProvider sp = plugin.getSearchProvider();
 									
 									if ( sp != null ){
 										
-										menu_item = menu_manager.addMenuItem( "sidebar." + key, "rcm.menu.create.subs" );
+										MenuItem parent = menu_item = menu_manager.addMenuItem( "sidebar." + key, "rcm.menu.create.subs" );
 	
+										parent.setStyle( MenuItem.STYLE_MENU );
+										
+										menu_item = menu_manager.addMenuItem(parent , "subs.prop.is_public" );
+																				
 										menu_item.addListener(
 											new MenuItemListener() 
 											{
@@ -1901,10 +1911,8 @@ RelatedContentUISWT
 													Object 				target )
 												{
 													Map<String,Object>	properties = new HashMap<String, Object>();
-													
-													String search_name = MessageText.getString( "rcm.search.provider" ) + ": " + name + net_str;
-													
-													properties.put( SearchProvider.SP_SEARCH_NAME, search_name );
+																										
+													properties.put( SearchProvider.SP_SEARCH_NAME, subscription_name[0] );
 													properties.put( SearchProvider.SP_SEARCH_TERM, expression );
 													properties.put( SearchProvider.SP_NETWORKS, networks );
 													
@@ -1919,8 +1927,83 @@ RelatedContentUISWT
 													}
 												}
 											});
+										
+										menu_item = menu_manager.addMenuItem(parent , "label.anon" );
+										
+										menu_item.addListener(
+											new MenuItemListener() 
+											{
+												public void
+												selected(
+													MenuItem			menu,
+													Object 				target )
+												{
+													Map<String,Object>	properties = new HashMap<String, Object>();
+																										
+													properties.put( SearchProvider.SP_SEARCH_NAME, subscription_name[0] );
+													properties.put( SearchProvider.SP_SEARCH_TERM, expression );
+													properties.put( SearchProvider.SP_NETWORKS, networks );
+													
+														// hack for the moment
+													
+													properties.put( "_anonymous_", true );
+													
+													try{
+														plugin.getPluginInterface().getUtilities().getSubscriptionManager().requestSubscription(
+															sp,
+															properties );
+														
+													}catch( Throwable e ){
+														
+														Debug.out( e );
+													}
+												}
+											});
 									}
 									
+										// rename
+									
+									menu_item = menu_manager.addMenuItem( "sidebar." + key, "rcm.menu.rename" );
+
+									menu_item.addListener(
+										new MenuItemListener() 
+										{
+											public void
+											selected(
+												MenuItem			menu,
+												Object 				target )
+											{
+												SimpleTextEntryWindow entryWindow = 
+													new SimpleTextEntryWindow(
+														"rcm.menu.rename.title", 
+														"rcm.menu.rename.msg" );
+																	
+												entryWindow.setPreenteredText( subscription_name[0], false );
+													
+												entryWindow.selectPreenteredText(true);
+												
+												entryWindow.prompt(new UIInputReceiverListener() {
+													public void UIInputReceiverClosed(UIInputReceiver entryWindow) {
+														if (!entryWindow.hasSubmittedInput()) {
+															return;
+														}
+														
+														String value = entryWindow.getSubmittedInput();
+																												
+														if ( value != null && value.length() > 0 ){
+															
+															subscription_name[0] = value;
+															
+															view.setTitle( value );
+														}
+													}
+												});
+
+											}
+										});
+									
+										
+
 									new_si.activate();
 								}
 							}
@@ -2038,6 +2121,15 @@ RelatedContentUISWT
 		getTitle()
 		{
 			return( name );
+		}
+		
+		public void
+		setTitle(
+			String		_name )
+		{
+			name	= _name;
+			
+			ViewTitleInfoManager.refreshTitleInfo( this );
 		}
 		
 		protected void
