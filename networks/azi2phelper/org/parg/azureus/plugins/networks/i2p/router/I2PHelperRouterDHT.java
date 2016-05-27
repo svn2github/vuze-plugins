@@ -100,6 +100,22 @@ I2PHelperRouterDHT
 		enabled	= true;
 	}
 	
+	public String
+	getName()
+	{
+		String name;
+		
+		if ( dht_index == I2PHelperRouter.DHT_MIX ){
+			name = "Mix";
+		}else if ( dht_index == I2PHelperRouter.DHT_NON_MIX ){
+			name = "Pure";
+		}else{
+			name = String.valueOf( dht_index );
+		}
+		
+		return( "[" + name + "/" + (is_vuze_dht?"AZ":"I2P") + "]" );
+	}
+	
 	public void
 	setEnabled(
 		boolean		b )

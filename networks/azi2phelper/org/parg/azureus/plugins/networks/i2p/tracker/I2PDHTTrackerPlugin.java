@@ -73,6 +73,7 @@ import org.parg.azureus.plugins.networks.i2p.I2PHelperDHT;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperDHTAdapter;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperDHTListener;
 import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouter;
+import org.parg.azureus.plugins.networks.i2p.router.I2PHelperRouterDHT;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTI2P;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.DHTTransportContactI2P;
 import org.parg.azureus.plugins.networks.i2p.vuzedht.I2PHelperAZDHT;
@@ -1195,7 +1196,9 @@ I2PDHTTrackerPlugin
 			}else{
 				
 				try{
-					I2PHelperDHT dht = router.selectDHT( download ).getDHT(true);
+					final I2PHelperRouterDHT rdht = router.selectDHT( download );
+					
+					I2PHelperDHT dht = rdht.getDHT(true);
 				
 					if ( listener != null && !listener_informed ){
 						
@@ -1225,7 +1228,7 @@ I2PDHTTrackerPlugin
 								if ( target.getType() == REG_TYPE_FULL ){
 									
 									log( 	download,
-											"Registration of '" + target.getDesc() + "' completed (elapsed="	+ TimeFormatter.formatColonMillis((SystemTime.getCurrentTime() - start)) + ")");
+											"Registration of '" + target.getDesc(rdht) + "' completed (elapsed="	+ TimeFormatter.formatColonMillis((SystemTime.getCurrentTime() - start)) + ")");
 								}
 								
 									// decreaseActive( dl );
@@ -1272,7 +1275,9 @@ I2PDHTTrackerPlugin
 			num_done++;
 			
 			try{
-				router.selectDHT( download ).getDHT(true).get(target.getHash(), 
+				final I2PHelperRouterDHT rdht = router.selectDHT( download );
+
+				rdht.getDHT(true).get(target.getHash(), 
 						"Tracker announce for '" + download.getName() + "'" + target.getDesc(),
 						(byte)( isComplete( download )?DHT.FLAG_SEEDING:DHT.FLAG_DOWNLOADING),
 						NUM_WANT, 
@@ -1348,7 +1353,7 @@ I2PDHTTrackerPlugin
 											seed_count + leecher_count > 1 )){
 									
 									log( 	download,
-											"Get of '" + target.getDesc() + "' completed (elapsed=" + TimeFormatter.formatColonMillis(SystemTime.getCurrentTime() - start)
+											"Get of '" + target.getDesc(rdht) + "' completed (elapsed=" + TimeFormatter.formatColonMillis(SystemTime.getCurrentTime() - start)
 													+ "), addresses=" + addresses.size() + ", seeds="
 													+ seed_count + ", leechers=" + leecher_count);
 								}
@@ -1778,7 +1783,10 @@ I2PDHTTrackerPlugin
 		I2PHelperDHTAdapter		listener )
 	{
 		try{
-			router.selectDHT( options ).getDHT(true).get(torrent_hash, 
+			I2PHelperRouterDHT rdht = router.selectDHT( options );
+			
+			rdht.getDHT(true).get(
+					torrent_hash, 
 					reason,
 					(byte)DHT.FLAG_DOWNLOADING,
 					NUM_WANT, 
@@ -2045,7 +2053,9 @@ I2PDHTTrackerPlugin
 		trackerTarget[] targets = details.getTargets( true );
 		
 		try{
-			I2PHelperDHT dht = router.selectDHT( download ).getDHT(true);
+			final I2PHelperRouterDHT rdht = router.selectDHT( download );
+			
+			I2PHelperDHT dht = rdht.getDHT(true);
 			
 			if ( listener != null ){
 				
@@ -2078,7 +2088,7 @@ I2PDHTTrackerPlugin
 									if ( target.getType() == REG_TYPE_FULL ){
 		
 										log( 	download,
-												"Unregistration of '" + target.getDesc() + "' completed (elapsed="
+												"Unregistration of '" + target.getDesc(rdht) + "' completed (elapsed="
 													+ TimeFormatter.formatColonMillis(SystemTime.getCurrentTime() - start) + ")");
 									}
 									
@@ -2105,7 +2115,9 @@ I2PDHTTrackerPlugin
 		try{
 			final 	long	start = SystemTime.getCurrentTime();
 			
-			I2PHelperDHT dht = router.selectDHT( download ).getDHT(true);
+			final I2PHelperRouterDHT rdht = router.selectDHT( download );
+
+			I2PHelperDHT dht = rdht.getDHT(true);
 	
 			if ( dht.hasLocalKey( target.getHash())){
 				
@@ -2124,7 +2136,7 @@ I2PDHTTrackerPlugin
 								if ( target.getType() == REG_TYPE_FULL ){
 	
 									log( 	download,
-											"Unregistration of '" + target.getDesc() + "' completed (elapsed="
+											"Unregistration of '" + target.getDesc(rdht) + "' completed (elapsed="
 											+ TimeFormatter.formatColonMillis(SystemTime.getCurrentTime() - start) + ")");
 								}
 								
@@ -2293,7 +2305,9 @@ I2PDHTTrackerPlugin
 				final long f_next_check = ready_download_next_check;
 				
 				try{
-					final I2PHelperDHT dht = router.selectDHT( ready_download ).getDHT(true);
+					final I2PHelperRouterDHT rdht = router.selectDHT( ready_download );
+					
+					final I2PHelperDHT dht = rdht.getDHT(true);
 	
 					dht.get(	torrent.getHash(), 
 								"Presence query for '" + ready_download.getName() + "'",
@@ -2336,7 +2350,7 @@ I2PDHTTrackerPlugin
 										log( torrent,
 												"Presence query: availability="+
 												(total==INTERESTING_AVAIL_MAX?(INTERESTING_AVAIL_MAX+"+"):(total+"")) + ",div=" + diversified +
-												" (elapsed=" + TimeFormatter.formatColonMillis(SystemTime.getCurrentTime() - start) + ")");
+												" (elapsed=" + TimeFormatter.formatColonMillis(SystemTime.getCurrentTime() - start) + ")" + rdht.getName());
 												
 										if ( diversified ){
 											
@@ -2892,6 +2906,13 @@ I2PDHTTrackerPlugin
 		getHash()
 		{
 			return( hash );
+		}
+		
+		public String
+		getDesc(
+			I2PHelperRouterDHT	rdht )
+		{
+			return( getDesc() + rdht.getName());
 		}
 		
 		public String

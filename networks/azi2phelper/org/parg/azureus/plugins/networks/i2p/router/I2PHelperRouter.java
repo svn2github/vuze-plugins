@@ -55,7 +55,6 @@ import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.core3.util.DisplayFormatters;
 import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.plugins.download.Download;
-import org.gudy.azureus2.pluginsimpl.local.PluginCoreUtils;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperAdapter;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperDHT;
 import org.parg.azureus.plugins.networks.i2p.I2PHelperPlugin;

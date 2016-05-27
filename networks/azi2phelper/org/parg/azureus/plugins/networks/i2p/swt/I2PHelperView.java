@@ -335,18 +335,10 @@ I2PHelperView
 		ops_views	= new DHTOpsView[ total_views ];
 
 			// views are basic1 basic2 (proxy1,proxy2...) az1 az2 (proxyaz1, proxyaz2...)
+			// actually the proxy1/2/... views are dead as there is no non-AZ traffic
 		
 		for ( int i=0;i<total_views;i++){
-				
-				// DHT stats view
-			
-			CTabItem stats_item = new CTabItem(tab_folder, SWT.NULL);
-	
-			if ( i == 0 ){
-				
-				first_stats_item = stats_item;
-			}
-			
+							
 			int	dht_index;
 			
 			if ( i < total_dhts ){
@@ -362,6 +354,9 @@ I2PHelperView
 				stats_text = plugin.getMessageText("azi2phelper.ui.dht_stats" + dht_index);
 				graph_text = plugin.getMessageText("azi2phelper.ui.dht_graph" + dht_index);
 			}else{
+				if ( i < total_dhts ){
+					continue;	// skip this view as dead
+				}
 				String name = proxy_dhts.get(dht_index - normal_dht_count).getName();
 				stats_text = name + " " + plugin.getMessageText("azi2phelper.ui.dht_stats3");
 				graph_text = name + " " + plugin.getMessageText("azi2phelper.ui.dht_graph3");
@@ -372,6 +367,15 @@ I2PHelperView
 				graph_text = graph_text + " (AZ)";
 			}
 			
+				// DHT stats view
+				
+			CTabItem stats_item = new CTabItem(tab_folder, SWT.NULL);
+	
+			if ( i == 0 ){
+				
+				first_stats_item = stats_item;
+			}
+
 			stats_item.setText( stats_text );
 			
 			DHTView dht_view = dht_views[i] = new DHTView( false );
@@ -466,6 +470,11 @@ I2PHelperView
 										run()
 										{
 											for ( DHTView dht_view: dht_views ){
+												
+												if ( dht_view == null ){
+													
+													continue;
+												}
 												
 												dht_view.eventOccurred(
 													new UISWTViewEvent() {										
