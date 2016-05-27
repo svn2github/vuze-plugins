@@ -183,7 +183,8 @@ UPnPMediaServer
 
 	private UPnPMediaServerContentServer	content_server;
 		
-	private Set<UPnPMediaRenderer>		renderers = new HashSet<UPnPMediaRenderer>();
+	private Set<UPnPMediaRenderer>							renderers 			= new HashSet<UPnPMediaRenderer>();
+	private Map<UPnPMediaRenderer,DeviceManagerListener>	renderer_listeners 	= new HashMap<UPnPMediaRenderer, DeviceManagerListener>();
 	
 	private CopyOnWriteList<IPCInterface>	browse_listeners = new CopyOnWriteList<IPCInterface>();
 	
@@ -1675,6 +1676,15 @@ UPnPMediaServer
 		synchronized( renderers ){
 			
 			renderers.remove( renderer );
+			
+			DeviceManagerListener l = renderer_listeners.remove( renderer );
+			
+			if ( l != null ){
+				
+				DeviceManager deviceManager = DeviceManagerFactory.getSingleton();
+
+				deviceManager.removeListener( l );
+			}
 		}
 		
 		if ( uiInstance != null ){
@@ -1690,7 +1700,7 @@ UPnPMediaServer
 
 	protected void 
 	addRenderer(
-			final UPnPMediaRenderer new_renderer)
+		final UPnPMediaRenderer new_renderer)
 	{
 		synchronized (renderers) {
 
@@ -1788,8 +1798,9 @@ UPnPMediaServer
 						toolBarItem.setImageID(imageID);
 					}
 				} else {
-					deviceManager.addListener(new DeviceManagerListener() {
-	
+					
+					DeviceManagerListener l = new DeviceManagerListener() {
+						
 						public void deviceRemoved(Device device) {
 						}
 	
@@ -1820,7 +1831,20 @@ UPnPMediaServer
 								}
 							}
 						}
-					});
+					};
+					DeviceManagerListener old;
+					
+					synchronized( renderers ){
+						
+						 old = renderer_listeners.put( new_renderer, l );
+					}
+					
+					if ( old != null ){
+						
+						deviceManager.removeListener( old );
+					}
+					
+					deviceManager.addListener( l );
 				}
 			}
 	    }
