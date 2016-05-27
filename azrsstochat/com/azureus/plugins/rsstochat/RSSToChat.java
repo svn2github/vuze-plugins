@@ -330,6 +330,8 @@ RSSToChat
 				Pattern	desc_link_pattern 	= null;
 				String	link_type			= "magnet";
 				boolean	ignore_dates		= false;
+				int		min_seeds			= 0;
+				int		min_leechers		= 0;
 				
 				String	presentation 			= "link";
 				String	website_name			= null;
@@ -402,6 +404,24 @@ RSSToChat
 						String id_value = ignore_dates_node.getValue().trim();
 
 						ignore_dates = id_value.equalsIgnoreCase( "true" );
+					}
+					
+					SimpleXMLParserDocumentNode min_seeds_node = subs_node.getChild( "minimum_seeds" );
+
+					if ( min_seeds_node != null ){
+						
+						String value = min_seeds_node.getValue().trim();
+
+						min_seeds = Integer.parseInt( value );
+					}
+					
+					SimpleXMLParserDocumentNode min_leechers_node = subs_node.getChild( "minimum_leechers" );
+
+					if ( min_leechers_node != null ){
+						
+						String value = min_leechers_node.getValue().trim();
+
+						min_leechers = Integer.parseInt( value );
 					}
 					
 					source 	= name;
@@ -561,7 +581,7 @@ RSSToChat
 				
 				for ( String network: networks ){
 					
-					Mapping mapping = new Mapping( source, is_rss, desc_link_pattern, link_type, ignore_dates, network, key, type, presentation, website_name, website_retain_sites, website_retain_items, refresh_mins );
+					Mapping mapping = new Mapping( source, is_rss, desc_link_pattern, link_type, ignore_dates, min_seeds, min_leechers, network, key, type, presentation, website_name, website_retain_sites, website_retain_items, refresh_mins );
 					
 					log( "    Mapping: " + mapping.getOverallName());
 					
@@ -917,6 +937,21 @@ RSSToChat
 					continue;
 				}
 					
+				int min_seeds = mapping.getMinSeeds();
+				
+				if ( min_seeds > 0 && seeds < min_seeds ){
+					
+					continue;
+				}
+
+				int min_leechers = mapping.getMinLeechers();
+				
+				if ( min_leechers > 0 && leechers < min_leechers ){
+					
+					continue;
+				}
+				
+				
 				String magnet = buildMagnetHead( dl_link, hash, title_short );
 				
 				String history_key = magnet;
@@ -1096,6 +1131,24 @@ RSSToChat
 					String history_key = result.getID();
 					
 					Map<Integer,Object>	props = entry.getValue();
+									
+					long	seeds		= (Long)props.get( SearchResult.PR_SEED_COUNT );
+
+					int min_seeds = mapping.getMinSeeds();
+					
+					if ( min_seeds > 0 && seeds < min_seeds ){
+						
+						continue;
+					}
+
+					long	leechers	= (Long)props.get( SearchResult.PR_LEECHER_COUNT );
+
+					int min_leechers = mapping.getMinLeechers();
+					
+					if ( min_leechers > 0 && leechers < min_leechers ){
+						
+						continue;
+					}
 					
 					//System.out.println( history_key + " -> " + result.toPropertyMap());
 					
@@ -1110,7 +1163,7 @@ RSSToChat
 
 					long	result_time = pub_date==null?0:pub_date.getTime();
 					
-					if ( !mapping.ignore_dates ){
+					if ( !mapping.getIgnoreDates()){
 						
 						if ( result_time > 0 && result_time < history.getLatestPublish()){
 							
@@ -1126,8 +1179,6 @@ RSSToChat
 					String	cdp_link 	= (String)props.get( SearchResult.PR_DETAILS_LINK );
 					
 					long	size 		= (Long)props.get( SearchResult.PR_SIZE );
-					long	seeds		= (Long)props.get( SearchResult.PR_SEED_COUNT );
-					long	leechers	= (Long)props.get( SearchResult.PR_LEECHER_COUNT );
 						
 					if ( mapping.link_type.equals( "details_url" ) || mapping.link_type.equals( "download_url" )){
 						
@@ -2065,6 +2116,8 @@ RSSToChat
 		private final Pattern		desc_link_pattern;
 		private final String		link_type;
 		private final boolean		ignore_dates;
+		private final int			min_seeds;
+		private final int			min_leechers;
 		private final int			type;
 		private final String		network;
 		private final String		key;
@@ -2089,6 +2142,8 @@ RSSToChat
 			Pattern			_desc_link_pattern,
 			String			_link_type,
 			boolean			_ignore_dates,
+			int				_min_seeds,
+			int				_min_leechers,
 			String			_network,
 			String			_key,
 			int				_type,
@@ -2103,6 +2158,8 @@ RSSToChat
 			desc_link_pattern	= _desc_link_pattern;
 			link_type			= _link_type;
 			ignore_dates		= _ignore_dates;
+			min_seeds			= _min_seeds;
+			min_leechers		= _min_leechers;
 			network				= _network;
 			key					= _key;
 			type				= _type;
@@ -2300,6 +2357,24 @@ RSSToChat
 		getItemsToRetain()
 		{
 			return( retain_items );
+		}
+		
+		private boolean
+		getIgnoreDates()
+		{
+			return( ignore_dates );
+		}
+		
+		private int
+		getMinSeeds()
+		{
+			return( min_seeds );
+		}
+		
+		private int
+		getMinLeechers()
+		{
+			return( min_leechers );
 		}
 		
 		private String
