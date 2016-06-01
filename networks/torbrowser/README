@@ -1,7 +1,16 @@
 The 'Tor Browser' components included in this plugin are derived directly from the release version of the product with the following removed:
 
--- versions 4.0 and higher
+-- versions 6.0 and higher
 
+Mac: Fairly major change to the browser (linux/windows is the same)
+   	.\Contents\Resources\TorBrowser\Docs
+	.\Contents\Resources\TorBrowser\Tor
+	.\Contents\MacOS\Tor
+	.\Contents\MacOS\updater.app
+	.\Contents\Resources\distribution\extensions\tor-launcher@torproject.org.xpi
+	
+-- versions 4.0 and higher
+	
 Windows:
     .\Start Tor Browser.exe
     .\Browser\TorBrowser\Docs
