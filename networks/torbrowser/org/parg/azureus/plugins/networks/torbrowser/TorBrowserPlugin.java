@@ -516,7 +516,7 @@ TorBrowserPlugin
 				
 				if ( !to_file.exists()){
 					
-					if ( !to_file.mkdir()){
+					if ( !to_file.mkdirs()){
 						
 						throw( new Exception( "Failed to create dir: " + to_file ));
 					}
