@@ -32,6 +32,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -226,18 +227,31 @@ I2PHelperPlugin
 				mod_pow_limiter = l;
 			}
 			
+			// since 0.9.26 there are 2 methods that we rate-limit (not modInverse as cost is low and relatively infrequently us0ed)
+			
 		    @Override
 		    public BigInteger modPow(BigInteger exponent, BigInteger m) {
-		        // jbigi.c convert_j2mp() and convert_mp2j() do NOT currently support negative numbers
 		        // Where negative or zero values aren't legal in modPow() anyway, avoid native,
-		        // as the Java code will throw an exception rather than silently fail
+		        // as the Java code will throw an exception rather than silently fail or crash the JVM
+		        // Negative values supported as of version 3
 		    	BigInteger result;
 		    	long start = System.nanoTime();
-		        if (_nativeOk && signum() >= 0 && exponent.signum() >= 0 && m.signum() > 0)
-		        	result = new NativeBigInteger(nativeModPow(toByteArray(), exponent.toByteArray(), m.toByteArray()));
+		        if (_nativeOk3 || (_nativeOk && signum() >= 0 && exponent.signum() >= 0 && m.signum() > 0))
+		            result = new NativeBigInteger(nativeModPow(toByteArray(), exponent.toByteArray(), m.toByteArray()));
 		        else
 		            result = super.modPow(exponent, m);
 		        
+		        mod_pow_limiter.handleCall( start, System.nanoTime());
+		        return( result );
+		    }
+		  
+		    public BigInteger modPowCT(BigInteger exponent, BigInteger m) {
+		    	BigInteger result;
+		    	long start = System.nanoTime();
+		        if (_nativeCTOk)
+		            result = new NativeBigInteger(nativeModPowCT(toByteArray(), exponent.toByteArray(), m.toByteArray()));
+		        else
+		            result = modPow(exponent, m);
 		        mod_pow_limiter.handleCall( start, System.nanoTime());
 		        return( result );
 		    }
@@ -498,7 +512,7 @@ I2PHelperPlugin
 								}
 								
 								call_time	+= end - start;
-								
+																
 								long	sleep;
 								
 								if ( current_sleep == -1 || call_count == 1000 ){
