@@ -337,7 +337,41 @@ SBC_RCMView
 				}
 			});
 			
-
+			final Button searchMore = new Button(cRow, SWT.PUSH);
+			searchMore.setText( MessageText.getString( "rcm.menu.searchmore" ));
+			searchMore.addListener(SWT.Selection, new Listener() {
+				public void handleEvent(Event event) {
+					searchMore.setEnabled( false );
+					
+					SimpleTimer.addEvent(
+						"enabler",
+						SystemTime.getOffsetTime( 5*1000 ),
+						new TimerEventPerformer() {
+							
+							public void perform(TimerEvent event){
+								Utils.execSWTThread(
+									new Runnable()
+									{
+										public void run()
+										{
+									
+											if ( !searchMore.isDisposed()){
+								
+												searchMore.setEnabled( true );
+											}
+										}
+									});
+							}
+						});
+					
+					if ( ds instanceof RCMItemContent ){
+						
+						((RCMItemContent)ds).search();
+					}
+				}});
+			
+			searchMore.setVisible( ds instanceof RCMItemContent );
+			
 			parent.layout(true);
 		}
 

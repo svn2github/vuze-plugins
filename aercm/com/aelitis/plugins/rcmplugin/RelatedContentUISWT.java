@@ -1405,7 +1405,7 @@ RelatedContentUISWT
 										
 										String[] networks = new String[]{ AENetworkClassifier.AT_PUBLIC };
 										
-										String[] bits = value.split( ":" );
+										String[] bits = value.split( ":", 2 );
 										
 										if ( bits.length == 2 ){
 											
