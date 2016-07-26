@@ -160,6 +160,8 @@ XMWebUIPlugin
 
     private static final String	SEARCH_PREFIX 	= "/psearch";
     private static final int	SEARCH_TIMEOUT	= 60*1000;
+
+		protected static final long SEARCH_AUTOREMOVE_TIMEOUT = 60 * 1000 * 60l;
     
     private boolean	view_mode;
     
@@ -392,11 +394,15 @@ XMWebUIPlugin
 							
 							SearchInstance search = it2.next();
 							
-							if ( search.getAge() > SEARCH_TIMEOUT ){
+							if (search.isComplete() && search.getLastResultsAgo() > SEARCH_AUTOREMOVE_TIMEOUT) {
+								it2.remove();
+							}
+							
+							if ( !search.isComplete() && search.getAge() > SEARCH_TIMEOUT ){
 								
 								log( "Timeout: " + search.getString());
-							
-								it2.remove();
+								
+								search.failWithTimeout();
 							}	
 						}
 					}
@@ -676,6 +682,7 @@ XMWebUIPlugin
 	{
 	}
 	
+	// @see org.gudy.azureus2.plugins.download.DownloadManagerListener#downloadRemoved(org.gudy.azureus2.plugins.download.Download)
 	public void
 	downloadRemoved(
 		Download	download )
@@ -5474,6 +5481,9 @@ XMWebUIPlugin
 				obj.put(FIELD_FILES_NAME, file.getFile().getName());
 			} else {
 				if (absolutePath.startsWith(savePath)) {
+					// TODO: .dnd_az parent..
+		    	//String dnd_sf = dm.getDownloadState().getAttribute( DownloadManagerState.AT_DND_SUBFOLDER );
+
 					// + 1 to remove the dir separator
 					obj.put(FIELD_FILES_NAME, absolutePath.substring(savePath.length() + 1));
 				} else {

@@ -21,6 +21,8 @@ SearchInstance
 	private final XMWebUIPlugin xmWebUIPlugin;
 	private String	sid;
 	private long	start_time = SystemTime.getMonotonousTime();
+	private long	last_got_results_on = -1;
+	private boolean	all_searches_complete = false;
 	
 	private Map<String,List>	engine_results = new HashMap<String, List>();
 	
@@ -73,10 +75,21 @@ SearchInstance
 		}
 	}
 	
+	long
+	getLastResultsAgo() {
+		return last_got_results_on > 0 ? SystemTime.getMonotonousTime() - last_got_results_on : -1;
+	}
+	
+	boolean isComplete() {
+		return all_searches_complete;
+	}
+	
 	boolean
 	getResults(
 		Map	result )
 	{
+		last_got_results_on = SystemTime.getMonotonousTime();
+		
 		result.put( "sid", sid );
 		
 		List<Map>	engines = new ArrayList<Map>();
@@ -136,8 +149,15 @@ SearchInstance
 						}
 					}
 				}
-			
-				m.put( "complete", engine_complete );
+				
+				if (!engine_complete && all_searches_complete) {
+					engine_complete = true;
+					if (!m.containsKey("error")) {
+						m.put("error", "Timeout");
+					}
+				}
+  			
+ 				m.put( "complete", engine_complete );
 				
 				if ( !engine_complete ){
 					
@@ -145,6 +165,8 @@ SearchInstance
 				}
 			}
 			
+			all_searches_complete = all_complete;
+
 			result.put( "complete", all_complete );
 			
 			return( all_complete );
@@ -258,5 +280,9 @@ SearchInstance
 	getString()
 	{
 		return( sid );
+	}
+
+	public void failWithTimeout() {
+		all_searches_complete = true;
 	}
 }
