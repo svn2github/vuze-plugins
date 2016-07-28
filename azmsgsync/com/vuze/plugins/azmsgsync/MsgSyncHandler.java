@@ -60,6 +60,7 @@ import org.gudy.azureus2.core3.util.SHA1Simple;
 import org.gudy.azureus2.core3.util.SimpleTimer;
 import org.gudy.azureus2.core3.util.SystemTime;
 import org.gudy.azureus2.core3.util.ThreadPool;
+import org.gudy.azureus2.core3.util.TimeFormatter;
 import org.gudy.azureus2.core3.util.TimerEvent;
 import org.gudy.azureus2.core3.util.TimerEventPerformer;
 import org.gudy.azureus2.core3.util.TimerEventPeriodic;
@@ -2396,6 +2397,55 @@ MsgSyncHandler
 				
 			}else if ( cmd.equals( "dump" )){
 				
+				System.out.println( "Nodes" );
+				
+				long now = SystemTime.getMonotonousTime();
+				
+				synchronized( node_uid_map ){
+					
+					int	total_alive = 0;
+					
+					for ( List<MsgSyncNode> nodes: node_uid_map.values()){
+						
+						for ( MsgSyncNode node: nodes ){
+							
+							int	fails = node.getFailCount();
+							
+							long last_alive = node.getLastAlive();
+							
+							String prefix;
+							
+							if ( fails == 0 && last_alive > 0 ){
+								
+								prefix = "   *";
+								
+								total_alive++;
+								
+							}else{
+								
+								prefix = "    ";
+							}
+							
+							String	last_alive_str;
+							
+							if ( last_alive > 0 ){
+								
+								last_alive_str = ", alive ago=" + TimeFormatter.format(( now - last_alive )/1000 );
+								
+							}else{
+								
+								last_alive_str = "";
+							}
+							
+							System.out.println( prefix + node.getContactAddress() + ", fails=" + fails + last_alive_str);
+						}
+					}
+					
+					System.out.println( "Total alive: " + total_alive );
+				}
+				
+				System.out.println( "Messages" );
+				
 				synchronized( message_lock ){
 
 					for ( int i=0;i<messages.size(); i++ ){
@@ -2406,7 +2456,7 @@ MsgSyncHandler
 												
 						String msg_id = ByteFormatter.encodeString( sig, 8, 3 );
 						
-						System.out.println(msg_id + ", age=" +  message.getAgeSecs() + " (" + message.getAgeSecsWhenReceived() + ")" );
+						System.out.println( "    " + msg_id + ", age=" +  message.getAgeSecs() + " (" + message.getAgeSecsWhenReceived() + ")" );
 					}
 				}
 				
