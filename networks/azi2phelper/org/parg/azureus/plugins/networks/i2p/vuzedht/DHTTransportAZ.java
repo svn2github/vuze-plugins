@@ -316,11 +316,12 @@ DHTTransportAZ
 					public void
 					reply(
 						DHTTransportContactI2P 		basis,
-						Map							map )
+						Map							map,
+						int							elapsed )
 					{
 						stats.pingOK();
 						
-						handler.pingReply( contact, -1 );
+						handler.pingReply( contact, elapsed );
 					}
 					
 					@Override
@@ -389,7 +390,8 @@ DHTTransportAZ
 				public void
 				reply(
 					DHTTransportContactI2P 		basis,
-					Map							map )
+					Map							map,
+					int							elapsed )
 				{
 					if ( TRACE ) trace( "AZ: sendFindNode to " + contact.getString() + " OK" );
 
@@ -478,7 +480,8 @@ DHTTransportAZ
 				public void
 				reply(
 					DHTTransportContactI2P 		basis,
-					Map							map )
+					Map							map,
+					int							elapsed )
 				{
 					stats.findValueOK();
 					
@@ -634,7 +637,8 @@ DHTTransportAZ
 				public void
 				reply(
 					DHTTransportContactI2P 		basis,
-					Map							map )
+					Map							map,
+					int							elapsed )
 				{
 					if ( TRACE ) trace( "AZ: sendStore to " + contact.getString() + " OK" );
 
@@ -776,7 +780,8 @@ DHTTransportAZ
 				public void
 				reply(
 					DHTTransportContactI2P 		basis,
-					Map							map )
+					Map							map,
+					int							elapsed )
 				{
 					// see above
 				}
@@ -1109,7 +1114,8 @@ DHTTransportAZ
 				public void
 				reply(
 					DHTTransportContactI2P		contact,
-					Map							payload )
+					Map							payload,
+					int							elapsed )
 				{
 					if ( TRACE ) System.out.println( "AZReply from " + contact.getString() + ": " + payload );
 					
@@ -1118,7 +1124,7 @@ DHTTransportAZ
 					
 					contact.setDetails( instance_id, (byte)flags);
 					
-					reply_handler.reply( contact, payload );
+					reply_handler.reply( contact, payload, elapsed );
 					
 					contactAlive( contact );
 				}

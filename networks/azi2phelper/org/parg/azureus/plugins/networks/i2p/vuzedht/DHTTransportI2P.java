@@ -660,7 +660,8 @@ DHTTransportI2P
 	        		public void 
 	        		handleReply(
 	        			int		originator_version,
-	        			Map 	reply ) 
+	        			Map 	reply,
+	        			int		elapsed ) 
 	        		{	        			
 	        			stats.pingOK();
 	        			
@@ -717,13 +718,14 @@ DHTTransportI2P
 	        		public void 
 	        		handleReply(
 	        			int		originator_version,
-	        			Map 	reply ) 
+	        			Map 	reply,
+	        			int		elapsed ) 
 	        		{
 	        			if ( TRACE ) trace( "good pingReply" );
 	        			
 	        			contact.setProtocolVersion((byte)originator_version );
 	        			
-	        			handler.pingReply( contact, -1 );
+	        			handler.pingReply( contact, elapsed );
 	        			
 	        			stats.pingOK();
 	        		}
@@ -809,7 +811,8 @@ DHTTransportI2P
 	        		public void 
 	        		handleReply(
 	        			int		originator_version,
-	        			Map 	reply )
+	        			Map 	reply,
+	        			int		elapsed )
 	        		{
 	        			byte[]	nodes = (byte[])reply.get( "nodes" );
 	        				        				        			
@@ -927,7 +930,8 @@ DHTTransportI2P
 		        		public void 
 		        		handleReply(
 		        			int		originator_version,
-		        			Map 	reply ) 
+		        			Map 	reply,
+		        			int		elapsed )
 		        		{
 		        			contact.setProtocolVersion((byte)originator_version );
 		        			
@@ -1063,7 +1067,8 @@ DHTTransportI2P
 	        		public void 
 	        		handleReply(
 	        			int		originator_version,
-	        			Map 	reply ) 
+	        			Map 	reply,
+	        			int		elapsed )
 	        		{
 	        			if ( TRACE ) trace( "good sendFindValue: " + reply );
 	        			
@@ -1458,7 +1463,8 @@ DHTTransportI2P
 									public void 
 									handleReply(
 										int		originator_version,
-										Map 	reply ) 
+										Map 	reply,
+										int		elapsed )
 									{
 										if ( TRACE ) trace( "good sendStoreReply" );
 	
@@ -1602,7 +1608,8 @@ DHTTransportI2P
 	        		public void 
 	        		handleReply(
 	        			int					originator_version,
-	        			Map<String,Object> 	reply ) 
+	        			Map<String,Object> 	reply,
+	        			int					elapsed )
 	        		{
 	        			if ( TRACE ) trace( "good AZReply" );
 	        			
@@ -1615,7 +1622,7 @@ DHTTransportI2P
 	        				contact.setRandomID2( token );
 	        			}
 	        			
-	        			handler.reply( contact, (Map<String,Object>)reply.get( "p" ));
+	        			handler.reply( contact, (Map<String,Object>)reply.get( "p" ), elapsed );
 	        		}
 	        		
 	        		@Override
@@ -2325,7 +2332,7 @@ DHTTransportI2P
 	        		
 	        		trace( request.getDestination(), "received (2)" );
 	        		
-	        		long elapsed = SystemTime.getMonotonousTime() - request.getStartTime();
+	        		int elapsed = (int)( SystemTime.getMonotonousTime() - request.getStartTime());
 	        		
 	        		if ( TRACE ) trace( "Request took " + elapsed );
 	        		
@@ -2342,7 +2349,7 @@ DHTTransportI2P
 		                    		                    
 		                    reply_handler.packetReceived( raw_payload_length );
 		                    
-		                    reply_handler.handleReply( contact_version, reply );
+		                    reply_handler.handleReply( contact_version, reply, elapsed );
 		                    
 		                }else{
 		                	
@@ -2704,7 +2711,8 @@ DHTTransportI2P
 		public void
 		handleReply(
 			int						originator_version,
-			Map<String,Object>		reply );
+			Map<String,Object>		reply,
+			int						elapsed );
 		
 		public void
 		handleError(
@@ -2940,7 +2948,8 @@ DHTTransportI2P
 		public void
 		reply(
 			DHTTransportContactI2P		contact,
-			Map							map );
+			Map							map,
+			int							elapsed );
 		
 		public void
 		failed(
