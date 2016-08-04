@@ -25,6 +25,7 @@ import static com.aelitis.azureus.plugins.xmwebui.TransmissionVars.*;
 
 import java.io.*;
 import java.net.*;
+import java.text.DateFormat;
 import java.text.NumberFormat;
 import java.text.ParseException;
 import java.util.*;
@@ -82,6 +83,7 @@ import com.aelitis.azureus.core.AzureusCoreFactory;
 import com.aelitis.azureus.core.metasearch.*;
 import com.aelitis.azureus.core.pairing.PairingManager;
 import com.aelitis.azureus.core.pairing.PairingManagerFactory;
+import com.aelitis.azureus.core.subs.*;
 import com.aelitis.azureus.core.tag.*;
 import com.aelitis.azureus.core.torrent.PlatformTorrentUtils;
 import com.aelitis.azureus.core.tracker.TrackerPeerSource;
@@ -1484,6 +1486,18 @@ XMWebUIPlugin
 
 				method_Tags_Lookup_Get_Results(args, result);
 
+			}else if ( method.equals( "subscription-get" )){
+				
+				method_Subscription_Get(args, result);
+				
+			}else if ( method.equals( "subscription-add" )){
+				
+				method_Subscription_Add(args, result);
+				
+			}else if ( method.equals( "subscription-remove" )){
+				
+				method_Subscription_Remove(args, result);
+				
 			}else if ( method.equals( "vuze-search-start" )){
 				
 				method_Vuze_Search_Start(args, result);
@@ -1544,8 +1558,7 @@ XMWebUIPlugin
 		}
 	}
 
-	
-	private void method_Tags_Lookup_Start(Map args, Map result) {
+		private void method_Tags_Lookup_Start(Map args, Map result) {
 		Object ids = args.get("ids");
 		
 		TagSearchInstance tagSearchInstance = new TagSearchInstance();
@@ -1698,6 +1711,252 @@ XMWebUIPlugin
 			map.put("type", Engine.ENGINE_SOURCE_STRS[engine.getSource()]);
 		}
 	}
+
+	private void method_Subscription_Add(Map args, Map result) throws MalformedURLException, SubscriptionException {
+		String url = MapUtils.getMapString(args, "rss-url", null);
+		String name = MapUtils.getMapString(args, "name",
+				"Subscription " + DateFormat.getInstance().toString());
+		boolean anonymous = MapUtils.getMapBoolean(args, "anonymous", false);
+		
+
+		if (url != null) {
+			Subscription subRSS = SubscriptionManagerFactory.getSingleton().createRSS(
+					name, new URL(url), SubscriptionHistory.DEFAULT_CHECK_INTERVAL_MINS, anonymous,
+					null);
+			
+			result.put("subscription", subRSS.getJSON());
+		}
+	}
+	
+	private void method_Subscription_Remove(Map args, Map result) throws IOException {
+		Object oID = args.get("ids");
+
+		if (oID == null) {
+			throw new IOException("ID missing");
+		}
+		
+		String[] ids = new String[0];
+		if (oID instanceof String) {
+			ids = new String[] { (String) oID };
+		} else if (oID instanceof Object[]) {
+			Object[] oIDS = (Object[]) oID; 
+			ids = new String[oIDS.length];
+			for (int i = 0; i < oIDS.length; i++) {
+				ids[i] = oIDS[i].toString();
+			}
+		}
+		
+		SubscriptionManager subMan = SubscriptionManagerFactory.getSingleton();
+		for (String id : ids) {
+			Subscription subs = subMan.getSubscriptionByID(id);
+			if (subs == null) {
+				result.put(id, "Error: Not Found");
+			} else {
+				subs.setSubscribed(false);
+				result.put(id, "Unsubscribed");
+			}
+		}
+	}
+
+	
+	
+	/*
+	 * Subscriptions : 
+	 * {
+	 *   SubscriptionID : 
+	 *   {
+	 *   	Field:Value,
+	 *   },
+	 *   SubscriptionID : 
+	 *   {
+	 *   	Field:Value,
+	 *   },
+	 * }
+	 */
+	private void method_Subscription_Get(Map args, Map result) throws IOException {
+
+		boolean subscribedOnly = MapUtils.getMapBoolean(args, "subscribed-only",
+				true);
+
+		Object oID = args.get("ids");
+
+		if (oID == null) {
+			throw (new IOException("ID missing"));
+		}
+		
+		String[] ids = new String[0];
+		if (oID instanceof String) {
+			ids = new String[] { (String) oID };
+		} else if (oID instanceof Object[]) {
+			Object[] oIDS = (Object[]) oID; 
+			ids = new String[oIDS.length];
+			for (int i = 0; i < oIDS.length; i++) {
+				ids[i] = oIDS[i].toString();
+			}
+		}
+
+		List fields = (List) args.get("fields");
+		List<String> fieldsResults = null;
+		boolean all = fields == null || fields.size() == 0;
+		if (!all) {
+			// sort so we can't use Collections.binarySearch
+			Collections.sort(fields);
+			int i = Collections.binarySearch(fields, FIELD_SUBSCRIPTION_RESULTS);
+			if (i >= 0) {
+				Object oResults = fields.get(0);
+				if (oResults instanceof List) {
+					fieldsResults = (List) oResults;
+				}
+			}
+		}
+		boolean allResultFields = fieldsResults == null || fieldsResults.size() == 0;
+
+		Map<String, Map<String, Object>> mapSubcriptions = new HashMap<String, Map<String, Object>>();
+
+		SubscriptionManager subMan = SubscriptionManagerFactory.getSingleton();
+		Subscription[] subscriptions;
+		if (ids.length == 0) {
+			subscriptions = subMan.getSubscriptions(subscribedOnly);
+		} else {
+			List<Subscription> list = new ArrayList<Subscription>();
+			for (String id : ids) {
+				Subscription subscriptionByID = subMan.getSubscriptionByID(id);
+				if (subscriptionByID == null) {
+					mapSubcriptions.put(id, Collections.EMPTY_MAP);
+				} else {
+					list.add(subscriptionByID);
+				}
+			}
+			subscriptions = list.toArray(new Subscription[0]);
+		}
+
+		for (Subscription sub : subscriptions) {
+			Map<String, Object> map = new HashMap<String, Object>();
+			
+			mapSubcriptions.put(sub.getID(), map);
+			
+			if (all
+					|| Collections.binarySearch(fields, FIELD_SUBSCRIPTION_NAME) >= 0) {
+				map.put(FIELD_SUBSCRIPTION_NAME, sub.getName());
+			}
+			if (all || Collections.binarySearch(fields,
+					FIELD_SUBSCRIPTION_ADDEDON) >= 0) {
+				map.put(FIELD_SUBSCRIPTION_ADDEDON, sub.getAddTime());
+			}
+			if (all || Collections.binarySearch(fields,
+					FIELD_SUBSCRIPTION_ASSOCIATION_COUNT) >= 0) {
+				map.put(FIELD_SUBSCRIPTION_ASSOCIATION_COUNT,
+						sub.getAssociationCount());
+			}
+			if (all || Collections.binarySearch(fields,
+					FIELD_SUBSCRIPTION_POPULARITY) >= 0) {
+				map.put(FIELD_SUBSCRIPTION_POPULARITY, sub.getCachedPopularity());
+			}
+			if (all || Collections.binarySearch(fields,
+					FIELD_SUBSCRIPTION_CATEGORY) >= 0) {
+				map.put(FIELD_SUBSCRIPTION_CATEGORY, sub.getCategory());
+			}
+			if (all || Collections.binarySearch(fields,
+					FIELD_SUBSCRIPTION_CREATOR) >= 0) {
+				map.put(FIELD_SUBSCRIPTION_CREATOR, sub.getCreatorRef());
+			}
+			try {
+				Engine engine = sub.getEngine();
+				if (engine != null) {
+					if (all || Collections.binarySearch(fields,
+							FIELD_SUBSCRIPTION_ENGINE_NAME) >= 0) {
+						map.put(FIELD_SUBSCRIPTION_ENGINE_NAME, engine.getName());
+					}
+					if (all || Collections.binarySearch(fields,
+							FIELD_SUBSCRIPTION_ENGINE_TYPE) >= 0) {
+						map.put(FIELD_SUBSCRIPTION_ENGINE_TYPE, engine.getType());
+					}
+				}
+			} catch (SubscriptionException e) {
+			}
+			if (all || Collections.binarySearch(fields,
+					FIELD_SUBSCRIPTION_HIGHEST_VERSION) >= 0) {
+				map.put(FIELD_SUBSCRIPTION_HIGHEST_VERSION, sub.getHighestVersion());
+			}
+			if (all || Collections.binarySearch(fields,
+					FIELD_SUBSCRIPTION_NAME_EX) >= 0) {
+				map.put(FIELD_SUBSCRIPTION_NAME_EX, sub.getNameEx());
+			}
+			if (all || Collections.binarySearch(fields,
+					FIELD_SUBSCRIPTION_QUERY_KEY) >= 0) {
+				map.put(FIELD_SUBSCRIPTION_QUERY_KEY, sub.getQueryKey());
+			}
+			if (all || Collections.binarySearch(fields,
+					FIELD_SUBSCRIPTION_REFERER) >= 0) {
+				map.put(FIELD_SUBSCRIPTION_REFERER, sub.getReferer());
+			}
+			if (all || Collections.binarySearch(fields,
+					FIELD_SUBSCRIPTION_TAG_UID) >= 0) {
+				map.put(FIELD_SUBSCRIPTION_TAG_UID, sub.getTagID());
+			}
+			if (all
+					|| Collections.binarySearch(fields, FIELD_SUBSCRIPTION_URI) >= 0) {
+				map.put(FIELD_SUBSCRIPTION_URI, sub.getURI());
+			}
+			if (all || Collections.binarySearch(fields,
+					FIELD_SUBSCRIPTION_ANONYMOUS) >= 0) {
+				map.put(FIELD_SUBSCRIPTION_ANONYMOUS, sub.isAnonymous());
+			}
+			if (all || Collections.binarySearch(fields,
+					FIELD_SUBSCRIPTION_AUTO_DL_SUPPORTED) >= 0) {
+				map.put(FIELD_SUBSCRIPTION_AUTO_DL_SUPPORTED,
+						sub.isAutoDownloadSupported());
+			}
+			if (all
+					|| Collections.binarySearch(fields, FIELD_SUBSCRIPTION_MINE) >= 0) {
+				map.put(FIELD_SUBSCRIPTION_MINE, sub.isMine());
+			}
+			if (all
+					|| Collections.binarySearch(fields, FIELD_SUBSCRIPTION_PUBLIC) >= 0) {
+				map.put(FIELD_SUBSCRIPTION_PUBLIC, sub.isPublic());
+			}
+			if (all || Collections.binarySearch(fields,
+					FIELD_SUBSCRIPTION_IS_SEARCH_TEMPLATE) >= 0) {
+				map.put(FIELD_SUBSCRIPTION_IS_SEARCH_TEMPLATE, sub.isSearchTemplate());
+			}
+			if (all || Collections.binarySearch(fields,
+					FIELD_SUBSCRIPTION_SUBSCRIBED) >= 0) {
+				map.put(FIELD_SUBSCRIPTION_SUBSCRIBED, sub.isSubscribed());
+			}
+			if (all || Collections.binarySearch(fields,
+					FIELD_SUBSCRIPTION_UPDATEABLE) >= 0) {
+				map.put(FIELD_SUBSCRIPTION_UPDATEABLE, sub.isUpdateable());
+			}
+			if (all || Collections.binarySearch(fields,
+					FIELD_SUBSCRIPTION_SHAREABLE) >= 0) {
+				map.put(FIELD_SUBSCRIPTION_SHAREABLE, sub.isShareable());
+			}
+			if (all || Collections.binarySearch(fields,
+					FIELD_SUBSCRIPTION_RESULTS_COUNT) >= 0) {
+				map.put(FIELD_SUBSCRIPTION_RESULTS_COUNT, sub.getResults(false).length);
+			}
+
+			if (Collections.binarySearch(fields, FIELD_SUBSCRIPTION_RESULTS) >= 0) {
+				List<Map> listResults = new ArrayList<>();
+				map.put(FIELD_SUBSCRIPTION_RESULTS_COUNT, listResults);
+				
+				SubscriptionResult[]	results = sub.getHistory().getResults( false );
+				
+				for(int i=0; i<results.length; i++){
+					
+					SubscriptionResult r = results[i];
+					
+					// TODO filter by fieldsResults
+					
+					listResults.add( r.toJSONMap());
+				}
+			}
+		}
+
+		result.put("subscriptions", mapSubcriptions);
+	}
+
+
 
 	private void method_Tags_Get_List(Map args, Map result) {
 		List<Map<String, Object>> listTags = new ArrayList<Map<String,Object>>();
@@ -2002,7 +2261,9 @@ XMWebUIPlugin
 		
 		List listSupports = new ArrayList();
 		Collections.addAll(listSupports, "rpc:receive-gzip", "field:files-hc",
-				"method:tags-get-list", "field:torrent-set-name");
+				"method:tags-get-list", "field:torrent-set-name", 
+				"method:subscription-get", "method:subscription-add", 
+				"method:subscription-remove");
 
 		synchronized( json_server_method_lock ){
   		for (String key : json_server_methods.keySet()) {

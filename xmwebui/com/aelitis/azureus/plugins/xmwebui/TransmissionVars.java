@@ -320,4 +320,32 @@ public class TransmissionVars
 	public static final int TR_STATUS_DOWNLOAD       = 4; /* Downloading */
 	public static final int TR_STATUS_SEED_WAIT      = 5; /* Queued to seed */
 	public static final int TR_STATUS_SEED           = 6; /* Seeding */
+
+	//////////////////////////////////////////////////////////////////////////////
+
+	public static final String FIELD_SUBSCRIPTION_NAME = "name";
+	public static final String FIELD_SUBSCRIPTION_ADDEDON = "addedDate";
+	public static final String FIELD_SUBSCRIPTION_ASSOCIATION_COUNT = "associationCount";
+	public static final String FIELD_SUBSCRIPTION_POPULARITY = "popularity";
+	public static final String FIELD_SUBSCRIPTION_CATEGORY = "category";
+	public static final String FIELD_SUBSCRIPTION_CREATOR = "creator";
+	public static final String FIELD_SUBSCRIPTION_ENGINE_NAME = "engineName";
+	public static final String FIELD_SUBSCRIPTION_ENGINE_TYPE = "engineType";
+	public static final String FIELD_SUBSCRIPTION_HIGHEST_VERSION = "highestVersion";
+	public static final String FIELD_SUBSCRIPTION_NAME_EX = "nameEx";
+	public static final String FIELD_SUBSCRIPTION_QUERY_KEY = "queryKey";
+	public static final String FIELD_SUBSCRIPTION_REFERER = "referer";
+	public static final String FIELD_SUBSCRIPTION_TAG_UID = "tagUID";
+	public static final String FIELD_SUBSCRIPTION_URI = "uri";
+	public static final String FIELD_SUBSCRIPTION_ANONYMOUS = "anonymous";
+	public static final String FIELD_SUBSCRIPTION_AUTO_DL_SUPPORTED = "autoDLSupported";
+	public static final String FIELD_SUBSCRIPTION_MINE = "mine";
+	public static final String FIELD_SUBSCRIPTION_PUBLIC = "public";
+	public static final String FIELD_SUBSCRIPTION_IS_SEARCH_TEMPLATE = "isSearchTemplate";
+	public static final String FIELD_SUBSCRIPTION_SUBSCRIBED = "subscribed";
+	public static final String FIELD_SUBSCRIPTION_UPDATEABLE = "updateable";
+	public static final String FIELD_SUBSCRIPTION_SHAREABLE = "shareable";
+	public static final String FIELD_SUBSCRIPTION_RESULTS_COUNT = "resultsCount";
+	public static final String FIELD_SUBSCRIPTION_RESULTS = "results";
+	
 }
