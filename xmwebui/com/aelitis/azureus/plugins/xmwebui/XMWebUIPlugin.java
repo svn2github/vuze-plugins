@@ -1937,7 +1937,7 @@ XMWebUIPlugin
 			}
 
 			if (Collections.binarySearch(fields, FIELD_SUBSCRIPTION_RESULTS) >= 0) {
-				List<Map> listResults = new ArrayList<>();
+				List<Map> listResults = new ArrayList();
 				map.put(FIELD_SUBSCRIPTION_RESULTS_COUNT, listResults);
 				
 				SubscriptionResult[]	results = sub.getHistory().getResults( false );
