@@ -339,7 +339,7 @@ RCMPlugin
   								
   								List list = MapUtils.getMapList(map, "results", null);
   								if (list == null) {
-  									list = new ArrayList<>();
+  									list = new ArrayList();
   									map.put("results", list);
   								}
 
@@ -427,7 +427,7 @@ RCMPlugin
 
 							List list = MapUtils.getMapList(map, "results", null);
 							if (list == null) {
-								list = new ArrayList<>();
+								list = new ArrayList();
 								map.put("results", list);
 							}
 

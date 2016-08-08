@@ -3583,7 +3583,7 @@ RelatedContentUISWT
 		private int		rank;
 		private boolean	unread	= true;
 		
-		private
+		protected
 		SearchRelatedContent(
 			SearchResult	sr )
 		{
