@@ -32,7 +32,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -424,7 +423,7 @@ I2PHelperPlugin
 	
 	private I2PHelperHostnameService	hostname_service;
 	
-	private static final int CPU_THROTTLE_DEFAULT	= 5;
+	private static final int CPU_THROTTLE_DEFAULT	= 2;
 	
 	private int cpu_throttle_factor;
 	
