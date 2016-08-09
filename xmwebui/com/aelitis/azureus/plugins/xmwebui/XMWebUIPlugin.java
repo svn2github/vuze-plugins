@@ -1255,7 +1255,12 @@ XMWebUIPlugin
 		throws IOException
 	{
 		Map	response = new HashMap();
-		
+
+		if (request == null) {
+			response.put( "result", "error: Bad or missing JSON string");
+			return response;
+		}
+
 		String method = (String)request.get( "method" );
 		
 		if ( method == null ){
@@ -1738,6 +1743,8 @@ XMWebUIPlugin
 		String[] ids = new String[0];
 		if (oID instanceof String) {
 			ids = new String[] { (String) oID };
+		} else if (oID instanceof List) {
+			ids = (String[]) ((List) oID).toArray(new String[0]);
 		} else if (oID instanceof Object[]) {
 			Object[] oIDS = (Object[]) oID; 
 			ids = new String[oIDS.length];
@@ -1780,13 +1787,11 @@ XMWebUIPlugin
 
 		Object oID = args.get("ids");
 
-		if (oID == null) {
-			throw (new IOException("ID missing"));
-		}
-		
 		String[] ids = new String[0];
 		if (oID instanceof String) {
 			ids = new String[] { (String) oID };
+		} else if (oID instanceof List) {
+			ids = (String[]) ((List) oID).toArray(new String[0]);
 		} else if (oID instanceof Object[]) {
 			Object[] oIDS = (Object[]) oID; 
 			ids = new String[oIDS.length];
@@ -1936,9 +1941,10 @@ XMWebUIPlugin
 				map.put(FIELD_SUBSCRIPTION_RESULTS_COUNT, sub.getResults(false).length);
 			}
 
-			if (Collections.binarySearch(fields, FIELD_SUBSCRIPTION_RESULTS) >= 0) {
+			if (fields != null && Collections.binarySearch(fields,
+					FIELD_SUBSCRIPTION_RESULTS) >= 0) {
 				List<Map> listResults = new ArrayList();
-				map.put(FIELD_SUBSCRIPTION_RESULTS_COUNT, listResults);
+				map.put(FIELD_SUBSCRIPTION_RESULTS, listResults);
 				
 				SubscriptionResult[]	results = sub.getHistory().getResults( false );
 				
