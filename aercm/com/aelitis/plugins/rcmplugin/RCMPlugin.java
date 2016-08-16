@@ -39,7 +39,6 @@ import com.aelitis.azureus.core.cnetwork.ContentNetwork;
 import com.aelitis.azureus.core.content.*;
 import com.aelitis.azureus.ui.UserPrompterResultListener;
 import com.aelitis.azureus.util.MapUtils;
-import com.aelitis.plugins.rcmplugin.RelatedContentUISWT.SearchRelatedContent;
 
 
 public class 
