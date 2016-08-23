@@ -88,6 +88,7 @@ import com.aelitis.azureus.core.tag.*;
 import com.aelitis.azureus.core.torrent.PlatformTorrentUtils;
 import com.aelitis.azureus.core.tracker.TrackerPeerSource;
 import com.aelitis.azureus.core.util.MultiPartDecoder;
+import com.aelitis.azureus.core.versioncheck.VersionCheckClient;
 import com.aelitis.azureus.core.vuzefile.VuzeFile;
 import com.aelitis.azureus.core.vuzefile.VuzeFileComponent;
 import com.aelitis.azureus.core.vuzefile.VuzeFileHandler;
@@ -204,6 +205,8 @@ XMWebUIPlugin
 		private BooleanParameter logtofile_param;
 
 		private LoggerChannel log;
+
+		private long lastVerserverCheck;
     
     public
     XMWebUIPlugin()
@@ -2278,7 +2281,69 @@ XMWebUIPlugin
 		}
 
 		result.put("rpc-supports", listSupports);
+		
+		if (lastVerserverCheck == 0 || SystemTime.getCurrentTime() - lastVerserverCheck > 864000l) {
+			lastVerserverCheck = SystemTime.getCurrentTime();
+  		Map decoded = VersionCheckClient.getSingleton().getVersionCheckInfo("xmw");
+  		String userMessage = getUserMessage(decoded);
+  		if (userMessage != null) {
+  			result.put("az-message", userMessage);
+  		}
+		}
+		//result.put("az-message", "This is a test message with a  <A HREF=\"http://www.vuze.com\">Link</a>");
+		
 	}
+	
+  private String 
+  getUserMessage( 
+	Map reply ) 
+	{
+		try {
+			byte[] message_bytes = MapUtils.getMapByteArray(reply, "xmwebui_message",
+					null);
+			if (message_bytes == null || message_bytes.length == 0) {
+				return null;
+			}
+
+			String message;
+
+			try {
+				message = new String(message_bytes, "UTF-8");
+
+			} catch (Throwable e) {
+
+				message = new String(message_bytes);
+			}
+
+			byte[] signature = MapUtils.getMapByteArray(reply, "xmwebui_message_sig",
+					null);
+
+			if (signature == null) {
+
+				log("Signature missing from message");
+
+				return null;
+			}
+
+			try {
+				AEVerifier.verifyData(message, signature);
+
+			} catch (Throwable e) {
+
+				log("Message signature check failed", e);
+
+				return null;
+			}
+
+			return message;
+		} catch (Throwable e) {
+			log("Failed get message", e);
+
+			Debug.printStackTrace(e);
+		}
+		return null;
+	} 
+
 
 	private void method_Session_Set(Map args, Map result)
 			throws IOException {
