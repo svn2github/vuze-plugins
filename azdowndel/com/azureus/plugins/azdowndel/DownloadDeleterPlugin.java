@@ -525,7 +525,7 @@ DownloadDeleterPlugin
 											
 										}catch( Throwable e ){
 											
-											log.log( "Failed to delete/arhive '" + download.getName() + "'", e );
+											log.log( "Failed to delete/archive '" + download.getName() + "'", e );
 										}
 									}
 								}
