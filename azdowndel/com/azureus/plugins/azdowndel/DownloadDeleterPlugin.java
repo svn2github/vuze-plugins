@@ -25,7 +25,10 @@ import java.io.File;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.Set;
 
+import org.gudy.azureus2.core3.util.HashWrapper;
 import org.gudy.azureus2.plugins.*;
 import org.gudy.azureus2.plugins.disk.DiskManagerFileInfo;
 import org.gudy.azureus2.plugins.download.Download;
@@ -76,6 +79,10 @@ DownloadDeleterPlugin
 	private BooleanParameter	delete_data;
 	private BooleanParameter	start_if_space;
 	
+	private BooleanParameter	archive_downloads;
+	
+	private Set<HashWrapper>	archive_fails = new HashSet<HashWrapper>();
+	
 	public void 
 	initialize(
 		PluginInterface _plugin_interface )
@@ -93,9 +100,7 @@ DownloadDeleterPlugin
 		LocaleUtilities loc_utils = plugin_interface.getUtilities().getLocaleUtilities();
 		
 		loc_utils.integrateLocalisedMessageBundle( "com.azureus.plugins.azdowndel.internat.Messages");
-		
-		final String plugin_name = plugin_interface.getUtilities().getLocaleUtilities().getLocalisedMessageText( "azdowndel.name" );
-				
+						
 		UIManager	ui_manager = plugin_interface.getUIManager();
 		
 		final BasicPluginViewModel	view_model = ui_manager.createBasicPluginViewModel( loc_utils.getLocalisedMessageText( "azdowndel.name" ));
@@ -186,14 +191,31 @@ DownloadDeleterPlugin
 		
 		del_cats 		= config_model.addStringParameter2( "azdowndel.del_cats", "azdowndel.del_cats", "" );
 
+		archive_downloads 	= config_model.addBooleanParameter2( "azdowndel.archive_downloads", "azdowndel.archive_downloads", false );
+		
 		delete_torrent 	= config_model.addBooleanParameter2( "azdowndel.del_torrent", "azdowndel.del_torrent", true );
 		delete_data		= config_model.addBooleanParameter2( "azdowndel.del_data", "azdowndel.del_data", true );
 			
+		archive_downloads.addListener(
+				new ParameterListener()
+				{
+					public void 
+					parameterChanged(
+						Parameter param )
+					{
+						delete_torrent.setEnabled( !archive_downloads.getValue());
+						delete_data.setEnabled( !archive_downloads.getValue());
+					}
+				});
+		
+		delete_torrent.setEnabled( !archive_downloads.getValue());
+		delete_data.setEnabled( !archive_downloads.getValue());
+		
 		config_model.createGroup(
 				"azdowndel.group.del",
 				new Parameter[]{ 
 						enable_del_all, sr_param, del_idle, del_idle_if_complete, 
-						del_cats, delete_torrent, delete_data });
+						del_cats, archive_downloads, delete_torrent, delete_data });
 
 		
 			// start
@@ -471,15 +493,39 @@ DownloadDeleterPlugin
 									}else if ( state == Download.ST_STOPPED ){
 										
 										try{
-											log.log( "Deleting '" + download.getName() + "'" );
-											
-											download.remove( delete_torrent.getValue(), delete_data.getValue());
+											if ( archive_downloads.getValue()){
+												
+												if ( download.canStubbify()){
+													
+													log.log( "Archiving '" + download.getName() + "'" );
+													
+													download.stubbify();
+													
+												}else{
+													
+													HashWrapper hw = new HashWrapper( download.getTorrentHash());
+													
+													synchronized( archive_fails ){
+													
+														if ( !archive_fails.contains( hw )){
+													
+															archive_fails.add( hw );
+															
+															log.log( "Can't archive '" + download.getName() + "'" );
+														}
+													}
+												}
+											}else{
+												log.log( "Deleting '" + download.getName() + "'" );
+												
+												download.remove( delete_torrent.getValue(), delete_data.getValue());
+											}
 											
 											tryStart();
 											
 										}catch( Throwable e ){
 											
-											log.log( "Failed to delete '" + download.getName() + "'", e );
+											log.log( "Failed to delete/arhive '" + download.getName() + "'", e );
 										}
 									}
 								}
