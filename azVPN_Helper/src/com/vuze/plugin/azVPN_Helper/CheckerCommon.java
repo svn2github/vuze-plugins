@@ -38,6 +38,7 @@ import com.aelitis.azureus.core.AzureusCoreFactory;
 import com.aelitis.azureus.core.networkmanager.admin.*;
 import com.aelitis.azureus.core.proxy.AEProxySelector;
 import com.aelitis.azureus.core.proxy.AEProxySelectorFactory;
+import com.aelitis.azureus.core.util.NetUtils;
 import com.aelitis.net.udp.uc.PRUDPPacketHandler;
 import com.aelitis.net.udp.uc.PRUDPPacketHandlerFactory;
 import com.aelitis.net.udp.uc.PRUDPReleasablePacketHandler;
@@ -218,7 +219,7 @@ public abstract class CheckerCommon
 		if (matches && excludes != null && excludes.length > 0) {
 			if (networkInterface == null) {
 				try {
-					networkInterface = NetworkInterface.getByInetAddress(address);
+					networkInterface = NetUtils.getByInetAddress(address);
 				} catch (SocketException e) {
 				}
 			}
@@ -260,7 +261,7 @@ public abstract class CheckerCommon
 			if (isGoodExistingBind) {
 				String niName = "Unknown Interface";
 				try {
-					NetworkInterface networkInterface = NetworkInterface.getByInetAddress(
+					NetworkInterface networkInterface = NetUtils.getByInetAddress(
 							currentBindIP);
 					niName = networkInterface.getName() + " ("
 							+ networkInterface.getDisplayName() + ")";
@@ -290,7 +291,7 @@ public abstract class CheckerCommon
 					BindableInterface bi = mapBindableInterfaces.get(hostAddress);
 					if (bi == null) {
 						bi = new BindableInterface(bindableAddress,
-								NetworkInterface.getByInetAddress(bindableAddress));
+								NetUtils.getByInetAddress(bindableAddress));
 						mapBindableInterfaces.put(hostAddress, bi);
 					}
 				}
@@ -315,7 +316,7 @@ public abstract class CheckerCommon
 							String hostAddress = address.getHostAddress();
 							BindableInterface bi = mapBindableInterfaces.get(hostAddress);
 							if (bi == null) {
-								bi = new BindableInterface(address, NetworkInterface.getByName(
+								bi = new BindableInterface(address, NetUtils.getByName(
 										networkAdminInterface.getName()));
 								mapBindableInterfaces.put(hostAddress, bi);
 							}
@@ -375,7 +376,7 @@ public abstract class CheckerCommon
 			}
 
 			if (localAddress != null && !localAddress.isAnyLocalAddress()) {
-				NetworkInterface networkInterface = NetworkInterface.getByInetAddress(
+				NetworkInterface networkInterface = NetUtils.getByInetAddress(
 						localAddress);
 
 				s = texts.getLocalisedMessageText("vpnhelper.nonvuze.probable.route",
