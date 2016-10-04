@@ -3511,7 +3511,14 @@ RelatedContentUISWT
 		setUnread(
 			boolean unread )
 		{
-			subscription.setSubscribed( !unread );
+			boolean subscribed = !unread;
+			
+			subscription.setSubscribed( subscribed );
+			
+			if ( subscribed ){
+				
+				subscription.requestAttention();
+			}
 		}
 		
 		public Download

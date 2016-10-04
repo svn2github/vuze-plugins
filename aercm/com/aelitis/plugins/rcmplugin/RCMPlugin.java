@@ -961,13 +961,77 @@ RCMPlugin
 	
 		throws IPCException
 	{
+		lookupByExpression( expression, networks, new HashMap<String,Object>());
+	}
+	
+	public void
+	lookupByExpression(
+		final String 				expression,
+		final String[]				networks,
+		final Map<String,Object>	options )
+	
+		throws IPCException
+	{
 		RelatedContentUI current_ui = ui;
 		
 		if ( current_ui == null ){
 			
 			throw( new IPCException( "UI not bound" ));
 		}
-		
+				
+		final Runnable do_it = 
+			new Runnable()
+			{
+				public void
+				run()
+				{
+					if ( isRCMEnabled()){
+
+						Boolean b_is_subscription = (Boolean)options.get( "Subscription" );
+						
+						boolean is_subscription = b_is_subscription != null && b_is_subscription;
+	
+						if ( is_subscription ){
+							
+							Map<String,Object>	properties = new HashMap<String, Object>();
+								
+							String name = (String)options.get( "Name" );
+							
+							if ( name == null ){
+								
+								name = expression;
+							}
+							
+							properties.put( SearchProvider.SP_SEARCH_NAME, name );
+							properties.put( SearchProvider.SP_SEARCH_TERM, expression );
+							properties.put( SearchProvider.SP_NETWORKS, networks );
+							
+							properties.put( "_frequency_", 10 );
+							
+							try{
+								getPluginInterface().getUtilities().getSubscriptionManager().requestSubscription(
+									getSearchProvider(),
+									properties );
+									
+							}catch( Throwable e ){
+									
+								Debug.out( e );
+							}
+						}else{
+							
+							RelatedContentUI current_ui = ui;
+
+							if ( current_ui != null ){
+								
+								current_ui.setUIEnabled( true );
+							
+								current_ui.addSearch( expression, networks );
+							}
+						}
+					}
+				}
+			};
+				
 		if ( !hasFTUXBeenShown() || !isRCMEnabled()){
 			
 			current_ui.showFTUX(
@@ -976,25 +1040,13 @@ RCMPlugin
 					public void 
 					prompterClosed(
 						int result) 
-					{
-						if ( isRCMEnabled()){
-							
-							RelatedContentUI current_ui = ui;
-							
-							if ( current_ui != null ){
-							
-								current_ui.setUIEnabled( true );
-								
-								current_ui.addSearch( expression, networks );
-							}
-						}
+					{									
+						do_it.run();
 					}
 				});
 		}else{
 			
-			current_ui.setUIEnabled( true );
-			
-			current_ui.addSearch( expression, networks );
+			do_it.run();
 		}
 	}
 	
