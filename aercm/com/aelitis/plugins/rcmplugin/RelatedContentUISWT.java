@@ -1835,7 +1835,7 @@ RelatedContentUISWT
 										return;
 									}
 									
-									final RCMView view = new RCMView( SIDEBAR_SECTION_RELATED_CONTENT, name + RCMPlugin.getNetworkString( networks ) );
+									final RCMView view = new RCMView( SIDEBAR_SECTION_RELATED_CONTENT, name + RCMPlugin.getNetworkString( networks ));
 									
 									new_si.setView( view );
 									
@@ -1887,7 +1887,59 @@ RelatedContentUISWT
 												addSearch( expression, networks );
 											}
 										});
-																		
+											
+										// edit expression
+									
+									menu_item = menu_manager.addMenuItem( "sidebar." + key, "rcm.menu.editexpr" );
+									
+									menu_item.addListener( 
+											new MenuItemListener() 
+											{
+												public void 
+												selected(
+													MenuItem menu, Object target ) 
+												{
+													SimpleTextEntryWindow entryWindow = new SimpleTextEntryWindow(
+															"rcm.menu.findbyexpr.title", "rcm.menu.findbyexpr.msg" );
+													
+													String[] expressions = new_si.getExpressions();
+																											
+													entryWindow.setPreenteredText( expressions[0], false );
+														
+													entryWindow.selectPreenteredText(true);
+													
+													entryWindow.prompt(new UIInputReceiverListener() {
+														public void UIInputReceiverClosed(UIInputReceiver entryWindow) {
+															if (!entryWindow.hasSubmittedInput()) {
+																return;
+															}
+															
+															String value = entryWindow.getSubmittedInput();
+																														
+															if ( value != null && value.length() > 0 ){
+																
+																value = value.replaceAll( ",", "" ).trim();
+																
+																last_search_expr = value;
+																
+																new_si.setExpressions( new String[]{ value });
+																
+																new_si.search();
+																
+																String new_name = "'" + value + "'" + RCMPlugin.getNetworkString( new_si.getNetworks());
+																
+																view.setTitle( new_name );
+																
+																// should probably remap entry in rcm_item_map as the key has changed but woreva
+															}
+														}
+													}); 	
+												}
+											});
+									
+									
+									boolean	needs_sep = true;
+									
 										// create subscription
 									
 									final String[]	subscription_name = { MessageText.getString( "rcm.search.provider" ) + ": " + name + net_str };
@@ -1895,6 +1947,15 @@ RelatedContentUISWT
 									final SearchProvider sp = plugin.getSearchProvider();
 									
 									if ( sp != null ){
+										
+										if ( needs_sep ){
+											
+											MenuItem sep = menu_manager.addMenuItem( "sidebar." + key, "sep1" );
+											
+											sep.setStyle( MenuItem.STYLE_SEPARATOR );
+											
+											needs_sep = false;
+										}
 										
 										MenuItem parent = menu_item = menu_manager.addMenuItem( "sidebar." + key, "rcm.menu.create.subs" );
 	
@@ -1959,6 +2020,15 @@ RelatedContentUISWT
 													}
 												}
 											});
+									}
+									
+									if ( needs_sep ){
+										
+										MenuItem sep = menu_manager.addMenuItem( "sidebar." + key, "sep1" );
+										
+										sep.setStyle( MenuItem.STYLE_SEPARATOR );
+										
+										needs_sep = false;
 									}
 									
 										// rename
@@ -2385,6 +2455,25 @@ RelatedContentUISWT
 		isPopularity()
 		{
 			return( popularity );
+		}
+		
+		private String[]
+		getExpressions()
+		{
+			return( expressions );
+		}
+		
+		private void
+		setExpressions(
+			String[]	e )
+		{
+			expressions = e;
+		}
+		
+		private String[]
+		getNetworks()
+		{
+			return( networks );
 		}
 		
 		public void
