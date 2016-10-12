@@ -77,6 +77,7 @@ import org.gudy.azureus2.ui.swt.views.utils.ManagerUtils;
 
 import com.aelitis.azureus.core.AzureusCoreFactory;
 import com.aelitis.azureus.core.subs.Subscription;
+import com.aelitis.azureus.core.subs.SubscriptionManager;
 import com.aelitis.azureus.core.subs.SubscriptionManagerFactory;
 import com.aelitis.azureus.core.subs.SubscriptionResult;
 import com.aelitis.azureus.core.tag.Tag;
@@ -299,6 +300,8 @@ RSSToChat
 		List<Mapping>	loaded_mappings = new ArrayList<Mapping>();
 		
 		try{
+			SubscriptionManager subs_man = SubscriptionManagerFactory.getSingleton();
+			
 			SimpleXMLParserDocument doc = plugin_interface.getUtilities().getSimpleXMLParserDocumentFactory().create( config_file );
 			
 			SimpleXMLParserDocumentNode[] kids = doc.getChildren();
@@ -323,6 +326,7 @@ RSSToChat
 				SimpleXMLParserDocumentNode chat_node 			= kid.getChild( "chat" );
 				SimpleXMLParserDocumentNode presentation_node 	= kid.getChild( "presentation" );
 				SimpleXMLParserDocumentNode refresh_node 		= kid.getChild( "refresh" );
+				SimpleXMLParserDocumentNode associations_node 	= kid.getChild( "associations" );
 				
 				String 	source;
 				boolean	is_rss;
@@ -337,6 +341,8 @@ RSSToChat
 				String	website_name			= null;
 				int		website_retain_sites	= 7;
 				int		website_retain_items	= 2048;
+				
+				List<Subscription>	item_associations = new ArrayList<Subscription>();
 				
 				if ( rss_node != null && subs_node == null ){
 					
@@ -579,9 +585,46 @@ RSSToChat
 					}
 				}
 				
+				if ( associations_node != null ){
+					
+					SimpleXMLParserDocumentNode[] associations = associations_node.getChildren();
+					
+					for ( SimpleXMLParserDocumentNode association: associations ){
+						
+						SimpleXMLParserDocumentNode name_node = association.getChild( "name" );
+						
+						if ( name_node == null ){
+							
+							throw( new Exception( "association name missing" ));
+						}
+						
+						String name = name_node.getValue().trim();
+						
+						Subscription[] subs = subs_man.getSubscriptions();
+						
+						boolean found = false;
+						
+						for ( Subscription sub: subs ){
+							
+							if ( sub.getName().equals( name )){
+								
+								item_associations.add( sub );
+								
+								found = true;
+								
+								break;
+							}
+						}
+						
+						if ( !found ){
+							
+							throw( new Exception( "subscription '" + name + "' not found" ));
+						}
+					}
+				}
 				for ( String network: networks ){
 					
-					Mapping mapping = new Mapping( source, is_rss, desc_link_pattern, link_type, ignore_dates, min_seeds, min_leechers, network, key, type, presentation, website_name, website_retain_sites, website_retain_items, refresh_mins );
+					Mapping mapping = new Mapping( source, is_rss, desc_link_pattern, link_type, ignore_dates, min_seeds, min_leechers, network, key, type, presentation, website_name, website_retain_sites, website_retain_items, item_associations, refresh_mins );
 					
 					log( "    Mapping: " + mapping.getOverallName());
 					
@@ -1014,6 +1057,8 @@ RSSToChat
 						
 					site_updated = true;
 				}
+				
+				checkItemAssociations( mapping, hash );
 			}
 			
 			if ( presentation_is_link ){
@@ -1263,6 +1308,8 @@ RSSToChat
 							site_updated = true;
 						}
 					}
+					
+					checkItemAssociations( mapping, hash );
 				}
 				
 				if ( presentation_is_link ){
@@ -1569,7 +1616,7 @@ RSSToChat
 						String 	title 		= ImportExportUtils.importString( config, "title" );
 						long	time		= (Long)config.get( "time" );
 						String 	description	= ImportExportUtils.importString( config, "description" );
-						byte[]	hash		= (byte[])config.get( "hash" );
+						String 	hash_str	= ImportExportUtils.importString(config, "hash" );
 						String 	dl_link 	= ImportExportUtils.importString( config, "dl_link" );
 						String 	cdp_link 	= ImportExportUtils.importString( config, "cdp_link" );
 						long	size		= (Long)config.get( "size" );
@@ -1591,8 +1638,10 @@ RSSToChat
 							File torrent_file = new File( item, torrent );
 							
 							FileUtil.copyFile( torrent_file, new File( site_folder, torrent_file.getName()));
-						}
-												
+						}						
+					
+						checkItemAssociations( mapping, hash_str );
+																		
 						String row_str = String.valueOf( row_num );
 						while( row_str.length() < 6 ){
 							row_str = "0" + row_str;
@@ -1935,14 +1984,43 @@ RSSToChat
 		}
 	}
 	
+	private void
+	checkItemAssociations(
+		Mapping		mapping,
+		String		hash_str )
+	{
+		byte[] hash = UrlUtils.decodeSHA1Hash( hash_str );
+					
+		checkItemAssociations( mapping, hash );
+	}
+	
+	private void
+	checkItemAssociations(
+		Mapping		mapping,
+		byte[]		hash )
+	{
+		if ( hash != null ){
+			
+			List<Subscription> subs = mapping.getItemAssociations();
+			
+			for ( Subscription sub: subs ){
+				
+				if ( !sub.hasAssociation(hash)){
+				
+					sub.addAssociation( hash );
+					
+					log( "        Added item association " + ByteFormatter.encodeString( hash ) + " to " + sub.getName());
+				}
+			}
+		}
+	}
+	
 	private String
 	escape(
 		String	str )
 	{
 		return( XUXmlWriter.escapeXML( str ));
 	}
-	
-
 	
 	private String
 	buildMagnetHead(
@@ -2122,6 +2200,8 @@ RSSToChat
 		private final String		network;
 		private final String		key;
 		
+		private final List<Subscription>	item_associations;
+		
 		private final String		presentation;
 		private final String		website_name;
 		private final int			retain_sites;
@@ -2137,21 +2217,22 @@ RSSToChat
 		
 		private
 		Mapping(
-			String			_source,
-			boolean			_is_rss,
-			Pattern			_desc_link_pattern,
-			String			_link_type,
-			boolean			_ignore_dates,
-			int				_min_seeds,
-			int				_min_leechers,
-			String			_network,
-			String			_key,
-			int				_type,
-			String			_presentation,
-			String			_website_name,
-			int				_retain_sites,
-			int				_retain_items,
-			int				_refresh )
+			String				_source,
+			boolean				_is_rss,
+			Pattern				_desc_link_pattern,
+			String				_link_type,
+			boolean				_ignore_dates,
+			int					_min_seeds,
+			int					_min_leechers,
+			String				_network,
+			String				_key,
+			int					_type,
+			String				_presentation,
+			String				_website_name,
+			int					_retain_sites,
+			int					_retain_items,
+			List<Subscription>	_item_associations,
+			int					_refresh )
 		{
 			source				= _source;
 			is_rss				= _is_rss;
@@ -2168,6 +2249,7 @@ RSSToChat
 			website_name		= _website_name;
 			retain_sites		= _retain_sites;
 			retain_items		= _retain_items;
+			item_associations	= _item_associations;
 			
 			refresh				= _refresh;
 			
@@ -2244,6 +2326,13 @@ RSSToChat
 								if ( chat == null ){
 									
 									chat = bp.getChat( network, key );
+									
+									if ( chat == null ){
+										
+										retry_outstanding = true;
+										
+										return;
+									}
 									
 									if ( type == TYPE_ADMIN ){
 										
@@ -2393,6 +2482,12 @@ RSSToChat
 		getChatName()
 		{
 			return((network==AENetworkClassifier.AT_PUBLIC?"Public":"Anonymous") + ": " + key );
+		}
+		
+		private List<Subscription>
+		getItemAssociations()
+		{
+			return( item_associations );
 		}
 	}
 	
