@@ -97,6 +97,9 @@ RSSToChat
 	public static final int MAX_POSTS_PER_REFRESH	= 10;
 	public static final int MAX_HISTORY_ENTRIES		= 1000;
 	
+	public static final int WEBSITE_RETAIN_SITES_DEFAULT	= 7;
+	public static final int WEBSITE_RETAIN_ITEMS_DEFAULT	= 2048;
+	
 	private TorrentAttribute		ta_website;
 	
 	private PluginInterface			plugin_interface;
@@ -105,12 +108,16 @@ RSSToChat
 	private BasicPluginViewModel	view_model;
 	private LocaleUtilities			loc_utils;
 
+	private ActionParameter			republish;
+	
 	private File		config_file;
 	private File		history_dir;
 
 	private TimerEventPeriodic	timer;
 	
 	private List<Mapping>		mappings = new ArrayList<Mapping>();
+	
+	private boolean	force_site_update;
 	
 	private boolean	unloaded;
 	
@@ -177,6 +184,22 @@ RSSToChat
 					}
 				}
 			});
+		
+		republish = config_model.addActionParameter2( "azrsstochat.config.republish", "azrsstochat.republish" );
+
+		republish.addListener(
+				new ParameterListener() 
+				{
+					public void 
+					parameterChanged(
+						Parameter param ) 
+					{
+						republish.setEnabled( false );
+						
+						force_site_update = true;
+					}
+				});
+
 		
 		final UITextArea text_area = config_model.addTextArea( "azrsstochat.statuslog");
 		
@@ -249,8 +272,12 @@ RSSToChat
 							
 							for ( Mapping map: maps ){
 								
-								map.update( bp, minute_count );
+								map.update( bp, minute_count, force_site_update );
 							}
+							
+							force_site_update = false;
+							
+							republish.setEnabled( true );
 						}
 					});
 		}
@@ -339,8 +366,8 @@ RSSToChat
 				
 				String	presentation 			= "link";
 				String	website_name			= null;
-				int		website_retain_sites	= 7;
-				int		website_retain_items	= 2048;
+				int		website_retain_sites	= WEBSITE_RETAIN_SITES_DEFAULT;
+				int		website_retain_items	= WEBSITE_RETAIN_ITEMS_DEFAULT;
 				
 				List<Subscription>	item_associations = new ArrayList<Subscription>();
 				
@@ -705,7 +732,8 @@ RSSToChat
 		Mapping			mapping,
 		String			rss_source,
 		ChatInstance	inst,
-		History			history )
+		History			history,
+		boolean			force )
 	{
 		boolean	try_again = false;
 		
@@ -753,7 +781,7 @@ RSSToChat
 					
 			boolean presentation_is_link = mapping.getPresentation().equals( "link" );
 
-			boolean	site_updated = false;
+			boolean	site_updated = force;
 			
 			for ( RSSItem item: items ){
 				
@@ -1087,10 +1115,11 @@ RSSToChat
 		Mapping			mapping,
 		String			subscription_name,
 		ChatInstance	chat,
-		History			history )
+		History			history,
+		boolean			force )
 	{
 		boolean	try_again 		= false;
-		boolean	site_updated	= false;
+		boolean	site_updated	= force;
 		
 		Subscription[] subscriptions = SubscriptionManagerFactory.getSingleton().getSubscriptions();
 		
@@ -1343,7 +1372,7 @@ RSSToChat
 		long		item_time,
 		String		title,
 		String		description,
-		String		hash,
+		String		hash_str,
 		long		size,
 		long		seeds,
 		long		leechers,
@@ -1361,6 +1390,8 @@ RSSToChat
 		if ( dl_link != null ){
 			
 			try{
+				File torrent_file = null;
+				
 				URL dl_url = new URL( dl_link );
 				
 				String protocol = dl_url.getProtocol();
@@ -1383,13 +1414,15 @@ RSSToChat
 								
 								torrent_file_name = item_key + ".torrent";
 								
-								File torrent_file = new File( item_folder, torrent_file_name );
+								File tf = new File( item_folder, torrent_file_name );
 							
-								if ( !torrent_file.exists()){
+								if ( !tf.exists()){
 							
-									FileUtil.copyFile( new ResourceDownloaderFactoryImpl().create( dl_url ).download(), torrent_file );
+									FileUtil.copyFile( new ResourceDownloaderFactoryImpl().create( dl_url ).download(), tf );
 							
 									log( "Downloaded torrent: " + dl_url );
+									
+									torrent_file = tf;
 								}
 							}
 						}
@@ -1402,13 +1435,31 @@ RSSToChat
 					
 						torrent_file_name = item_key + ".torrent";
 						
-						File torrent_file = new File( item_folder, torrent_file_name );
+						File tf = new File( item_folder, torrent_file_name );
 					
-						if ( !torrent_file.exists()){
+						if ( !tf.exists()){
 					
-							FileUtil.copyFile( new ResourceDownloaderFactoryImpl().create( dl_url ).download(), torrent_file );
+							FileUtil.copyFile( new ResourceDownloaderFactoryImpl().create( dl_url ).download(), tf );
 					
 							log( "Downloaded torrent: " + dl_url );
+							
+							torrent_file = tf;
+						}
+					}
+				}
+				
+				if ( hash_str == null || hash_str.length() == 0 ){
+					
+					if ( torrent_file != null ){
+						
+						try{
+							byte[] b_hash = TOTorrentFactory.deserialiseFromBEncodedFile( torrent_file ).getHash();
+							
+							hash_str = ByteFormatter.encodeString( b_hash );
+							
+						}catch( Throwable e ){
+							
+							log( "Invalid torrent: " + dl_url );
 						}
 					}
 				}
@@ -1467,7 +1518,7 @@ RSSToChat
 			map.put( "title", title );
 			map.put( "time", item_time );
 			map.put( "description", description );
-			map.put( "hash", hash );
+			map.put( "hash", hash_str );
 			map.put( "dl_link", dl_link );
 			map.put( "cdp_link", cdp_link );
 			map.put( "size", size );
@@ -1536,6 +1587,8 @@ RSSToChat
 		File to_resources 	= site_folder;
 				
 		try{
+			List<String>	associations_to_check = new ArrayList<String>();
+			
 			FileUtil.copyFileOrDirectory( from_resources, to_resources ); 
 
 			PrintWriter index = new PrintWriter( new OutputStreamWriter( new FileOutputStream( new File( site_folder, "index.html" )), "UTF-8" ));
@@ -1616,7 +1669,7 @@ RSSToChat
 						String 	title 		= ImportExportUtils.importString( config, "title" );
 						long	time		= (Long)config.get( "time" );
 						String 	description	= ImportExportUtils.importString( config, "description" );
-						String 	hash_str	= ImportExportUtils.importString(config, "hash" );
+						String 	hash_str	= ImportExportUtils.importString( config, "hash" );
 						String 	dl_link 	= ImportExportUtils.importString( config, "dl_link" );
 						String 	cdp_link 	= ImportExportUtils.importString( config, "cdp_link" );
 						long	size		= (Long)config.get( "size" );
@@ -1638,9 +1691,23 @@ RSSToChat
 							File torrent_file = new File( item, torrent );
 							
 							FileUtil.copyFile( torrent_file, new File( site_folder, torrent_file.getName()));
+							
+								// migration - this is now computed during item extraction but for a while
+								// existing items will have it missing
+							
+							if ( hash_str == null || hash_str.length() == 0 ){
+								
+								try{
+									byte[] b_hash = TOTorrentFactory.deserialiseFromBEncodedFile( torrent_file ).getHash();
+									
+									hash_str = ByteFormatter.encodeString( b_hash );
+									
+								}catch( Throwable e ){
+								}
+							}
 						}						
 					
-						checkItemAssociations( mapping, hash_str );
+						associations_to_check.add( hash_str );
 																		
 						String row_str = String.valueOf( row_num );
 						while( row_str.length() < 6 ){
@@ -1978,6 +2045,16 @@ RSSToChat
 					log( "Removed old web site: " + dm.getDisplayName());
 				}
 			}
+			
+				// do this in reverse so that the most recent association is checked last and therefore 
+				// added to the subscription last (in case old ones are discarded)
+			
+			Collections.reverse( associations_to_check );
+			
+			for ( String hash_str: associations_to_check ){
+				
+				checkItemAssociations( mapping, hash_str );
+			}
 		}catch( Throwable e ){
 			
 			log( "Failed to update website", e );
@@ -2259,7 +2336,8 @@ RSSToChat
 		private void
 		update(
 			BuddyPluginBeta		bp,
-			int					minute_count )
+			int					minute_count,
+			boolean				force )
 		{
 			synchronized( this ){
 				
@@ -2272,7 +2350,8 @@ RSSToChat
 			}
 			
 			try{
-				if ( 	retry_outstanding || 
+				if ( 	force ||
+						retry_outstanding || 
 						minute_count % refresh == 0 ){
 									
 					retry_outstanding = false;
@@ -2372,11 +2451,11 @@ RSSToChat
 					try{
 						if ( is_rss ){
 							
-							retry_outstanding = updateRSS( this, source, chat_instance, history );
+							retry_outstanding = updateRSS( this, source, chat_instance, history, force );
 							
 						}else{
 							
-							retry_outstanding = updateSubscription( this, source, chat_instance, history );
+							retry_outstanding = updateSubscription( this, source, chat_instance, history, force );
 						}
 					}finally{
 						
