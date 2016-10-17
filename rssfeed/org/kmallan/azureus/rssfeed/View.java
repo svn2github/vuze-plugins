@@ -909,9 +909,15 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
         TableItem[] items = urlTable.getItems();
         UrlTableItem curItem = (UrlTableItem)items[curPos];
         UrlTableItem newItem = (UrlTableItem)items[newPos];
-        UrlBean tmpBean = curItem.getBean();
-        curItem.setBean(newItem.getBean());
-        newItem.setBean(tmpBean);
+        if ( move > 0 ){
+	        UrlBean tmpBean = newItem.getBean();
+	        newItem.setBean(curItem.getBean());
+	        curItem.setBean(tmpBean);
+        }else{
+	        UrlBean tmpBean = curItem.getBean();
+	        curItem.setBean(newItem.getBean());
+	        newItem.setBean(tmpBean);
+        }
         urlTable.setSelection(newPos);
         selUrlItem = newItem;
         urlTable.setRedraw(true);
@@ -981,9 +987,15 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
         TableItem[] items = filtTable.getItems();
         FilterTableItem curItem = (FilterTableItem)items[curPos];
         FilterTableItem newItem = (FilterTableItem)items[newPos];
-        FilterBean tmpBean = curItem.getBean();
-        curItem.setBean(newItem.getBean());
-        newItem.setBean(tmpBean);
+        if ( move > 0 ){
+            FilterBean tmpBean = newItem.getBean();
+            newItem.setBean(curItem.getBean());
+            curItem.setBean(tmpBean);     
+        }else{
+            FilterBean tmpBean = curItem.getBean();
+           	curItem.setBean(newItem.getBean());
+        	newItem.setBean(tmpBean);       	
+        }
         filtTable.setSelection(newPos);
         selFilterItem = newItem;
         filtTable.setRedraw(true);
