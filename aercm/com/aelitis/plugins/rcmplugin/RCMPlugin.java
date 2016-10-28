@@ -38,17 +38,12 @@ import org.gudy.azureus2.plugins.utils.search.*;
 import com.aelitis.azureus.core.cnetwork.ContentNetwork;
 import com.aelitis.azureus.core.content.*;
 import com.aelitis.azureus.ui.UserPrompterResultListener;
-import com.aelitis.azureus.util.MapUtils;
 
 
 public class 
 RCMPlugin 
 	implements UnloadablePlugin
 {
-	// following code to make plugin backwards compatible from 5101 to 5100
-	
-	private static final boolean IS_5101_PLUS = Constants.isCurrentVersionGE( "5.1.0.1" );
-
 	protected static final int MIN_SEARCH_RANK_DEFAULT = 0;
 
 	public static  final String PARAM_SOURCES_LIST = "Plugin.aercm.sources.setlist";
@@ -93,10 +88,7 @@ RCMPlugin
 	private boolean						source_map_wildcard;
 	private byte[]						source_vhdn = compressDomain( "vhdn.vuze.com" );
 	
-	private Object json_rpc_server;	// Object during migration
-	
-	private Map<String, SearchInstance> mapSearchInstances = new HashMap<String, SearchInstance>();
-	private Map<String, Map> mapSearchResults = new HashMap<String, Map>();
+	private RCM_JSONServer json_rpc_server;
 	
 	private byte[]
 	compressDomain(
@@ -204,358 +196,10 @@ RCMPlugin
 				}
 			});
 		
-		if ( IS_5101_PLUS ){
-
-			json_rpc_server = 
-				new Utilities.JSONServer() 
-				{
-					private List<String> methods = new ArrayList<String>();
-					
-					{
-						methods.add( "rcm-is-enabled" );
-						methods.add( "rcm-get-list" );
-						methods.add( "rcm-lookup-start" );
-						methods.add( "rcm-lookup-remove" );
-						methods.add( "rcm-lookup-get-results" );
-						methods.add( "rcm-set-enabled" );
-					}
-					
-					public String 
-					getName() 
-					{
-						return( "SwarmDiscoveries" );
-					}
-
-					public List<String> 
-					getSupportedMethods() 
-					{
-						return( methods );
-					}				
-					
-					public Map 
-					call(
-						String 	method, 
-						Map 	args )
-								
-						throws PluginException 
-					{
-						if ( destroyed ){
-							
-							throw( new PluginException( "Plugin unloaded" ));
-						}
-						
-						Map<String, Object> result = new HashMap<String, Object>();
-						
-						if ( method.equals( "rcm-is-enabled" )){
-							
-							result.put( "enabled", isRCMEnabled());
-							result.put( "sources", getSourcesList());
-							result.put( "is-all-sources", isAllSources());
-							result.put( "is-default-sources", isDefaultSourcesList());
-							result.put( "ui-enabled", isUIEnabled());
-							
-						} else if ( method.equals( "rcm-get-list" )){
-
-							if (isRCMEnabled() && isUIEnabled()) {
-								rpcGetList(result, args);
-							} else {
-								throw( new PluginException( "RCM not enabled" ));
-							}
-
-						} else if ( method.equals( "rcm-set-enabled" )) {
-
-							boolean enable = MapUtils.getMapBoolean(args, "enable", false);
-							boolean all = MapUtils.getMapBoolean(args, "all-sources", false);
-							if (enable) {
-								setRCMEnabled(enable);
-							}
-
-							setSearchEnabled(enable);
-							setUIEnabled(enable);
-
-							setFTUXBeenShown(true);
-							
-							if (all) {
-								setToAllSources();
-							} else {
-								setToDefaultSourcesList();
-							}
-
-						} else if ( method.equals( "rcm-lookup-start" )){
-
-							if (isRCMEnabled() && isUIEnabled()) {
-								rpcLookupStart(result, args);
-							} else {
-								throw( new PluginException( "RCM not enabled" ));
-							}
-							
-						} else if ( method.equals( "rcm-lookup-remove" )){
-
-							if (isRCMEnabled() && isUIEnabled()) {
-								rpcLookupRemove(result, args);
-							} else {
-								throw( new PluginException( "RCM not enabled" ));
-							}
-							
-						} else if ( method.equals( "rcm-lookup-get-results" )){
-
-							if (isRCMEnabled() && isUIEnabled()) {
-								rpcLookupGetResults(result, args);
-							} else {
-								throw( new PluginException( "RCM not enabled" ));
-							}
-							
-						}else{
-							
-							throw( new PluginException( "Unsupported method" ));
-						}
-						
-						return( result );
-					}
-				};
-				
-			plugin_interface.getUtilities().registerJSONRPCServer((Utilities.JSONServer)json_rpc_server);
-		}
-	}
-
-	protected void rpcLookupStart(Map result, Map args) throws PluginException {
-		String searchTerm = MapUtils.getMapString(args, "search-term", null);
-		String lookupByTorrent = MapUtils.getMapString(args, "torrent-hash", null);
-		long lookupBySize = MapUtils.getMapLong(args, "file-size", 0);
-		
-		String[] networks = new String[] {
-			AENetworkClassifier.AT_PUBLIC
-		};
-		String net_str = getNetworkString(networks);
-		try {
-			RelatedContentManager manager = RelatedContentManager.getSingleton();
-
-			if (searchTerm != null) {
-				final String lookupID = Integer.toHexString((searchTerm + net_str).hashCode());
-
-				result.put("lid", lookupID);
-
-				//SearchInstance searchInstance = mapSearchInstances.get(searchID);
-
-				Map<String, Object> parameters = new HashMap<String, Object>();
-				parameters.put(SearchProvider.SP_SEARCH_TERM, searchTerm);
-
-				//if ( networks != null && networks.length > 0 ){
-				//parameters.put( SearchProvider.SP_NETWORKS, networks );
-				//}
-
-				Map map = mapSearchResults.get(lookupID);
-				if (map == null) {
-					map = new HashMap();
-					mapSearchResults.put(lookupID, map);
-				}
-				int activeSearches = MapUtils.getMapInt(map, "active-searches", 0);
-				map.put("active-searches", ++activeSearches);
-				map.put("complete", activeSearches > 0 ? false : true);
-				SearchInstance searchRCM = manager.searchRCM(
-						parameters, new SearchObserver() {
-							
-							public void resultReceived(SearchInstance search, SearchResult result) {
-								synchronized (mapSearchResults) {
-  								Map map = mapSearchResults.get(lookupID);
-  								if (map == null) {
-  									return;
-  								}
-  								
-  								List list = MapUtils.getMapList(map, "results", null);
-  								if (list == null) {
-  									list = new ArrayList();
-  									map.put("results", list);
-  								}
-
-  								
-  								SearchRelatedContent src = new SearchRelatedContent( result );
-  								
-  								Map mapResult = relatedContentToMap(src);
-  								
-  								list.add(mapResult);
-
-								}
-							}
-							
-							public Object getProperty(int property) {
-								// TODO Auto-generated method stub
-								return null;
-							}
-							
-							public void complete() {
-								synchronized (mapSearchResults) {
-  								Map map = mapSearchResults.get(lookupID);
-  								if (map == null) {
-  									return;
-  								}
-  								int activeSearches = MapUtils.getMapInt(map, "active-searches", 0);
-  								if (activeSearches > 0) {
-  									activeSearches--;
-  								}
-  								map.put("active-searches", activeSearches);
-  								map.put("complete", activeSearches > 0 ? false : true);
-								}
-							}
-							
-							public void cancelled() {
-								complete();
-							}
-						});
-			} else if (lookupByTorrent != null || lookupBySize > 0) {
-
-				final String lookupID = lookupByTorrent != null ? lookupByTorrent
-						: Integer.toHexString(
-								(String.valueOf(lookupBySize) + net_str).hashCode());
-
-				result.put("lid", lookupID);
-
-				Map map = mapSearchResults.get(lookupID);
-				if (map == null) {
-					map = new HashMap();
-					mapSearchResults.put(lookupID, map);
-				}
-				int activeSearches = MapUtils.getMapInt(map, "active-searches", 0);
-				map.put("active-searches", ++activeSearches);
-				map.put("complete", activeSearches > 0 ? false : true);
-				RelatedContentLookupListener l = new RelatedContentLookupListener() {
-
-					public void lookupStart() {
-					}
-
-					public void lookupFailed(ContentException error) {
-						lookupComplete();
-					}
-
-					public void lookupComplete() {
-						synchronized (mapSearchResults) {
-							Map map = mapSearchResults.get(lookupID);
-							if (map == null) {
-								return;
-							}
-							int activeSearches = MapUtils.getMapInt(map, "active-searches",
-									0);
-							if (activeSearches > 0) {
-								activeSearches--;
-							}
-							map.put("active-searches", activeSearches);
-							map.put("complete", activeSearches > 0 ? false : true);
-						}
-					}
-
-					public void contentFound(RelatedContent[] content) {
-						synchronized (mapSearchResults) {
-							Map map = mapSearchResults.get(lookupID);
-							if (map == null) {
-								return;
-							}
-
-							List list = MapUtils.getMapList(map, "results", null);
-							if (list == null) {
-								list = new ArrayList();
-								map.put("results", list);
-							}
-
-							for (RelatedContent item : content) {
-								Map<String, Object> mapResult = relatedContentToMap(item);
-								list.add(mapResult);
-							}
-
-						}
-					}
-				};
-				if (lookupByTorrent != null) {
-					byte[] hash = ByteFormatter.decodeString(lookupByTorrent);
-					manager.lookupContent(hash, networks, l);
-				} else if (lookupBySize > 0) {
-					manager.lookupContent(lookupBySize, l);
-				}
-
-			} else {
-				throw new PluginException("No search-term, torrent-hash or file-size");
-			}
-		} catch (Exception e) {
-			throw new PluginException(e);
-		}
-	}
-
-	protected void rpcLookupRemove(Map result, Map args) throws PluginException {
-		String lid = MapUtils.getMapString(args, "lid", null);
-		if (lid == null) {
-			throw new PluginException("No Lookup ID");
-		}
-		mapSearchInstances.remove(lid);
-		mapSearchResults.remove(lid);
-	}
-
-	protected void rpcLookupGetResults(Map result, Map args) throws PluginException {
-		// TODO: filter by "since"
-		long since = MapUtils.getMapLong(args, "since", 0);
-
-		Map map = mapSearchResults.get(MapUtils.getMapString(args, "lid", null));
-		if (map == null) {
-			throw new PluginException("No results for Lookup ID");
-		}
-		result.putAll(map);
-	}
-
-	protected void rpcGetList(Map result, Map args) throws PluginException {
-		long since = MapUtils.getMapLong(args, "since", 0);
-		long until = 0;
-
-		List<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
-		result.put("related", list);
-		try {
-			RelatedContentManager manager = RelatedContentManager.getSingleton();
-			RelatedContent[] relatedContent = manager.getRelatedContent();
+		json_rpc_server = new RCM_JSONServer(this);
 			
-			for (RelatedContent item : relatedContent) {
-				if (!isVisible(item)) {
-					continue;
-				}
-
-				long changedLocallyOn = item.getChangedLocallyOn();
-				if (changedLocallyOn < since) {
-					continue;
-				}
-				if (changedLocallyOn > until) {
-					until = changedLocallyOn;
-				}
-
-				Map map = relatedContentToMap(item);
-				list.add(map);
-			}
-		} catch (Exception e) {
-			throw new PluginException(e);
-		}
-		
-		result.put("until", until);
+		plugin_interface.getUtilities().registerJSONRPCServer(json_rpc_server);
 	}
-
-
-	private Map<String, Object> relatedContentToMap(RelatedContent item) {
-		HashMap<String, Object> map = new HashMap<String, Object>();
-		
-		long changedLocallyOn = item.getChangedLocallyOn();
-
-		map.put("changedOn", changedLocallyOn);
-		map.put("contentNetwork", item.getContentNetwork());
-		map.put("hash", ByteFormatter.encodeString(item.getHash()));
-		map.put("lastSeenSecs", item.getLastSeenSecs());
-		map.put("peers", item.getLeechers());
-		map.put("level", item.getLevel());
-		map.put("publishDate", item.getPublishDate());
-		map.put("rank", item.getRank());
-		map.put("relatedToHash", ByteFormatter.encodeString(item.getRelatedToHash()) );
-		map.put("seeds", item.getSeeds());
-		map.put("size", item.getSize());
-		map.put("tags", item.getTags());
-		map.put("title", item.getTitle());
-		map.put("tracker", item.getTracker());
-		map.put("unread", item.isUnread());
-		return map;
-	}
-
 
 	protected void
 	updatePluginInfo()
@@ -862,23 +506,13 @@ RCMPlugin
 		
 		if ( json_rpc_server != null ){
 			
-			plugin_interface.getUtilities().unregisterJSONRPCServer((Utilities.JSONServer)json_rpc_server);
+			plugin_interface.getUtilities().unregisterJSONRPCServer(json_rpc_server);
+			
+			json_rpc_server.unload();
 			
 			json_rpc_server = null;
 		}
 
-		if (mapSearchResults != null) {
-			mapSearchResults.clear();
-		}
-		if (mapSearchInstances != null) {
-  		for (SearchInstance si: mapSearchInstances.values()) {
-  			try {
-  				si.cancel();
-  			} catch (Throwable t) {
-  			}
-  		}
-  		mapSearchInstances.clear();
-		}
 	}
 	
 		// IPC methods
@@ -1188,5 +822,9 @@ RCMPlugin
 		}
 		
 		return( uri );
+	}
+	
+	public boolean isDestroyed() {
+		return destroyed;
 	}
 }
