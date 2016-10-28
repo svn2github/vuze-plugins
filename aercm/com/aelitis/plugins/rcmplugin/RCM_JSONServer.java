@@ -20,8 +20,10 @@ package com.aelitis.plugins.rcmplugin;
 
 import java.util.*;
 
+import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.AENetworkClassifier;
 import org.gudy.azureus2.core3.util.ByteFormatter;
+import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.utils.Utilities;
 import org.gudy.azureus2.plugins.utils.search.*;
@@ -50,6 +52,7 @@ public final class RCM_JSONServer
 		methods.add("rcm-lookup-remove");
 		methods.add("rcm-lookup-get-results");
 		methods.add("rcm-set-enabled");
+		methods.add("rcm-create-subscription");
 	}
 
 	public String getName() {
@@ -125,6 +128,14 @@ public final class RCM_JSONServer
 
 			if (rcmPlugin.isRCMEnabled() && rcmPlugin.isUIEnabled()) {
 				rpcLookupGetResults(result, args);
+			} else {
+				throw (new PluginException("RCM not enabled"));
+			}
+
+		} else if (method.equals("rcm-create-subscription")) {
+
+			if (rcmPlugin.isRCMEnabled() && rcmPlugin.isUIEnabled()) {
+				rpcCreateSubscription(result, args);
 			} else {
 				throw (new PluginException("RCM not enabled"));
 			}
@@ -394,5 +405,35 @@ public final class RCM_JSONServer
 		} catch (Exception e) {
 			throw new PluginException(e);
 		}
+	}
+
+	private void rpcCreateSubscription(Map result, Map args)
+			throws PluginException {
+		String expression = MapUtils.getMapString(args, "expression", null);
+		boolean is_popularity = expression == null;
+		final String name = is_popularity ? MessageText.getString("rcm.pop")
+				: ("'" + expression + "'");
+		String subscription_name = MessageText.getString("rcm.search.provider")
+				+ ": " + name;
+		SearchProvider sp = rcmPlugin.getSearchProvider();
+		String[] networks = AENetworkClassifier.AT_NETWORKS;
+
+		Map<String, Object> properties = new HashMap<String, Object>();
+
+		properties.put(SearchProvider.SP_SEARCH_NAME, subscription_name);
+		properties.put(SearchProvider.SP_SEARCH_TERM, expression);
+		properties.put(SearchProvider.SP_NETWORKS, networks);
+
+		try {
+			rcmPlugin.getPluginInterface().getUtilities().getSubscriptionManager().requestSubscription(
+					sp, properties);
+
+		} catch (Throwable e) {
+
+			throw new PluginException(e);
+		}
+		
+		// Probably successful
+		result.put("success", true);
 	}
 }
