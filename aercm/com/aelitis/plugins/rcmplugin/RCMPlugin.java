@@ -53,6 +53,8 @@ RCMPlugin
 
 	public static  final String PARAM_SOURCES_LIST = "Plugin.aercm.sources.setlist";
 
+	public static  final String PARAM_SOURCES_ISDEFAULT = "Plugin.aercm.sources.isdefault";
+
 	public static final String PARAM_FTUX_SHOWN = "rcm.ftux.shown2";
 
 	public static final String POPULARITY_SEARCH_EXPR	= "(.)";
@@ -77,6 +79,14 @@ RCMPlugin
 		source_map_defaults.add( "bt.archive.org" );
 		source_map_defaults.add( "tracker.legaltorrents.com" );
 		source_map_defaults.add( "tracker.mininova.org" );
+		// End of original list
+		source_map_defaults.add( "www.legaltorrents.com" );
+		source_map_defaults.add( "torrent.ubuntu.com" );
+		source_map_defaults.add( "torrents.freebsd.org" );
+		source_map_defaults.add( "torrent.fedoraproject.org" );
+		source_map_defaults.add( "tracker.opensuse.org" );
+		source_map_defaults.add( "torrents.linuxmint.com" );
+		source_map_defaults.add( "tracker.johncave.co.nz" ); // OpenMandriva
 	}
 	
 	private ByteArrayHashMap<Boolean>	source_map 	= new ByteArrayHashMap<Boolean>();
@@ -121,6 +131,21 @@ RCMPlugin
 	{
 		plugin_interface = _plugin_interface;
 			
+
+		// ensure source list is up to date if marked as default
+		boolean isDefaultList = COConfigurationManager.getBooleanParameter(PARAM_SOURCES_ISDEFAULT, false);
+		if (isDefaultList) {
+			setToDefaultSourcesList();
+		} else {
+  		// Upgrade source list if it's a subset of default list (ie. older version)
+  		// Should be done before anything hooks PARAM_SOURCES_LIST, since
+  		// it may fire a config change
+  		List<String> list = getSourcesList();
+  		if (source_map_defaults.containsAll(list)) {
+  			setToDefaultSourcesList();
+  		}
+		}
+		
 		COConfigurationManager.addAndFireParameterListener(
 				PARAM_SOURCES_LIST,
 			new ParameterListener()
@@ -226,6 +251,7 @@ RCMPlugin
 							result.put( "enabled", isRCMEnabled());
 							result.put( "sources", getSourcesList());
 							result.put( "is-all-sources", isAllSources());
+							result.put( "is-default-sources", isDefaultSourcesList());
 							result.put( "ui-enabled", isUIEnabled());
 							
 						} else if ( method.equals( "rcm-get-list" )){
@@ -695,6 +721,10 @@ RCMPlugin
 				source_map.put( compressDomain( host ), Boolean.TRUE );
 			}
 		}
+		
+		boolean isDefaultList = list.size() == source_map_defaults.size()
+				&& list.containsAll(source_map_defaults);
+		COConfigurationManager.setParameter(PARAM_SOURCES_ISDEFAULT, isDefaultList);
 	}
 	
 	public List<String>
@@ -703,7 +733,7 @@ RCMPlugin
 		List original_list = COConfigurationManager.getListParameter( PARAM_SOURCES_LIST, source_map_defaults );
 		
 		List<String>	list = BDecoder.decodeStrings( BEncoder.cloneList(original_list) );
-
+		
 		return( list );
 	}
 	
@@ -713,6 +743,10 @@ RCMPlugin
 	
 	public void setToAllSources() {
 		COConfigurationManager.setParameter(PARAM_SOURCES_LIST, Arrays.asList("*"));
+	}
+	
+	public boolean isDefaultSourcesList() {
+		return COConfigurationManager.getBooleanParameter(PARAM_SOURCES_ISDEFAULT, false);
 	}
 	
 	public boolean isAllSources() {
