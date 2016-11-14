@@ -50,6 +50,8 @@ public final class RCM_JSONServer
 		methods.add("rcm-get-list");
 		methods.add("rcm-lookup-start");
 		methods.add("rcm-lookup-remove");
+		methods.add("rcm-remove");
+		methods.add("rcm-set-read");
 		methods.add("rcm-lookup-get-results");
 		methods.add("rcm-set-enabled");
 		methods.add("rcm-create-subscription");
@@ -124,6 +126,22 @@ public final class RCM_JSONServer
 				throw (new PluginException("RCM not enabled"));
 			}
 
+		} else if (method.equals("rcm-remove")) {
+
+			if (rcmPlugin.isRCMEnabled() && rcmPlugin.isUIEnabled()) {
+				rpcRemove(result, args);
+			} else {
+				throw (new PluginException("RCM not enabled"));
+			}
+
+		} else if (method.equals("rcm-set-read")) {
+
+			if (rcmPlugin.isRCMEnabled() && rcmPlugin.isUIEnabled()) {
+				rpcSetRead(result, args);
+			} else {
+				throw (new PluginException("RCM not enabled"));
+			}
+
 		} else if (method.equals("rcm-lookup-get-results")) {
 
 			if (rcmPlugin.isRCMEnabled() && rcmPlugin.isUIEnabled()) {
@@ -184,6 +202,8 @@ public final class RCM_JSONServer
 		map.put("title", item.getTitle());
 		map.put("tracker", item.getTracker());
 		map.put("unread", item.isUnread());
+		// can't find a good uid, hashcode will do for session
+		map.put("id", item.hashCode());
 		return map;
 	}
 
@@ -233,12 +253,138 @@ public final class RCM_JSONServer
 		result.putAll(map);
 	}
 
+	protected void rpcSetRead(Map result, Map args)
+			throws PluginException {
+
+		boolean unread = !MapUtils.getMapBoolean(args, "read", true);
+
+		String lid = MapUtils.getMapString(args, "lid", null);
+
+		if (!args.containsKey("ids")) {
+			throw new PluginException("No ids");
+		}
+
+		List<Integer> ids = new ArrayList<Integer>();
+		Object oIDs = args.get("ids");
+		if (oIDs instanceof List) {
+			List list = (List) oIDs;
+			for (Object item : list) {
+				ids.add(((Number) item).intValue());
+			}
+		} else if (oIDs instanceof Number) {
+			ids.add(((Number) oIDs).intValue());
+		}
+
+		List<Integer> successes = new ArrayList<Integer>();
+		result.put("success", successes);
+		result.put("failure", ids);
+
+		if (lid != null) {
+			SearchInstance searchInstance = mapSearchInstances.get(lid);
+			Map map = mapSearchResults.get(lid);
+			if (map != null) {
+				List listResults = (List) map.get("results");
+				if (listResults == null) {
+					return;
+				}
+				for (Object o : listResults) {
+					Map mapRC = (Map) o;
+					int rcID = MapUtils.getMapInt(mapRC, "id", 0);
+					for (Iterator<Integer> iterator = ids.iterator(); iterator.hasNext();) {
+						Integer id = iterator.next();
+						if (rcID != id) {
+							continue;
+						}
+
+						successes.add(id);
+						map.put("unread", unread);
+
+						iterator.remove();
+						if (ids.size() == 0) {
+							return;
+						}
+					} // for ids
+				}
+			}
+			return;
+		}
+
+		try {
+		
+			RelatedContentManager manager = RelatedContentManager.getSingleton();
+			RelatedContent[] relatedContent = manager.getRelatedContent();
+			for (RelatedContent rc : relatedContent) {
+				for (Iterator<Integer> iterator = ids.iterator(); iterator.hasNext();) {
+					Integer id = iterator.next();
+					if (rc.hashCode() == id) {
+						rc.setUnread(unread);
+						successes.add(id);
+
+						iterator.remove();
+
+						if (ids.size() == 0) {
+							return;
+						}
+					}
+				}
+			}
+		} catch (ContentException e) {
+			throw new PluginException(e);
+		}
+	}
+
+	protected void rpcRemove(Map result, Map args)
+			throws PluginException {
+
+		if (!args.containsKey("ids")) {
+			throw new PluginException("No ids");
+		}
+
+		List<Integer> ids = new ArrayList<Integer>();
+		Object o = args.get("ids");
+		if (o instanceof List) {
+			List list = (List) o;
+			for (Object item : list) {
+				ids.add(((Number) item).intValue());
+			}
+		} else if (o instanceof Number) {
+			ids.add(((Number) o).intValue());
+		}
+
+		List<Integer> successes = new ArrayList<Integer>();
+		result.put("success", successes);
+		result.put("failure", ids);
+
+		try {
+			RelatedContentManager manager = RelatedContentManager.getSingleton();
+			RelatedContent[] relatedContent = manager.getRelatedContent();
+			for (RelatedContent rc : relatedContent) {
+				for (Iterator<Integer> iterator = ids.iterator(); iterator.hasNext();) {
+					Integer id = iterator.next();
+					if (rc.hashCode() == id) {
+						successes.add(id);
+						rc.delete();
+
+						iterator.remove();
+
+						if (ids.size() == 0) {
+							return;
+						}
+					}
+				}
+			}
+		} catch (ContentException e) {
+			throw new PluginException(e);
+		}
+	}
+
 	protected void rpcLookupRemove(Map result, Map args)
 			throws PluginException {
 		String lid = MapUtils.getMapString(args, "lid", null);
 		if (lid == null) {
 			throw new PluginException("No Lookup ID");
 		}
+
 		mapSearchInstances.remove(lid);
 		mapSearchResults.remove(lid);
 	}
@@ -432,7 +578,7 @@ public final class RCM_JSONServer
 
 			throw new PluginException(e);
 		}
-		
+
 		// Probably successful
 		result.put("success", true);
 	}
