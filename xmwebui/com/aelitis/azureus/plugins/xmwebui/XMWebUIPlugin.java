@@ -2004,7 +2004,11 @@ XMWebUIPlugin
 				map.put("public", tag.isPublic());
 				map.put("visible", tag.isVisible());
 				map.put("group", tag.getGroup());
-				map.put("auto", tag.isTagAuto());
+				
+				boolean[] auto = tag.isTagAuto();
+				
+				map.put("auto", auto[0] || auto[1]);
+				
 				listTags.add(map);
 			}
 		}
