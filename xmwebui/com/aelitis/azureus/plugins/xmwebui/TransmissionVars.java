@@ -339,6 +339,7 @@ public class TransmissionVars
 	public static final String FIELD_SUBSCRIPTION_URI = "uri";
 	public static final String FIELD_SUBSCRIPTION_ANONYMOUS = "anonymous";
 	public static final String FIELD_SUBSCRIPTION_AUTO_DL_SUPPORTED = "autoDLSupported";
+	public static final String FIELD_SUBSCRIPTION_AUTO_DOWNLOAD = "autoDownlaod";
 	public static final String FIELD_SUBSCRIPTION_MINE = "mine";
 	public static final String FIELD_SUBSCRIPTION_PUBLIC = "public";
 	public static final String FIELD_SUBSCRIPTION_IS_SEARCH_TEMPLATE = "isSearchTemplate";
@@ -347,5 +348,29 @@ public class TransmissionVars
 	public static final String FIELD_SUBSCRIPTION_SHAREABLE = "shareable";
 	public static final String FIELD_SUBSCRIPTION_RESULTS_COUNT = "resultsCount";
 	public static final String FIELD_SUBSCRIPTION_RESULTS = "results";
-	
+	public static final String FIELD_SUBSCRIPTION_ENGINE = "engine";
+	public static final String FIELD_SUBSCRIPTION_ENGINE_URL = "url";
+	public static final String FIELD_SUBSCRIPTION_ENGINE_NAMEX = "nameEx";
+	public static final String FIELD_SUBSCRIPTION_ENGINE_AUTHMETHOD = "authMethod";
+	public static final String FIELD_SUBSCRIPTION_ENGINE_LASTUPDATED = "lastUpdated";
+	public static final String FIELD_SUBSCRIPTION_ENGINE_SOURCE = "source";
+
+	public static final String FIELD_SUBSCRIPTION_RESULT_UID = "u";
+	public static final String FIELD_SUBSCRIPTION_RESULT_ISREAD = "subs_is_read";
+
+	public static final String FIELD_TAG_NAME = "name";
+	public static final String FIELD_TAG_COUNT = "count";
+	public static final String FIELD_TAG_TYPE = "type";
+	public static final String FIELD_TAG_TYPENAME = "type-name";
+	public static final String FIELD_TAG_CATEGORY_TYPE = "category-type";
+	public static final String FIELD_TAG_UID = "uid";
+	public static final String FIELD_TAG_ID = "id";
+	public static final String FIELD_TAG_COLOR = "color";
+	public static final String FIELD_TAG_CANBEPUBLIC = "canBePublic";
+	public static final String FIELD_TAG_PUBLIC = "public";
+	public static final String FIELD_TAG_VISIBLE = "visible";
+	public static final String FIELD_TAG_GROUP = "group";
+	public static final String FIELD_TAG_AUTO_ADD = "auto_add";
+	public static final String FIELD_TAG_AUTO_REMOVE = "auto_remove";
+
 }

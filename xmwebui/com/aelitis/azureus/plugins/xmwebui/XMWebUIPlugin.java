@@ -77,12 +77,15 @@ import org.gudy.azureus2.pluginsimpl.local.utils.resourcedownloader.ResourceDown
 import org.gudy.azureus2.ui.webplugin.WebPlugin;
 import org.gudy.bouncycastle.util.encoders.Base64;
 import org.json.simple.JSONObject;
+import org.json.simple.JSONValue;
 
 import com.aelitis.azureus.core.AzureusCore;
 import com.aelitis.azureus.core.AzureusCoreFactory;
 import com.aelitis.azureus.core.metasearch.*;
+import com.aelitis.azureus.core.metasearch.impl.web.WebEngine;
 import com.aelitis.azureus.core.pairing.PairingManager;
 import com.aelitis.azureus.core.pairing.PairingManagerFactory;
+import com.aelitis.azureus.core.security.CryptoManager;
 import com.aelitis.azureus.core.subs.*;
 import com.aelitis.azureus.core.tag.*;
 import com.aelitis.azureus.core.torrent.PlatformTorrentUtils;
@@ -884,10 +887,18 @@ XMWebUIPlugin
 					log( "-> " + request_json_str );
 				}
 				
-				Map request_json = JSONUtils.decodeJSON( request_json_str.toString());
+				Map response_json;
+				Object object = JSONValue.parse(request_json_str.toString());
+				if (object instanceof Map) {
+					Map request_json = JSONUtils.decodeJSON( request_json_str.toString());
+					response_json = processRequest( request, session_id_plus, request_json );
+				} else {
+					response_json = new HashMap();
+					response_json.put( "result", "error: Bad or missing JSON string");
+					response_json.put("request", request_json_str);
+				}
+
 				
-				Map response_json = processRequest( request, session_id_plus, request_json );
-					
 				String response_json_str = JSONUtils.encodeToJSON( response_json );
 				
 				if ( logit ){
@@ -1502,6 +1513,10 @@ XMWebUIPlugin
 				
 				method_Subscription_Add(args, result);
 				
+			}else if ( method.equals( "subscription-set" )){
+				
+				method_Subscription_Set(args, result);
+				
 			}else if ( method.equals( "subscription-remove" )){
 				
 				method_Subscription_Remove(args, result);
@@ -1511,8 +1526,20 @@ XMWebUIPlugin
 				method_Vuze_Search_Start(args, result);
 				
 			}else if ( method.equals( "vuze-search-get-results" )){
-										
+				
 				method_Vuze_Search_Get_Results(args, result);
+
+			}else if ( method.equals( "vuze-config-set" )){
+				
+				method_Vuze_Config_Set(args, result);
+
+			}else if ( method.equals( "vuze-config-get" )){
+				
+				method_Vuze_Config_Get(args, result);
+
+			}else if ( method.equals( "vuze-plugin-get-list" )){
+				
+				method_Vuze_Plugin_Get_List(args, result);
 
 			}else if ( method.equals( "vuze-lifecycle" )){
 	
@@ -1565,8 +1592,196 @@ XMWebUIPlugin
 			}
 		}
 	}
+	
+	private void method_Vuze_Plugin_Get_List(Map args, Map result) {
+		String sep = System.getProperty("file.separator");
 
-		private void method_Tags_Lookup_Start(Map args, Map result) {
+		File fUserPluginDir = FileUtil.getUserFile("plugins");
+		String sUserPluginDir;
+		try {
+			sUserPluginDir = fUserPluginDir.getCanonicalPath();
+		} catch (Throwable e) {
+			sUserPluginDir = fUserPluginDir.toString();
+		}
+		if (!sUserPluginDir.endsWith(sep)) {
+			sUserPluginDir += sep;
+		}
+
+		File fAppPluginDir = FileUtil.getApplicationFile("plugins");
+		String sAppPluginDir;
+		try {
+			sAppPluginDir = fAppPluginDir.getCanonicalPath();
+		} catch (Throwable e) {
+			sAppPluginDir = fAppPluginDir.toString();
+		}
+		if (!sAppPluginDir.endsWith(sep)) {
+			sAppPluginDir += sep;
+		}
+
+		List pluginIFs = Arrays.asList(
+				AzureusCoreFactory.getSingleton().getPluginManager().getPlugins());
+		for (Iterator iter = pluginIFs.iterator(); iter.hasNext();) {
+			PluginInterface pi = (PluginInterface) iter.next();
+
+			Map mapPlugin = new HashMap();
+			result.put(pi.getPluginID(), mapPlugin);
+			mapPlugin.put("name", pi.getPluginName());
+
+			String sDirName = pi.getPluginDirectoryName();
+			String sKey;
+
+			if (sDirName.length() > sUserPluginDir.length()
+					&& sDirName.substring(0, sUserPluginDir.length()).equals(
+							sUserPluginDir)) {
+				sKey = "perUser";
+
+			} else if (sDirName.length() > sAppPluginDir.length()
+					&& sDirName.substring(0, sAppPluginDir.length()).equals(
+							sAppPluginDir)) {
+				sKey = "shared";
+			} else {
+				sKey = "builtIn";
+			}
+
+			mapPlugin.put("type", sKey);
+			mapPlugin.put("version", pi.getPluginVersion());
+			PluginState pluginState = pi.getPluginState();
+			mapPlugin.put("isBuiltIn", pluginState.isBuiltIn());
+			mapPlugin.put("isDisabled", pluginState.isDisabled());
+			mapPlugin.put("isInitialisationComplete",
+					pluginState.isInitialisationComplete());
+			mapPlugin.put("isLoadedAtStartup", pluginState.isLoadedAtStartup());
+			mapPlugin.put("isMandatory", pluginState.isMandatory());
+			mapPlugin.put("isOperational", pluginState.isOperational());
+			mapPlugin.put("isShared", pluginState.isShared());
+			mapPlugin.put("isUnloadable", pluginState.isUnloadable());
+			mapPlugin.put("isUnloaded", pluginState.isUnloaded());
+		}
+	}
+
+	private void method_Vuze_Config_Get(Map args, Map result) {
+		List listKeys = MapUtils.getMapList(args, "keys", Collections.EMPTY_LIST);
+		for (Object key : listKeys) {
+			String keyString = key.toString();
+			if (ignoreConfigKey(keyString)) {
+				continue;
+			}
+			Object val = COConfigurationManager.getParameter(keyString);
+			if (val instanceof byte[]) {
+				// Place parsed string in key's value, B64 of bytes in key + ".B64"
+				String valString;
+				byte[] bytes = (byte[]) val;
+				try {
+					valString = new String(bytes, Constants.DEFAULT_ENCODING);
+				} catch (Throwable e) {
+					valString = new String(bytes);
+				}
+
+				result.put(key, valString);
+				try {
+					result.put(key + ".B64", new String(Base64.encode(bytes), "utf8"));
+				} catch (UnsupportedEncodingException e) {
+				}
+			} else {
+				result.put(key, val);
+			}
+		}
+
+	}
+
+	private void method_Vuze_Config_Set(Map args, Map result) {
+		Map mapDirect = MapUtils.getMapMap(args, "direct", Collections.EMPTY_MAP);
+		for (Object key : mapDirect.keySet()) {
+			String keyString = key.toString();
+			if (ignoreConfigKey(keyString)) {
+				result.put(keyString, "key ignored");
+				continue;
+			}
+			Object val = mapDirect.get(key);
+			boolean changed;
+			if (val instanceof String) {
+				changed = COConfigurationManager.setParameter(keyString, (String) val);
+			} else if (val instanceof Boolean) {
+				changed = COConfigurationManager.setParameter(keyString, (Boolean) val);
+			} else if (val instanceof Float) {
+				changed = COConfigurationManager.setParameter(keyString, (Float) val);
+			} else if (val instanceof Double) {
+				changed = COConfigurationManager.setParameter(keyString,
+						((Number) val).floatValue());
+			} else if (val instanceof Number) {
+				changed = COConfigurationManager.setParameter(keyString,
+						((Number) val).longValue());
+			} else if (val instanceof Map) {
+				changed = COConfigurationManager.setParameter(keyString, (Map) val);
+			} else {
+				result.put(keyString, "error");
+				continue;
+			}
+			result.put(keyString, changed);
+		}
+
+		Map mapByteArray = MapUtils.getMapMap(args, "byteArray.B64",
+				Collections.EMPTY_MAP);
+		for (Object key : mapByteArray.keySet()) {
+			String keyString = key.toString();
+			if (ignoreConfigKey(keyString)) {
+				result.put(keyString, "key ignored");
+				continue;
+			}
+			Object val = mapByteArray.get(key);
+			if (val instanceof String) {
+				byte[] decode = Base64.decode((String) val);
+				boolean changed = COConfigurationManager.setParameter(keyString,
+						decode);
+				result.put(keyString, changed);
+			} else {
+				result.put(keyString, "error");
+			}
+		}
+
+		COConfigurationManager.save();
+	}
+	
+	private boolean
+	ignoreConfigKey(
+		String		key )
+	{
+		String lc_key = key.toLowerCase(Locale.US);
+
+		if (key.startsWith(CryptoManager.CRYPTO_CONFIG_PREFIX)
+				|| lc_key.equals("id") || lc_key.equals("azbuddy.dchat.optsmap")
+				|| lc_key.endsWith(".privx") || lc_key.endsWith(".user")
+				|| lc_key.contains("password") || lc_key.contains("username")
+				|| lc_key.contains("session key")) {
+
+			return (true);
+		}
+
+		Object value = COConfigurationManager.getParameter(key);
+
+		if (value instanceof byte[]) {
+
+			try {
+				value = new String((byte[]) value, "UTF-8");
+
+			} catch (Throwable e) {
+
+			}
+		}
+
+		if (value instanceof String) {
+
+			if (((String) value).toLowerCase(Locale.US).endsWith(".b32.i2p")) {
+
+				return (true);
+			}
+		}
+
+		return (false);
+	}
+
+
+	private void method_Tags_Lookup_Start(Map args, Map result) {
 		Object ids = args.get("ids");
 		
 		TagSearchInstance tagSearchInstance = new TagSearchInstance();
@@ -1716,7 +1931,9 @@ XMWebUIPlugin
 			map.put("favicon", engine.getIcon());
 			map.put("dl_link_css", engine.getDownloadLinkCSS());
 			map.put("selected", Engine.SEL_STATE_STRINGS[engine.getSelectionState()]);
-			map.put("type", Engine.ENGINE_SOURCE_STRS[engine.getSource()]);
+			map.put("source", Engine.ENGINE_SOURCE_STRS[engine.getSource()]);
+			int type = engine.getType();
+			map.put("type", type < Engine.ENGINE_TYPE_STRS.length ? Engine.ENGINE_TYPE_STRS[type] : type);
 		}
 	}
 
@@ -1735,7 +1952,99 @@ XMWebUIPlugin
 			result.put("subscription", subRSS.getJSON());
 		}
 	}
+
 	
+	/*
+	 * {
+	 *   <Subscription List ID> :
+	 *   {
+	 *     <field> : value,
+	 *     "results" : {
+	 *       <field> : value,
+	 *       etc
+	 *     },
+	 *     etc
+	 *   },
+	 *   etc
+	 * }
+	 */
+	private void method_Subscription_Set(Map args, Map result)
+			throws SubscriptionException, IOException {
+		Object oIDs = args.get("ids");
+
+		if (oIDs == null) {
+			throw new IOException("ids missing");
+		}
+
+		if (!(oIDs instanceof Map)) {
+			throw new IOException("ids not map");
+		}
+
+		Map mapSubscriptionIDs = (Map) oIDs;
+		SubscriptionManager subMan = SubscriptionManagerFactory.getSingleton();
+		for (Object oSubscriptionID : mapSubscriptionIDs.keySet()) {
+			Subscription subs = subMan.getSubscriptionByID((String) oSubscriptionID);
+			if (subs == null) {
+				result.put(oSubscriptionID, "Error: Not Found");
+				continue;
+			}
+			Object oVal = mapSubscriptionIDs.get(oSubscriptionID);
+			if (!(oVal instanceof Map)) {
+				continue;
+			}
+			Map mapSubscriptionFields = (Map) oVal;
+			// could change name, subscribed state, etc
+
+			int numChanged = 0;
+
+			for (Object oSubscriptionFieldName : mapSubscriptionFields.keySet()) {
+				String subscriptionFieldName = (String) oSubscriptionFieldName;
+				Object oSubscriptionFieldValue = mapSubscriptionFields.get(
+						subscriptionFieldName);
+				if (subscriptionFieldName.equals(FIELD_SUBSCRIPTION_NAME)) {
+					subs.setName((String) oSubscriptionFieldValue);
+					numChanged++;
+
+				} else if (subscriptionFieldName.equals(FIELD_SUBSCRIPTION_AUTO_DOWNLOAD)
+						&& (oSubscriptionFieldValue instanceof Boolean)) {
+					subs.getHistory().setAutoDownload((Boolean) oSubscriptionFieldValue);
+					numChanged++;
+				
+				} else if (subscriptionFieldName.equals(FIELD_SUBSCRIPTION_SUBSCRIBED)
+						&& (oSubscriptionFieldValue instanceof Boolean)) {
+					subs.setSubscribed((Boolean) oSubscriptionFieldValue);
+					numChanged++;
+				
+				} else if (subscriptionFieldName.equals(FIELD_SUBSCRIPTION_RESULTS)
+						&& (oSubscriptionFieldValue instanceof Map)) {
+					
+					Map map = new HashMap();
+
+					Map mapResults = (Map) oSubscriptionFieldValue;
+					SubscriptionResult[] results = subs.getResults(false);
+					for (Object oResultKey : mapResults.keySet()) {
+						String subs_id = (String) oResultKey;
+						Map mapResultEntries = (Map) mapResults.get(oResultKey);
+
+						for (SubscriptionResult entry : results) {
+							if (entry.getID().equals(subs_id)) {
+								Boolean isRead = (Boolean) mapResultEntries.get(
+										FIELD_SUBSCRIPTION_RESULT_ISREAD);
+								if (isRead != null) {
+									numChanged++;
+									entry.setRead(isRead);
+								}
+								break;
+							}
+						}
+					}
+					result.put(oSubscriptionID, map);
+				}
+			}
+
+		}
+	}
+
 	private void method_Subscription_Remove(Map args, Map result) throws IOException {
 		Object oID = args.get("ids");
 
@@ -1762,8 +2071,8 @@ XMWebUIPlugin
 			if (subs == null) {
 				result.put(id, "Error: Not Found");
 			} else {
-				subs.setSubscribed(false);
-				result.put(id, "Unsubscribed");
+				subs.remove();
+				result.put(id, "Removed");
 			}
 		}
 	}
@@ -1771,6 +2080,8 @@ XMWebUIPlugin
 	
 	
 	/*
+	 * For non-torrent specific:
+	 * 
 	 * Subscriptions : 
 	 * {
 	 *   SubscriptionID : 
@@ -1782,183 +2093,88 @@ XMWebUIPlugin
 	 *   	Field:Value,
 	 *   },
 	 * }
+	 * 
+	 * For torrent specific:
+	 * Subscriptions :
+	 * {
+	 *   SubscriptionID: {
+	 *     torrentId: #,
+	 * 	   Field:Value,
+	 *   },
+	 *   etc
+	 * }
 	 */
-	private void method_Subscription_Get(Map args, Map result) throws IOException {
+	private void method_Subscription_Get(Map args, Map result)
+			throws IOException {
 
 		boolean subscribedOnly = MapUtils.getMapBoolean(args, "subscribed-only",
 				true);
 
-		Object oID = args.get("ids");
+		Map<Object, Map<String, Object>> mapSubcriptions = new HashMap<Object, Map<String, Object>>();
 
-		String[] ids = new String[0];
-		if (oID instanceof String) {
-			ids = new String[] { (String) oID };
-		} else if (oID instanceof List) {
-			ids = (String[]) ((List) oID).toArray(new String[0]);
-		} else if (oID instanceof Object[]) {
-			Object[] oIDS = (Object[]) oID; 
-			ids = new String[oIDS.length];
-			for (int i = 0; i < oIDS.length; i++) {
-				ids[i] = oIDS[i].toString();
-			}
-		}
+		SubscriptionManager subMan = SubscriptionManagerFactory.getSingleton();
 
 		List fields = (List) args.get("fields");
-		List<String> fieldsResults = null;
 		boolean all = fields == null || fields.size() == 0;
 		if (!all) {
 			// sort so we can't use Collections.binarySearch
 			Collections.sort(fields);
-			int i = Collections.binarySearch(fields, FIELD_SUBSCRIPTION_RESULTS);
-			if (i >= 0) {
-				Object oResults = fields.get(0);
-				if (oResults instanceof List) {
-					fieldsResults = (List) oResults;
+		}
+
+		Object oTorrentHashes = args.get("torrent-ids");
+		if (oTorrentHashes != null) {
+			List<DownloadStub> downloads = getDownloads(oTorrentHashes, false);
+			for (DownloadStub stub : downloads) {
+				Subscription[] subs = subMan.getKnownSubscriptions(
+						stub.getTorrentHash());
+				if (subs != null) {
+					for (Subscription sub : subs) {
+						Map<String, Object> map = buildSubscriptionMap(sub, args, fields, all);
+						map.put("torrentID", getID(stub, false));
+
+						mapSubcriptions.put(sub.getID(), map);
+					}
 				}
 			}
-		}
-		boolean allResultFields = fieldsResults == null || fieldsResults.size() == 0;
-
-		Map<String, Map<String, Object>> mapSubcriptions = new HashMap<String, Map<String, Object>>();
-
-		SubscriptionManager subMan = SubscriptionManagerFactory.getSingleton();
-		Subscription[] subscriptions;
-		if (ids.length == 0) {
-			subscriptions = subMan.getSubscriptions(subscribedOnly);
 		} else {
-			List<Subscription> list = new ArrayList<Subscription>();
-			for (String id : ids) {
-				Subscription subscriptionByID = subMan.getSubscriptionByID(id);
-				if (subscriptionByID == null) {
-					mapSubcriptions.put(id, Collections.EMPTY_MAP);
-				} else {
-					list.add(subscriptionByID);
-				}
-			}
-			subscriptions = list.toArray(new Subscription[0]);
-		}
+			Subscription[] subscriptions;
 
-		for (Subscription sub : subscriptions) {
-			Map<String, Object> map = new HashMap<String, Object>();
-			
-			mapSubcriptions.put(sub.getID(), map);
-			
-			if (all
-					|| Collections.binarySearch(fields, FIELD_SUBSCRIPTION_NAME) >= 0) {
-				map.put(FIELD_SUBSCRIPTION_NAME, sub.getName());
-			}
-			if (all || Collections.binarySearch(fields,
-					FIELD_SUBSCRIPTION_ADDEDON) >= 0) {
-				map.put(FIELD_SUBSCRIPTION_ADDEDON, sub.getAddTime());
-			}
-			if (all || Collections.binarySearch(fields,
-					FIELD_SUBSCRIPTION_ASSOCIATION_COUNT) >= 0) {
-				map.put(FIELD_SUBSCRIPTION_ASSOCIATION_COUNT,
-						sub.getAssociationCount());
-			}
-			if (all || Collections.binarySearch(fields,
-					FIELD_SUBSCRIPTION_POPULARITY) >= 0) {
-				map.put(FIELD_SUBSCRIPTION_POPULARITY, sub.getCachedPopularity());
-			}
-			if (all || Collections.binarySearch(fields,
-					FIELD_SUBSCRIPTION_CATEGORY) >= 0) {
-				map.put(FIELD_SUBSCRIPTION_CATEGORY, sub.getCategory());
-			}
-			if (all || Collections.binarySearch(fields,
-					FIELD_SUBSCRIPTION_CREATOR) >= 0) {
-				map.put(FIELD_SUBSCRIPTION_CREATOR, sub.getCreatorRef());
-			}
-			try {
-				Engine engine = sub.getEngine();
-				if (engine != null) {
-					if (all || Collections.binarySearch(fields,
-							FIELD_SUBSCRIPTION_ENGINE_NAME) >= 0) {
-						map.put(FIELD_SUBSCRIPTION_ENGINE_NAME, engine.getName());
-					}
-					if (all || Collections.binarySearch(fields,
-							FIELD_SUBSCRIPTION_ENGINE_TYPE) >= 0) {
-						map.put(FIELD_SUBSCRIPTION_ENGINE_TYPE, engine.getType());
-					}
+			Object oID = args.get("ids");
+
+			String[] ids = new String[0];
+			if (oID instanceof String) {
+				ids = new String[] {
+					(String) oID
+				};
+			} else if (oID instanceof List) {
+				ids = (String[]) ((List) oID).toArray(new String[0]);
+			} else if (oID instanceof Object[]) {
+				Object[] oIDS = (Object[]) oID;
+				ids = new String[oIDS.length];
+				for (int i = 0; i < oIDS.length; i++) {
+					ids[i] = oIDS[i].toString();
 				}
-			} catch (SubscriptionException e) {
-			}
-			if (all || Collections.binarySearch(fields,
-					FIELD_SUBSCRIPTION_HIGHEST_VERSION) >= 0) {
-				map.put(FIELD_SUBSCRIPTION_HIGHEST_VERSION, sub.getHighestVersion());
-			}
-			if (all || Collections.binarySearch(fields,
-					FIELD_SUBSCRIPTION_NAME_EX) >= 0) {
-				map.put(FIELD_SUBSCRIPTION_NAME_EX, sub.getNameEx());
-			}
-			if (all || Collections.binarySearch(fields,
-					FIELD_SUBSCRIPTION_QUERY_KEY) >= 0) {
-				map.put(FIELD_SUBSCRIPTION_QUERY_KEY, sub.getQueryKey());
-			}
-			if (all || Collections.binarySearch(fields,
-					FIELD_SUBSCRIPTION_REFERER) >= 0) {
-				map.put(FIELD_SUBSCRIPTION_REFERER, sub.getReferer());
-			}
-			if (all || Collections.binarySearch(fields,
-					FIELD_SUBSCRIPTION_TAG_UID) >= 0) {
-				map.put(FIELD_SUBSCRIPTION_TAG_UID, sub.getTagID());
-			}
-			if (all
-					|| Collections.binarySearch(fields, FIELD_SUBSCRIPTION_URI) >= 0) {
-				map.put(FIELD_SUBSCRIPTION_URI, sub.getURI());
-			}
-			if (all || Collections.binarySearch(fields,
-					FIELD_SUBSCRIPTION_ANONYMOUS) >= 0) {
-				map.put(FIELD_SUBSCRIPTION_ANONYMOUS, sub.isAnonymous());
-			}
-			if (all || Collections.binarySearch(fields,
-					FIELD_SUBSCRIPTION_AUTO_DL_SUPPORTED) >= 0) {
-				map.put(FIELD_SUBSCRIPTION_AUTO_DL_SUPPORTED,
-						sub.isAutoDownloadSupported());
-			}
-			if (all
-					|| Collections.binarySearch(fields, FIELD_SUBSCRIPTION_MINE) >= 0) {
-				map.put(FIELD_SUBSCRIPTION_MINE, sub.isMine());
-			}
-			if (all
-					|| Collections.binarySearch(fields, FIELD_SUBSCRIPTION_PUBLIC) >= 0) {
-				map.put(FIELD_SUBSCRIPTION_PUBLIC, sub.isPublic());
-			}
-			if (all || Collections.binarySearch(fields,
-					FIELD_SUBSCRIPTION_IS_SEARCH_TEMPLATE) >= 0) {
-				map.put(FIELD_SUBSCRIPTION_IS_SEARCH_TEMPLATE, sub.isSearchTemplate());
-			}
-			if (all || Collections.binarySearch(fields,
-					FIELD_SUBSCRIPTION_SUBSCRIBED) >= 0) {
-				map.put(FIELD_SUBSCRIPTION_SUBSCRIBED, sub.isSubscribed());
-			}
-			if (all || Collections.binarySearch(fields,
-					FIELD_SUBSCRIPTION_UPDATEABLE) >= 0) {
-				map.put(FIELD_SUBSCRIPTION_UPDATEABLE, sub.isUpdateable());
-			}
-			if (all || Collections.binarySearch(fields,
-					FIELD_SUBSCRIPTION_SHAREABLE) >= 0) {
-				map.put(FIELD_SUBSCRIPTION_SHAREABLE, sub.isShareable());
-			}
-			if (all || Collections.binarySearch(fields,
-					FIELD_SUBSCRIPTION_RESULTS_COUNT) >= 0) {
-				map.put(FIELD_SUBSCRIPTION_RESULTS_COUNT, sub.getResults(false).length);
 			}
 
-			if (fields != null && Collections.binarySearch(fields,
-					FIELD_SUBSCRIPTION_RESULTS) >= 0) {
-				List<Map> listResults = new ArrayList();
-				map.put(FIELD_SUBSCRIPTION_RESULTS, listResults);
-				
-				SubscriptionResult[]	results = sub.getHistory().getResults( false );
-				
-				for(int i=0; i<results.length; i++){
-					
-					SubscriptionResult r = results[i];
-					
-					// TODO filter by fieldsResults
-					
-					listResults.add( r.toJSONMap());
+			if (ids.length == 0) {
+				subscriptions = subMan.getSubscriptions(subscribedOnly);
+			} else {
+				List<Subscription> list = new ArrayList<Subscription>();
+				for (String id : ids) {
+					Subscription subscriptionByID = subMan.getSubscriptionByID(id);
+					if (subscriptionByID == null) {
+						mapSubcriptions.put(id, Collections.EMPTY_MAP);
+					} else {
+						list.add(subscriptionByID);
+					}
 				}
+				subscriptions = list.toArray(new Subscription[0]);
+			}
+
+			for (Subscription sub : subscriptions) {
+				Map<String, Object> map = buildSubscriptionMap(sub, args, fields, all);
+
+				mapSubcriptions.put(sub.getID(), map);
 			}
 		}
 
@@ -1967,8 +2183,260 @@ XMWebUIPlugin
 
 
 
+	private Map<String, Object> buildSubscriptionMap(Subscription sub, Map args, List fields, boolean all) {
+		Map<String, Object> map = new HashMap<String, Object>();
+		
+		if (all || Collections.binarySearch(fields,
+				"json") >= 0) {
+			try {
+				Map mapJSON = JSONUtils.decodeJSON(sub.getJSON());
+				mapJSON.remove("engines");
+				map.put("json", mapJSON);
+			} catch (SubscriptionException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+		}
+
+		if (all
+				|| Collections.binarySearch(fields, FIELD_SUBSCRIPTION_NAME) >= 0) {
+			map.put(FIELD_SUBSCRIPTION_NAME, sub.getName());
+		}
+		if (all || Collections.binarySearch(fields,
+				FIELD_SUBSCRIPTION_ADDEDON) >= 0) {
+			map.put(FIELD_SUBSCRIPTION_ADDEDON, sub.getAddTime());
+		}
+		if (all || Collections.binarySearch(fields,
+				FIELD_SUBSCRIPTION_ASSOCIATION_COUNT) >= 0) {
+			map.put(FIELD_SUBSCRIPTION_ASSOCIATION_COUNT,
+					sub.getAssociationCount());
+		}
+		if (all || Collections.binarySearch(fields,
+				FIELD_SUBSCRIPTION_POPULARITY) >= 0) {
+			map.put(FIELD_SUBSCRIPTION_POPULARITY, sub.getCachedPopularity());
+		}
+		if (all || Collections.binarySearch(fields,
+				FIELD_SUBSCRIPTION_CATEGORY) >= 0) {
+			addNotNullToMap(map, FIELD_SUBSCRIPTION_CATEGORY, sub.getCategory());
+		}
+		if (all || Collections.binarySearch(fields,
+				FIELD_SUBSCRIPTION_CREATOR) >= 0) {
+			addNotNullToMap(map, FIELD_SUBSCRIPTION_CREATOR, sub.getCreatorRef());
+		}
+		if (all || Collections.binarySearch(fields,
+				FIELD_SUBSCRIPTION_ENGINE) >= 0) {
+			try {
+				Engine engine = sub.getEngine();
+				if (engine != null) {
+					Map mapEngine = new HashMap();
+					map.put(FIELD_SUBSCRIPTION_ENGINE, mapEngine);
+
+					if (all || Collections.binarySearch(fields,
+							FIELD_SUBSCRIPTION_ENGINE_NAME) >= 0) {
+						mapEngine.put("name", engine.getName());
+					}
+					if (all || Collections.binarySearch(fields,
+							FIELD_SUBSCRIPTION_ENGINE_NAMEX) >= 0) {
+						mapEngine.put(FIELD_SUBSCRIPTION_ENGINE_NAMEX,
+								engine.getNameEx());
+					}
+					if (all || Collections.binarySearch(fields,
+							FIELD_SUBSCRIPTION_ENGINE_TYPE) >= 0) {
+						map.put(FIELD_SUBSCRIPTION_ENGINE_TYPE, engine.getType());
+						int type = engine.getType();
+						mapEngine.put("type", type < Engine.ENGINE_TYPE_STRS.length
+								? Engine.ENGINE_TYPE_STRS[type] : type);
+					}
+
+					if (all || Collections.binarySearch(fields,
+							FIELD_SUBSCRIPTION_ENGINE_NAMEX) >= 0) {
+						mapEngine.put(FIELD_SUBSCRIPTION_ENGINE_NAMEX,
+								engine.getNameEx());
+					}
+					//engine.getAutoDownloadSupported() same as sub.getAutoDownloadSupported
+
+					if (all || Collections.binarySearch(fields,
+							FIELD_SUBSCRIPTION_ENGINE_SOURCE) >= 0) {
+						mapEngine.put("source",
+								Engine.ENGINE_SOURCE_STRS[engine.getSource()]);
+					}
+					if (all || Collections.binarySearch(fields,
+							FIELD_SUBSCRIPTION_ENGINE_LASTUPDATED) >= 0) {
+						mapEngine.put(FIELD_SUBSCRIPTION_ENGINE_LASTUPDATED,
+								engine.getLastUpdated());
+					}
+
+					mapEngine.put("id", engine.getUID());
+					addNotNullToMap(mapEngine, "favicon", engine.getIcon());
+					mapEngine.put("dl_link_css", engine.getDownloadLinkCSS());
+					mapEngine.put("selected",
+							Engine.SEL_STATE_STRINGS[engine.getSelectionState()]);
+					mapEngine.put("class", engine.getClass().getSimpleName());
+
+					if (engine instanceof WebEngine) {
+						WebEngine web_engine = (WebEngine) engine;
+						if (all || Collections.binarySearch(fields,
+								FIELD_SUBSCRIPTION_ENGINE_URL) >= 0) {
+							mapEngine.put(FIELD_SUBSCRIPTION_ENGINE_URL,
+									web_engine.getSearchUrl(true));
+						}
+						if (all || Collections.binarySearch(fields,
+								FIELD_SUBSCRIPTION_ENGINE_AUTHMETHOD) >= 0) {
+							mapEngine.put(FIELD_SUBSCRIPTION_ENGINE_AUTHMETHOD,
+									web_engine.getAuthMethod());
+						}
+					}
+				}
+			} catch (SubscriptionException e) {
+			}
+		}
+		
+		if (all || Collections.binarySearch(fields,
+				FIELD_SUBSCRIPTION_HIGHEST_VERSION) >= 0) {
+			map.put(FIELD_SUBSCRIPTION_HIGHEST_VERSION, sub.getHighestVersion());
+		}
+		if (all || Collections.binarySearch(fields,
+				FIELD_SUBSCRIPTION_NAME_EX) >= 0) {
+			map.put(FIELD_SUBSCRIPTION_NAME_EX, sub.getNameEx());
+		}
+		if (all || Collections.binarySearch(fields,
+				FIELD_SUBSCRIPTION_QUERY_KEY) >= 0) {
+			map.put(FIELD_SUBSCRIPTION_QUERY_KEY, sub.getQueryKey());
+		}
+		if (all || Collections.binarySearch(fields,
+				FIELD_SUBSCRIPTION_REFERER) >= 0) {
+			map.put(FIELD_SUBSCRIPTION_REFERER, sub.getReferer());
+		}
+		if (all || Collections.binarySearch(fields,
+				FIELD_SUBSCRIPTION_TAG_UID) >= 0) {
+			map.put(FIELD_SUBSCRIPTION_TAG_UID, sub.getTagID());
+		}
+		if (all
+				|| Collections.binarySearch(fields, FIELD_SUBSCRIPTION_URI) >= 0) {
+			map.put(FIELD_SUBSCRIPTION_URI, sub.getURI());
+		}
+		if (all || Collections.binarySearch(fields,
+				FIELD_SUBSCRIPTION_ANONYMOUS) >= 0) {
+			map.put(FIELD_SUBSCRIPTION_ANONYMOUS, sub.isAnonymous());
+		}
+		if (all || Collections.binarySearch(fields,
+				FIELD_SUBSCRIPTION_AUTO_DL_SUPPORTED) >= 0) {
+			map.put(FIELD_SUBSCRIPTION_AUTO_DL_SUPPORTED,
+					sub.isAutoDownloadSupported());
+		}
+		if (all
+				|| Collections.binarySearch(fields, FIELD_SUBSCRIPTION_MINE) >= 0) {
+			map.put(FIELD_SUBSCRIPTION_MINE, sub.isMine());
+		}
+		if (all
+				|| Collections.binarySearch(fields, FIELD_SUBSCRIPTION_PUBLIC) >= 0) {
+			map.put(FIELD_SUBSCRIPTION_PUBLIC, sub.isPublic());
+		}
+		if (all || Collections.binarySearch(fields,
+				FIELD_SUBSCRIPTION_IS_SEARCH_TEMPLATE) >= 0) {
+			map.put(FIELD_SUBSCRIPTION_IS_SEARCH_TEMPLATE, sub.isSearchTemplate());
+		}
+		if (all || Collections.binarySearch(fields,
+				FIELD_SUBSCRIPTION_SUBSCRIBED) >= 0) {
+			map.put(FIELD_SUBSCRIPTION_SUBSCRIBED, sub.isSubscribed());
+		}
+		if (all || Collections.binarySearch(fields,
+				FIELD_SUBSCRIPTION_UPDATEABLE) >= 0) {
+			map.put(FIELD_SUBSCRIPTION_UPDATEABLE, sub.isUpdateable());
+		}
+		if (all || Collections.binarySearch(fields,
+				FIELD_SUBSCRIPTION_SHAREABLE) >= 0) {
+			map.put(FIELD_SUBSCRIPTION_SHAREABLE, sub.isShareable());
+		}
+		if (all || Collections.binarySearch(fields,
+				FIELD_SUBSCRIPTION_RESULTS_COUNT) >= 0) {
+			map.put(FIELD_SUBSCRIPTION_RESULTS_COUNT, sub.getResults(false).length);
+		}
+
+		SubscriptionHistory history = sub.getHistory();
+		if (history != null) {
+			
+			if (all || Collections.binarySearch(fields,
+					"newResultsCount") >= 0) {
+				map.put("newResultsCount", history.getNumUnread());
+			}
+			if (all || Collections.binarySearch(fields,
+					"nextScanTime") >= 0) {
+				map.put("nextScanTime", history.getNextScanTime());
+			}
+			if (all || Collections.binarySearch(fields,
+					"checkFrequency") >= 0) {
+				map.put("checkFrequency", history.getCheckFrequencyMins());
+			}
+			if (all || Collections.binarySearch(fields,
+					"consecutiveFails") >= 0) {
+				map.put("consecutiveFails", history.getConsecFails());
+			}
+			if (all || Collections.binarySearch(fields,
+					FIELD_SUBSCRIPTION_AUTO_DOWNLOAD) >= 0) {
+				map.put(FIELD_SUBSCRIPTION_AUTO_DOWNLOAD, history.isAutoDownload());
+			}
+			if (all || Collections.binarySearch(fields,
+					"authFail") >= 0) {
+				map.put("authFail", history.isAuthFail());
+			}
+
+			if (all || Collections.binarySearch(fields,
+					"error") >= 0) {
+				addNotNullToMap(map, "error", history.getLastError());
+			}
+
+			if (fields != null && Collections.binarySearch(fields,
+					FIELD_SUBSCRIPTION_RESULTS) >= 0) {
+				
+				List<Map> listResults = new ArrayList();
+
+				SubscriptionResult[] results = sub.getHistory().getResults(false);
+
+				List fieldsResults = (List) args.get("results-fields");
+				boolean allResults = fieldsResults == null || fieldsResults.size() == 0;
+				
+				for (int i = 0; i < results.length; i++) {
+					SubscriptionResult r = results[i];
+
+					listResults.add(buildSubscriptionResultMap(r, fieldsResults, allResults));
+				}
+
+				map.put(FIELD_SUBSCRIPTION_RESULTS, listResults);
+			}
+		}
+		return map;
+	}
+
+	private Map buildSubscriptionResultMap(SubscriptionResult r,
+			List fieldsResults, boolean allResults) {
+
+		Map jsonMap = r.toJSONMap();
+		if (!allResults) {
+			jsonMap.keySet().retainAll(fieldsResults);
+		}
+
+		return jsonMap;
+	}
+
+	private void addNotNullToMap(Map<String, Object> map,
+			String id, Object o) {
+		if (o == null) {
+			return;
+		}
+		map.put(id, o);
+	}
+
 	private void method_Tags_Get_List(Map args, Map result) {
-		List<Map<String, Object>> listTags = new ArrayList<Map<String,Object>>();
+		List fields = (List) args.get("fields");
+		boolean all = fields == null || fields.size() == 0;
+		if (!all) {
+			// sort so we can't use Collections.binarySearch
+			Collections.sort(fields);
+		}
+
+		List<SortedMap<String, Object>> listTags = 
+				new ArrayList<SortedMap<String,Object>>();
 
 		TagManager tm = TagManagerFactory.getTagManager();
 
@@ -1978,42 +2446,84 @@ XMWebUIPlugin
 			List<Tag> tags = tagType.getTags();
 			
 			for (Tag tag : tags) {
-				Map<String, Object> map = new HashMap<String, Object>();
-				map.put("name", tag.getTagName(true));
+				SortedMap<String, Object> map = new TreeMap<String, Object>();
+				if (all || Collections.binarySearch(fields, FIELD_TAG_NAME) >= 0) {
+					map.put(FIELD_TAG_NAME, tag.getTagName(true));
+				}
+
 				//map.put("taggableTypes", tag.getTaggableTypes()); // com.aelitis.azureus.core.tag.Taggable
-				map.put("count", tag.getTaggedCount());
-				map.put("type", tag.getTagType().getTagType());
-				map.put("type-name", tag.getTagType().getTagTypeName(true));
-				if (tag instanceof Category) {
-					map.put("category-type", ((Category) tag).getType());
+				if (all || Collections.binarySearch(fields, FIELD_TAG_COUNT) >= 0) {
+					map.put(FIELD_TAG_COUNT, tag.getTaggedCount());
 				}
-				map.put("uid", tag.getTagUID());
-				//map.put("id", tag.getTagID());
-				int[] color = tag.getColor();
-				if (color != null) {
-					String hexColor = "#";
-					for (int c : color) {
-						if (c < 0x10) {
-							hexColor += "0";
-						}
-						hexColor += Integer.toHexString(c);
+				if (all || Collections.binarySearch(fields, FIELD_TAG_TYPE) >= 0) {
+					map.put(FIELD_TAG_TYPE, tag.getTagType().getTagType());
+				}
+				if (all || Collections.binarySearch(fields, FIELD_TAG_TYPENAME) >= 0) {
+					map.put(FIELD_TAG_TYPENAME, tag.getTagType().getTagTypeName(true));
+				}
+
+				if (all
+						|| Collections.binarySearch(fields, FIELD_TAG_CATEGORY_TYPE) >= 0) {
+					if (tag instanceof Category) {
+						map.put(FIELD_TAG_CATEGORY_TYPE, ((Category) tag).getType());
 					}
-					map.put("color", hexColor);
 				}
-				map.put("canBePublic", tag.canBePublic());
-				map.put("public", tag.isPublic());
-				map.put("visible", tag.isVisible());
-				map.put("group", tag.getGroup());
-				
-				boolean[] auto = tag.isTagAuto();
-				
-				map.put("auto", auto[0] || auto[1]);
+				if (all || Collections.binarySearch(fields, FIELD_TAG_UID) >= 0) {
+					map.put(FIELD_TAG_UID, tag.getTagUID());
+				}
+				if (all || Collections.binarySearch(fields, FIELD_TAG_ID) >= 0) {
+					map.put(FIELD_TAG_ID, tag.getTagID());
+				}
+				if (all || Collections.binarySearch(fields, FIELD_TAG_COLOR) >= 0) {
+					int[] color = tag.getColor();
+					if (color != null) {
+						String hexColor = "#";
+						for (int c : color) {
+							if (c < 0x10) {
+								hexColor += "0";
+							}
+							hexColor += Integer.toHexString(c);
+						}
+						map.put(FIELD_TAG_COLOR, hexColor);
+					}
+				}
+				if (all
+						|| Collections.binarySearch(fields, FIELD_TAG_CANBEPUBLIC) >= 0) {
+					map.put(FIELD_TAG_CANBEPUBLIC, tag.canBePublic());
+				}
+				if (all || Collections.binarySearch(fields, FIELD_TAG_PUBLIC) >= 0) {
+					map.put(FIELD_TAG_PUBLIC, tag.isPublic());
+				}
+				if (all || Collections.binarySearch(fields, FIELD_TAG_VISIBLE) >= 0) {
+					map.put(FIELD_TAG_VISIBLE, tag.isVisible());
+				}
+				if (all || Collections.binarySearch(fields, FIELD_TAG_GROUP) >= 0) {
+					map.put(FIELD_TAG_GROUP, tag.getGroup());
+				}
+				if (all || Collections.binarySearch(fields, FIELD_TAG_AUTO_ADD) >= 0
+						|| Collections.binarySearch(fields, FIELD_TAG_AUTO_REMOVE) >= 0) {
+					boolean[] auto = tag.isTagAuto();
+					if (all
+							|| Collections.binarySearch(fields, FIELD_TAG_AUTO_ADD) >= 0) {
+						map.put(FIELD_TAG_AUTO_ADD, auto[0]);
+					}
+					if (all
+							|| Collections.binarySearch(fields, FIELD_TAG_AUTO_REMOVE) >= 0) {
+						map.put(FIELD_TAG_AUTO_REMOVE, auto[1]);
+					}
+				}
 				
 				listTags.add(map);
 			}
 		}
 
-		result.put("tags", listTags);
+		String hc = Long.toHexString(longHashSimpleList(listTags));
+		result.put("tags-hc", hc);
+		
+		String oldHC = MapUtils.getMapString(args, "tags-hc", null);
+		if (!hc.equals(oldHC)) {
+			result.put("tags", listTags);
+		}
 	}
 
 	private void method_Free_Space(Map args, Map result) {
@@ -2192,15 +2702,15 @@ XMWebUIPlugin
     result.put(TransmissionVars.TR_PREFS_KEY_IDLE_LIMIT_ENABLED, false );//TODO
     result.put(TransmissionVars.TR_PREFS_KEY_INCOMPLETE_DIR, save_dir );
     result.put(TransmissionVars.TR_PREFS_KEY_INCOMPLETE_DIR_ENABLED, false );//TODO
-    //result.put(TransmissionVars.TR_PREFS_KEY_MSGLEVEL, TR_MSG_INF );//TODO
+    //result.put(TransmissionVars.TR_PREFS_KEY_MSGLEVEL, TR_MSG_INF ); // Not in Spec
     result.put(TransmissionVars.TR_PREFS_KEY_DOWNLOAD_QUEUE_SIZE, 5 );//TODO
     result.put(TransmissionVars.TR_PREFS_KEY_DOWNLOAD_QUEUE_ENABLED, true ); //TODO
     result.put(TransmissionVars.TR_PREFS_KEY_PEER_LIMIT_GLOBAL, glob_con );
     result.put(TransmissionVars.TR_PREFS_KEY_PEER_LIMIT_TORRENT, tor_con );
     result.put(TransmissionVars.TR_PREFS_KEY_PEER_PORT, tcp_port );
     result.put(TransmissionVars.TR_PREFS_KEY_PEER_PORT_RANDOM_ON_START, false ); //TODO
-    result.put(TransmissionVars.TR_PREFS_KEY_PEER_PORT_RANDOM_LOW, 49152 ); //TODO
-    result.put(TransmissionVars.TR_PREFS_KEY_PEER_PORT_RANDOM_HIGH, 65535 ); //TODO
+    //result.put(TransmissionVars.TR_PREFS_KEY_PEER_PORT_RANDOM_LOW, 49152 ); // Not in Spec
+    //result.put(TransmissionVars.TR_PREFS_KEY_PEER_PORT_RANDOM_HIGH, 65535 ); // Not in Spec
     //result.put(TransmissionVars.TR_PREFS_KEY_PEER_SOCKET_TOS, TR_DEFAULT_PEER_SOCKET_TOS_STR ); //TODO
     result.put(TransmissionVars.TR_PREFS_KEY_PEX_ENABLED, true ); //TODO
     result.put(TransmissionVars.TR_PREFS_KEY_PORT_FORWARDING, false ); //TODO
@@ -2208,19 +2718,20 @@ XMWebUIPlugin
     //result.put(TransmissionVars.TR_PREFS_KEY_PREFETCH_ENABLED, DEFAULT_PREFETCH_ENABLED ); //TODO
     result.put(TransmissionVars.TR_PREFS_KEY_QUEUE_STALLED_ENABLED, true ); //TODO
     result.put(TransmissionVars.TR_PREFS_KEY_QUEUE_STALLED_MINUTES, 30 ); //TODO
-    result.put(TransmissionVars.TR_PREFS_KEY_RATIO, 2.0 ); //TODO
-    result.put(TransmissionVars.TR_PREFS_KEY_RATIO_ENABLED, false ); //TODO
+    result.put(TransmissionVars.TR_PREFS_KEY_RATIO, 2.0 ); //TODO (wrong key?)
+    result.put(TransmissionVars.TR_PREFS_KEY_RATIO_ENABLED, false ); //TODO (wrong key?)
     result.put(TransmissionVars.TR_PREFS_KEY_RENAME_PARTIAL_FILES, true ); //TODO
-    result.put(TransmissionVars.TR_PREFS_KEY_RPC_AUTH_REQUIRED, false ); //TODO
-    result.put(TransmissionVars.TR_PREFS_KEY_RPC_BIND_ADDRESS, "0.0.0.0" ); //TODO
-    result.put(TransmissionVars.TR_PREFS_KEY_RPC_ENABLED, false ); //TODO
-    result.put(TransmissionVars.TR_PREFS_KEY_RPC_PASSWORD, "" ); //TODO
-    result.put(TransmissionVars.TR_PREFS_KEY_RPC_USERNAME, "" ); //TODO
-    //result.put(TransmissionVars.TR_PREFS_KEY_RPC_WHITELIST, TR_DEFAULT_RPC_WHITELIST ); //TODO
-    result.put(TransmissionVars.TR_PREFS_KEY_RPC_WHITELIST_ENABLED, true ); //TODO
-    //result.put(TransmissionVars.TR_PREFS_KEY_RPC_PORT, atoi( TR_DEFAULT_RPC_PORT_STR ) ); //TODO
-    //result.put(TransmissionVars.TR_PREFS_KEY_RPC_URL, TR_DEFAULT_RPC_URL_STR ); //TODO
-    result.put(TransmissionVars.TR_PREFS_KEY_SCRAPE_PAUSED_TORRENTS, true ); //TODO
+    //result.put(TransmissionVars.TR_PREFS_KEY_RPC_AUTH_REQUIRED, false ); // Not in Spec
+    //String bindIP = pc.getPluginStringParameter(WebPlugin.CONFIG_BIND_IP);
+    //result.put(TransmissionVars.TR_PREFS_KEY_RPC_BIND_ADDRESS, bindIP == null || bindIP.length() == 0 ? "0.0.0.0" : bindIP );
+    //result.put(TransmissionVars.TR_PREFS_KEY_RPC_ENABLED, false ); // Not in Spec
+    //result.put(TransmissionVars.TR_PREFS_KEY_RPC_PASSWORD, "" ); // Not in Spec
+    //result.put(TransmissionVars.TR_PREFS_KEY_RPC_USERNAME, "" ); // Not in Spec
+    //result.put(TransmissionVars.TR_PREFS_KEY_RPC_WHITELIST, TR_DEFAULT_RPC_WHITELIST ); // Not in Spec
+    //result.put(TransmissionVars.TR_PREFS_KEY_RPC_WHITELIST_ENABLED, true ); // Not in Spec
+    //result.put(TransmissionVars.TR_PREFS_KEY_RPC_PORT, atoi( TR_DEFAULT_RPC_PORT_STR ) ); // Not in Spec
+    //result.put(TransmissionVars.TR_PREFS_KEY_RPC_URL, TR_DEFAULT_RPC_URL_STR ); // Not in Spec
+    //result.put(TransmissionVars.TR_PREFS_KEY_SCRAPE_PAUSED_TORRENTS, true ); // Not in Spec
     result.put(TransmissionVars.TR_PREFS_KEY_SCRIPT_TORRENT_DONE_FILENAME, "" ); //TODO
     result.put(TransmissionVars.TR_PREFS_KEY_SCRIPT_TORRENT_DONE_ENABLED, false ); //TODO
     result.put(TransmissionVars.TR_PREFS_KEY_SEED_QUEUE_SIZE, 10 ); //TODO
@@ -2234,7 +2745,7 @@ XMWebUIPlugin
     result.put(TransmissionVars.TR_PREFS_KEY_ALT_SPEED_TIME_DAY, TransmissionVars.TR_SCHED_ALL ); //TODO
     result.put(TransmissionVars.TR_PREFS_KEY_USPEED_KBps, up_limit > 0 ? up_limit :pc.getUnsafeIntParameter("config.ui.speed.partitions.manual.upload.last"));
     result.put(TransmissionVars.TR_PREFS_KEY_USPEED_ENABLED, up_limit != 0);
-    result.put(TransmissionVars.TR_PREFS_KEY_UMASK, 022 ); //TODO
+    //result.put(TransmissionVars.TR_PREFS_KEY_UMASK, 022 ); // Not in Spec
     result.put(TransmissionVars.TR_PREFS_KEY_UPLOAD_SLOTS_PER_TORRENT, 14 ); //TODO
     //result.put(TransmissionVars.TR_PREFS_KEY_BIND_ADDRESS_IPV4, TR_DEFAULT_BIND_ADDRESS_IPV4 ); //TODO
     //result.put(TransmissionVars.TR_PREFS_KEY_BIND_ADDRESS_IPV6, TR_DEFAULT_BIND_ADDRESS_IPV6 ); //TODO
@@ -2261,7 +2772,7 @@ XMWebUIPlugin
     }
 
 		result.put( "port", new Long( tcp_port ) );                	// number     port number
-		result.put( "rpc-version", new Long( 14 ));              	// number     the current RPC API version
+		result.put( "rpc-version", new Long( 15 ));              	// number     the current RPC API version
 		result.put( "rpc-version-minimum", new Long( 6 ));      	// number     the minimum RPC API version supported
 		result.put( "seedRatioLimit", new Double(stop_ratio) );          	// double     the default seed ratio for torrents to use
 		result.put( "seedRatioLimited", stop_ratio>0 );         			// boolean    true if seedRatioLimit is honored by default
@@ -2271,12 +2782,17 @@ XMWebUIPlugin
 		result.put( "az-rpc-version", VUZE_RPC_VERSION);
 		result.put( "az-version", az_version );                  // string     
 		result.put( "az-mode", az_mode );										// string
+		result.put( "rpc-i2p-address", pc.getPluginStringParameter("webui.i2p_dest"));
+		result.put( "rpc-tor-address", pc.getPluginStringParameter("webui.tor_dest"));
 		
 		List listSupports = new ArrayList();
 		Collections.addAll(listSupports, "rpc:receive-gzip", "field:files-hc",
 				"method:tags-get-list", "field:torrent-set-name", 
 				"method:subscription-get", "method:subscription-add", 
-				"method:subscription-remove");
+				"method:subscription-remove", "method:subscription-set",
+				"method:vuze-plugin-get-list", "method:tags-lookup-start",
+				"method:tags-lookup-get-results", "method:vuze-search-start",
+				"method:vuze-search-get-results");
 
 		synchronized( json_server_method_lock ){
   		for (String key : json_server_methods.keySet()) {
@@ -4677,7 +5193,7 @@ XMWebUIPlugin
 
 			} else if (field.equals("speedHistory")) {
 				// azRPC
-
+				
 				DownloadManagerStats core_stats = core_download.getStats();
 				core_stats.setRecentHistoryRetention(true);
 				
@@ -4993,6 +5509,10 @@ XMWebUIPlugin
 				value = torrentGet_files_stub(host, download_stub, download_id,
 						file_fields, args);
 
+			}else if ( field.equals( "fileCount" )){
+
+				value = download_stub.getStubFiles().length;
+
 			}else if ( field.equals( "fileStats" )){
 				// RPC v5
 
@@ -5068,7 +5588,7 @@ XMWebUIPlugin
 				
 			}else{
 				if ( trace_param.getValue() ){
-					log( "Unknown field: " + field );
+					log( "Unknown stub field: " + field );
 				}
 			}
 		}
@@ -7173,7 +7693,10 @@ XMWebUIPlugin
 				hash = (hash * 31) + longHashSimpleList((List) value);
 			} else if (value instanceof Boolean) {
 				hash = (hash * 31) + ((Boolean) value ? 1231 : 1237);
-			} // else skip all other values since we can't be sure how they hash
+			} else {
+				// else skip all other values since we can't be sure how they hash
+				//System.out.println("Warning: Unhashed Value. key '" + key + "' Value: " + value);
+			}
 		}
 		return hash;
 	}
