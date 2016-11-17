@@ -473,6 +473,7 @@ RSSToChat
 				SimpleXMLParserDocumentNode net_node 	= chat_node.getChild( "network" );
 				SimpleXMLParserDocumentNode key_node 	= chat_node.getChild( "key" );
 				SimpleXMLParserDocumentNode type_node 	= chat_node.getChild( "type" );
+				SimpleXMLParserDocumentNode nick_node 	= chat_node.getChild( "nick" );
 
 				if ( net_node == null || key_node == null ){
 					
@@ -549,6 +550,18 @@ RSSToChat
 						
 						throw( new Exception( "<type> value of '" + type_str + "' is invalid" ));
 
+					}
+				}
+				
+				String nick = null;
+				
+				if ( nick_node != null ){
+					
+					nick = nick_node.getValue().trim();
+					
+					if ( nick.length() == 0 ){
+						
+						nick = null;
 					}
 				}
 				
@@ -651,7 +664,7 @@ RSSToChat
 				}
 				for ( String network: networks ){
 					
-					Mapping mapping = new Mapping( source, is_rss, desc_link_pattern, link_type, ignore_dates, min_seeds, min_leechers, network, key, type, presentation, website_name, website_retain_sites, website_retain_items, item_associations, refresh_mins );
+					Mapping mapping = new Mapping( source, is_rss, desc_link_pattern, link_type, ignore_dates, min_seeds, min_leechers, network, key, type, nick, presentation, website_name, website_retain_sites, website_retain_items, item_associations, refresh_mins );
 					
 					log( "    Mapping: " + mapping.getOverallName());
 					
@@ -1606,9 +1619,11 @@ RSSToChat
 				website_title = channel_title;
 			}
 			
-			String page_title = website_title + ": updated on " + title_date_format.format(new Date( now ));
+			String title_date = title_date_format.format(new Date( now ));
 			
-			String torrent_title = "WebSite for '" + website_title + "': updated on " + title_date_format.format(new Date( now ));
+			String page_title = website_title + ": updated on " + title_date;
+			
+			String torrent_title = "WebSite for '" + website_title + "': updated on " + title_date;
 
 			String NL = "\r\n";
 			
@@ -2274,6 +2289,7 @@ RSSToChat
 		private final int			min_seeds;
 		private final int			min_leechers;
 		private final int			type;
+		private final String		nick;
 		private final String		network;
 		private final String		key;
 		
@@ -2304,6 +2320,7 @@ RSSToChat
 			String				_network,
 			String				_key,
 			int					_type,
+			String				_nick,
 			String				_presentation,
 			String				_website_name,
 			int					_retain_sites,
@@ -2321,6 +2338,7 @@ RSSToChat
 			network				= _network;
 			key					= _key;
 			type				= _type;
+			nick				= _nick;
 			
 			presentation		= _presentation;
 			website_name		= _website_name;
@@ -2435,6 +2453,13 @@ RSSToChat
 								
 								chat.setSaveMessages( true );
 									
+								if ( nick != null ){
+									
+									chat.setSharedNickname( false );
+									
+									chat.setInstanceNickname( nick );
+								}
+								
 								log( "Chat initialised for '" + getChatName() + "': URL=" + chat.getURL() + ", history=" + history.getFileName());
 
 							}catch( Throwable e ){
