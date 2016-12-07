@@ -20,9 +20,7 @@ package com.vuze.plugin.azVPN_Helper;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 import org.gudy.azureus2.core3.internat.IntegratedResourceBundle;
 import org.gudy.azureus2.core3.util.AERunnable;
@@ -108,6 +106,25 @@ public class PluginVPNHelper
 		setupConfigModel(uiManager);
 
 		LocaleUtilities i18n = pi.getUtilities().getLocaleUtilities();
+
+		final String currentVpnID = currentVPN.getValue();
+		if (currentVpnID.length() > 0) {
+			Arrays.sort(vpnIDs, new Comparator<String>() {
+				@Override
+				public int compare(String o1, String o2) {
+					if (o1.equals(o2)) {
+						return 0;
+					}
+					if (o1.equals(currentVpnID)) {
+						return -1;
+					}
+					if (o2.equals(currentVpnID)) {
+						return 1;
+					}
+					return o1.compareTo(o2);
+				}
+			});
+		}
 
 		for (String vpnID : vpnIDs) {
 			if (vpnID.length() == 0) {
