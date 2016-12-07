@@ -21,10 +21,8 @@ package com.vuze.plugin.azVPN_PIA;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.gudy.azureus2.plugins.PluginException;
-import org.gudy.azureus2.plugins.PluginInterface;
-import org.gudy.azureus2.plugins.PluginListener;
-import org.gudy.azureus2.plugins.UnloadablePlugin;
+import org.gudy.azureus2.plugins.*;
+import org.gudy.azureus2.plugins.installer.StandardPlugin;
 import org.gudy.azureus2.plugins.logging.LoggerChannel;
 import org.gudy.azureus2.plugins.ui.UIInstance;
 import org.gudy.azureus2.plugins.ui.UIManager;
@@ -87,7 +85,7 @@ public class PluginPIA
 		initializedOn = System.currentTimeMillis();
 
 		this.pi = plugin_interface;
-
+		
 		checker = new Checker(pi);
 
 		plugin_interface.getUIManager().addUIListener(this);
@@ -175,6 +173,29 @@ public class PluginPIA
 	 * @see org.gudy.azureus2.plugins.PluginListener#initializationComplete()
 	 */
 	public void initializationComplete() {
+		PluginInterface betterPlugin = pi.getPluginManager().getPluginInterfaceByID("vpn_helper");
+		if (betterPlugin == null) {
+			try {
+				StandardPlugin standardPlugin = pi.getPluginManager().getPluginInstaller().getStandardPlugin("vpn_helper");
+				if (standardPlugin != null) {
+					standardPlugin.install(true, true, false);
+					pi.getPluginState().unload();
+					return;
+				}
+			} catch (PluginException e1) {
+				e1.printStackTrace();
+			}
+		} else if (betterPlugin.getPluginState().isOperational()) {
+			checker = null;
+			try {
+				pi.getPluginState().unload();
+			} catch (PluginException e) {
+				e.printStackTrace();
+			}
+ 			return;
+ 		}
+
+
 		if (checker == null) {
 			return;
 		}
