@@ -82,6 +82,7 @@ RCMPlugin
 		source_map_defaults.add( "tracker.opensuse.org" );
 		source_map_defaults.add( "torrents.linuxmint.com" );
 		source_map_defaults.add( "tracker.johncave.co.nz" ); // OpenMandriva
+		source_map_defaults.add( "academictorrents.com" );
 	}
 	
 	private ByteArrayHashMap<Boolean>	source_map 	= new ByteArrayHashMap<Boolean>();
