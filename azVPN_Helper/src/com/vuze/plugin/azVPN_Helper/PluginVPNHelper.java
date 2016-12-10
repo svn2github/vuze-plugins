@@ -110,7 +110,6 @@ public class PluginVPNHelper
 		final String currentVpnID = currentVPN.getValue();
 		if (currentVpnID.length() > 0) {
 			Arrays.sort(vpnIDs, new Comparator<String>() {
-				@Override
 				public int compare(String o1, String o2) {
 					if (o1.equals(o2)) {
 						return 0;
