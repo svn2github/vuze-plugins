@@ -232,18 +232,28 @@ public class ColumnRC_Actions
 							
 							if ( vf != null ){
 							
-								subs.setSubscribed( true );
+								if ( !subs.isSubscribed()){
 								
-								VuzeFileHandler.getSingleton().handleFiles( new VuzeFile[]{ vf }, VuzeFileComponent.COMP_TYPE_NONE );
-								
-								
-								for ( VuzeFileComponent comp: vf.getComponents()){
+										// subscribing to it will cause the search template to
+										// be installed
 									
-									Engine engine = (Engine)comp.getData( Engine.VUZE_FILE_COMPONENT_ENGINE_KEY );
+									subs.setSubscribed( true );
 									
-									if ( engine != null && engine.getSelectionState() == Engine.SEL_STATE_DESELECTED ){
+								}else{
+									
+										// force re-installation
+									
+									VuzeFileHandler.getSingleton().handleFiles( new VuzeFile[]{ vf }, VuzeFileComponent.COMP_TYPE_NONE );
+									
+									
+									for ( VuzeFileComponent comp: vf.getComponents()){
 										
-										engine.setSelectionState( Engine.SEL_STATE_MANUAL_SELECTED );
+										Engine engine = (Engine)comp.getData( Engine.VUZE_FILE_COMPONENT_ENGINE_KEY );
+										
+										if ( engine != null && engine.getSelectionState() == Engine.SEL_STATE_DESELECTED ){
+											
+											engine.setSelectionState( Engine.SEL_STATE_MANUAL_SELECTED );
+										}
 									}
 								}
 							}
