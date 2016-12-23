@@ -93,6 +93,7 @@ import com.aelitis.azureus.core.content.AzureusContentFile;
 import com.aelitis.azureus.core.content.AzureusContentFilter;
 import com.aelitis.azureus.core.devices.*;
 import com.aelitis.azureus.core.util.CopyOnWriteList;
+import com.aelitis.azureus.core.util.NetUtils;
 import com.aelitis.azureus.core.util.UUIDGenerator;
 import com.aelitis.azureus.plugins.upnp.UPnPMapping;
 import com.aelitis.azureus.plugins.upnp.UPnPPlugin;
@@ -422,14 +423,13 @@ UPnPMediaServer
 							// seen high CPU on some systems calling this (due to a mass of weird 6to4 interfaces maybe
 							// so just call the once
 						
-						Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+						List<NetworkInterface> interfaces = NetUtils.getNetworkInterfaces();
 						
 						InetAddress	ipv4 = null;
 						InetAddress	ipv6 = null;
 						
-						while( interfaces.hasMoreElements()){
-							
-							Enumeration<InetAddress> addresses = interfaces.nextElement().getInetAddresses();
+						for (NetworkInterface networkInterface : interfaces) {
+							Enumeration<InetAddress> addresses = networkInterface.getInetAddresses();
 							
 							while( addresses.hasMoreElements()){
 								
