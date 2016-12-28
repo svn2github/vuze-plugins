@@ -814,7 +814,8 @@ VZ.1 Start Search
        "favicon"            | string     URL to icon
        "dl_link_css"        | string     ?????
        "selected"           | string     { "no", "auto", "manual" }
-       "type"               | string     { "unknown","vuze","local","rss","unused" }
+       "source"             | string     { "unknown","vuze","local","rss","unused" }
+       "type"               | depends    { "unknown","regexp","json", "plugin", number }
  
  VZ.2 Get Search Results
  
