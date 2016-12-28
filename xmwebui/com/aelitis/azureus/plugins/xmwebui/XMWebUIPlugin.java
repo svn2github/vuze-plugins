@@ -29,6 +29,8 @@ import java.text.DateFormat;
 import java.text.NumberFormat;
 import java.text.ParseException;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
 import org.gudy.azureus2.core3.category.Category;
@@ -779,6 +781,10 @@ XMWebUIPlugin
 	{
 		boolean logit = trace_param.getValue();
 
+		if (request.getInputStream().available() == 0 && "chunked".equals(request.getHeaders().get("transfer-encoding"))) {
+			response.setReplyStatus( 415 );
+			return true;
+		}
 		
 		try{
 			String session_id = getSessionID( request );
@@ -824,7 +830,7 @@ XMWebUIPlugin
 			//System.out.println( "Header: " + request.getHeader() );
 			
 			if ( url.equals( "/transmission/rpc" )){
-							
+				
 				LineNumberReader lnr;
 				if ("gzip".equals(request.getHeaders().get("content-encoding"))) {
 					GZIPInputStream gzipIS = new GZIPInputStream(request.getInputStream());
@@ -860,6 +866,7 @@ XMWebUIPlugin
 				
 				if ( logit ){
 				
+					log( "<- " + response_json_str.length() );
 					log( "<- " + response_json_str );
 				}
 
@@ -1096,6 +1103,7 @@ XMWebUIPlugin
 			if ( logit ){
 			
 				log( "Processing failed", e );
+				e.printStackTrace();
 			}
 			
 			throw( e );
@@ -1105,6 +1113,7 @@ XMWebUIPlugin
 			if ( logit ){
 				
 				log( "Processing failed", e );
+				e.printStackTrace();
 			}
 			
 			throw( new IOException( "Processing failed: " + Debug.getNestedExceptionMessage( e )));
@@ -2038,6 +2047,10 @@ XMWebUIPlugin
 							}
 						}
 					}
+				}
+				
+				if (numChanged > 0) {
+					Map<String, Object> map = buildSubscriptionMap(subs, null, null, true);
 					result.put(oSubscriptionID, map);
 				}
 			}
@@ -2183,7 +2196,8 @@ XMWebUIPlugin
 
 
 
-	private Map<String, Object> buildSubscriptionMap(Subscription sub, Map args, List fields, boolean all) {
+	private Map<String, Object> buildSubscriptionMap(Subscription sub, Map args,
+			List fields, boolean all) {
 		Map<String, Object> map = new HashMap<String, Object>();
 		
 		if (all || Collections.binarySearch(fields,
@@ -2393,7 +2407,7 @@ XMWebUIPlugin
 
 				SubscriptionResult[] results = sub.getHistory().getResults(false);
 
-				List fieldsResults = (List) args.get("results-fields");
+				List fieldsResults = args == null ? null : (List) args.get("results-fields");
 				boolean allResults = fieldsResults == null || fieldsResults.size() == 0;
 				
 				for (int i = 0; i < results.length; i++) {
@@ -2792,7 +2806,7 @@ XMWebUIPlugin
 				"method:subscription-remove", "method:subscription-set",
 				"method:vuze-plugin-get-list", "method:tags-lookup-start",
 				"method:tags-lookup-get-results", "method:vuze-search-start",
-				"method:vuze-search-get-results");
+				"method:vuze-search-get-results", "torrent-add:torrent-duplicate");
 
 		synchronized( json_server_method_lock ){
   		for (String key : json_server_methods.keySet()) {
@@ -4146,7 +4160,7 @@ XMWebUIPlugin
 			}
 		}
 		
-		Torrent 		torrent;
+		Torrent 		torrent = null;
 		DownloadStub	download = null;
 		
 		String url = (String) args.get("filename");
@@ -4256,10 +4270,17 @@ XMWebUIPlugin
 		
 		
 		TorrentManager torrentManager = plugin_interface.getTorrentManager();
+		
+		boolean duplicate = false;
 
 		if ( metainfoBytes != null ){
 			try {
 				torrent = torrentManager.createFromBEncodedData( metainfoBytes);
+				
+				org.gudy.azureus2.plugins.download.DownloadManager dm = plugin_interface.getDownloadManager();
+				download = dm.getDownload( torrent );
+				duplicate = download != null;
+				
 			} catch (Throwable e) {
 
 				e.printStackTrace();
@@ -4289,14 +4310,22 @@ XMWebUIPlugin
 				
 				url = UrlUtils.parseTextForURL(url, true, true);
 			}
+			
+			byte[] hashFromMagnetURI = getHashFromMagnetURI(url);
+			if (hashFromMagnetURI != null) {
+				org.gudy.azureus2.plugins.download.DownloadManager dm = plugin_interface.getDownloadManager();
+				download = dm.getDownload(hashFromMagnetURI);
+				duplicate = download != null;
+			}
 
+			if (download == null) {
 			URL torrent_url;
 			try {
 			 torrent_url = new URL(url);
 			} catch (MalformedURLException mue) {
 				throw new TextualException("The torrent URI was not valid");
 			}
-
+			
 			try{
 				final TorrentDownloader dl = torrentManager.getURLDownloader(torrent_url, null, null);
 
@@ -4475,6 +4504,7 @@ XMWebUIPlugin
 
 				throw( new IOException( Debug.getNestedExceptionMessage( e )));
 			}
+			}
 		}
 
 		if ( download == null ){
@@ -4489,7 +4519,16 @@ XMWebUIPlugin
 		torrent_details.put(TransmissionVars.FIELD_TORRENT_HASH,
 				ByteFormatter.encodeString(download.getTorrentHash()));
 
-		result.put("torrent-added", torrent_details);
+		result.put(duplicate ? "torrent-duplicate" : "torrent-added", torrent_details);
+	}
+	
+	private byte[] getHashFromMagnetURI(String magnetURI) {
+		Pattern patXT = Pattern.compile("xt=urn:(?:btih|sha1):([^&]+)");
+		Matcher matcher = patXT.matcher(magnetURI);
+		if (matcher.find()) {
+			return UrlUtils.decodeSHA1Hash(matcher.group(1));
+		}
+		return null;
 	}
 
 	private Map
