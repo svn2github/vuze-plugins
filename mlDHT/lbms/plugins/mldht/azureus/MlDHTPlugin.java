@@ -21,6 +21,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
+import java.util.List;
 import java.util.Map;
 
 import lbms.plugins.mldht.DHTConfiguration;
@@ -28,6 +29,7 @@ import lbms.plugins.mldht.kad.DHT;
 import lbms.plugins.mldht.kad.DHTConstants;
 import lbms.plugins.mldht.kad.DHTLogger;
 import lbms.plugins.mldht.kad.DHT.DHTtype;
+import lbms.plugins.mldht.kad.RPCServer;
 import lbms.plugins.mldht.kad.RPCServerListener;
 
 import org.gudy.azureus2.core3.util.AERunnable;
@@ -54,13 +56,15 @@ import org.gudy.azureus2.plugins.ui.tables.TableManager;
 import org.gudy.azureus2.plugins.ui.tables.TableRow;
 import org.gudy.azureus2.plugins.utils.LocaleUtilities;
 
+import com.aelitis.azureus.core.networkmanager.admin.NetworkAdmin;
+import com.aelitis.azureus.core.networkmanager.admin.NetworkAdminPropertyChangeListener;
 import com.aelitis.azureus.plugins.upnp.UPnPPlugin;
 
 /**
  * @author Damokles
  * 
  */
-public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
+public class MlDHTPlugin implements UnloadablePlugin, PluginListener, NetworkAdminPropertyChangeListener {
 
 	private PluginInterface			pluginInterface;
 	private Map<DHTtype, DHT>		dhts;
@@ -310,6 +314,8 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 
 		incAnnounceItem.addListener(announceItemListener);
 		comAnnounceItem.addListener(announceItemListener);
+		
+		NetworkAdmin.getSingleton().addPropertyChangeListener(this);
 
 		//must be at the end because on update you get a synchronous callback
 		pluginInterface.addListener(this);
@@ -393,6 +399,8 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 		
 		unloaded = true;
 		
+		NetworkAdmin.getSingleton().removePropertyChangeListener(this);
+
 		if (uiHelper != null) {
 			uiHelper.onPluginUnload();
 		}
@@ -604,6 +612,19 @@ public class MlDHTPlugin implements UnloadablePlugin, PluginListener {
 		if ( !sem.reserve(30*1000)){
 			
 			Debug.out( "Timeout waiting for DHT to stop" );
+		}
+	}
+
+	/* (non-Javadoc)
+	 * @see com.aelitis.azureus.core.networkmanager.admin.NetworkAdminPropertyChangeListener#propertyChanged(java.lang.String)
+	 */
+	@Override
+	public void propertyChanged(String property) {
+		for (DHT dht : dhts.values()) {
+			List<RPCServer> servers = dht.getServers();
+			for (RPCServer server: servers) {
+				server.closeSocket();
+			}
 		}
 	}
 }

@@ -481,4 +481,9 @@ public class RPCServer implements Runnable, RPCServerBase {
 		}
 	}
 
+	public void closeSocket() {
+		if (sock != null && !sock.isClosed()) {
+			sock.close();
+		}
+	}
 }
