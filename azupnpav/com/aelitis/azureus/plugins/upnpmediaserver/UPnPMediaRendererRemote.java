@@ -43,7 +43,7 @@ UPnPMediaRendererRemote
 	private UPnPService			av_transport;
 	
 	private String	current_connection_id;
-	private String	current_av_id;
+	private String	current_av_id = "0";
 	
 	private AESemaphore	action_sem	= new AESemaphore( "UPnPMediaRenderer:action", 1 );
 	private String[] sinkProtocols;
