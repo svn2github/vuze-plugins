@@ -36,18 +36,7 @@ import java.util.Random;
 import java.util.Set;
 
 import org.gudy.azureus2.core3.internat.MessageText;
-import org.gudy.azureus2.core3.util.AERunnable;
-import org.gudy.azureus2.core3.util.Base32;
-import org.gudy.azureus2.core3.util.ByteFormatter;
-import org.gudy.azureus2.core3.util.Debug;
-import org.gudy.azureus2.core3.util.DelayedEvent;
-import org.gudy.azureus2.core3.util.DisplayFormatters;
-import org.gudy.azureus2.core3.util.FileUtil;
-import org.gudy.azureus2.core3.util.HashWrapper;
-import org.gudy.azureus2.core3.util.StringInterner;
-import org.gudy.azureus2.core3.util.SystemTime;
-import org.gudy.azureus2.core3.util.TimeFormatter;
-import org.gudy.azureus2.core3.util.UrlUtils;
+import org.gudy.azureus2.core3.util.*;
 import org.gudy.azureus2.plugins.disk.DiskManagerFileInfo;
 import org.gudy.azureus2.plugins.download.Download;
 import org.gudy.azureus2.plugins.download.DownloadManager;
@@ -196,6 +185,7 @@ UPnPMediaServerContentDirectory
 	private int		system_update_id	= random.nextInt( Integer.MAX_VALUE );
 
 	private Map<Integer,content>		content_map 	= new HashMap<Integer,content>();
+	private Map<String,content>		resourcekey_map 	= new HashMap<String,content>();
 
 	private Map<String,Long>			config;
 	private boolean						config_dirty;
@@ -323,7 +313,7 @@ UPnPMediaServerContentDirectory
 				}
 					
 				contentItem	item = new contentItem( downloads_container, content_file, hash, title );
-						
+								
 				addToFilters( item );
 				
 			}catch( Throwable e ){
@@ -662,7 +652,7 @@ UPnPMediaServerContentDirectory
 	{
 		synchronized( unique_names ){
 			
-			String name = (String)unique_name_map.remove( hash );
+			String name = unique_name_map.remove( hash );
 			
 			if ( name != null ){
 				
@@ -742,13 +732,6 @@ UPnPMediaServerContentDirectory
 	}
 		
 	protected contentItem
-	peekContentFromResourceID(
-		String		id )
-	{
-		return( getContentFromResourceIDSupport( id, true ));
-	}
-	
-	protected contentItem
 	getContentFromResourceID(
 		String		id )
 	{
@@ -764,38 +747,20 @@ UPnPMediaServerContentDirectory
 			
 			ensureStarted();
 		}
-		
-		int	pos = id.indexOf( "-" );
-		
-		if ( pos == -1 ){
-			
-			log( "Failed to decode resource id '" + id + "'" );
-			
-			return( null );
-		}
-		
-		byte[]	hash = ByteFormatter.decodeString( id.substring( 0, pos ));
-		
-		String	rem = id.substring( pos+1 );
-		
-		pos = rem.indexOf( "." );
+
+		int pos = id.indexOf( "." );
 		
 		if ( pos != -1 ){
 			
-			rem = rem.substring( 0, pos );
+			id = id.substring( 0, pos );
 		}
-		
-		try{
-			int file_index = Integer.parseInt( rem );
-			
-			return( getExistingContentFromHashAndFileIndex( hash, file_index ));
-			
-		}catch( Throwable e ){
-			
-			log( "Failed to decode resource id '" + id + "'", e );
-			
-			return( null );
+
+		content content = resourcekey_map.get(id);
+		if ( content instanceof contentItem ) {
+			return (contentItem) content;
 		}
+
+		return null;
 	}
 	
 	protected contentItem
@@ -985,31 +950,12 @@ UPnPMediaServerContentDirectory
 	{
 		ensureStarted();
 		
-		synchronized( content_map ){
-
-			Iterator<content>	it = content_map.values().iterator();
-			
-			while( it.hasNext()){
-				
-				content	content = it.next();
-				
-				if ( content instanceof contentItem ){
-					
-					contentItem	item = (contentItem)content;
-					
-					DiskManagerFileInfo	file = item.getFile();
-					
-					if ( file.getIndex() == file_index ){
-				
-						if ( Arrays.equals( item.getHash(), hash )){
-									
-							return( item );
-						}
-					}
-				}
-			}
+		String resourceKey = UPnPMediaServer.getContentResourceKey(hash, file_index);
+		content content = resourcekey_map.get(resourceKey);
+		if ( content instanceof contentItem ) {
+			return (contentItem) content;
 		}
-		
+
 		return( null );
 	}
 	
@@ -1073,25 +1019,6 @@ UPnPMediaServerContentDirectory
 		}
 	}
 	
-	protected String
-	createResourceID(
-		byte[]					hash,
-		DiskManagerFileInfo		file )
-	{
-		String	res =
-			ByteFormatter.encodeString(hash) + "-" + file.getIndex();
-		
-		String	name = file.getFile().toString();
-		
-		int	pos = name.lastIndexOf('.');
-		
-		if ( pos != -1 && !name.endsWith(".")){
-			
-			res += name.substring( pos );
-		}
-		
-		return( res );
-	}
 
 	protected int
 	getSystemUpdateID()
@@ -1601,7 +1528,7 @@ UPnPMediaServerContentDirectory
 				
 			while( it.hasNext()){
 				
-				content	con = (content)it.next();
+				content	con = it.next();
 				
 				String	c_name = con.getName();
 				
@@ -1630,7 +1557,7 @@ UPnPMediaServerContentDirectory
 			
 			while( it.hasNext()){
 				
-				content	con = (content)it.next();
+				content	con = it.next();
 				
 				String	c_name = con.getName();
 				
@@ -1822,6 +1749,7 @@ UPnPMediaServerContentDirectory
 				
 		private String[]		content_types;
 		private String		item_class;
+		private String resource_key;
 		
 		protected 
 		contentItem(
@@ -1864,10 +1792,17 @@ UPnPMediaServerContentDirectory
 					content_types	= new String[] { "unknown/unknown" };
 					item_class		= CONTENT_UNKNOWN;
 				}
+				
+				resource_key = UPnPMediaServer.getContentResourceKey(hash, content_file.getFile().getIndex());
+				resourcekey_map.put(resource_key, this);
 			}finally{
 				
 				_parent.addChildz( this );
 			}
+		}
+		
+		public String getResourceKey() {
+			return resource_key;
 		}
 		
 		protected content
@@ -2120,7 +2055,8 @@ UPnPMediaServerContentDirectory
 			String	host,
 			int		stream_id )
 		{
-			return( "http://" + UrlUtils.convertIPV6Host( host ) + ":" + media_server.getContentServer().getPort() + "/Content/" + createResourceID( hash, getFile() ) + (stream_id==-1?"":("?sid=" + stream_id ))); 
+			return UPnPMediaServer.getContentResourceURI(getFile(), host, 
+					media_server.getContentServer().getPort(), stream_id);
 		}
 		
 		protected String
@@ -2374,6 +2310,7 @@ UPnPMediaServerContentDirectory
 			boolean	is_link )
 		{
 			super.deleted( is_link );
+			resourcekey_map.remove(resource_key);
 		}
 		
 		protected long

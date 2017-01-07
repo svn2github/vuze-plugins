@@ -84,6 +84,7 @@ import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloaderFact
 import org.gudy.azureus2.plugins.utils.xml.simpleparser.SimpleXMLParserDocument;
 import org.gudy.azureus2.plugins.utils.xml.simpleparser.SimpleXMLParserDocumentException;
 import org.gudy.azureus2.plugins.utils.xml.simpleparser.SimpleXMLParserDocumentNode;
+import org.gudy.azureus2.ui.swt.Utils;
 
 import com.aelitis.azureus.core.content.AzureusContentDirectory;
 import com.aelitis.azureus.core.content.AzureusContentDirectoryListener;
@@ -1229,7 +1230,7 @@ UPnPMediaServer
 						return;
 					}
 					
-					String	id = content_directory.createResourceID( download.getTorrent().getHash(), file );
+					String	id = getContentResourceID( file );
 						
 					UPnPMediaServerContentDirectory.contentItem item = content_directory.getContentFromResourceID( id );
 					
@@ -1434,9 +1435,7 @@ UPnPMediaServer
 			}
 			hash = download.getTorrentHash();
 		}
-		String id = content_directory.createResourceID(hash, file);
-
-		System.out.println("play: " + id);
+		String id = getContentResourceID(file);
 
 		UPnPMediaServerContentDirectory.contentItem item = content_directory.getContentFromResourceID(id);
 
@@ -2103,7 +2102,7 @@ UPnPMediaServer
 	
 		throws IPCException
 	{
-		return( getContentURL( download.getDiskManagerFileInfo()[0]));
+		return( peekContentURL( download.getDiskManagerFileInfo()[0]));
 	}
 	
 	public String
@@ -2112,28 +2111,7 @@ UPnPMediaServer
 	
 		throws IPCException
 	{
-		try{
-			String	id = content_directory.createResourceID( file.getDownloadHash(), file );
-
-			UPnPMediaServerContentDirectory.contentItem item = content_directory.getContentFromResourceID( id );
-
-			if ( item != null ){
-
-				try{
-					return item.getURI( getLocalIP(), -1 );
-
-				}catch( Throwable e ){
-
-					log( "Failed to get URI", e);
-				}
-			}
-			
-			return "";
-			
-		} catch (Throwable t) {
-			
-			throw new IPCException(t);
-		}
+		return peekContentURL(file);
 	}
 
 		// peek content URL
@@ -2154,23 +2132,7 @@ UPnPMediaServer
 		throws IPCException
 	{
 		try{
-			String	id = content_directory.createResourceID( file.getDownloadHash(), file );
-
-			UPnPMediaServerContentDirectory.contentItem item = content_directory.peekContentFromResourceID( id );
-
-			if ( item != null ){
-
-				try{
-					return item.getURI( getLocalIP(), -1 );
-
-				}catch( Throwable e ){
-
-					log( "Failed to get URI", e);
-				}
-			}
-			
-			return "";
-			
+			return getContentResourceURI(file, getLocalIP(), getActivePort(), -1);
 		} catch (Throwable t) {
 			
 			throw new IPCException(t);
@@ -2184,7 +2146,7 @@ UPnPMediaServer
 		throws IPCException
 	{
 		try{
-			String	id = content_directory.createResourceID( file.getDownloadHash(), file );
+			String	id = getContentResourceID( file );
 
 			UPnPMediaServerContentDirectory.contentItem item = content_directory.getContentFromResourceID( id );
 
@@ -2224,7 +2186,7 @@ UPnPMediaServer
 		DiskManagerFileInfo	file )
 	{
 		try{
-			String	id = content_directory.createResourceID( file.getDownload().getTorrent().getHash(), file );
+			String	id = getContentResourceID( file );
 		
 			UPnPMediaServerContentDirectory.contentItem item = content_directory.getContentFromResourceID( id );
 			
@@ -2964,6 +2926,15 @@ UPnPMediaServer
 		}
 	}
 	
+	public int
+	getActivePort()
+	{
+		if (content_server == null) {
+			return -1;
+		}
+		return content_server.getPort();
+	}
+	
 	protected void
 	createContent()
 	{
@@ -3691,7 +3662,7 @@ UPnPMediaServer
 			}
 		}
 		
-		String	id = content_directory.createResourceID( download.getTorrent().getHash(), file );
+		String	id = getContentResourceID( file );
 		
 		System.out.println( "play: " + id );
 
@@ -4295,5 +4266,48 @@ UPnPMediaServer
 				
 			}
 		}
+	}
+
+	public static String
+	getContentResourceURI(
+		DiskManagerFileInfo file,
+		String	host,
+		int port,
+		int		stream_id )
+	{
+		return( "http://" + UrlUtils.convertIPV6Host( host ) + ":" + port + "/Content/" + getContentResourceID( file ) + (stream_id==-1?"":("?sid=" + stream_id ))); 
+	}
+
+	public static String
+	getContentResourceKey(
+		byte[]					hash,
+		int index )
+	{
+		return ByteFormatter.encodeString(hash) + "-" + index;
+	}
+
+	public static String
+	getContentResourceID(
+		DiskManagerFileInfo		file )
+	{
+		byte[] hash;
+		try {
+			hash = file.getDownloadHash();
+		} catch (DownloadException e) {
+			hash = new byte[0];
+		}
+		
+		String	res = getContentResourceKey(hash, file.getIndex());
+		
+		String	name = file.getFile().getName();
+		
+		int	pos = name.lastIndexOf('.');
+		
+		if ( pos != -1 && !name.endsWith(".")){
+			
+			res += name.substring( pos );
+		}
+		
+		return( res );
 	}
 }
