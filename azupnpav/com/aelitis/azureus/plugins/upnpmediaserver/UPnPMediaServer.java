@@ -84,7 +84,6 @@ import org.gudy.azureus2.plugins.utils.resourcedownloader.ResourceDownloaderFact
 import org.gudy.azureus2.plugins.utils.xml.simpleparser.SimpleXMLParserDocument;
 import org.gudy.azureus2.plugins.utils.xml.simpleparser.SimpleXMLParserDocumentException;
 import org.gudy.azureus2.plugins.utils.xml.simpleparser.SimpleXMLParserDocumentNode;
-import org.gudy.azureus2.ui.swt.Utils;
 
 import com.aelitis.azureus.core.content.AzureusContentDirectory;
 import com.aelitis.azureus.core.content.AzureusContentDirectoryListener;
