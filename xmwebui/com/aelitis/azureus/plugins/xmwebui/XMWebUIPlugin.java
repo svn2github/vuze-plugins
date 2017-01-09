@@ -2798,6 +2798,7 @@ XMWebUIPlugin
 		result.put( "az-mode", az_mode );										// string
 		result.put( "rpc-i2p-address", pc.getPluginStringParameter("webui.i2p_dest"));
 		result.put( "rpc-tor-address", pc.getPluginStringParameter("webui.tor_dest"));
+		result.put( "az-content-port", getMediaServerActivePort());
 		
 		List listSupports = new ArrayList();
 		Collections.addAll(listSupports, "rpc:receive-gzip", "field:files-hc",
@@ -2828,6 +2829,12 @@ XMWebUIPlugin
 		
 	}
 	
+	
+	public int getMediaServerActivePort() {
+		return plugin_interface.getPluginconfig().getUnsafeIntParameter(
+				"Plugin.azupnpav.content_port", -1);
+	}
+
   private String 
   getUserMessage( 
 	Map reply ) 
