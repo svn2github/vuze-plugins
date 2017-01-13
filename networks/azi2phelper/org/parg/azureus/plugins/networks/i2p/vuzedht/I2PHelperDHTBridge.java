@@ -42,7 +42,6 @@ import org.gudy.azureus2.plugins.ddb.DistributedDatabaseEvent;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabaseException;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabaseKey;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabaseListener;
-import org.gudy.azureus2.plugins.ddb.DistributedDatabaseProgressListener;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabaseTransferHandler;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabaseTransferType;
 import org.gudy.azureus2.plugins.ddb.DistributedDatabaseValue;
@@ -400,17 +399,7 @@ I2PHelperDHTBridge
 				try{
 					DistributedDatabaseValue result = 
 						contact.read(
-							new DistributedDatabaseProgressListener() {								
-								@Override
-								public void reportSize(long size) {
-								}								
-								@Override
-								public void reportCompleteness(int percent) {
-								}								
-								@Override
-								public void reportActivity(String str) {
-								}
-							},
+							null,
 							this,
 							read_key,
 							30*1000 );

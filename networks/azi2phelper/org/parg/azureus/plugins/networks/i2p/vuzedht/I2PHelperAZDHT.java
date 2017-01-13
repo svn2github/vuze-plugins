@@ -429,6 +429,7 @@ I2PHelperAZDHT
 		{
 			try{
 				return( getDHT().getTransport().readTransfer(
+					listener == null ? null :
 							new DHTTransportProgressListener()
 							{
 								public void
@@ -474,6 +475,7 @@ I2PHelperAZDHT
 		{
 			try{
 				 getDHT().getTransport().writeTransfer(
+						listener == null ? null :
 						new DHTTransportProgressListener()
 						{
 							public void
@@ -519,6 +521,7 @@ I2PHelperAZDHT
 		{
 			try{
 				return( getDHT().getTransport().writeReadTransfer(
+						listener == null ? null :
 						new DHTTransportProgressListener()
 						{
 							public void

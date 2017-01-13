@@ -906,6 +906,7 @@ I2PHelperDHTPluginInterface
 			
 			try{
 				return( contact.getTransport().readTransfer(
+						listener == null ? null :
 						new DHTTransportProgressListener()
 						{
 							public void
@@ -952,6 +953,7 @@ I2PHelperDHTPluginInterface
 			
 			try{
 				contact.getTransport().writeTransfer(
+						listener == null ? null :
 						new DHTTransportProgressListener()
 						{
 							public void
@@ -998,6 +1000,7 @@ I2PHelperDHTPluginInterface
 			
 			try{
 				return( contact.getTransport().writeReadTransfer(
+						listener == null ? null :
 						new DHTTransportProgressListener()
 						{
 							public void
