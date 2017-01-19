@@ -595,6 +595,9 @@ public class SpellChecker
                 catch (Exception e)
                 {   
                     DictionaryDownloader.add(locale);
+                    
+                }catch( Throwable e ){
+                	e.printStackTrace();
                 }
                 SpellChecker.dictionaries.put(locale, dictionary); 
             }
@@ -624,6 +627,10 @@ public class SpellChecker
         value = (value == null) ? "" : value;
         List<SpellObject> misspellings = new ArrayList<SpellObject>();
         Dictionary dictionary = SpellChecker.getDictionary(locale);
+        
+        if ( dictionary == null ){
+        	return( misspellings );
+        }
         
         String[] spaceWords = value.split("\\s+");        
 

@@ -413,18 +413,8 @@ public class DictionaryDownloader implements iTask
         try
         {
             dictionary = Hunspell.getInstance().getDictionary(dictionaryFolder + File.separator + languageTag);
-        }
-        catch (FileNotFoundException e)
-        {
-        }
-        catch (UnsupportedEncodingException e)
-        {
-        }
-        catch (UnsatisfiedLinkError e)
-        {
-        }
-        catch (UnsupportedOperationException e)
-        {
+        }catch( Throwable e ){
+        	e.printStackTrace();
         }
         return dictionary;
     }
