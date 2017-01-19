@@ -36,6 +36,8 @@ import org.gudy.azureus2.plugins.torrent.Torrent;
 import org.gudy.azureus2.ui.swt.*;
 
 import java.io.*;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Timer;
 
 public class View implements MouseListener, SelectionListener, MenuListener, ModifyListener,
@@ -249,8 +251,23 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
     Messages.setLanguageText(tabHist, "RSSFeed.Tab.History");
     this.tabHelp = new CTabItem(tabFolder, SWT.NULL);
     Messages.setLanguageText(tabHelp, "RSSFeed.Tab.Help");
-    tabFolder.setSelection(tabStatus);
+    
+    int selTab = pluginInterface.getPluginconfig().getPluginIntParameter( "ui.tabFolder.sel.index", 0 );
+    if ( selTab >= 0 && selTab < tabFolder.getItemCount()){
+    	tabFolder.setSelection(selTab);
+    }else{
+    	tabFolder.setSelection(tabStatus);
+    }
 
+    tabFolder.addSelectionListener(
+    	new SelectionAdapter() {
+    		@Override
+    		public void widgetSelected(SelectionEvent e) {
+    			int sel = tabFolder.getSelectionIndex();
+    			pluginInterface.getPluginconfig().setPluginParameter( "ui.tabFolder.sel.index", sel );
+    		}
+		});
+    
     // Options Folder
     this.options = setupComposite(tabFolder, setupGridLayout(2, -1, -1, -1, -1), GridData.FILL_HORIZONTAL | GridData.FILL_VERTICAL);
     tabOptions.setControl(options);
@@ -302,12 +319,28 @@ public class View implements MouseListener, SelectionListener, MenuListener, Mod
     filtTable.setHeaderVisible(true);
 
     String filtColumnNames = "RSSFeed.Options.Filter.Table.Col";
-    int[] filtColumnWidths = {195, 65, 60};
-    for(int i = 0; i < filtColumnWidths.length; i++) {
-      TableColumn column = new TableColumn(filtTable, SWT.NULL);
+    java.util.List<Integer> filtColumnWidthDefaults = Arrays.asList( 195, 65, 60 );
+    
+    final java.util.List<Number> filtColumnWidths = (java.util.List<Number>)pluginInterface.getPluginconfig().getPluginListParameter( "ui.filtTable.col.widths", filtColumnWidthDefaults );
+    
+    for(int i = 0; i < filtColumnWidths.size(); i++) {
+      final TableColumn column = new TableColumn(filtTable, SWT.NULL);
+      final int f_i = i;
+      
       Messages.setLanguageText(column, filtColumnNames + i);
-      column.setWidth(filtColumnWidths[i]);
+      
+      column.setWidth(filtColumnWidths.get(i).intValue());
+
+      column.addControlListener(
+    		 new ControlAdapter() {
+    			 @Override
+    			public void controlResized(ControlEvent e) {
+    				 filtColumnWidths.set( f_i , column.getWidth());
+    				 pluginInterface.getPluginconfig().setPluginListParameter( "ui.filtTable.col.widths", new ArrayList<Number>( filtColumnWidths ));
+    			}
+    		 });      
     }
+    
     filtTable.addMouseListener(this);
 
     ToolBar filtCompBar = new ToolBar(filtComp, SWT.FLAT | SWT.VERTICAL);
