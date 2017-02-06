@@ -33,6 +33,7 @@ import org.gudy.azureus2.core3.config.COConfigurationManager;
 import org.gudy.azureus2.core3.internat.MessageText;
 import org.gudy.azureus2.core3.util.*;
 import org.gudy.azureus2.plugins.PluginConfig;
+import org.gudy.azureus2.plugins.PluginConfigListener;
 import org.gudy.azureus2.plugins.PluginInterface;
 import org.gudy.azureus2.plugins.disk.DiskManagerFileInfo;
 import org.gudy.azureus2.plugins.download.Download;
@@ -384,13 +385,33 @@ RelatedContentUISWT
 				}
 			});
 			
-				// max results
+				// max results 
 			
 			final IntParameter max_results = 
 				config_model.addIntParameter2( 
 					"rcm.config.max_results", "rcm.config.max_results",
 					manager.getMaxResults());
 			
+			plugin_interface.getPluginconfig().addListener(
+				new PluginConfigListener() {
+					
+					public void configSaved() {
+						if ( destroyed ){
+							//plugin_interface.getPluginconfig().removeListener( this );
+						}else{
+							int max  = max_results.getValue();
+							
+							if ( max != manager.getMaxResults()){
+							
+								manager.setMaxResults( max );
+							}
+						}
+					}
+				});
+			
+			/*
+			 * This generates intermediate timed-save values :(
+			 * 
 			max_results.addListener(
 					new ParameterListener()
 					{
@@ -401,8 +422,8 @@ RelatedContentUISWT
 							manager.setMaxResults( max_results.getValue());
 						}
 					});
-			
-				// max level
+			*/
+				// max level 
 			
 			final IntParameter max_level = 
 				config_model.addIntParameter2( 
