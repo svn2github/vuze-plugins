@@ -49,16 +49,40 @@ public class FilterBean implements Serializable {
   public static Pattern moviePattern = Pattern.compile("^(.*)[._\\-\\s]+\\(?(\\d{4})");
 
   private static final Pattern[] episodePatterns = new Pattern[] {
+      // S##E## Style patterns
+      //
+
+      // s02e03-s02e5
       Pattern.compile("(.*?)" + "s([0-9]+)e([0-9]+)[\\-\\+]s([0-9]+)e([0-9]+)" + ".*?"),
+      // s02e03-e05
       Pattern.compile("(.*?)" + "s([0-9]+)e([0-9]+)[\\-\\+]e([0-9]+)" + ".*?"),
+      // s02e03-05
       Pattern.compile("(.*?)" + "s([0-9]+)e([0-9]+)[\\-\\+]([0-9]+)" + ".*?"),
+      // s02e03
       Pattern.compile("(.*?)" + "s([0-9]+)e([0-9]+)" + ".*?"),
+
+      // Miniseries style patterns - no season specified, set to '1'
+      //
+
+      // part3
+      Pattern.compile("(.*?)" + "(part)[-._ ]([0-9]+)" + ".*?"),
+
+      // Number only patterns - keep these last because they tend to match too easily and disrupt valid patterns
+      //
+
+      // 02x03-02x05
       Pattern.compile("(.*?)" + "([0-9]+)x([0-9]+)[\\-\\+]([0-9]+)x([0-9]+)" + ".*?"),
+      // 02x03-05
       Pattern.compile("(.*?)" + "([0-9]+)x([0-9]+)[\\-\\+]([0-9]+)" + ".*?"),
+      // 02x03
       Pattern.compile("(.*?)" + "([0-9]+)x([0-9]+)" + ".*?"),
+      // 203-205
       Pattern.compile("(.*?)" + "([0-9]+)([0-9]{2})[\\-\\+]([0-9]+)([0-9]{2})" + ".*?"),
+      // 203-05
       Pattern.compile("(.*?)" + "([0-9]+)([0-9]{2})[\\-\\+]([0-9]{2})" + ".*?"),
+      // 2-3
       Pattern.compile("(.*?)" + "([0-9]+) - ([0-9]+)" + ".*?"),
+      // 203
       Pattern.compile("(.*?)" + "([0-9]+)([0-9]{2})" + ".*?"),
   };
 
@@ -391,7 +415,8 @@ public class FilterBean implements Serializable {
 
       switch(m.groupCount()) {
         case 3:
-          seasonStart = Integer.parseInt(m.group(2));
+          final String season = m.group(2);
+          seasonStart = Character.isDigit(season.charAt(0)) ? Integer.parseInt(season) : 1;
           episodeStart = Integer.parseInt(m.group(3));
           e = new Episode(showTitle, seasonStart, episodeStart, isProper);
           break;
