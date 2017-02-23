@@ -1262,7 +1262,13 @@ RSSToChat
 					
 					String hash = b_hash==null?"":Base32.encode(b_hash);
 					
-					String	dl_link 	= (String)props.get( SearchResult.PR_DOWNLOAD_LINK );
+					String	dl_link 	= (String)props.get( SearchResult.PR_TORRENT_LINK );
+					
+					if ( dl_link == null ){
+						
+						dl_link 	= (String)props.get( SearchResult.PR_DOWNLOAD_LINK );
+					}
+					
 					String	cdp_link 	= (String)props.get( SearchResult.PR_DETAILS_LINK );
 					
 					long	size 		= (Long)props.get( SearchResult.PR_SIZE );
