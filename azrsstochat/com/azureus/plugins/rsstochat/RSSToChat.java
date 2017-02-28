@@ -2121,6 +2121,43 @@ RSSToChat
 	}
 	
 	private String
+	encodeTitle(
+		String		title )
+	{
+		int MAX_TITLE = 60;
+		
+		boolean	truncated = false;
+		
+		String str;
+		
+		while( true ){
+		
+			str = UrlUtils.encode( title );
+			
+			if ( str.length() <= MAX_TITLE ){
+				
+				break;
+			}
+			
+			title = title.substring( 0, title.length() - 1 );
+			
+			if ( !truncated ){
+			
+				truncated = true;
+				
+				MAX_TITLE -= 3;
+			}
+		}
+		
+		if ( truncated ){
+			
+			str += "...";
+		}
+		
+		return( str );
+	}
+	
+	private String
 	buildMagnetHead(
 		String		dl_link,
 		String		hash,
@@ -2136,7 +2173,7 @@ RSSToChat
 		
 			magnet = 
 				"magnet:?xt=urn:btih:" + hash + 
-				"&dn=" + UrlUtils.encode( title ) + 
+				"&dn=" + encodeTitle( title ) + 
 				(dl_link==null?"":("&fl=" + UrlUtils.encode( dl_link )));
 		}
 		
@@ -2155,12 +2192,14 @@ RSSToChat
 		long		leechers )
 		
 	{
+		final int MAX_CDP_LINK	= 100;
+		
 		int	length_rem = MAX_MESSAGE_SIZE;
 		
 		String lc_magnet = magnet.toLowerCase( Locale.US );
 		
 		if ( !lc_magnet.contains( "&dn=" )){	
-			magnet += "&dn=" + UrlUtils.encode( title );
+			magnet += "&dn=" + encodeTitle( title );
 		}
 		
 		if ( size != -1 ){
@@ -2184,7 +2223,17 @@ RSSToChat
 		boolean	has_cdp = cdp_link != null && ( dl_link == null || !cdp_link.equals( dl_link ));
 		
 		if ( has_cdp ){
-			magnet += "&_c=" + UrlUtils.encode( cdp_link );
+			
+			String encoded_cdp = UrlUtils.encode( cdp_link );
+			
+			if ( encoded_cdp.length() > MAX_CDP_LINK ){
+				
+				has_cdp = false;
+				
+			}else{
+			
+				magnet += "&_c=" + encoded_cdp;
+			}
 		}
 		
 		length_rem -= magnet.length();
