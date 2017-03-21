@@ -238,7 +238,7 @@ public class Checker_PIA
 
 			// Call needs to be from the VPN interface (the bindIP)
 			RequestConfig requestConfig = RequestConfig.custom().setLocalAddress(
-					bindIP).setConnectTimeout(10000).build();
+					bindIP).setConnectTimeout(15000).build();
 
 			post.setConfig(requestConfig);
 

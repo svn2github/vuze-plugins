@@ -18,6 +18,7 @@
 
 package com.vuze.plugin.azVPN_Helper;
 
+import java.lang.reflect.Field;
 import java.net.*;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -30,7 +31,9 @@ import org.apache.http.impl.conn.SystemDefaultDnsResolver;
 import org.gudy.azureus2.core3.util.AESemaphore;
 import org.gudy.azureus2.core3.util.Debug;
 import org.gudy.azureus2.plugins.PluginConfig;
+import org.gudy.azureus2.plugins.PluginException;
 import org.gudy.azureus2.plugins.PluginInterface;
+import org.gudy.azureus2.plugins.installer.StandardPlugin;
 import org.gudy.azureus2.plugins.utils.*;
 
 import com.aelitis.azureus.core.AzureusCore;
@@ -141,6 +144,22 @@ public abstract class CheckerCommon
 			NetworkAdmin networkAdmin = NetworkAdmin.getSingleton();
 			AzureusCore azureus_core = AzureusCoreFactory.getSingleton();
 
+			NetworkAdminNetworkInterfaceAddress bindTo = null;
+			try {
+				NetworkAdminNetworkInterface[] interfaces = networkAdmin.getInterfaces();
+				for (NetworkAdminNetworkInterface networkAdminInterface : interfaces) {
+					NetworkAdminNetworkInterfaceAddress[] addresses = networkAdminInterface.getAddresses();
+					for (NetworkAdminNetworkInterfaceAddress a : addresses) {
+						InetAddress address = a.getAddress();
+						if (address.equals(vpnIP)) {
+							bindTo = a;
+							break;
+						}
+					}
+				}
+			} catch (Throwable e) {
+			}
+
 			NetworkAdminProtocol[] protocols = networkAdmin.getOutboundProtocols(
 					azureus_core);
 
@@ -150,7 +169,8 @@ public abstract class CheckerCommon
 
 				try {
 
-					InetAddress ext_addr = networkAdmin.testProtocol(protocol);
+//					InetAddress ext_addr = networkAdmin.testProtocol(protocol);
+					InetAddress ext_addr = protocol.test(protocol.getType() == NetworkAdminProtocol.PT_HTTP ? null : bindTo);
 
 					String country = null;
 					if (ext_addr != null) {
@@ -239,6 +259,17 @@ public abstract class CheckerCommon
 
 	protected final int handleFindBindingAddress(InetAddress currentBindIP,
 			StringBuilder sReply) {
+		return handleFindBindingAddress(currentBindIP, sReply, 0);
+	}
+
+	private final int handleFindBindingAddress(InetAddress currentBindIP,
+			StringBuilder sReply, int numLoops) {
+		if (currentBindIP == null) {
+  		addReply(sReply, CHAR_BAD, "!Bind IP null!", new String[] {
+  			"" + currentBindIP
+  		});
+  		return STATUS_ID_BAD;
+		}
 
 		int newStatusID = STATUS_ID_OK;
 
@@ -280,6 +311,7 @@ public abstract class CheckerCommon
 		}
 
 		try {
+			boolean foundExistingVPNIP = false;
 			NetworkAdmin networkAdmin = NetworkAdmin.getSingleton();
 
 			// Find a bindable address that starts with 10.
@@ -293,6 +325,9 @@ public abstract class CheckerCommon
 						bi = new BindableInterface(bindableAddress,
 								NetUtils.getByInetAddress(bindableAddress));
 						mapBindableInterfaces.put(hostAddress, bi);
+						if (!foundExistingVPNIP && bindableAddress.equals(vpnIP)) {
+							foundExistingVPNIP = true;
+						}
 					}
 				}
 			}
@@ -319,8 +354,37 @@ public abstract class CheckerCommon
 								bi = new BindableInterface(address, NetUtils.getByName(
 										networkAdminInterface.getName()));
 								mapBindableInterfaces.put(hostAddress, bi);
+								if (!foundExistingVPNIP && address.equals(vpnIP)) {
+									foundExistingVPNIP = true;
+								}
 							}
 						}
+					}
+				}
+			}
+			
+			if (vpnIP != null && !foundExistingVPNIP) {
+				String niName = "Unknown Interface";
+				try {
+					NetworkInterface networkInterface = NetUtils.getByInetAddress(
+							currentBindIP);
+					niName = networkInterface.getName() + " ("
+							+ networkInterface.getDisplayName() + ")";
+				} catch (Throwable e) {
+				}
+				addReply(sReply, CHAR_WARN, "vpnhelper.existing.not.found", new String[] {
+					"" + currentBindIP,
+					niName
+				});
+
+				if (numLoops == 0) {
+  				try {
+  					Field fldLastNICheck = NetUtils.class.getDeclaredField("last_ni_check");
+  					fldLastNICheck.setAccessible(true);
+  					fldLastNICheck.set(null, Long.valueOf(-1));
+  					return handleFindBindingAddress(currentBindIP, sReply, ++numLoops);
+					} catch (Throwable t) {
+						t.printStackTrace();
 					}
 				}
 			}
@@ -487,6 +551,18 @@ public abstract class CheckerCommon
 							configBindIP
 				});
 
+				if (currentBindIP.isLoopbackAddress()) {
+					if (numLoops == 0) {
+	  				try {
+	  					Field fldLastNICheck = NetUtils.class.getDeclaredField("last_ni_check");
+	  					fldLastNICheck.setAccessible(true);
+	  					fldLastNICheck.set(null, Long.valueOf(-1));
+	  					return handleFindBindingAddress(currentBindIP, sReply, ++numLoops);
+						} catch (Throwable t) {
+							t.printStackTrace();
+						}
+					}
+				}
 			}
 
 			return STATUS_ID_BAD;
@@ -647,7 +723,13 @@ public abstract class CheckerCommon
 			newStatusID = STATUS_ID_BAD;
 		} else {
 
-			InetAddress currentBindIP = handlers.get(0).getBindIP();
+			InetAddress currentBindIP = null;
+			for (PRUDPPacketHandler handler : handlers) {
+				currentBindIP = handler.getBindIP();
+				if (currentBindIP != null) {
+					break;
+				}
+			}
 			newStatusID = handleFindBindingAddress(currentBindIP, sReply);
 		}
 		return newStatusID;
@@ -755,7 +837,7 @@ public abstract class CheckerCommon
 
 			HttpHead getHead = new HttpHead(uri);
 			RequestConfig requestConfig = RequestConfig.custom().setLocalAddress(
-					addressToReach).setConnectTimeout(10000).build();
+					addressToReach).setConnectTimeout(12000).build();
 			getHead.setConfig(requestConfig);
 
 			CloseableHttpResponse response = HttpClients.createDefault().execute(
@@ -764,6 +846,7 @@ public abstract class CheckerCommon
 			response.close();
 
 		} catch (Throwable t) {
+			t.printStackTrace();
 			return false;
 		} finally {
 			AEProxySelector selector = AEProxySelectorFactory.getSelector();

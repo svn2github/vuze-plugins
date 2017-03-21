@@ -91,6 +91,8 @@ public class Checker_AirVPN
 
 	private static final String REGEX_NotConnected = "\"Not connected\"";
 
+	private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36";
+
 	private HttpClientContext httpClientContext;
 
 	public Checker_AirVPN() {
@@ -250,6 +252,11 @@ public class Checker_AirVPN
 					PluginVPNHelper.log("Valid ports page. Skipping Login");
 					skipLoginPage = true;
 					alreadyLoggedIn = true;
+					
+					if (ports == null) {
+						addReply(sReply, CHAR_WARN, "airvpn.vpnhelper.rpc.notconnected");
+						return false;
+					}
 				} else {
 					ports = null;
 				}
@@ -263,8 +270,9 @@ public class Checker_AirVPN
 
 				HttpGet getLoginPage = new HttpGet(VPN_LOGIN_URL);
 				requestConfig = RequestConfig.custom().setLocalAddress(
-						bindIP).setConnectTimeout(10000).build();
+						bindIP).setConnectTimeout(15000).build();
 				getLoginPage.setConfig(requestConfig);
+				getLoginPage.setHeader("User-Agent", USER_AGENT);
 
 				CloseableHttpClient httpClientLoginPage = HttpClients.createDefault();
 				CloseableHttpResponse loginPageResponse = httpClientLoginPage.execute(
@@ -325,9 +333,10 @@ public class Checker_AirVPN
 					HttpPost httpPostLogin = new HttpPost(loginURL);
 
 					requestConfig = RequestConfig.custom().setLocalAddress(
-							bindIP).setConnectTimeout(10000).build();
+							bindIP).setConnectTimeout(15000).build();
 
 					httpPostLogin.setConfig(requestConfig);
+					httpPostLogin.setHeader("User-Agent", USER_AGENT);
 
 					CloseableHttpClient httpClient = HttpClients.createDefault();
 
@@ -335,8 +344,9 @@ public class Checker_AirVPN
 					urlParameters.add(new BasicNameValuePair("ips_username", user));
 					urlParameters.add(new BasicNameValuePair("ips_password", pass));
 					urlParameters.add(new BasicNameValuePair("auth_key", authKey));
-					urlParameters.add(new BasicNameValuePair("invisible", "1"));
-					urlParameters.add(new BasicNameValuePair("inline_invisible", "1"));
+					urlParameters.add(new BasicNameValuePair("referer", "http://airvpn.org/"));
+					urlParameters.add(new BasicNameValuePair("anonymous", "1"));
+					urlParameters.add(new BasicNameValuePair("rememberMe", "1"));
 
 					httpPostLogin.setEntity(new UrlEncodedFormEntity(urlParameters));
 
@@ -359,6 +369,10 @@ public class Checker_AirVPN
 
 			if (ports == null) {
 				ports = scrapePorts(bindIP, token);
+				if (ports == null && token.length() > 0) {
+					addReply(sReply, CHAR_WARN, "airvpn.vpnhelper.rpc.notconnected");
+					return false;
+				}
 			}
 
 			PluginVPNHelper.log("Found Ports: " + Arrays.toString(ports));
@@ -452,9 +466,10 @@ public class Checker_AirVPN
 		HttpPost httpPostCreatePort = new HttpPost(VPN_PORTS_URL);
 
 		RequestConfig requestConfig = RequestConfig.custom().setLocalAddress(
-				bindIP).setConnectTimeout(10000).build();
+				bindIP).setConnectTimeout(15000).build();
 
 		httpPostCreatePort.setConfig(requestConfig);
+		httpPostCreatePort.setHeader("User-Agent", USER_AGENT);
 
 		CloseableHttpClient httpClientCreatPort = HttpClients.createDefault();
 
@@ -489,8 +504,9 @@ public class Checker_AirVPN
 		String bindIPString = bindIP == null ? null : bindIP.getHostAddress();
 		HttpGet getPortsPage = new HttpGet(VPN_PORTS_URL);
 		RequestConfig requestConfig = RequestConfig.custom().setLocalAddress(
-				bindIP).setConnectTimeout(10000).build();
+				bindIP).setConnectTimeout(15000).build();
 		getPortsPage.setConfig(requestConfig);
+		getPortsPage.setHeader("User-Agent", USER_AGENT);
 
 		CloseableHttpClient httpClientPortsPage = HttpClients.createDefault();
 		CloseableHttpResponse portsPageResponse = httpClientPortsPage.execute(
@@ -557,6 +573,7 @@ public class Checker_AirVPN
 
 			Matcher matcherNC = patNotConnected.matcher(line);
 			if (matcherNC.find()) {
+				PluginVPNHelper.log("AirVPN's ports page indicates you are not connected to VPN");
 				return null;
 			}
 		}
