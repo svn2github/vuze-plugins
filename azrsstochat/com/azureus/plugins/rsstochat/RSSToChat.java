@@ -93,7 +93,7 @@ public class
 RSSToChat
 	implements UnloadablePlugin
 {
-	public static final int MAX_MESSAGE_SIZE		= 450;
+	public static final int MAX_MESSAGE_SIZE		= 500;
 	public static final int MAX_POSTS_PER_REFRESH	= 10;
 	public static final int MAX_HISTORY_ENTRIES		= 1000;
 	
@@ -1036,7 +1036,7 @@ RSSToChat
 				}
 				
 				
-				String magnet = buildMagnetHead( dl_link, hash, title_short );
+				String magnet = buildMagnetHead( dl_link, cdp_link, hash, title_short );
 				
 				String history_key = magnet;
 				
@@ -1294,7 +1294,7 @@ RSSToChat
 						
 						if ( presentation_is_link ){
 							
-							String magnet = buildMagnetHead( dl_link, "", title );
+							String magnet = buildMagnetHead( dl_link, cdp_link, "", title );
 						
 							magnet = buildMagnetTail(magnet, dl_link, cdp_link, title, size, result_time, seeds, leechers );
 							
@@ -1327,10 +1327,8 @@ RSSToChat
 						}
 							
 						if ( presentation_is_link ){
-							
-							int	length_rem = MAX_MESSAGE_SIZE;
-							
-							String magnet = buildMagnetHead( dl_link, hash, title );
+														
+							String magnet = buildMagnetHead( dl_link, cdp_link, hash, title );
 							
 							magnet = buildMagnetTail(magnet, dl_link, cdp_link, title, size, result_time, seeds, leechers );
 							
@@ -1987,7 +1985,7 @@ RSSToChat
 			
 			log( "Torrent created: " + torrent_file );
 			
-			String magnet = buildMagnetHead( null, Base32.encode( hash ), torrent_title );
+			String magnet = buildMagnetHead( null, null, Base32.encode( hash ), torrent_title );
 			
 			magnet += "&xl="  + torrent.getSize();
 			magnet += "&pfi=" + primary_file_index;
@@ -2122,9 +2120,20 @@ RSSToChat
 	
 	private String
 	encodeTitle(
-		String		title )
+		String		title,
+		String		dl_link,
+		String		cdp_link )
 	{
-		int MAX_TITLE = 60;
+		if ( title.endsWith( "..." )){
+			
+			return( UrlUtils.encode( title ));
+		}
+		
+		int	baggage = (dl_link==null?0:UrlUtils.encode(dl_link).length()) + (cdp_link==null?0:UrlUtils.encode(cdp_link).length());
+		
+		int MAX_TITLE = 240 - (3*baggage)/5;	// 100->180, 200->120 ...
+		
+		MAX_TITLE = Math.min( Math.max( MAX_TITLE, 80 ), 180 );
 		
 		boolean	truncated = false;
 		
@@ -2160,6 +2169,7 @@ RSSToChat
 	private String
 	buildMagnetHead(
 		String		dl_link,
+		String		cdp_link,
 		String		hash,
 		String		title )
 	{
@@ -2173,7 +2183,7 @@ RSSToChat
 		
 			magnet = 
 				"magnet:?xt=urn:btih:" + hash + 
-				"&dn=" + encodeTitle( title ) + 
+				"&dn=" + encodeTitle( title, dl_link, cdp_link ) + 
 				(dl_link==null?"":("&fl=" + UrlUtils.encode( dl_link )));
 		}
 		
@@ -2192,14 +2202,14 @@ RSSToChat
 		long		leechers )
 		
 	{
-		final int MAX_CDP_LINK	= 100;
+		final int MAX_CDP_LINK	= 140;
 		
 		int	length_rem = MAX_MESSAGE_SIZE;
 		
 		String lc_magnet = magnet.toLowerCase( Locale.US );
 		
 		if ( !lc_magnet.contains( "&dn=" )){	
-			magnet += "&dn=" + encodeTitle( title );
+			magnet += "&dn=" + encodeTitle( title, dl_link, cdp_link );
 		}
 		
 		if ( size != -1 ){
@@ -2238,7 +2248,9 @@ RSSToChat
 		
 		length_rem -= magnet.length();
 		
-		String tail = "[[$dn]]";
+		final String tail_min = "[[$dn]]";
+		
+		String tail = tail_min;
 		
 		String info = "";
 		
@@ -2264,6 +2276,10 @@ RSSToChat
 		if ( tail.length() < length_rem ){
 			
 			magnet += tail;
+			
+		}else{
+			
+			magnet += tail_min;
 		}
 		
 		return( magnet );
