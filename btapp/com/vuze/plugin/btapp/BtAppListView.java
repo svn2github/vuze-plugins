@@ -23,7 +23,7 @@ import org.gudy.azureus2.ui.swt.plugins.UISWTView;
 import org.gudy.azureus2.ui.swt.plugins.UISWTViewEvent;
 import org.gudy.azureus2.ui.swt.plugins.UISWTViewEventListener;
 import org.gudy.azureus2.ui.swt.views.table.TableViewSWT;
-import org.gudy.azureus2.ui.swt.views.table.impl.TableViewSWTImpl;
+import org.gudy.azureus2.ui.swt.views.table.impl.TableViewFactory;
 
 import com.aelitis.azureus.ui.common.table.TableColumnCore;
 import com.aelitis.azureus.ui.common.table.TableLifeCycleListener;
@@ -242,8 +242,8 @@ public class BtAppListView
 		Utils.execSWTThread(new Runnable() {
 			public void run() {
 
-				tv = new TableViewSWTImpl<BtAppDataSource>(BtAppDataSource.class,
-						TABLE_ID, TABLE_ID, "name");
+				tv = TableViewFactory.createTableViewSWT(BtAppDataSource.class,
+						TABLE_ID, TABLE_ID, null, "name", 0);
 				tv.setRowDefaultHeight(80);
 				tv.setHeaderVisible(true);
 

@@ -22,6 +22,7 @@
 
 package com.aelitis.azureus.plugins.jpc.cache.impl;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.*;
 
@@ -123,7 +124,12 @@ public class JPCCacheMultiplexerHelper {
   public void receivedRequest( byte[] hash, int piece_index, int start_offset, int length ) {
     requests.add( new PieceRequest( hash, piece_index, start_offset, length ) );
     Message request = BTMessageManager.createCoreBTRequest( piece_index, start_offset, length );
-    peer.getConnection().getIncomingMessageQueue().notifyOfExternalReceive( request );
+    try {
+			peer.getConnection().getIncomingMessageQueue().notifyOfExternalReceive( request );
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
   }
   
   

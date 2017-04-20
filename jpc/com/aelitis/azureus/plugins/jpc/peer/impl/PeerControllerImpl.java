@@ -23,6 +23,7 @@
 package com.aelitis.azureus.plugins.jpc.peer.impl;
 
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.*;
@@ -294,7 +295,12 @@ public class PeerControllerImpl implements PeerController {
         }
 
         Message piece = BTMessageManager.createCoreBTPiece( piece_index, start_offset, data );
-        peer.getConnection().getIncomingMessageQueue().notifyOfExternalReceive( piece );
+        try {
+					peer.getConnection().getIncomingMessageQueue().notifyOfExternalReceive( piece );
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
       }
 
       public void receivedBye( String reason ) {
