@@ -6613,8 +6613,24 @@ XMWebUIPlugin
 			if (relative) {
 				return -l;
 			}
-			// XXX THIS IS STUPID!  Time on this machine won't be the same as the client..
+			
 			return (SystemTime.getCurrentTime() / 1000) - l;
+		}
+
+		DownloadManagerState downloadState = download.getDownloadState();
+		long timestamp = downloadState.getLongParameter(DownloadManagerState.PARAM_DOWNLOAD_LAST_ACTIVE_TIME);
+		if (timestamp != 0) {
+			return timestamp / 1000;
+		}
+
+		timestamp = downloadState.getLongParameter(DownloadManagerState.PARAM_DOWNLOAD_COMPLETED_TIME);
+		if (timestamp != 0) {
+			return timestamp / 1000;
+		}
+
+		timestamp = downloadState.getLongParameter(DownloadManagerState.PARAM_DOWNLOAD_ADDED_TIME);
+		if (timestamp != 0) {
+			return timestamp / 1000;
 		}
 		
 		return 0;
