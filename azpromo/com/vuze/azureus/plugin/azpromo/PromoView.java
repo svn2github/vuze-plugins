@@ -23,6 +23,7 @@ package com.vuze.azureus.plugin.azpromo;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
@@ -87,7 +88,7 @@ public class PromoView
 	public boolean eventOccurred(UISWTViewEvent event) {
 		switch (event.getType()) {
 			case UISWTViewEvent.TYPE_CREATE:
-				plugin.viewAdded( this );
+				plugin.addViewInViews( this );
 				break;
 
 			case UISWTViewEvent.TYPE_INITIALIZE:
@@ -99,7 +100,7 @@ public class PromoView
 				break;
 
 			case UISWTViewEvent.TYPE_DESTROY:
-				plugin.viewRemoved( this );
+				plugin.removeViewInViews( this );
 				break;
 
 			case UISWTViewEvent.TYPE_DATASOURCE_CHANGED:
@@ -254,8 +255,8 @@ public class PromoView
 				}
 			});
 		}
-		
-		
+
+
 		adBrowser = new Browser(ourParent, SWT.NO_SCROLL);
 		adBrowser.addOpenWindowListener(new OpenWindowListener() {
 			public void open(WindowEvent event) {
@@ -328,14 +329,14 @@ public class PromoView
 			
 			flipTest(0);
 		}
-		
+
 		 showEvery = mapJSON == null ? 1000 * 60 * 15
 				: MapUtils.getMapInt(mapJSON, "show-every-ms", 1000 * 60 * 5);
-		
+
 		if (timeEvent_inHouse != null) {
 			timeEvent_inHouse.cancel();
 		}
-		
+
 		timeEvent_inHouse = SimpleTimer.addEvent("pv", SystemTime.getOffsetTime(showEvery),
 				new TimerEventPerformer() {
 		
@@ -378,21 +379,33 @@ public class PromoView
 					return;
 				}
 
-				if (adBrowser == null || adBrowser.isDisposed()) {
+				boolean popupOnShowEvery = MapUtils.getMapBoolean(mapJSON, "popup-on-show-every", false);
+				if (popupOnShowEvery) {
+					addViewIfNotPresent();
+				} else if (adBrowser == null || adBrowser.isDisposed()) {
 					return;
 				}
-
-				setInHouse(true);
+				if (adBrowser != null && ! adBrowser.isDisposed()) {
+					setInHouse(true);
+				}
 			}
 		});
+	}
+
+	private void addViewIfNotPresent() {
+		List<PromoView> views = plugin.getViews();
+		boolean isPromoViewAlreadyShown = views.contains(this);
+		if (! isPromoViewAlreadyShown) {
+			plugin.getSWTInstance().addView(UISWTInstance.VIEW_SIDEBAR_AREA, PromoPlugin.VIEWID, PromoView.class, null);
+			plugin.addViewInViews(this);
+		}
 	}
 
 	protected void temporaryClose() {
 		if (view == null) {
 			return;
 		}
-		view.closeView();
-		PromoPlugin.logEvent("clickx");
+
 		UISWTInstance swtInstance = plugin.getSWTInstance();
 		if (swtInstance == null) {
 			return;
@@ -409,6 +422,13 @@ public class PromoView
 
 			MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
 			mdi.showEntryByID(MultipleDocumentInterface.SIDEBAR_SECTION_PLUS);
+		} else {
+			boolean canCloseOnX = MapUtils.getMapBoolean(mapJSON, "can-close-on-x", false);
+			if (canCloseOnX) {
+				PromoPlugin.logEvent("clickx");
+				swtInstance.removeViews( UISWTInstance.VIEW_SIDEBAR_AREA, PromoPlugin.VIEWID );
+				plugin.removeViewInViews(this);
+			}
 		}
 	}
 
@@ -428,7 +448,7 @@ public class PromoView
 			showingInHouse = on;
 		}
 		adBrowser.setText("");
-		String html = showingInHouse ? MapUtils.getMapString(mapJSON, "html", DEFAULT_INHOUSE_HTML) : DEFAULT_INHOUSE_HTML;  
+		String html = showingInHouse ? MapUtils.getMapString(mapJSON, "html", DEFAULT_INHOUSE_HTML) : DEFAULT_INHOUSE_HTML;
 		adBrowser.setText(html);
 	}
 	

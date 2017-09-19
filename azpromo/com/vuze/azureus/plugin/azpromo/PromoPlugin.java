@@ -59,17 +59,16 @@ import com.aelitis.azureus.util.FeatureUtils;
 /**
  * @created Sep 29, 2014
  */
-public class PromoPlugin
-	implements UnloadablePlugin
+public class PromoPlugin implements UnloadablePlugin
 {
 
-	private static final String VIEWID = "SidebarPromo";
+	protected static final String VIEWID = "SidebarPromo";
 
 	private static PromoPlugin		pluginInstance;
 	
 	private Object					viewLock	= new Object();
 	private UISWTInstance 			swtInstance;
-	private boolean					viewAdded;
+	private boolean didAddViewInSidebar;
 	
 	private List<PromoView>			views	= new ArrayList<PromoView>();
 	
@@ -169,45 +168,7 @@ public class PromoPlugin
 
 		configModel = uiManager.createBasicPluginConfigModel("ConfigView.Section."
 				+ VIEWID);
-		BooleanParameter paramEnabled = configModel.addBooleanParameter2("enabled",
-				VIEWID + ".enabled", true);
-		paramEnabled.addConfigParameterListener(new ConfigParameterListener() {
-			public void configParameterChanged(ConfigParameter param) {
-				UIInstance[] uiInstances = pluginInterface.getUIManager().getUIInstances();
-				for (UIInstance uiInstance : uiInstances) {
-					if (uiInstance instanceof UISWTInstance) {
-						swtInstance = (UISWTInstance) uiInstance;
-						break;
-					}
-				}
-				if (swtInstance != null) {
-					boolean enabled = pluginInterface.getPluginconfig().getPluginBooleanParameter(
-							"enabled");
-					
-					synchronized( viewLock ){
-						
-						if ( enabled ){
-							
-							if ( !viewAdded ){
-								
-								swtInstance.addView(UISWTInstance.VIEW_SIDEBAR_AREA, VIEWID, PromoView.class, null);
-								
-								viewAdded = true;
-							}
-						}else{
-							if ( viewAdded ){
-								
-								swtInstance.removeViews( UISWTInstance.VIEW_SIDEBAR_AREA, VIEWID );
-	
-								viewAdded = false;
-								
-								PromoPlugin.logEvent("goaway");
-							}
-						}
-					}
-				}
-			}
-		});
+//		createEnableDisablePluginEntryInPreferencesMenu(uiManager);
 
 		// Get notified when the UI is attached
 		pluginInterface.getUIManager().addUIListener(new UIManagerListener() {
@@ -223,11 +184,11 @@ public class PromoPlugin
 						
 						synchronized( viewLock ){
 							
-							if ( !viewAdded ){
+							if ( !didAddViewInSidebar){
 						
 								swtInstance.addView(UISWTInstance.VIEW_SIDEBAR_AREA, VIEWID, PromoView.class, null);
 								
-								viewAdded = true;
+								didAddViewInSidebar = true;
 							}
 						}
 					}
@@ -275,6 +236,49 @@ public class PromoPlugin
 		});
 	}
 
+	private void createEnableDisablePluginEntryInPreferencesMenu(UIManager uiManager) {
+
+		BooleanParameter paramEnabled = configModel.addBooleanParameter2("enabled",
+				VIEWID + ".enabled", true);
+		paramEnabled.addConfigParameterListener(new ConfigParameterListener() {
+			public void configParameterChanged(ConfigParameter param) {
+				UIInstance[] uiInstances = pluginInterface.getUIManager().getUIInstances();
+				for (UIInstance uiInstance : uiInstances) {
+					if (uiInstance instanceof UISWTInstance) {
+						swtInstance = (UISWTInstance) uiInstance;
+						break;
+					}
+				}
+				if (swtInstance != null) {
+					boolean enabled = pluginInterface.getPluginconfig().getPluginBooleanParameter(
+							"enabled");
+
+					synchronized( viewLock ){
+
+						if ( enabled ){
+
+							if ( !didAddViewInSidebar){
+
+								swtInstance.addView(UISWTInstance.VIEW_SIDEBAR_AREA, VIEWID, PromoView.class, null);
+
+								didAddViewInSidebar = true;
+							}
+						}else{
+							if (didAddViewInSidebar){
+
+								swtInstance.removeViews( UISWTInstance.VIEW_SIDEBAR_AREA, VIEWID );
+
+								didAddViewInSidebar = false;
+
+								PromoPlugin.logEvent("goaway");
+							}
+						}
+					}
+				}
+			}
+		});
+	}
+
 	protected void checkLicence() {
 		boolean hasLicence = FeatureUtils.hasPlusLicence() || FeatureUtils.hasNoAdLicence();
 
@@ -297,11 +301,11 @@ public class PromoPlugin
 			
 			synchronized( viewLock ){
 				
-				if ( viewAdded ){
+				if (didAddViewInSidebar){
 			
 					swtInstance.removeViews(UISWTInstance.VIEW_SIDEBAR_AREA, VIEWID);
 					
-					viewAdded = false;
+					didAddViewInSidebar = false;
 				}
 			}
 			
@@ -508,17 +512,17 @@ public class PromoPlugin
 	}
 	
 	protected void
-	viewAdded(
+	addViewInViews(
 		PromoView		view )
 	{
 		synchronized( views ){
-			
+
 			views.add( view );
 		}
 	}
 	
 	protected void
-	viewRemoved(
+	removeViewInViews(
 		PromoView		view )
 	{
 		synchronized( views ){
@@ -536,6 +540,10 @@ public class PromoPlugin
 	getPlugin()
 	{
 		return( pluginInstance );
+	}
+
+	protected List<PromoView> getViews(){
+		return new ArrayList<>(views);
 	}
 
 }
