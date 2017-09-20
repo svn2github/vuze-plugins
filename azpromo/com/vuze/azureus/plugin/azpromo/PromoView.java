@@ -427,12 +427,12 @@ public class PromoView
 			MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
 			mdi.showEntryByID(MultipleDocumentInterface.SIDEBAR_SECTION_PLUS);
 		} else {
+			PromoPlugin.logEvent("clickNotNow");
+
 			boolean canCloseOnX = MapUtils.getMapBoolean(mapJSON, "can-close-on-x", false);
 			if (canCloseOnX) {
-				PromoPlugin.logEvent("clickNotNow");
-
-				swtInstance.removeViews( UISWTInstance.VIEW_SIDEBAR_AREA, PromoPlugin.VIEWID );
-				plugin.removeViewInViews(this);
+					swtInstance.removeViews( UISWTInstance.VIEW_SIDEBAR_AREA, PromoPlugin.VIEWID );
+					plugin.removeViewInViews(this);
 			}
 		}
 	}
