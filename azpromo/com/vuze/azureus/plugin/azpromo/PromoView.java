@@ -64,7 +64,7 @@ import com.aelitis.azureus.util.MapUtils;
 public class PromoView
 	implements UISWTViewEventListener
 {
-	private static final String URL_JSON = "http://client.vuze.com/donation/sidebar_promo.php";
+	private static final String URL_JSON = "http://client.vuze.com/donation/sidebar_promo.php?ver=2.4";
 
 	private static final String DEFAULT_INHOUSE_HTML = "<html><body style=\"overflow:hidden; margin:100px 10px;\"><p>Please <a target=\"_BLANK\" href=\"http://www.vuze.com/donation/donate.php?sourceRef=sidebarpromo\">Donate</a></BODY></html>";
 
@@ -406,6 +406,8 @@ public class PromoView
 			return;
 		}
 
+		PromoPlugin.logEvent("clickx");
+
 		UISWTInstance swtInstance = plugin.getSWTInstance();
 		if (swtInstance == null) {
 			return;
@@ -418,6 +420,8 @@ public class PromoView
 		}, 1);
 
 		if (result == 1) {
+			PromoPlugin.logEvent("clickUpgrade");
+
 			SBC_PlusFTUX.setSourceRef("dlg-promo");
 
 			MultipleDocumentInterface mdi = UIFunctionsManager.getUIFunctions().getMDI();
@@ -425,7 +429,8 @@ public class PromoView
 		} else {
 			boolean canCloseOnX = MapUtils.getMapBoolean(mapJSON, "can-close-on-x", false);
 			if (canCloseOnX) {
-				PromoPlugin.logEvent("clickx");
+				PromoPlugin.logEvent("clickNotNow");
+
 				swtInstance.removeViews( UISWTInstance.VIEW_SIDEBAR_AREA, PromoPlugin.VIEWID );
 				plugin.removeViewInViews(this);
 			}
