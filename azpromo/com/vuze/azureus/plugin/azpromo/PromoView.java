@@ -23,8 +23,8 @@ package com.vuze.azureus.plugin.azpromo;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
@@ -64,7 +64,7 @@ import com.aelitis.azureus.util.MapUtils;
 public class PromoView
 	implements UISWTViewEventListener
 {
-	private static final String URL_JSON = "http://client.vuze.com/donation/sidebar_promo.php?ver=2.4";
+	private static final String URL_JSON = "http://client.vuze.com/donation/sidebar_promo.php?ver=2.5";
 
 	private static final String DEFAULT_INHOUSE_HTML = "<html><body style=\"overflow:hidden; margin:100px 10px;\"><p>Please <a target=\"_BLANK\" href=\"http://www.vuze.com/donation/donate.php?sourceRef=sidebarpromo\">Donate</a></BODY></html>";
 
@@ -78,7 +78,9 @@ public class PromoView
 
 	private Map mapJSON;
 
-	private TimerEvent timeEvent_inHouse;
+	private static TimerEvent timeEvent_inHouse;
+
+	private static Map<String, Map.Entry<Date, String>> urlToLastResult = new HashMap<>();
 
 	public PromoView() {
 		plugin	= PromoPlugin.getPlugin();
@@ -121,21 +123,7 @@ public class PromoView
 	private void initialize(Composite parent, final UISWTView view) {
 
 		this.view = view;
-		try {
-			PluginConfig config = plugin.getPluginInterface().getPluginconfig();
-			if (!config.getPluginBooleanParameter("resized.once")) {
-				config.setPluginParameter("resized.once", true);
-				boolean visible = SideBar.instance.isVisible();
-				if (visible) {
-					final SWTSkinObjectSash soSash = (SWTSkinObjectSash) SideBar.instance.getSkin().getSkinObject(
-							"sidebar-sash");
-					if (soSash != null && soSash.getAboveSize() < 300) {
-						soSash.setAboveSize(300);
-					}
-				}
-			}
-		} catch (Throwable t) {
-		}
+		configureInitialPluginSize();
 
 		final Composite ourParent = parent;
 
@@ -147,23 +135,134 @@ public class PromoView
 		fd.left = null;
 		fd.right.offset = -3;
 
-		final Label lblClose = new Label(ourParent, SWT.NONE);
-		lblClose.setText("x");
-		lblClose.setCursor(lblClose.getDisplay().getSystemCursor(SWT.CURSOR_HAND));
-		lblClose.setLayoutData(fd);
-		lblClose.addMouseListener(new MouseListener() {
+		final Label lblClose = createCloseLabel(ourParent, fd);
 
-			public void mouseUp(MouseEvent e) {
-				temporaryClose();
-			}
+		final Label lblText = createPlusLabel(ourParent);
 
-			public void mouseDown(MouseEvent e) {
-			}
+		configureLogger();
 
-			public void mouseDoubleClick(MouseEvent e) {
+		Browser theirBrowser = findBrowser( ourParent );
+		listenOnLocationChangeFor(theirBrowser);
+
+
+		adBrowser = new Browser(ourParent, SWT.NO_SCROLL);
+		listenBrowserOnWindowOpenFor(ourParent);
+
+		fd = Utils.getFilledFormData();
+		fd.height = 254;
+		fd.top = new FormAttachment(lblClose, 2);
+		adBrowser.setLayoutData(fd);
+
+		fd = Utils.getFilledFormData();
+		fd.bottom = new FormAttachment(adBrowser, -1);
+		fd.top = null;
+		fd.right = null;
+		fd.left.offset = 3;
+		lblText.setLayoutData(fd);
+
+		ourParent.getShell().layout(true, true);
+
+		plugin.getPluginInterface().getUtilities().createThread("pv",
+				new Runnable() {
+					public void run() {
+						loadInHouse();
+					}
+				});
+
+	}
+
+	private void listenBrowserOnWindowOpenFor(Composite ourParent) {
+		adBrowser.addOpenWindowListener(new OpenWindowListener() {
+			public void open(WindowEvent event) {
+				final BrowserWrapper subBrowser = Utils.createSafeBrowser(ourParent,
+						Utils.getInitialBrowserStyle(SWT.NONE));
+				subBrowser.addLocationListener(new LocationListener() {
+					public void changed(LocationEvent arg0) {
+					}
+
+					public void changing(LocationEvent event) {
+						if (event.location == null || !event.location.startsWith("http")) {
+							return;
+						}
+						event.doit = false;
+						Utils.launch(event.location);
+
+						Utils.execSWTThreadLater(1000, new AERunnable() {
+							public void runSupport() {
+								subBrowser.dispose();
+							}
+						});
+					}
+				});
+				subBrowser.setBrowser(event);
 			}
 		});
+	}
 
+	private void listenOnLocationChangeFor(Browser theirBrowser) {
+		if ( theirBrowser != null ){
+
+			theirBrowser.addLocationListener(new LocationListener() {
+				public void changed(LocationEvent arg0) {
+				}
+
+				public void changing(LocationEvent event) {
+
+					String str = String.valueOf( event );
+
+					if ( str.contains( "://mono.vizu.com" )){
+
+						event.doit = false;
+					}
+
+					if ( Constants.getCurrentVersion().endsWith( "_CVS" )){
+
+						log( str );
+					}
+				}
+			});
+		}
+	}
+
+	private void configureLogger() {
+		Logger logger = Logger.getLogger( "com.appadx.adcontrol" );
+
+		logger.setUseParentHandlers( false );
+
+		//Logger.getLogger( "com.appadx.adcontrol" ).setLevel(Level.OFF);
+
+		logger.addHandler(
+			new Handler() {
+
+				@Override
+				public void
+				publish( LogRecord record )
+				{
+					String text = new SimpleFormatter().format(record).trim();
+
+					text = text.replace( '\r',  ' ' );
+					text = text.replace( '\n',  ' ' );
+
+					text = text.replaceAll( "  ", " " );
+
+					log( text);
+				}
+
+				@Override
+				public void flush() {
+					// TODO Auto-generated method stub
+
+				}
+
+				@Override
+				public void close() {
+					// TODO Auto-generated method stub
+
+				}
+			});
+	}
+
+	private Label createPlusLabel(Composite ourParent) {
 		final Label lblText = new Label(ourParent, SWT.NONE);
 		lblText.setText("Plus Users Don't See Ads");
 		lblText.setFont(FontUtils.getFontWithHeight(lblText.getFont(), null, 9));
@@ -193,134 +292,61 @@ public class PromoView
 			public void mouseDoubleClick(MouseEvent e) {
 			}
 		});
+		return lblText;
+	}
 
-		
-		Logger logger = Logger.getLogger( "com.appadx.adcontrol" );
-		
-		logger.setUseParentHandlers( false );
-		
-		//Logger.getLogger( "com.appadx.adcontrol" ).setLevel(Level.OFF);
-		
-		logger.addHandler(
-			new Handler() {
-				
-				@Override
-				public void 
-				publish( LogRecord record ) 
-				{
-					String text = new SimpleFormatter().format(record).trim();
-					
-					text = text.replace( '\r',  ' ' );
-					text = text.replace( '\n',  ' ' );
-					
-					text = text.replaceAll( "  ", " " );
-					
-					log( text);
-				}
-				
-				@Override
-				public void flush() {
-					// TODO Auto-generated method stub
-					
-				}
-				
-				@Override
-				public void close() {
-					// TODO Auto-generated method stub
-					
-				}
-			});
+	private Label createCloseLabel(Composite ourParent, FormData fd) {
+		final Label lblClose = new Label(ourParent, SWT.NONE);
+		lblClose.setText("x");
+		lblClose.setCursor(lblClose.getDisplay().getSystemCursor(SWT.CURSOR_HAND));
+		lblClose.setLayoutData(fd);
+		lblClose.addMouseListener(new MouseListener() {
 
-		Browser theirBrowser = findBrowser( ourParent );
-		
-		if ( theirBrowser != null ){
-							
-			theirBrowser.addLocationListener(new LocationListener() {
-				public void changed(LocationEvent arg0) {
-				}
+			public void mouseUp(MouseEvent e) {
+				temporaryClose();
+			}
 
-				public void changing(LocationEvent event) {
-					
-					String str = String.valueOf( event );
-					
-					if ( str.contains( "://mono.vizu.com" )){
-						
-						event.doit = false;
-					}
-					
-					if ( Constants.getCurrentVersion().endsWith( "_CVS" )){
-						
-						log( str );
-					}
-				}
-			});
-		}
+			public void mouseDown(MouseEvent e) {
+			}
 
-
-		adBrowser = new Browser(ourParent, SWT.NO_SCROLL);
-		adBrowser.addOpenWindowListener(new OpenWindowListener() {
-			public void open(WindowEvent event) {
-				final BrowserWrapper subBrowser = Utils.createSafeBrowser(ourParent,
-						Utils.getInitialBrowserStyle(SWT.NONE));
-				subBrowser.addLocationListener(new LocationListener() {
-					public void changed(LocationEvent arg0) {
-					}
-
-					public void changing(LocationEvent event) {
-						if (event.location == null || !event.location.startsWith("http")) {
-							return;
-						}
-						event.doit = false;
-						Utils.launch(event.location);
-
-						Utils.execSWTThreadLater(1000, new AERunnable() {
-							public void runSupport() {
-								subBrowser.dispose();
-							}
-						});
-					}
-				});
-				subBrowser.setBrowser(event);
+			public void mouseDoubleClick(MouseEvent e) {
 			}
 		});
-		fd = Utils.getFilledFormData();
-		fd.height = 254;
-		fd.top = new FormAttachment(lblClose, 2);
-		adBrowser.setLayoutData(fd);
+		return lblClose;
+	}
 
-		fd = Utils.getFilledFormData();
-		fd.bottom = new FormAttachment(adBrowser, -1);
-		fd.top = null;
-		fd.right = null;
-		fd.left.offset = 3;
-		lblText.setLayoutData(fd);
-
-		ourParent.getShell().layout(true, true);
-
-		plugin.getPluginInterface().getUtilities().createThread("pv",
-				new Runnable() {
-					public void run() {
-						loadInHouse();
+	private void configureInitialPluginSize() {
+		try {
+			PluginConfig config = plugin.getPluginInterface().getPluginconfig();
+			if (!config.getPluginBooleanParameter("resized.once")) {
+				config.setPluginParameter("resized.once", true);
+				boolean visible = SideBar.instance.isVisible();
+				if (visible) {
+					final SWTSkinObjectSash soSash = (SWTSkinObjectSash) SideBar.instance.getSkin().getSkinObject(
+							"sidebar-sash");
+					if (soSash != null && soSash.getAboveSize() < 300) {
+						soSash.setAboveSize(300);
 					}
-				});
-
+				}
+			}
+		} catch (Throwable t) {
+		}
 	}
 
 	protected void loadInHouse() {
 		if (plugin.getPluginInterface() == null) {
 			return;
 		}
-		boolean first = mapJSON == null;
-		
-		int showEvery = 1000 * 60 * 15;
-				
-		String json = readStringFromUrl(URL_JSON).trim();
+
+		String json = readStringFromUrlOrCache(URL_JSON).trim();
 
 		log("Inhouse load");
 	
 		mapJSON = JSONUtils.decodeJSON(json);
 
-		if (first){
+		boolean isFirstShowKeyPresent = mapJSON == null;
+
+		if (isFirstShowKeyPresent){
 			
 			int firstShowInMS = MapUtils.getMapInt(mapJSON, "first-show-ms", 0);
 			flipTest(firstShowInMS);
@@ -330,7 +356,7 @@ public class PromoView
 			flipTest(0);
 		}
 
-		 showEvery = mapJSON == null ? 1000 * 60 * 15
+		int showEvery = isFirstShowKeyPresent ? 1000 * 60 * 15
 				: MapUtils.getMapInt(mapJSON, "show-every-ms", 1000 * 60 * 5);
 
 		if (timeEvent_inHouse != null) {
@@ -339,7 +365,7 @@ public class PromoView
 
 		timeEvent_inHouse = SimpleTimer.addEvent("pv", SystemTime.getOffsetTime(showEvery),
 				new TimerEventPerformer() {
-		
+
 			public void perform(TimerEvent event) {
 				loadInHouse();
 			}
@@ -381,7 +407,7 @@ public class PromoView
 
 				boolean popupOnShowEvery = MapUtils.getMapBoolean(mapJSON, "popup-on-show-every", false);
 				if (popupOnShowEvery) {
-					addViewIfNotPresent();
+					plugin.addViewInSidebar();
 				} else if (adBrowser == null || adBrowser.isDisposed()) {
 					return;
 				}
@@ -390,15 +416,6 @@ public class PromoView
 				}
 			}
 		});
-	}
-
-	private void addViewIfNotPresent() {
-		List<PromoView> views = plugin.getViews();
-		boolean isPromoViewAlreadyShown = views.contains(this);
-		if (! isPromoViewAlreadyShown) {
-			plugin.getSWTInstance().addView(UISWTInstance.VIEW_SIDEBAR_AREA, PromoPlugin.VIEWID, PromoView.class, null);
-			plugin.addViewInViews(this);
-		}
 	}
 
 	protected void temporaryClose() {
@@ -431,8 +448,13 @@ public class PromoView
 
 			boolean canCloseOnX = MapUtils.getMapBoolean(mapJSON, "can-close-on-x", false);
 			if (canCloseOnX) {
-					swtInstance.removeViews( UISWTInstance.VIEW_SIDEBAR_AREA, PromoPlugin.VIEWID );
-					plugin.removeViewInViews(this);
+				plugin.removeViewInSidebar();
+				boolean popupOnShowEvery = MapUtils.getMapBoolean(mapJSON, "popup-on-show-every", false);
+				if (!popupOnShowEvery) {
+					if( timeEvent_inHouse != null ) {
+						timeEvent_inHouse.cancel();
+					}
+				}
 			}
 		}
 	}
@@ -473,29 +495,39 @@ public class PromoView
 			});
 	}
 
-	public static String readStringFromUrl(String url) {
-		StringBuffer sb = new StringBuffer();
-		try {
-			URL _url = new URL(url);
-			HttpURLConnection con = (HttpURLConnection) _url.openConnection();
 
-			con.setConnectTimeout(30000);
-			con.setReadTimeout(30000);
-			InputStream is = con.getInputStream();
+	public String readStringFromUrlOrCache(String url) {
+		Map.Entry<Date, String> lastResult = urlToLastResult.get(url);
+		Date currentTime = new Date();
+		if (lastResult != null && (TimeUnit.MILLISECONDS.toSeconds(currentTime.getTime() - lastResult.getKey().getTime()))<10) {
+			return lastResult.getValue();
+		} else {
 
-			byte[] buffer = new byte[256];
+			StringBuffer sb = new StringBuffer();
+			try {
+				URL _url = new URL(url);
+				HttpURLConnection con = (HttpURLConnection) _url.openConnection();
 
-			int read = 0;
+				con.setConnectTimeout(30000);
+				con.setReadTimeout(30000);
+				InputStream is = con.getInputStream();
 
-			while ((read = is.read(buffer)) != -1) {
-				sb.append(new String(buffer, 0, read));
+				byte[] buffer = new byte[256];
+
+				int read = 0;
+
+				while ((read = is.read(buffer)) != -1) {
+					sb.append(new String(buffer, 0, read));
+				}
+				con.disconnect();
+
+			} catch (Throwable e) {
+				//e.printStackTrace();
 			}
-			con.disconnect();
 
-		} catch (Throwable e) {
-			//e.printStackTrace();
+			urlToLastResult.put(url, new AbstractMap.SimpleEntry<Date, String>(new Date(), sb.toString()));
+			return sb.toString();
 		}
-		return sb.toString();
 	}
 
 }

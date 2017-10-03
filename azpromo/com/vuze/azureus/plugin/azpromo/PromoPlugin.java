@@ -86,29 +86,6 @@ public class PromoPlugin implements UnloadablePlugin
 		pluginInstance	= this;
 	}
 	
-	public String readStringFromUrl(String url) {
-		StringBuffer sb = new StringBuffer();
-		try {
-			URL _url = new URL(url);
-			HttpURLConnection con = (HttpURLConnection) _url.openConnection();
-
-			InputStream is = con.getInputStream();
-
-			byte[] buffer = new byte[256];
-
-			int read = 0;
-
-			while ((read = is.read(buffer)) != -1) {
-				sb.append(new String(buffer, 0, read));
-			}
-			con.disconnect();
-
-		} catch (Throwable e) {
-
-		}
-		return sb.toString();
-	}
-
 	// @see org.gudy.azureus2.plugins.Plugin#initialize(org.gudy.azureus2.plugins.PluginInterface)
 	public void initialize(final PluginInterface pi) throws PluginException {
 		pluginInterface = pi;
@@ -126,21 +103,21 @@ public class PromoPlugin implements UnloadablePlugin
 		checkDumps();
 		
 		// COConfigurationManager.setParameter( "azpromo.dump.disable.plugin", false );
-		
+
 		if ( COConfigurationManager.getBooleanParameter( "azpromo.dump.disable.plugin", false )){
-			
+
 			PluginConfig pc = pluginInterface.getPluginconfig();
-			
+
 			if ( !pc.getPluginStringParameter( "plugin.info", "" ).equals( "c" )){
-				
+
 				pc.setPluginParameter( "plugin.info", "c" );
-				
+
 				logEvent( "crashed" );
 			}
-			
+
 			return;
 		}
-		
+
 		if ( COConfigurationManager.getBooleanParameter( "Beta Programme Enabled" )){
 		
 				// no ads for beta users unless testing with explicit pubid
@@ -181,16 +158,9 @@ public class PromoPlugin implements UnloadablePlugin
 				if ( enabled ){
 					if (instance instanceof UISWTInstance && !unloaded ) {
 						swtInstance = ((UISWTInstance) instance);
-						
-						synchronized( viewLock ){
-							
-							if ( !didAddViewInSidebar){
-						
-								swtInstance.addView(UISWTInstance.VIEW_SIDEBAR_AREA, VIEWID, PromoView.class, null);
-								
-								didAddViewInSidebar = true;
-							}
-						}
+
+						addViewInSidebar();
+
 					}
 				}
 			}
@@ -257,26 +227,40 @@ public class PromoPlugin implements UnloadablePlugin
 
 						if ( enabled ){
 
-							if ( !didAddViewInSidebar){
-
-								swtInstance.addView(UISWTInstance.VIEW_SIDEBAR_AREA, VIEWID, PromoView.class, null);
-
-								didAddViewInSidebar = true;
-							}
+							addViewInSidebar();
 						}else{
-							if (didAddViewInSidebar){
-
-								swtInstance.removeViews( UISWTInstance.VIEW_SIDEBAR_AREA, VIEWID );
-
-								didAddViewInSidebar = false;
-
-								PromoPlugin.logEvent("goaway");
-							}
+							removeViewInSidebar();
 						}
 					}
 				}
 			}
 		});
+	}
+
+	protected void addViewInSidebar() {
+		synchronized (viewLock) {
+
+			if (!didAddViewInSidebar) {
+
+				swtInstance.addView(UISWTInstance.VIEW_SIDEBAR_AREA, VIEWID, PromoView.class, null);
+
+				didAddViewInSidebar = true;
+			}
+		}
+	}
+
+	protected void removeViewInSidebar() {
+		synchronized (viewLock) {
+
+			if (didAddViewInSidebar) {
+
+				swtInstance.removeViews(UISWTInstance.VIEW_SIDEBAR_AREA, VIEWID);
+
+				didAddViewInSidebar = false;
+
+				PromoPlugin.logEvent("goaway");
+			}
+		}
 	}
 
 	protected void checkLicence() {
@@ -540,10 +524,6 @@ public class PromoPlugin implements UnloadablePlugin
 	getPlugin()
 	{
 		return( pluginInstance );
-	}
-
-	protected List<PromoView> getViews(){
-		return new ArrayList<>(views);
 	}
 
 }
